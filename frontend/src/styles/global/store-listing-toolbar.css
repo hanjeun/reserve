@@ -29,6 +29,25 @@
 .reserve-reservation-filters { width: 100%; }
 .reserve-reservation-store-filter { max-width: min(180px, 34vw); }
 
+.reserve-listing-heading { margin-bottom: 24px; }
+.reserve-listing-content { min-width: 0; }
+.reserve-listing-content__notice { margin-bottom: 16px; }
+.reserve-listing-content__notice:empty { display: none; }
+.reserve-listing-content__notice > * + * { margin-top: 16px; }
+/* 내 예약의 결과 여백 100px에는 툴바의 아래 16px도 포함된다.
+   안내 문구와 갱신 오류는 그 안에 배치하고, 길면 필요한 만큼만 늘린다. */
+.reserve-listing-content:has(> .reserve-listing-content__results > .reserve-data-state:not(.reserve-data-state--compact)) > .reserve-listing-content__notice {
+    display: block;
+    box-sizing: border-box;
+    min-height: calc(100px - 16px);
+    margin-bottom: 0;
+    padding-bottom: 16px;
+}
+.reserve-listing-content__results > .reserve-data-state:not(.reserve-data-state--compact) {
+    justify-content: flex-start;
+}
+.reserve-listing-pagination { margin-top: 16px; }
+
 /* 관리자·사업자 목록도 탐색/예약과 같은 입력 없는 메뉴형 툴바를 쓴다. */
 .reserve-filter-toolbar {
     display: flex;
@@ -140,7 +159,6 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
     align-items: start;
     gap: 24px;
-    padding-bottom: 40px;
 }
 .reserve-reservation-card-grid > * { min-width: 0; }
 .reserve-reservation-summary-card-content {

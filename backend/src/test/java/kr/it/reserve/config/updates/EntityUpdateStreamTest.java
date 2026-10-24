@@ -142,7 +142,7 @@ class EntityUpdateStreamTest {
     @Test
     void delayedOAuthRevocationDisconnectsOnlyTheOriginalFamilyBeforePrivateDelivery() throws Exception {
         MemberRepository members = mock(MemberRepository.class);
-        UpdateStreamAccess liveAccess = new UpdateStreamAccess(members, mock(TokenProvider.class, CALLS_REAL_METHODS));
+        UpdateStreamAccess liveAccess = new UpdateStreamAccess(members, activeDeviceTokens());
         Member member = member(1, Role.USER);
         member.setProvider(AuthProvider.GOOGLE);
         LocalDateTime oldAuthentication = LocalDateTime.of(2026, 10, 16, 8, 0);
@@ -155,8 +155,8 @@ class EntityUpdateStreamTest {
         SseEmitter publicConnection = mock(SseEmitter.class);
         var emitters = List.of(oldConnection, newConnection, publicConnection).iterator();
         EntityUpdateStream liveStream = new EntityUpdateStream(liveAccess, emitters::next);
-        liveStream.subscribe(member, oldAuthentication);
-        liveStream.subscribe(member, newAuthentication);
+        liveStream.subscribe(member, oldAuthentication, "OAUTH", "old-device");
+        liveStream.subscribe(member, newAuthentication, "OAUTH", "new-device");
         liveStream.subscribePublic("127.0.0.1");
         clearInvocations(oldConnection, newConnection, publicConnection);
 
@@ -176,6 +176,34 @@ class EntityUpdateStreamTest {
         verifyNoInteractions(oldConnection);
         verify(newConnection).send(any(SseEmitter.SseEventBuilder.class));
         verify(publicConnection).send(any(SseEmitter.SseEventBuilder.class));
+    }
+
+    @Test
+    void aPasswordConnectionAfterAnOAuthCutoffReceivesPrivateUpdatesUntilItsVersionIsRevoked() throws Exception {
+        MemberRepository members = mock(MemberRepository.class);
+        UpdateStreamAccess liveAccess = new UpdateStreamAccess(members, activeDeviceTokens());
+        Member member = member(1, Role.USER);
+        member.setProvider(AuthProvider.GOOGLE);
+        member.setPassword("enabled-password-hash");
+        member.recordOAuthSecurityRevocation(LocalDateTime.of(2026, 10, 16, 8, 0));
+        when(members.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(member));
+        SseEmitter connection = mock(SseEmitter.class);
+        EntityUpdateStream liveStream = new EntityUpdateStream(liveAccess, () -> connection);
+        liveStream.subscribe(member, null, "PASSWORD", "password-device");
+        clearInvocations(connection);
+
+        liveStream.changed(change(NOTIFICATION, false, Set.of(1L), false));
+        verify(connection).send(any(SseEmitter.SseEventBuilder.class));
+        verify(connection, never()).complete();
+        clearInvocations(connection);
+
+        member.rotateAuthVersion();
+        liveStream.heartbeat();
+        var signal = ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
+        verify(connection).send(signal.capture());
+        assertThat(signal.getValue().build().stream().map(SseEmitter.DataWithMediaType::getData).toList().toString())
+                .contains("session-ended").doesNotContain("heartbeat");
+        verify(connection).complete();
     }
 
     @Test
@@ -207,4 +235,36 @@ class EntityUpdateStreamTest {
     }
 
     static Member member(long id, Role role) { return Member.builder().id(id).role(role).termsAgreed(true).build(); }
+
+    @Test
+    void logoutClosesOnlyTheCapturedDeviceAtTheNextDeliveryCheck() throws Exception {
+        Member member = member(1, Role.USER);
+        member.setProvider(AuthProvider.LOCAL);
+        member.setPassword("synthetic-hash");
+        var fixture = new kr.it.reserve.config.JwtSessionFixture(member);
+        var first = fixture.issue(null);
+        var second = fixture.issue(null);
+        var guarded = new UpdateStreamAccess(fixture.members, fixture.tokens);
+        SseEmitter one = mock(SseEmitter.class), two = mock(SseEmitter.class);
+        var emitters = List.of(one, two).iterator();
+        var live = new EntityUpdateStream(guarded, emitters::next);
+        live.subscribe(member, null, "PASSWORD", fixture.tokens.getSessionId(first.accessToken()));
+        live.subscribe(member, null, "PASSWORD", fixture.tokens.getSessionId(second.accessToken()));
+        clearInvocations(one, two);
+        fixture.service.revoke(first.refreshToken());
+        live.heartbeat();
+        var ended = ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
+        verify(one).send(ended.capture());
+        assertThat(ended.getValue().build().stream().map(SseEmitter.DataWithMediaType::getData).toList().toString())
+                .contains("session-ended").doesNotContain("heartbeat");
+        verify(one).complete();
+        verify(two).send(any(SseEmitter.SseEventBuilder.class));
+        verify(two, never()).complete();
+    }
+
+    private static TokenProvider activeDeviceTokens() {
+        TokenProvider tokens = mock(TokenProvider.class, CALLS_REAL_METHODS);
+        doReturn(true).when(tokens).isDeviceSessionCurrent(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyLong());
+        return tokens;
+    }
 }

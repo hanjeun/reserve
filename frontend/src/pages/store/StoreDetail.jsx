@@ -2,7 +2,7 @@ import { PageTitle } from '../../components/common/PageTypography';
 import PhotoGallery from '../../components/common/PhotoGallery';
 import WaitingJoin from '../../components/waiting/WaitingJoin';
 import { useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import useAuthStore from '../../store/useAuthStore';
 import { Typography, Form, Divider } from 'antd';
 import { StarFilled, MessageOutlined, PhoneOutlined } from '../../components/common/icons';
@@ -24,6 +24,7 @@ import useMessengerStore from '../../store/useMessengerStore';
 import { breakpoints, colors, radius, fontWeight } from '../../styles/tokens';
 
 import { ReservationPanel } from '../../components/reservation/StoreReservationPanel';
+import AdmissionModal from '../../components/reservation/AdmissionModal';
 const { Title } = Typography;
 export { ReservationPanel, TimeSlotPicker } from '../../components/reservation/StoreReservationPanel';
 
@@ -187,6 +188,7 @@ export const StoreDetailMobileLayout = ({ sliderImages, identityProps, panelProp
 
 const StoreDetail = () => {
     const { id } = useParams();
+    const [searchParams] = useSearchParams();
     // /store/abc 처럼 숫자가 아닌 id 는 API 에 보내지 않는다 — 보내면 400 이 와서
     // "요청을 처리할 수 없습니다 · 다시 불러오기" 라는, 다시 눌러도 낫지 않는 오류로 보였다.
     const validId = /^\d+$/.test(id ?? '') && Number.isSafeInteger(Number(id)) && Number(id) > 0;
@@ -194,13 +196,15 @@ const StoreDetail = () => {
     const { message } = useMessage();
     const { isLoggedIn, user } = useAuthStore();
     const { pay, paying } = usePayment();
-    const { store, loading, error, refetch } = useStoreData(validId ? id : null);
+    const { store, loading, error, refetch } = useStoreData(validId ? id : null, { reservationId: searchParams.get('edit') });
     // Public responses supersede the document/browser hint, including photo reorder and missing metadata.
     useEffect(() => {
         if ([401, 403, 404, 410].includes(httpStatusOf(error))) forgetImageHint(id);
         else if (store) rememberImageHints(store);
     }, [store, error, id]);
     const [form] = Form.useForm();
+    const reservationDate = Form.useWatch('reservationDate', form);
+    const reservationTime = Form.useWatch('reservationTime', form);
     const windowWidth = useWindowWidth();
     const isPC = windowWidth >= BREAKPOINT;
     const openStoreMessenger = useMessengerStore((state) => state.openStore);
@@ -232,12 +236,15 @@ const StoreDetail = () => {
         stateOpenReviewId,
         reviewSectionRef,
         onFinish,
+        admissionModalProps,
+        reservationSubmitting,
+        reservationEntry,
         isEditMode,
         editingReservation,
         editLoadError,
         editRetrying,
         retryEditLoad,
-    } = useStoreDetailActions({ id, store, isLoggedIn, user, form, pay, message });
+    } = useStoreDetailActions({ id, store, isLoggedIn, user, form, pay, message, reservationDate, reservationTime });
 
     useDocumentTitle(store?.name ?? null, storeDocumentDescription(store));
 
@@ -268,7 +275,7 @@ const StoreDetail = () => {
     const nearby = isNearby(nearbyUserLocation, store.latitude, store.longitude, store.nearbyRadiusKm ?? undefined);
     const identityProps = { store, nearby, canContact: user?.id !== store.ownerId, onContact: handleStoreContact };
     const panelProps = {
-        store, form, onFinish, paying, isEditMode, editingReservation,
+        store, form, onFinish, paying: paying || reservationSubmitting, reservationEntry, isEditMode, editingReservation,
         editLoadError, editRetrying, onRetryEditLoad: retryEditLoad,
     };
     const reviewProps = {
@@ -284,6 +291,7 @@ const StoreDetail = () => {
 
     return (
         <PageContainer className="reserve-store-detail" size={containerSize} paddingTop={paddingTop}>
+            <AdmissionModal {...admissionModalProps} />
 
             {isPC ? (
                 <StoreDetailPCLayout sliderImages={sliderImages} identityProps={identityProps}

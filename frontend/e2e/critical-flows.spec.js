@@ -84,8 +84,13 @@ async function mockApi(page, authenticatedUser = null) {
             return;
         }
 
+        if (url.pathname === '/api/reservations/my/page') {
+            await ok(route, { content: [], page: { number: 0, size: 15, totalElements: 0, totalPages: 0 } });
+            return;
+        }
         if (url.pathname === '/api/reservations/my') {
-            await ok(route, []);
+            await route.fulfill({ status: 410, json: { success: false,
+                message: '예약 조회 방식이 변경됐어요. 화면을 새로고침한 뒤 다시 시도해주세요.' } });
             return;
         }
 

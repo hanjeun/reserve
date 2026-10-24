@@ -11,6 +11,8 @@ import { VALIDATION_RULES } from '../../utils/validation';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import RollingFieldValue from '../../components/common/RollingFieldValue';
+import ReservationEntryNotice from './ReservationEntryNotice';
+import reservationService from '../../services/reservationService';
 
 const GuestCountInput = ({ value = 1, onChange, disabled = false }) => {
     const dec = () => { if (value > 1) onChange?.(value - 1); };
@@ -108,7 +110,10 @@ const useTimeSlotAvailability = ({ store, dateValue, form, onAvailabilityChange,
         const controller = new AbortController();
         // Loading is derived from the request key; only the form's external validator needs notification.
         onAvailabilityChange?.({ key: requestKey, status: 'loading', slots: [] });
-        api.get(API_ENDPOINTS.RESERVATION.AVAILABILITY, { params: { storeId, date: dateKey }, signal: controller.signal })
+        const lookup = editingReservation?.id != null
+            ? reservationService.getEditAvailability(editingReservation.id, storeId, dateKey, { signal: controller.signal })
+            : api.get(API_ENDPOINTS.RESERVATION.AVAILABILITY, { params: { storeId, date: dateKey }, signal: controller.signal });
+        lookup
             .then((data) => {
                 if (cancelled) return;
                 if (!Array.isArray(data)) throw new Error('Invalid availability results');
@@ -317,9 +322,12 @@ const timeSlotStyles = {
 
 export const ReservationPanel = ({
     store, form, onFinish, paying, isPC, isEditMode, editingReservation,
+    reservationEntry = null,
     editLoadError = null, editRetrying = false, onRetryEditLoad, preview = false,
 }) => {
     const dateValue = Form.useWatch('reservationDate', form);
+    const timeValue = Form.useWatch('reservationTime', form);
+    const entry = reservationEntry?.slot === `${store?.id}:${dateValue?.format('YYYY-MM-DD')}:${formatTime(timeValue)}` ? reservationEntry : null;
     const reservationStore = React.useMemo(() => preview ? { ...store, id: undefined } : store, [preview, store]);
     const timeAvailabilityRef = React.useRef({ key: /** @type {string | null} */ (null), status: 'idle', slots: [] });
     // DAY auto-fill runs in the same effect batch as lookup completion. Validation must see that
@@ -347,7 +355,7 @@ export const ReservationPanel = ({
                             "왜 안 눌리지"를 알 방법이 없었다. 게다가 그 다섯 판정이 서버(isBookableOn)와
                             **프론트에도 따로**(makeDisabledDate) 있어서 언젠가 어긋날 자리였다.
                             이제 사유는 서버가 내려주고 달력은 그리기만 한다. */}
-                        <BookingCalendar storeId={reservationStore?.id} disabled={preview} />
+                        <BookingCalendar storeId={reservationStore?.id} reservationId={editingReservation?.id} disabled={preview} />
                     </Form.Item>
                     {/* 라벨·에러 문구가 예약 방식을 따라간다. DAY 는 시간을 고르는 게 아니라
                         "이 날 예약이 되는지"를 보는 칸이라, "시간을 선택해주세요"가 말이 안 된다. */}
@@ -395,6 +403,7 @@ export const ReservationPanel = ({
                         <FormTextArea rows={3} placeholder="요청 사항을 입력하세요." disabled={preview} />
                     </Form.Item>
                     <div style={{ marginTop: 24 }}>
+                        {entry && <ReservationEntryNotice expiresAt={entry.expiresAt} />}
                         <Button variant="primary" htmlType={preview ? 'button' : 'submit'} block loading={paying} disabled={preview}>
                             {submitLabel}
                         </Button>

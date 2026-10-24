@@ -77,7 +77,7 @@ function DraftTransferSession() {
         </div>
         <PageDescription>가게 등록·수정 중 저장한 내용과 사진을 새 앱 주소로 옮겨요.</PageDescription>
         <p className="reserve-feed-note">기존 주소에서 파일을 내보내고, 새 앱에서 같은 계정으로 로그인해 가져오세요.</p>
-        {legacy && <p><a className="reserve-feed-text-link" href={appUrl('/drafts/transfer')}>새 앱에서 가져오기</a></p>}
+        {legacy && <p><a className="reserve-feed-text-link reserve-text-link" href={appUrl('/drafts/transfer')}>새 앱에서 가져오기</a></p>}
         <div className="reserve-feed-editor-actions"><Button variant="outline" size="sm" onClick={exportSelected} disabled={busy || !selected.length}>선택한 초안 내보내기</Button>
             <Button size="sm" onClick={() => chooser.current?.click()} disabled={busy}>파일 가져오기</Button></div>
         <input ref={chooser} className="reserve-feed-file-input" type="file" accept="application/json,.json" onChange={chooseFile} disabled={busy} aria-label="임시저장 파일 가져오기" />
@@ -92,6 +92,6 @@ function DraftTransferSession() {
             <Checkbox checked={overwrite} onChange={event => setOverwrite(event.target.checked)} disabled={busy}>같은 가게의 기존 초안도 덮어쓰기</Checkbox>
             <div className="reserve-feed-editor-actions"><Button variant="outline" size="sm" onClick={() => setIncoming(null)} disabled={busy}>취소</Button>
                 <Button size="sm" onClick={restore} loading={busy} disabled={!incoming.length}>가져오기</Button></div></div>}
-        {APP_ORIGIN !== LEGACY_ORIGIN && !legacy && <p><a className="reserve-feed-text-link" href={`${LEGACY_ORIGIN}/drafts/transfer`}>기존 주소의 임시저장 확인</a></p>}
+        {APP_ORIGIN !== LEGACY_ORIGIN && !legacy && <p><a className="reserve-feed-text-link reserve-text-link" href={`${LEGACY_ORIGIN}/drafts/transfer`}>기존 주소의 임시저장 확인</a></p>}
     </PageContainer>;
 }

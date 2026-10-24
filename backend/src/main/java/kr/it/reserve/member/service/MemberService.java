@@ -185,8 +185,8 @@ public class MemberService {
     @Transactional
     public void changePassword(Long memberId, PasswordChangeRequest request) {
         Member member = findByIdForUpdate(memberId);
-        if (member.isOAuthUser() || member.getPassword() == null) {
-            throw new MemberException("소셜 로그인 사용자는 비밀번호를 변경할 수 없어요.", HttpStatus.FORBIDDEN);
+        if (member.getPassword() == null) {
+            throw new MemberException("이메일 로그인을 먼저 설정해주세요.", HttpStatus.FORBIDDEN);
         }
         if (!bCryptPasswordEncoder.matches(request.getCurrentPassword(), member.getPassword())) {
             throw new MemberException("현재 비밀번호가 일치하지 않아요.", HttpStatus.BAD_REQUEST);

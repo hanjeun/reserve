@@ -61,6 +61,11 @@ public class SecurityConfig {
     private final OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
     private final OAuth2AuthenticationFailureHandler oAuth2AuthenticationFailureHandler;
     private final ObjectMapper objectMapper; // ApiResponse를 JSON으로 변환하기 위해 필요
+    @Autowired private kr.it.reserve.member.service.LoginMethodService loginMethods;
+    @Autowired private org.springframework.beans.factory.ObjectProvider<kr.it.reserve.global.admission.ServiceAdmissionService> serviceAdmission;
+    @Autowired private org.springframework.beans.factory.ObjectProvider<kr.it.reserve.global.ratelimit.RateLimiter> entryLimiters;
+    @Value("${reserve.service-admission.enabled:false}") private boolean serviceAdmissionEnabled;
+    @Value("${server.env:prod}") private String serviceAdmissionEnvironment;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, ClientRegistrationRepository registrations) throws Exception {
@@ -208,7 +213,7 @@ public class SecurityConfig {
                 .oauth2Login(oauth2 -> oauth2
                         // OAuth2 state 파라미터를 세션에 저장 (STATELESS 환경에서 필수)
                         .authorizationEndpoint(authorization -> authorization
-                                .authorizationRequestResolver(new TrustedOAuth2AuthorizationRequestResolver(registrations, siteUrls.oauthOrigins(browserOrigins())))
+                                .authorizationRequestResolver(new TrustedOAuth2AuthorizationRequestResolver(registrations, siteUrls.oauthOrigins(browserOrigins()), loginMethods))
                                 .authorizationRequestRepository(new HttpSessionOAuth2AuthorizationRequestRepository()))
                         .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
                         .successHandler(oAuth2AuthenticationSuccessHandler)
@@ -218,6 +223,9 @@ public class SecurityConfig {
                 .addFilterBefore(new JwtAuthenticationFilter(tokenProvider), UsernamePasswordAuthenticationFilter.class)
                 // firewall·CORS 이후, 인증·CSRF 전에 미지원 API 버전만 404로 종료한다.
                 .addFilterBefore(new UnsupportedApiVersionFilter(objectMapper), CsrfFilter.class)
+                // Queue responses remain inside CORS/CSRF, before JWT session/member DB reads.
+                .addFilterAfter(new kr.it.reserve.config.ServiceAdmissionHttpFilter(serviceAdmission,
+                        entryLimiters, objectMapper, serviceAdmissionEnabled, serviceAdmissionEnvironment), CsrfFilter.class)
 
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint((request, response, authException) -> {
@@ -238,6 +246,7 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(browserOrigins());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
+        configuration.setExposedHeaders(List.of("Retry-After"));
         configuration.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

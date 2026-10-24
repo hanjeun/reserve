@@ -43,7 +43,7 @@ export const API_ENDPOINTS = {
     },
     RESERVATION: {
         LIST:                '/api/reservations',
-        MY_RESERVATIONS:     '/api/reservations/my',
+        MY_RESERVATIONS:     '/api/reservations/my/page',
         MY_COMPLETED_FOR_STORE: (storeId) => `/api/reservations/my/store/${storeId}/completed`,
         STORE_RESERVATIONS:  '/api/reservations/store',
         STORE_RESERVATION_SUMMARY: '/api/reservations/store/status-summary',

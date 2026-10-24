@@ -230,7 +230,7 @@ const PaymentResultFrame = ({ children, busy = false }) => (
 const PaymentRecoveryLink = ({ isAd, onRecover }) => (
     <p className="reserve-payment-result__recovery">
         결제창으로 이동하지 못하셨나요?{' '}
-        <button type="button" onClick={onRecover}>
+        <button type="button" className="reserve-text-link" onClick={onRecover}>
             {isAd ? '광고 관리에서 다시 열기' : '내 예약에서 다시 열기'}
         </button>
     </p>

@@ -70,6 +70,7 @@ spring:
 # JWT 설정
 jwt:
   issuer: reserve
+  absolute-session-lifetime: ${JWT_ABSOLUTE_SESSION_LIFETIME:30d}
   access-token:
     expiration-minutes: 30
   refresh-token:
@@ -138,6 +139,29 @@ waiting:
     customer-notice-published-at: ${WAITING_CUSTOMER_RETENTION_NOTICE_PUBLISHED_AT:}
 
 reserve:
+  service-admission:
+    # Visitor passes, not DB connections or measured throughput. Manual Redis modes always take precedence.
+    enabled: ${RESERVE_SERVICE_ADMISSION_ENABLED:false}
+    capacity: ${RESERVE_SERVICE_ADMISSION_CAPACITY:20}
+    session-seconds: ${RESERVE_SERVICE_ADMISSION_SESSION_SECONDS:900}
+    max-session-seconds: ${RESERVE_SERVICE_ADMISSION_MAX_SESSION_SECONDS:7200}
+    heartbeat-timeout-seconds: ${RESERVE_SERVICE_ADMISSION_HEARTBEAT_TIMEOUT_SECONDS:90}
+    max-waiting: ${RESERVE_SERVICE_ADMISSION_MAX_WAITING:1000}
+    epoch: ${RESERVE_SERVICE_ADMISSION_EPOCH:}
+    automatic:
+      enabled: ${RESERVE_SERVICE_ADMISSION_AUTOMATIC_ENABLED:false}
+      # Initial protection thresholds; capacity/latency are not inferred from these observations.
+      memory-pressure-mib: 128
+      memory-clear-mib: 256
+      cpu-pressure-percent: 90
+      cpu-clear-percent: 65
+      heap-pressure-percent: 90
+      heap-clear-percent: 75
+      pressure-seconds: 30
+      recovery-seconds: 120
+      minimum-emergency-seconds: 120
+  admission:
+    enabled: ${RESERVE_ADMISSION_ENABLED:false}
   redis:
     enabled: ${RESERVE_REDIS_ENABLED:false}
     port: ${RESERVE_REDIS_PORT:6379}

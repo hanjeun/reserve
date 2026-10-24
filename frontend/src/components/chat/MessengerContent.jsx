@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import MessengerFooter from './MessengerFooter';
+import MessengerStoreSearch from './MessengerStoreSearch';
 import useChatIntro, { chatIntroScope } from '../../hooks/useChatIntro';
 import { SUPPORT_LABEL, SupportIdentityContext, useSupportIdentity } from './messengerIdentity';
 import ChatNotificationControl from './ChatNotificationControl';
@@ -17,6 +18,7 @@ import useAuthStore from '../../store/useAuthStore';
 import useMessengerStore, { messengerIdentityOf } from '../../store/useMessengerStore';
 import { hasAdminAccess, hasOwnerAccess } from '../../constants/roles';
 import { breakpoints } from '../../styles/tokens';
+import { httpStatusOf } from '../../utils/listErrorMessage';
 import {
     clearUnreadInInfiniteData,
     disabledMessageOf,
@@ -41,6 +43,14 @@ import {
 const POLL_THREAD_MS = 4000;
 const THREAD_BACK_FALLBACK_MS = 320;
 const EMPTY_HISTORY = { hasMore: false, nextBeforeId: null, loading: false };
+const STORE_OPEN_FAILURE_TITLES = {
+    400: '이 가게에는 문의를 시작할 수 없어요.',
+    401: '로그인 상태를 확인한 뒤 다시 문의해주세요.',
+    403: '가게 문의를 시작할 권한이 없어요.',
+    404: '가게를 찾을 수 없어요.',
+    409: '현재 문의를 받을 수 없는 가게예요.',
+    410: '현재 문의를 받을 수 없는 가게예요.',
+};
 
 const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverImageSrc, onClose }) => {
     // 고객지원 표시 이름·사진(채팅 관리 설정) — 제목 계산보다 먼저 읽는다.
@@ -54,6 +64,10 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     const storedSelection = useMessengerStore((state) => state.selection);
     const storedView = useMessengerStore((state) => state.view);
     const activeThread = useMessengerStore((state) => state.activeThread);
+    const storeSearch = useMessengerStore((state) => state.storeSearch);
+    const openStoreSearch = useMessengerStore((state) => state.openStoreSearch);
+    const closeStoreSearch = useMessengerStore((state) => state.closeStoreSearch);
+    const returnToStoreSearch = useMessengerStore((state) => state.returnToStoreSearch);
     const select = useMessengerStore((state) => state.select);
     const showHome = useMessengerStore((state) => state.showHome);
     const showConversations = useMessengerStore((state) => state.showConversations);
@@ -67,6 +81,10 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     // 목록 → 대화 열기 애니메이션. 뒤로가기(대화가 오른쪽으로 빠짐)의 반대 방향이다.
     const [openingThread, setOpeningThread] = useState(false);
     const [showHidden, setShowHidden] = useState(false);
+    const [storeOpenFailure, setStoreOpenFailure] = useState(null);
+    const storeLoadRef = useRef(null);
+    const searchFocusFrame = useRef(null);
+    useEffect(() => () => cancelAnimationFrame(searchFocusFrame.current), []);
     const routeStoreId = Number(initialStoreId);
     const routeSelection = useMemo(
         () => Number.isInteger(routeStoreId) && routeStoreId > 0
@@ -78,7 +96,9 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     const inRoute = routeSelection !== null;
     const isHome = storedView === 'home' && !inRoute;
     const isSettings = storedView === 'settings' && !inRoute;
-    const isConversations = !isHome && !isSettings;
+    const isStoreSearch = Boolean(storeSearch?.visible) && !inRoute;
+    const isConversations = !isHome && !isSettings && !isStoreSearch;
+    const searchBackAvailable = !inRoute && selection.kind === 'store' && storeSearch?.selectedStoreId === selection.storeId;
 
     const lists = useConversationLists({ showHidden, canOwnStores, canAdminSupport });
     const { memberRows, ownerRows, adminRows, customerRows } = lists;
@@ -101,6 +121,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     const batchRef = useRef(null);
     const [batchScope, setBatchScope] = useState(null);
     const sendScope = `${sessionIdentity}:${threadKey}`;
+    useLayoutEffect(() => () => { storeLoadRef.current = null; }, [sessionIdentity, threadKey]);
     useEffect(() => () => { batchRef.current = null; }, []);
     const readScopeRef = useRef(/** @type {{threadKey: string | null, identity: string, loading: boolean, roomId: number | null} | null} */ (null));
     const notificationTargetRef = useRef(null);
@@ -131,10 +152,20 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
                 messages: messages ?? [],
             }));
         }
-        if (selection.kind === 'store') return chatService.getStore(selection.storeId);
+        if (selection.kind === 'store') {
+            const request = { identity: sessionIdentity, key: `store:${selection.storeId}` };
+            storeLoadRef.current = request;
+            return chatService.getStore(selection.storeId).catch(error => {
+                if (storeLoadRef.current === request && useMessengerStore.getState().sessionIdentity === request.identity) {
+                    setStoreOpenFailure({ scope: `${request.identity}:${request.key}`, error,
+                        title: STORE_OPEN_FAILURE_TITLES[httpStatusOf(error)] });
+                }
+                throw error;
+            });
+        }
         if (selection.kind === 'owner') return chatService.getStoreInboxRoom(selection.roomId);
         return chatService.getSupport();
-    }, [selectedRow?.counterpartName, selectedRow?.counterpartProfileImage, selection.kind, selection.roomId, selection.storeId]);
+    }, [selectedRow?.counterpartName, selectedRow?.counterpartProfileImage, selection.kind, selection.roomId, selection.storeId, sessionIdentity]);
     const poll = useCallback(
         (roomId, afterId) => selection.kind === 'admin'
             ? chatService.pollAdminSupportRoom(roomId, afterId)
@@ -314,20 +345,21 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
         }
     };
 
-    const choose = (next) => {
+    const choose = (next, { fromStoreSearch = false } = {}) => {
         if (returningToList || openingThread) return;
         if (routeSelection) navigate('/messages', { replace: true });
-        select(next);
+        select(next, { fromStoreSearch });
         setMobileThreadOpen(true);
         // 한 화면에 목록·대화가 같이 보이는 넓은 메시지 페이지는 자리만 바뀌므로 애니메이션이 없다.
         if (!(surface === 'page' && isWide)) setOpeningThread(true);
     };
     const finishConversationList = useCallback(() => {
         if (routeSelection) navigate('/messages', { replace: true });
-        showConversations();
+        if (searchBackAvailable) returnToStoreSearch();
+        else showConversations();
         setMobileThreadOpen(false);
         setReturningToList(false);
-    }, [navigate, routeSelection, showConversations]);
+    }, [navigate, routeSelection, showConversations, searchBackAvailable, returnToStoreSearch]);
     const handleVisibilityChanged = () => {
         void queryClient.invalidateQueries({ queryKey: chatKeys.conversations() });
         void queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
@@ -403,6 +435,23 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     };
     const changeDraft = value => setDraft(selectionKey, value);
 
+    const findStore = () => {
+        if (openingThread || returningToList) return;
+        if (routeSelection) navigate('/messages', { replace: true });
+        setMobileThreadOpen(false);
+        openStoreSearch();
+    };
+    const closeSearch = () => {
+        const origin = storeSearch?.origin;
+        closeStoreSearch();
+        cancelAnimationFrame(searchFocusFrame.current);
+        searchFocusFrame.current = requestAnimationFrame(() => {
+            if (useMessengerStore.getState().sessionIdentity !== sessionIdentity) return;
+            const selector = origin === 'home' ? '.reserve-messenger-footer [aria-label="홈"]' : '.reserve-messenger-list-actions [aria-label="가게 찾기"]';
+            document.querySelector(selector)?.focus();
+        });
+    };
+
     const handleFooterChange = value => {
         if (routeSelection) navigate('/messages', { replace: true });
         setMobileThreadOpen(false);
@@ -416,6 +465,16 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     );
     const closeAction = <MessengerCloseButton surface={surface} onClose={onClose} />;
     const headingLevel = surface === 'page' ? 1 : 2;
+
+    const searchPanel = (inert = false, searchNavigation) => <MessengerStoreSearch search={storeSearch} memberId={user?.id}
+        headingLevel={headingLevel} inert={inert} navigation={searchNavigation} onBack={closeSearch}
+        onChoose={next => choose(next, { fromStoreSearch: true })} />;
+
+    if (isStoreSearch) {
+        return <div className={`reserve-messenger reserve-messenger--${surface} is-store-search`}>
+            {closeAction}{searchPanel()}{navigation}
+        </div>;
+    }
 
     if (isHome || isSettings) {
         const notificationControl = isWide ? (
@@ -450,10 +509,12 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
         <div className={layout.className}>
             {closeAction}
             {layout.showList && (
-                <ConversationListPanel headingLevel={headingLevel}
+                searchBackAvailable ? searchPanel(openingThread || returningToList, layout.showListNavigation && navigation)
+                    : <ConversationListPanel headingLevel={headingLevel}
                     inert={openingThread || returningToList}
                     lists={lists} showHidden={showHidden}
                     onToggleHidden={() => setShowHidden(value => !value)}
+                    onFindStore={findStore}
                     canAdminSupport={canAdminSupport} canOwnStores={canOwnStores}
                     rowProps={{ showThread, selection, onChoose: choose }}
                     navigation={layout.showListNavigation && navigation} />
@@ -463,6 +524,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
                 <ThreadPanel
                     onAnimationEnd={handleThreadAnimationEnd}
                     onBack={showConversationList}
+                    backLabel={searchBackAvailable ? '가게 검색으로 돌아가기' : undefined}
                     returningToList={returningToList}
                     avatarProps={{ selection, thread, selectedRow }}
                     title={title}
@@ -481,6 +543,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
                     bodyProps={{
                         loading,
                         loadError,
+                        openError: storeOpenFailure?.scope === sendScope ? storeOpenFailure : null,
                         onReload: reload,
                         emptyText,
                         intro: {

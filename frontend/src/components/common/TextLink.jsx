@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 
-/** Text navigation keeps its color; hover, keyboard focus and the current page use an underline. */
+/** Neutral text navigation shares the footer's hover and keyboard focus treatment. */
 export default function TextLink({ to, href, className = '', children, ...props }) {
     const Component = to == null ? 'a' : Link;
     const destination = to == null ? { href } : { to };

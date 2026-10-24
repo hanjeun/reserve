@@ -147,14 +147,14 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
         if (!open || wasOpen || isMobile || isMessagesPage) return undefined;
         returnFocusRef.current = document.activeElement;
         const frame = requestAnimationFrame(() => {
-            panelRef.current?.querySelector('textarea, button, [href]')?.focus();
+            panelRef.current?.querySelector('input:not(:disabled), textarea:not(:disabled), button:not(:disabled), [href]')?.focus();
         });
         return () => cancelAnimationFrame(frame);
     }, [open, isMobile, isMessagesPage]);
 
     const keepFocusInside = (event) => {
         // 사진/신고 등 React 포털의 키 입력은 뒤쪽 패널을 닫거나 포커스를 가두지 않는다.
-        if (!event.currentTarget.contains(event.target)) return;
+        if (event.defaultPrevented || !event.currentTarget.contains(event.target)) return;
         if (event.key === 'Escape') {
             event.preventDefault();
             closePanel();
@@ -162,8 +162,8 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
         }
         if (event.key !== 'Tab') return;
         const focusable = [...(panelRef.current?.querySelectorAll(
-            'button:not(:disabled), textarea:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])') ?? [])]
-            .filter((element) => !element.hasAttribute('hidden'));
+            'button:not(:disabled), input:not(:disabled):not([type="hidden"]), textarea:not(:disabled), select:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])') ?? [])]
+            .filter((element) => !element.closest('[hidden], [inert], [aria-hidden="true"]'));
         if (focusable.length === 0) return;
         const first = focusable[0];
         const last = focusable.at(-1);

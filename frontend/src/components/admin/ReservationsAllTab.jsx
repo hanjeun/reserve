@@ -14,6 +14,7 @@ import Pagination from '../common/Pagination';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { DeleteOutlined } from '../common/icons';
 import { Button, FilterToolbar, AdminTableSkeleton, DataState, DataTable, ReservationSummaryCardSkeleton } from '../common';
+import ListingContent from '../common/ListingContent';
 import ReservationListingToolbar from '../reservation/ReservationListingToolbar';
 import ReservationSummaryCard from '../reservation/ReservationSummaryCard';
 import ReservationDetailModal from '../reservation/ReservationDetailModal';
@@ -146,7 +147,7 @@ const ReservationsAllTab = () => {
     } else if (viewMode === 'cards') {
         if (reservations.length === 0) {
             listContent = (
-                <DataState state="empty" kind="reservation" title="예약 내역이 없어요." style={{ marginTop: 80 }} />
+                <DataState state="empty" kind="reservation" title="예약 내역이 없어요." />
             );
         } else {
             listContent = (
@@ -175,7 +176,7 @@ const ReservationsAllTab = () => {
                         onChange={setPage}
                         showSizeChanger={false}
                         align="end"
-                        style={{ marginTop: 16 }}
+                        className="reserve-listing-pagination"
                     />
                 </>
             );
@@ -216,7 +217,7 @@ const ReservationsAllTab = () => {
             />
             {/* 본문 스켈레톤은 첫 조회·쿼리 전환에만 표시한다. 수동 새로고침은 기존 행을 유지하고
                 툴바의 진행 상태만 바뀌므로, 읽던 목록과 페이지 위치가 사라지지 않는다. */}
-            {listContent}
+            {viewMode === 'cards' ? <ListingContent>{listContent}</ListingContent> : listContent}
             <ReservationDetailModal
                 reservation={detailReservation}
                 open={detailReservation != null}

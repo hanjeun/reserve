@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CloseCircleFilled, CloseOutlined, SearchOutlined } from '../../components/common/icons';
+import { CloseOutlined, SearchOutlined } from '../../components/common/icons';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { SERVICE_DOMAIN_OPTIONS } from '../../constants';
 import ServiceDomainIcon from '../../components/common/ServiceDomainIcon';
@@ -7,6 +7,7 @@ import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import useRecentSearches from '../../hooks/useRecentSearches';
 import Tooltip from '../../components/common/Tooltip';
+import SearchControls from '../../components/common/SearchControls';
 import { SEARCH_MOTION_DURATION_MS } from '../../components/layout/searchTransition';
 import { useSkeletonShown } from '../../components/layout/loadingPresentation';
 
@@ -63,16 +64,6 @@ export default function SearchPage() {
         });
     };
 
-    const submitSearch = event => {
-        event.preventDefault();
-        searchFor(keyword);
-    };
-
-    const clearSearch = () => {
-        setKeyword('');
-        inputRef.current?.focus();
-    };
-
     const followSearchLink = event => {
         // 새 탭·창 열기는 현재 검색 화면을 닫지 않는다.
         if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
@@ -89,41 +80,9 @@ export default function SearchPage() {
         <div className={'reserve-search-page' + motionClass} inert={isClosing ? true : undefined}
             style={{ '--reserve-search-motion-duration': `${SEARCH_MOTION_DURATION_MS}ms` }}>
             <h1 className="reserve-discovery-visually-hidden">가게 검색</h1>
-            <header className="reserve-search-header">
-                <form className="reserve-search-field" role="search" onSubmit={submitSearch}>
-                    <Tooltip title="검색"><button type="submit" className="reserve-search-icon" aria-label="검색">
-                        <SearchOutlined aria-hidden="true" />
-                    </button></Tooltip>
-                    <input
-                        ref={inputRef}
-                        type="search"
-                        aria-label="가게 이름, 지역 또는 서비스 검색"
-                        placeholder="가게·지역·서비스 검색"
-                        autoComplete="off"
-                        autoCapitalize="off"
-                        spellCheck={false}
-                        enterKeyHint="search"
-                        value={keyword}
-                        onChange={event => setKeyword(event.target.value)}
-                        onKeyDown={event => {
-                            // 한글 조합을 확정하는 Enter가 검색까지 실행되지 않게 한다.
-                            if (event.key === 'Enter' && (event.nativeEvent.isComposing || event.keyCode === 229)) {
-                                event.preventDefault();
-                                return;
-                            }
-                            if (event.key === 'Escape') {
-                                event.preventDefault();
-                                closeSearch();
-                            }
-                        }}
-                    />
-                    {keyword && (
-                        <Tooltip title="검색어 지우기"><button type="button" className="reserve-search-clear" aria-label="검색어 지우기" onClick={clearSearch}>
-                            <CloseCircleFilled aria-hidden="true" />
-                        </button></Tooltip>
-                    )}
-                </form>
-                <button type="button" className="reserve-search-cancel" onClick={closeSearch}>취소</button>
+            <header className="reserve-search-header reserve-search-controls">
+                <SearchControls value={keyword} onChange={setKeyword} onCancel={closeSearch} onSubmit={searchFor}
+                    inputRef={inputRef} label="가게 이름, 지역 또는 서비스 검색" placeholder="가게·지역·서비스 검색" />
             </header>
 
             <div className="reserve-search-content">

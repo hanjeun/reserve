@@ -206,15 +206,9 @@
     display: inline-block;
     margin: 8px 0 0;
     padding: 2px 0;
-    color: var(--c-text-tertiary);
     font-size: 11px;
     line-height: 16px;
-    text-decoration: underline;
-    text-underline-offset: 3px;
 }
-.reserve-region-sheet-attribution-link:hover { color: var(--c-text-secondary); }
-/* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
-.reserve-region-sheet-attribution-link:active { color: var(--c-text-secondary); }
 .reserve-region-sheet-regions {
     display: grid;
     flex: 1 1 auto;

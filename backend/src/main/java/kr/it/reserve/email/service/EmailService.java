@@ -55,18 +55,46 @@ public class EmailService {
 
     @Async
     public void sendVerificationEmail(String toEmail, String verificationCode) {
+        sendVerificationMessage(toEmail, verificationCode, false);
+    }
+
+    @Async
+    public void sendLoginMethodVerificationEmail(String toEmail, String verificationCode) {
+        sendVerificationMessage(toEmail, verificationCode, true);
+    }
+
+    private void sendVerificationMessage(String toEmail, String verificationCode, boolean loginMethod) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, MAIL_CHARSET);
             helper.setFrom(fromEmail, fromName);
             helper.setTo(toEmail);
-            helper.setSubject("[RESERVE] 이메일 인증 코드");
-            helper.setText(buildVerificationEmailContent(verificationCode), true);
+            helper.setSubject(loginMethod ? "[RESERVE] 이메일 로그인 설정 인증 코드" : "[RESERVE] 이메일 인증 코드");
+            helper.setText(buildVerificationEmailContent(verificationCode, loginMethod), true);
             mailSender.send(message);
             log.info("Verification email sent");
         } catch (MessagingException | UnsupportedEncodingException | MailException e) {
             log.error("Email send failed: errorType={}", e.getClass().getSimpleName());
             throw new EmailException("인증 이메일 발송 중 서버 오류가 발생했어요.", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Async
+    public void sendLoginMethodChangedEmail(String toEmail) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, MAIL_CHARSET);
+            helper.setFrom(fromEmail, fromName);
+            helper.setTo(toEmail);
+            helper.setSubject("[RESERVE] 로그인 방법이 변경됐어요");
+            helper.setText(HTML_HEAD_OPEN + "</head><body style=\"font-family:" + FONT_FAMILY + ";line-height:1.8;\">"
+                    + "<h1>로그인 방법이 변경됐어요.</h1><p>마이페이지의 로그인 및 보안에서 현재 로그인 방법을 확인할 수 있어요.</p>"
+                    + "<p>본인이 변경하지 않았다면 계정 접근을 확인하고 RESERVE에 문의해주세요.</p></body></html>", true);
+            mailSender.send(message);
+            log.info("Login method notification sent");
+        } catch (MessagingException | UnsupportedEncodingException | MailException exception) {
+            log.error("Email send failed: errorType={}", exception.getClass().getSimpleName());
+            throw new EmailException("보안 알림 메일 발송에 실패했어요.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -447,6 +475,10 @@ public class EmailService {
     }
 
     private String buildVerificationEmailContent(String code) {
+        return buildVerificationEmailContent(code, false);
+    }
+
+    private String buildVerificationEmailContent(String code, boolean loginMethod) {
         return HTML_HEAD_OPEN + FONT_IMPORT + "</head>"
             + "<body style=\"margin:0;padding:0;font-family:" + FONT_FAMILY + ";background-color:#f9fafb;\">"
             + "  <div style=\"width:100%;background-color:#f9fafb;padding:40px 0;\">"
@@ -459,7 +491,8 @@ public class EmailService {
             + "        <span style=\"font-size:36px;font-weight:800;color:#3182f6;letter-spacing:8px;font-family:" + FONT_FAMILY + ";\">" + code + "</span>"
             + "      </div>"
             + "      <div style=\"font-size:13px;color:#b0b8c1;line-height:1.6;border-top:1px solid #f2f4f6;padding-top:24px;\">"
-            + "        본 메일은 회원가입을 위한 본인 확인 메일이에요.<br/>"
+            + (loginMethod ? "        본 메일은 기존 계정의 이메일 로그인 설정을 위한 본인 확인 메일이에요.<br/>"
+                    : "        본 메일은 회원가입을 위한 본인 확인 메일이에요.<br/>")
             + "        인증 코드는 <span style=\"color:#8b95a1;\">5분간</span> 유효해요.<br/><br/>"
             + "        © 2026 RESERVE. All rights reserved."
             + "      </div>"

@@ -46,11 +46,25 @@ const advanceRegistrationToIdentity = async page => {
 
 test.beforeEach(async ({ page }) => {
     await page.route('**/api/**', route => {
-        const path = new URL(route.request().url()).pathname;
+        const url = new URL(route.request().url());
+        const path = url.pathname;
         if (!path.startsWith('/api/')) return route.continue();
+        if (path === '/api/reservations/my') return route.fulfill({ status: 410, json: { success: false,
+            message: '예약 조회 방식이 변경됐어요. 화면을 새로고침한 뒤 다시 시도해주세요.' } });
+        if (path === '/api/reservations/my/page') {
+            const params = url.searchParams;
+            const keyword = (params.get('search') ?? '').toLowerCase();
+            let content = reservations.filter(row => (!params.get('status') || row.status === params.get('status'))
+                && (!keyword || [row.storeName, row.reservationCode, row.specialRequest].some(value => value?.toLowerCase().includes(keyword))));
+            if (params.get('sort') === 'oldest') content = [...content].reverse();
+            if (params.get('sort') === 'visit') content = [...content].sort((a, b) => `${a.reservationDate}T${a.reservationTime}`.localeCompare(`${b.reservationDate}T${b.reservationTime}`));
+            const number = Number(params.get('page') ?? 0);
+            const size = Number(params.get('size') ?? 15);
+            return route.fulfill({ json: { success: true, data: { content: content.slice(number * size, (number + 1) * size),
+                page: { number, size, totalElements: content.length, totalPages: Math.ceil(content.length / size) } } } });
+        }
         const data = path === '/api/member/me' ? member
-            : path === '/api/stores/my' ? stores
-                : path === '/api/reservations/my' ? reservations : emptyPage;
+            : path === '/api/stores/my' ? stores : emptyPage;
         return route.fulfill({ json: { success: true, data } });
     });
 });

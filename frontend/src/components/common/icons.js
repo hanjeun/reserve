@@ -7,7 +7,7 @@ import {
     CommentGlyph, CopyGlyph, CardGlyph, HeadsetGlyph, DeleteGlyph, DesktopGlyph, DollarGlyph, DoubleLeftGlyph,
     DoubleRightGlyph, DownloadGlyph, DownGlyph, EditGlyph, PinGlyph, WarningCircleGlyph, WarningCircleFilledGlyph,
     EyeOffGlyph, EyeGlyph, FileGlyph, UnknownFileGlyph, FlagGlyph, GlobeGlyph, HeartGlyph, HomeGlyph, HourglassGlyph,
-    IdentityGlyph, InboxGlyph, InfoGlyph, LeftGlyph, LockGlyph, LogoutGlyph, MailGlyph, MinusGlyph, MobileGlyph,
+    IdentityGlyph, InboxGlyph, InfoGlyph, LeftGlyph, LockGlyph, LogoutGlyph, MailGlyph, MinusGlyph, DisconnectGlyph, MobileGlyph,
     MoonGlyph, MoreGlyph, SpeakerGlyph, HashGlyph, PaperclipGlyph, PartitionGlyph, PauseGlyph, PhoneGlyph,
     PictureGlyph, PlusGlyph, ProfileGlyph, QrGlyph, BookGlyph, ReloadGlyph, RightGlyph, RollbackGlyph, ShieldGlyph,
     ScheduleGlyph, SearchGlyph, SendGlyph, SettingsGlyph, StoreGlyph, SmileGlyph, StarGlyph, StopGlyph, SunGlyph,
@@ -82,6 +82,7 @@ export const LogoutOutlined = /*#__PURE__*/createIcon('LogoutOutlined', LogoutGl
 export const MailOutlined = /*#__PURE__*/createIcon('MailOutlined', MailGlyph);
 export const MessageOutlined = /*#__PURE__*/createIcon('MessageOutlined', CommentGlyph);
 export const MinusOutlined = /*#__PURE__*/createIcon('MinusOutlined', MinusGlyph);
+export const DisconnectOutlined = /*#__PURE__*/createIcon('DisconnectOutlined', DisconnectGlyph);
 export const MobileOutlined = /*#__PURE__*/createIcon('MobileOutlined', MobileGlyph);
 export const MoonOutlined = /*#__PURE__*/createIcon('MoonOutlined', MoonGlyph);
 export const MoreOutlined = /*#__PURE__*/createIcon('MoreOutlined', MoreGlyph);

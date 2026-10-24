@@ -370,7 +370,7 @@ function CardsSkeleton({ pathname = '', search = '' }) {
         </PageContainer>;
     }
     return <PageContainer size="xl" paddingTop="40px" className="reserve-mystore-page">
-        <ListingHeader title="내 가게 관리" description="등록된 가게를 수정하거나 관리할 수 있어요." marginBottom={40} />
+        <ListingHeader title="내 가게 관리" description="등록된 가게를 수정하거나 관리할 수 있어요." />
         <ListingToolbarSkeleton className="" filters={storeSkeletonFilters(new URLSearchParams(search), OWNER_STORE_SORT_OPTIONS, 'recent')} />
         <div className={isList ? 'reserve-store-list-rows' : 'rsv-mystore-grid'}>
             {isList ? <StoreListRowSkeleton count={4} /> : <StoreCardSkeleton count={4} withActions />}
@@ -385,6 +385,7 @@ function StoreListRouteSkeleton({ pathname = '/stores', search = '' }) {
     return (
         <PageContainer size="xl" paddingTop="16px" className="reserve-explore-page">
             <ListingToolbarSkeleton className="" region count={null} filters={storeSkeletonFilters(params, SORT_OPTIONS, 'recommended')} />
+            <RefreshToolbarSkeleton search />
             <div className={isList ? 'reserve-store-list-rows' : 'rsv-store-grid'}>
                 {isList
                     ? <StoreListRowSkeleton count={STORE_LIST_PAGE_SIZE} />
@@ -401,7 +402,7 @@ function ReservationsSkeleton({ pathname = '/my-reservations', search = '' }) {
     const isCards = resolveViewMode(pathname, params, 'list') === 'cards';
     const waiting = params.get('tab') === 'waiting';
     return <PageContainer size="xl" paddingTop="40px" className="reserve-myreservation-page">
-        <ListingHeader title="내 예약 확인" description="예약과 웨이팅 현황을 확인해요" marginBottom={24} />
+        <ListingHeader title="내 예약 확인" description="예약과 웨이팅 현황을 확인해요" />
         <div style={{ marginBottom: 20 }}><SegmentedControlSkeleton
             value={waiting ? 'waiting' : 'reservation'}
             options={[{ value: 'reservation', label: '예약' }, { value: 'waiting', label: '웨이팅' }]} /></div>

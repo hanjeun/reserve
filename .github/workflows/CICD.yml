@@ -49,13 +49,10 @@ jobs:
           CI_FORCE_TESTS: ${{ github.event_name == 'workflow_dispatch' || vars.CI_FORCE_TESTS == 'true' }}
           CI_TEST_CONFIG_REVISION: ${{ vars.CI_TEST_CONFIG_REVISION }}
         run: node scripts/ci-evidence.mjs restore backend
-      - name: Test backend (unit and Spring/H2 integration)
+      - name: Test backend (unit, Spring/H2, isolated MySQL and Redis)
         id: backend_tests
         if: steps.evidence.outputs.reused != 'true'
-        working-directory: backend
-        run: |
-          chmod +x ./gradlew
-          ./gradlew test --console=plain
+        run: bash scripts/test-backend-isolated.sh
       - name: Record successful backend test evidence
         id: record
         env:
@@ -111,11 +108,12 @@ jobs:
         run: ./scripts/design-system-snapshot.ps1 -Stage Verify -InstallGitGuard
       - name: Validate operations scripts
         run: |
-          node --test scripts/tests/observability-config.test.mjs scripts/tests/deployment-memory.test.mjs
+          node --test scripts/tests/observability-config.test.mjs scripts/tests/deployment-memory.test.mjs scripts/tests/release-schema-readonly.test.mjs
           bash -n scripts/backup-mysql.sh
           bash -n scripts/restore-mysql.sh
           bash -n scripts/verify-post-deploy-readonly.sh
           bash -n scripts/verify-mysql-row-lock.sh
+          bash -n scripts/test-backend-isolated.sh
           bash -n scripts/check-deployment-memory.sh
           bash -n scripts/test-frontend-release-swap.sh
           bash -n scripts/preserve-frontend-assets.sh
@@ -230,7 +228,7 @@ jobs:
         run: |
           docker build --platform linux/amd64 \
             --label reserve.schema-compat=v270-refund-v1 \
-            --label reserve.feature-compat=waiting-signup-hidden-feed-oauth-v7 \
+            --label reserve.feature-compat=waiting-signup-hidden-feed-oauth-login-session-admission-v10 \
             -t "$DOCKERHUB_USERNAME/reserve:latest" \
             -t "$DOCKERHUB_USERNAME/reserve:sha-$COMMIT_SHA" \
             ./backend
@@ -593,12 +591,20 @@ jobs:
           RESERVE_REDIS_PORT: ${{ vars.RESERVE_REDIS_PORT || '6379' }}
           RESERVE_REDIS_PASSWORD: ${{ secrets.RESERVE_REDIS_PASSWORD }}
           RESERVE_REDIS_USERNAME: ${{ vars.RESERVE_REDIS_USERNAME }}
+          RESERVE_SERVICE_ADMISSION_ENABLED: ${{ vars.RESERVE_SERVICE_ADMISSION_ENABLED || 'false' }}
+          RESERVE_SERVICE_ADMISSION_CAPACITY: ${{ vars.RESERVE_SERVICE_ADMISSION_CAPACITY || '20' }}
+          RESERVE_SERVICE_ADMISSION_SESSION_SECONDS: ${{ vars.RESERVE_SERVICE_ADMISSION_SESSION_SECONDS || '900' }}
+          RESERVE_SERVICE_ADMISSION_MAX_SESSION_SECONDS: ${{ vars.RESERVE_SERVICE_ADMISSION_MAX_SESSION_SECONDS || '7200' }}
+          RESERVE_SERVICE_ADMISSION_HEARTBEAT_TIMEOUT_SECONDS: ${{ vars.RESERVE_SERVICE_ADMISSION_HEARTBEAT_TIMEOUT_SECONDS || '90' }}
+          RESERVE_SERVICE_ADMISSION_MAX_WAITING: ${{ vars.RESERVE_SERVICE_ADMISSION_MAX_WAITING || '1000' }}
+          RESERVE_SERVICE_ADMISSION_EPOCH: ${{ vars.RESERVE_SERVICE_ADMISSION_EPOCH }}
+          RESERVE_SERVICE_ADMISSION_AUTOMATIC_ENABLED: ${{ vars.RESERVE_SERVICE_ADMISSION_AUTOMATIC_ENABLED || 'false' }}
         with:
           username: ubuntu
           host: ${{ secrets.RESERVE_SERVER_IP }}
           key: ${{ secrets.EC2_SSH_KEY }}
           fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
-          envs: IMAGE_TAG,DOCKERHUB_USERNAME,JWT_SECRET_KEY,OAUTH_UNLINK_ENCRYPTION_KEY,OAUTH_PROVIDER_TOKEN_ENCRYPTION_ENABLED,OAUTH_PROVIDER_TOKEN_ENCRYPTION_KEY,OAUTH_SECURITY_EVENTS_GOOGLE_ENABLED,OAUTH_SECURITY_EVENTS_KAKAO_ENABLED,OAUTH_SECURITY_EVENTS_NAVER_ENABLED,KAKAO_APP_ID,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,RESEND_API_KEY,PORTONE_V2_SECRET,PORTONE_STORE_ID,PORTONE_WEBHOOK_SECRET,QR_TOKEN_SECRET,DB_APP_PASSWORD,MAIL_FROM,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,S3_BUCKET_NAME,CLOUDFRONT_DOMAIN,SENTRY_DSN,KAKAO_REST_API_KEY,HOLIDAY_API_KEY,TOURISM_API_SERVICE_KEY,CHAT_IMAGE_ENCRYPTION_KEY,FEED_ENABLED,FEED_INTERACTIONS_ENABLED,STORE_NEWS_ENABLED,RESERVE_DOMAIN_SPLIT,FEED_IMAGE_ENCRYPTION_KEY,CHAT_RETENTION_ENABLED,CHAT_RETENTION_NOTICE_PUBLISHED_AT,CHAT_RETENTION_ACCESS_AUDIT_YEARS,WAITING_RETENTION_ENABLED,WAITING_RETENTION_NOTICE_PUBLISHED_AT,WAITING_CUSTOMER_RETENTION_NOTICE_PUBLISHED_AT,RESERVE_REDIS_ENABLED,RESERVE_REDIS_HOST,RESERVE_REDIS_PORT,RESERVE_REDIS_PASSWORD,RESERVE_REDIS_USERNAME
+          envs: IMAGE_TAG,DOCKERHUB_USERNAME,JWT_SECRET_KEY,OAUTH_UNLINK_ENCRYPTION_KEY,OAUTH_PROVIDER_TOKEN_ENCRYPTION_ENABLED,OAUTH_PROVIDER_TOKEN_ENCRYPTION_KEY,OAUTH_SECURITY_EVENTS_GOOGLE_ENABLED,OAUTH_SECURITY_EVENTS_KAKAO_ENABLED,OAUTH_SECURITY_EVENTS_NAVER_ENABLED,KAKAO_APP_ID,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,RESEND_API_KEY,PORTONE_V2_SECRET,PORTONE_STORE_ID,PORTONE_WEBHOOK_SECRET,QR_TOKEN_SECRET,DB_APP_PASSWORD,MAIL_FROM,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,S3_BUCKET_NAME,CLOUDFRONT_DOMAIN,SENTRY_DSN,KAKAO_REST_API_KEY,HOLIDAY_API_KEY,TOURISM_API_SERVICE_KEY,CHAT_IMAGE_ENCRYPTION_KEY,FEED_ENABLED,FEED_INTERACTIONS_ENABLED,STORE_NEWS_ENABLED,RESERVE_DOMAIN_SPLIT,FEED_IMAGE_ENCRYPTION_KEY,CHAT_RETENTION_ENABLED,CHAT_RETENTION_NOTICE_PUBLISHED_AT,CHAT_RETENTION_ACCESS_AUDIT_YEARS,WAITING_RETENTION_ENABLED,WAITING_RETENTION_NOTICE_PUBLISHED_AT,WAITING_CUSTOMER_RETENTION_NOTICE_PUBLISHED_AT,RESERVE_REDIS_ENABLED,RESERVE_REDIS_HOST,RESERVE_REDIS_PORT,RESERVE_REDIS_PASSWORD,RESERVE_REDIS_USERNAME,RESERVE_SERVICE_ADMISSION_ENABLED,RESERVE_SERVICE_ADMISSION_CAPACITY,RESERVE_SERVICE_ADMISSION_SESSION_SECONDS,RESERVE_SERVICE_ADMISSION_MAX_SESSION_SECONDS,RESERVE_SERVICE_ADMISSION_HEARTBEAT_TIMEOUT_SECONDS,RESERVE_SERVICE_ADMISSION_MAX_WAITING,RESERVE_SERVICE_ADMISSION_EPOCH,RESERVE_SERVICE_ADMISSION_AUTOMATIC_ENABLED
           script: |
             set -e
             # 커밋 SHA로 고정된 이미지를 배포한다. :latest는 언제든 다른 커밋으로 바뀔 수 있어
@@ -624,6 +630,22 @@ jobs:
               true) : "${RESERVE_REDIS_PASSWORD:?A dedicated Redis password is required when Redis is enabled}" ;;
               false) ;;
               *) echo 'RESERVE_REDIS_ENABLED must be true or false'; exit 1 ;;
+            esac
+            case "$RESERVE_SERVICE_ADMISSION_ENABLED" in
+              true)
+                [ "$RESERVE_REDIS_ENABLED" = true ] || { echo 'Service admission requires Redis'; exit 1; }
+                case "$RESERVE_SERVICE_ADMISSION_EPOCH" in
+                  ''|*[!A-Za-z0-9-]*) echo 'Invalid service admission epoch'; exit 1 ;;
+                esac
+                [ "${#RESERVE_SERVICE_ADMISSION_EPOCH}" -ge 16 ] && [ "${#RESERVE_SERVICE_ADMISSION_EPOCH}" -le 64 ] || { echo 'Invalid service admission epoch'; exit 1; }
+                ;;
+              false) ;;
+              *) echo 'RESERVE_SERVICE_ADMISSION_ENABLED must be true or false'; exit 1 ;;
+            esac
+            case "$RESERVE_SERVICE_ADMISSION_AUTOMATIC_ENABLED" in
+              true) [ "$RESERVE_SERVICE_ADMISSION_ENABLED" = true ] || { echo 'Automatic protection requires service admission'; exit 1; } ;;
+              false) ;;
+              *) echo 'RESERVE_SERVICE_ADMISSION_AUTOMATIC_ENABLED must be true or false'; exit 1 ;;
             esac
             case "$FEED_ENABLED" in
               true) : "${FEED_IMAGE_ENCRYPTION_KEY:?A dedicated feed image key is required when feed is enabled}" ;;
@@ -762,8 +784,8 @@ jobs:
               COMPATIBLE_IMAGE=$(sudo docker inspect --format '{{.Image}}' "$COMPATIBLE_UPSTREAM")
               SCHEMA_COMPAT=$(sudo docker image inspect --format '{{index .Config.Labels "reserve.schema-compat"}}' "$COMPATIBLE_IMAGE")
               FEATURE_COMPAT=$(sudo docker image inspect --format '{{index .Config.Labels "reserve.feature-compat"}}' "$COMPATIBLE_IMAGE")
-              if [ "$SCHEMA_COMPAT" != 'v270-refund-v1' ] || [ "$FEATURE_COMPAT" != 'waiting-signup-hidden-feed-oauth-v7' ]; then
-                echo "Cutover requires compatible target and recovery images"
+              if [ "$SCHEMA_COMPAT" != 'v270-refund-v1' ] || [ "$FEATURE_COMPAT" != 'waiting-signup-hidden-feed-oauth-login-session-admission-v10' ]; then
+                echo "Cutover requires target and recovery images with login-method compatibility"
                 exit 1
               fi
             done

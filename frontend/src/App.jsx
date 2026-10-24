@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, matchPath, useLocation, useNavigationType } from 'react-router-dom';
 import SessionQueryProvider from './components/common/SessionQueryProvider';
+import ServiceAdmissionProvider from './components/common/ServiceAdmissionProvider';
 import WorkspaceNavigationProvider from './components/layout/WorkspaceNavigationProvider';
 import WorkspaceMenuProvider from './components/layout/WorkspaceMenuProvider';
 import LegacyDomainNotice from './components/layout/LegacyDomainNotice';
@@ -286,13 +287,15 @@ function AppContent() {
     return (
         <LoadingPresentationContext.Provider value={presentation}>
         <AntApp message={{ maxCount: 3, styles: {
-            list: { willChange: 'auto' }, listContent: { willChange: 'auto' },
+            list: { willChange: 'auto' }, listContent: { willChange: 'auto', pointerEvents: 'none' },
             root: { willChange: 'auto', backfaceVisibility: 'visible' },
             title: { color: colors.text.primary, fontWeight: fontWeight.medium, fontSize: fontSize.base, lineHeight: '24px' },
         } }}>
             <LoginFeedback />
             <SessionQueryProvider key={sessionRevision}>
-                <WorkspaceNavigationProvider><WorkspaceMenuProvider><AppRoutes /></WorkspaceMenuProvider></WorkspaceNavigationProvider>
+                <ServiceAdmissionProvider>
+                    <WorkspaceNavigationProvider><WorkspaceMenuProvider><AppRoutes /></WorkspaceMenuProvider></WorkspaceNavigationProvider>
+                </ServiceAdmissionProvider>
             </SessionQueryProvider>
         </AntApp>
         </LoadingPresentationContext.Provider>

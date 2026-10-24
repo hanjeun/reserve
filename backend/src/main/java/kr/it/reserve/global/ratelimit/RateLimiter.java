@@ -29,6 +29,9 @@ public class RateLimiter {
          */
         LOGIN_ACCOUNT(5, Duration.ofMinutes(10)),
         EMAIL_SEND(5, Duration.ofMinutes(10)),
+        LOGIN_METHOD_CHANGE(5, Duration.ofMinutes(10)),
+        LOGIN_METHOD_EMAIL(5, Duration.ofMinutes(10)),
+        LOGIN_METHOD_VERIFY(20, Duration.ofMinutes(10)),
         RESERVATION_CREATE(5, Duration.ofMinutes(1)),   // 1분에 5회 예약
         WAITING_JOIN(5, Duration.ofMinutes(1)),         // 회원·IP별 고객 웨이팅 접수 제한
         SIGNUP(5, Duration.ofMinutes(10)),              // 10분에 5회 회원가입
@@ -63,6 +66,12 @@ public class RateLimiter {
         AD_METRIC(120, Duration.ofMinutes(1)),
         // 공개 프로필과 작성글 조회는 같은 방문자 한도를 쓰되 다른 읽기·쓰기 정책과 분리한다.
         PROFILE_READ(120, Duration.ofMinutes(1)),
+        SERVICE_ENTRY_IP_READ(600, Duration.ofMinutes(1)),
+        SERVICE_ENTRY_READ(60, Duration.ofMinutes(1)),
+        SERVICE_ENTRY_JOIN(120, Duration.ofMinutes(1)),
+        // Emergency-only protection before JWT/DB work. Existing transaction recovery has its own policies.
+        SERVICE_EMERGENCY_IP(120, Duration.ofMinutes(1)),
+        SERVICE_EMERGENCY_GLOBAL(30, Duration.ofSeconds(1)),
         /**
          * QR 토큰의 자동 재생·대량 시도를 줄이는 IP 제한이다.
          * 서명·만료·방문 당일 및 소유 가게 검증을 대체하지 않는다.

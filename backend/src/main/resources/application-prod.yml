@@ -29,10 +29,15 @@ spring:
 
 # Redis remains disabled unless explicitly enabled. Only the internal service alias or RFC1918 address is accepted.
 reserve:
+  service-admission:
+    # Opt-in only; capacity/lifetime bindings are shared with application-common.yml.
+    enabled: ${RESERVE_SERVICE_ADMISSION_ENABLED:false}
+    automatic:
+      enabled: ${RESERVE_SERVICE_ADMISSION_AUTOMATIC_ENABLED:false}
   redis:
     host: ${RESERVE_REDIS_HOST:}
 
-# Bounded local fallback keeps Redis out of application availability; failures are logged separately.
+# Limits/relays have a bounded fallback. Enabled admission gates fail closed when Redis is unavailable.
 management:
   health:
     redis:

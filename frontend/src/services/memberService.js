@@ -11,15 +11,27 @@
 import api from '../api/axios';
 import { API_ENDPOINTS } from '../constants';
 
+const loginMethodScope = memberId => ({ headers: { 'X-Reserve-Member-Id': String(memberId) } });
+
 const memberService = {
     /** 내 정보 조회 */
     getMe: () => api.get(API_ENDPOINTS.MEMBER.ME),
+
+    getLoginMethods: (signal) => api.get('/api/member/login-methods', { signal }),
+    beginLoginMethodOAuth: (memberId, data) => api.post('/api/member/login-methods/oauth', data, loginMethodScope(memberId)),
+    sendLoginMethodCode: (memberId, email) => api.post('/api/member/login-methods/password/code', { email }, loginMethodScope(memberId)),
+    setLoginMethodPassword: (memberId, data) => api.post('/api/member/login-methods/password', data, loginMethodScope(memberId)),
+    removeLoginMethodPassword: (memberId) => api.delete('/api/member/login-methods/password', loginMethodScope(memberId)),
+    unlinkSocialLogin: (memberId, currentPassword) => api.delete('/api/member/login-methods/social', {
+        ...loginMethodScope(memberId), data: { currentPassword },
+    }),
 
     /** 일반 회원 정보 수정 (비밀번호는 전용 관문 사용) */
     updateMember: (data) => api.put(API_ENDPOINTS.MEMBER.UPDATE, data),
 
     /** 현재 비밀번호 재인증 후 변경. 성공하면 authVersion 회전 + refresh token 폐기로 모든 세션을 끊는다. */
-    changePassword: (data) => api.put(API_ENDPOINTS.MEMBER.PASSWORD, data),
+    changePassword: (data, memberId) => memberId == null ? api.put(API_ENDPOINTS.MEMBER.PASSWORD, data)
+        : api.put('/api/member/login-methods/password', data, loginMethodScope(memberId)),
 
     /** 프로필 이미지 업로드 */
     uploadProfileImage: (file) => {

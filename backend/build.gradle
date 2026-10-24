@@ -12,7 +12,7 @@ dependencyLocking {
 group = 'kr.it.reserve'
 // 주의: frontend/package.json 의 version 과 항상 같이 올린다.
 //    2.0.2 · 2.0.3 · 2.1.0 세 번을 여기만 안 올려서 프론트 2.1.0 / 백엔드 2.0.1 로 벌어져 있었다.
-version = '2.14.1'
+version = '2.15.0'
 description = 'We are reserve'
 
 java {
@@ -106,11 +106,16 @@ jar {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // Recycle cached Spring/ArchUnit state without increasing each worker's heap budget.
+    forkEvery = 50
     systemProperty 'reserve.toolTestClasspath', sourceSets.test.runtimeClasspath.asPath
 }
 
 // Compile the standalone operator tool for its isolated, read-only fixture checks.
 tasks.named('compileTestJava') {
+    source '../scripts/java/kr/it/reserve/tools/PrepareAdmissionCampaign.java'
+    source '../scripts/java/kr/it/reserve/tools/PrepareServiceAdmission.java'
+    source '../scripts/tests/kr/it/reserve/tools/PrepareServiceAdmissionTest.java'
     source '../scripts/java/kr/it/reserve/tools/VerifyDatabaseSchema.java'
     source '../scripts/java/kr/it/reserve/tools/VerifyChatImageRecovery.java'
     source '../scripts/tests/kr/it/reserve/tools/VerifyChatImageRecoveryTest.java'

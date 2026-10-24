@@ -29,7 +29,7 @@ const BLOCKED_LABEL = {
     FULL: '마감',
 };
 
-const BookingCalendar = ({ storeId, value, onChange, style, disabled = false }) => {
+const BookingCalendar = ({ storeId, reservationId, value, onChange, style, disabled = false }) => {
     const { status } = Form.Item.useStatus();
     const isError = status === 'error';
 
@@ -40,7 +40,7 @@ const BookingCalendar = ({ storeId, value, onChange, style, disabled = false }) 
 
     const monthKey = month.format('YYYY-MM');
     // 닫혀 있을 땐 부르지 않는다 — 열어야 볼 수 있는 정보라 미리 받아둘 이유가 없다.
-    const { byDate, loading, fetching, error, refetch } = useBookingCalendar(storeId, open ? monthKey : null);
+    const { byDate, loading, fetching, error, refetch } = useBookingCalendar(storeId, open ? monthKey : null, reservationId);
 
     const thisMonth = dayjs().startOf('month');
     // 지난 달로는 못 간다 — 어차피 전부 PAST 라 볼 것이 없고, 쿼리만 한 번 더 나간다.
@@ -341,6 +341,7 @@ const styles = {
 
 BookingCalendar.propTypes = {
     storeId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+    reservationId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
     /** dayjs. Form.Item 이 주입한다. */
     value: PropTypes.object,
     onChange: PropTypes.func,

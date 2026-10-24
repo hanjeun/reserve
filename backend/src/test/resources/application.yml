@@ -1,4 +1,12 @@
 # 테스트용 설정
+# Background workers are invoked explicitly by their tests, never on an unrelated fixture's timer.
+reserve:
+  scheduling:
+    enabled: false
+reservation:
+  code-backfill:
+    enabled: false
+
 advertisement:
   payments:
     reconciliation-enabled: false

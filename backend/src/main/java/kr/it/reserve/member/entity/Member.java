@@ -52,6 +52,11 @@ public class Member {
     @Column(name = "provider_id")
     private String providerId;  // OAuth2 제공자의 고유 ID
 
+    /** 로그인 수단을 직접 관리한 회원의 연락처·프로필은 공급자 재로그인으로 덮어쓰지 않는다. */
+    @Builder.Default
+    @Column(name = "login_methods_managed", nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private boolean loginMethodsManaged = false;
+
     @Column(name = "profile_image")
     private String profileImage;  // 프로필 이미지 URL
 
@@ -191,6 +196,7 @@ public class Member {
         this.role = Role.USER;
         this.provider = null;
         this.providerId = null;
+        this.loginMethodsManaged = false;
         this.profileImage = null;
         this.profileImageLocked = true;
         this.oauthAccessToken = null;

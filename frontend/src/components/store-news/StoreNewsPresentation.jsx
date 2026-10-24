@@ -3,6 +3,8 @@ import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { PageTitle } from '../common/PageTypography';
 import LoadingImage from '../common/LoadingImage';
+import Card from '../common/Card';
+import { getThumbnailUrl } from '../../utils';
 import PhotoGallery from '../common/PhotoGallery';
 import { feedDate, feedMediaUrl } from '../../utils/feed';
 import { storeNewsPeriodLabel, storeNewsTypeLabel } from '../../utils/storeNews';
@@ -17,21 +19,25 @@ export function StoreNewsMetadata({ item }) {
 }
 StoreNewsMetadata.propTypes = { item: PropTypes.object.isRequired };
 
-function BannerImage({ imageUrl }) {
+function BannerImage({ imageUrl, imageSize, square = false }) {
     const [failed, setFailed] = useState(false);
     const placeholder = failed || imageUrl === BENEFIT_IMAGE_FALLBACK;
-    return <span className={`reserve-benefit-media${placeholder ? ' reserve-benefit-media--placeholder' : ''}`}>
-        <LoadingImage className="reserve-benefit-thumbnail" src={placeholder ? BENEFIT_IMAGE_FALLBACK : imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer"
-            onError={() => { if (!placeholder) setFailed(true); }} />
-    </span>;
+    return <div className={`reserve-benefit-media${placeholder && !square ? ' reserve-benefit-media--placeholder' : ''}`}>
+        {square ? <Card.Cover src={placeholder ? getThumbnailUrl() : imageUrl} alt="" referrerPolicy="no-referrer"
+            width={imageSize?.width} height={imageSize?.height} aspectRatio={1} imageClassName="reserve-benefit-thumbnail" />
+            : <LoadingImage className="reserve-benefit-thumbnail" src={placeholder ? BENEFIT_IMAGE_FALLBACK : imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer"
+                onError={() => { if (!placeholder) setFailed(true); }} />}
+    </div>;
 }
-BannerImage.propTypes = { imageUrl: PropTypes.string.isRequired };
+BannerImage.propTypes = { imageUrl: PropTypes.string.isRequired, square: PropTypes.bool,
+    imageSize: PropTypes.shape({ width: PropTypes.number, height: PropTypes.number }) };
 
 export function BenefitRow({ item, preview = false }) {
     const imageUrl = feedMediaUrl(item.images?.[0]?.url) || getBenefitImageUrl(item.mainImageUrl);
     const design = ['PHOTO', 'COMPACT'].includes(item.design) ? item.design.toLowerCase() : 'standard';
     const className = `reserve-benefit-row reserve-benefit-row--${design}`;
-    const content = <><BannerImage key={imageUrl} imageUrl={imageUrl} /><div className="reserve-benefit-row-copy">
+    const imageSize = item.images?.[0] || { width: item.mainImageWidth, height: item.mainImageHeight };
+    const content = <><BannerImage key={imageUrl} imageUrl={imageUrl} imageSize={imageSize} square={design !== 'standard'} /><div className="reserve-benefit-row-copy">
         {item.excerpt && <p className="reserve-benefit-description">{item.excerpt}</p>}
         <h2 className="reserve-benefit-store">{item.storeName}</h2>
         <span className="reserve-benefit-title-badge"><span>{item.title}</span></span>
@@ -43,12 +49,10 @@ export function BenefitRow({ item, preview = false }) {
 BenefitRow.propTypes = { item: PropTypes.object.isRequired, preview: PropTypes.bool };
 
 function BenefitPhotos({ pictures }) {
-    const [current, setCurrent] = useState(0);
     return <div className="reserve-benefit-photos">
-        <PhotoGallery label="혜택" sources={pictures.map(image => image.src)} imageSizes={pictures} adaptiveHeight dots={false} onSlideChange={setCurrent}
+        <PhotoGallery label="혜택" sources={pictures.map(image => image.src)} imageSizes={pictures}
             wrapperStyle={{ width: '100%', overflow: 'hidden', borderRadius: 16, lineHeight: 0 }}
-            imageStyle={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }} />
-        {pictures.length > 1 && <span className="reserve-benefit-photo-count reserve-photo-count" aria-label={`사진 ${Math.min(current + 1, pictures.length)} / ${pictures.length}`}>{Math.min(current + 1, pictures.length)} / {pictures.length}</span>}
+            imageStyle={{ width: '100%', height: 'auto', display: 'block' }} />
     </div>;
 }
 BenefitPhotos.propTypes = { pictures: PropTypes.array.isRequired };
@@ -57,8 +61,8 @@ export function BenefitDetailContent({ item, preview = false, actions, status })
     const pictures = (item.images || []).map(image => ({ ...image, src: feedMediaUrl(image.url) })).filter(image => image.src);
     const mainImage = getBenefitImageUrl(item.mainImageUrl);
     const design = ['PHOTO', 'COMPACT'].includes(item.design) ? item.design.toLowerCase() : 'standard';
-    const store = preview ? <span className="reserve-benefits-text-link">{item.storeName}</span>
-        : <Link to={`/store/${item.storeId}`} className="reserve-benefits-text-link">{item.storeName}</Link>;
+    const store = preview ? <span className="reserve-benefits-text-link reserve-text-link">{item.storeName}</span>
+        : <Link to={`/store/${item.storeId}`} className="reserve-benefits-text-link reserve-text-link">{item.storeName}</Link>;
     return <article className={`reserve-benefits-page reserve-benefit-detail reserve-benefit-detail--${design}`} aria-label={preview ? `${item.title} 가게 소식 미리보기` : undefined} aria-labelledby={preview ? undefined : 'benefit-detail-title'}>
         <header className="reserve-benefits-heading"><div>
             <PageTitle level={preview ? 2 : 1} id={preview ? undefined : 'benefit-detail-title'}>{item.title || '제목 없는 소식'}</PageTitle>
@@ -70,8 +74,8 @@ export function BenefitDetailContent({ item, preview = false, actions, status })
                 onError={event => { if (!event.currentTarget.src.endsWith(BENEFIT_IMAGE_FALLBACK)) { event.currentTarget.src = BENEFIT_IMAGE_FALLBACK; event.currentTarget.alt = '가게 사진을 불러오지 못했어요'; event.currentTarget.classList.add('reserve-benefit-detail-image--placeholder'); } }} />}
         <div className="reserve-benefit-detail-content">{item.content}</div>
         {item.conditions && <section className="reserve-store-news-conditions" aria-label="이용 조건"><h2>이용 조건</h2><p>{item.conditions}</p></section>}
-        {!preview && <footer className="reserve-benefit-detail-links"><Link className="reserve-benefits-text-link" to="/benefits">소식 목록</Link>
-            <Link className="reserve-benefits-text-link" to={`/store/${item.storeId}`}>가게 보기 →</Link>{actions}</footer>}
+        {!preview && <footer className="reserve-benefit-detail-links"><Link className="reserve-benefits-text-link reserve-text-link" to="/benefits">소식 목록</Link>
+            <Link className="reserve-benefits-text-link reserve-text-link" to={`/store/${item.storeId}`}>가게 보기 →</Link>{actions}</footer>}
     </article>;
 }
 BenefitDetailContent.propTypes = { item: PropTypes.object.isRequired, preview: PropTypes.bool, actions: PropTypes.node, status: PropTypes.string };

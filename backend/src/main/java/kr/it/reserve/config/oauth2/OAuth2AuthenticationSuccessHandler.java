@@ -85,7 +85,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
         // 2. CookieUtil을 사용한 쿠키 저장 (중복 메서드 제거)
         int accessMaxAge = (int) jwtProperties.getAccessTokenExpiration().toSeconds();
-        int refreshMaxAge = (int) jwtProperties.getRefreshTokenExpiration().toSeconds();
+        int refreshMaxAge = (int) (pair.refreshMaxAge() == null ? jwtProperties.getRefreshTokenExpiration() : pair.refreshMaxAge()).toSeconds();
 
         cookieUtil.addCookie(response, "access_token", accessToken, accessMaxAge);
         cookieUtil.addCookie(response, "refresh_token", refreshToken, refreshMaxAge);
@@ -96,7 +96,8 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         // 4. 리액트 앱으로 리다이렉트
         // 신규 유저(약관 미동의)면 newUser=true 파라미터 추가
         String baseUrl = destination + "/oauth2/callback";
-        String redirectUrl = oAuth2User.isNewUser() ? baseUrl + "?newUser=true" : baseUrl;
+        String redirectUrl = oAuth2User.isLoginMethodAction() ? destination + "/my-page"
+                : oAuth2User.isNewUser() ? baseUrl + "?newUser=true" : baseUrl;
         log.info("OAuth2 redirect: url={}, env={}, newUser={}", redirectUrl, serverEnv, oAuth2User.isNewUser());
         getRedirectStrategy().sendRedirect(request, response, redirectUrl);
     }

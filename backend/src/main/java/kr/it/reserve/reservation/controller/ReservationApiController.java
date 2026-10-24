@@ -19,6 +19,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -54,9 +55,31 @@ public class ReservationApiController {
                 .body(ApiResponse.success(reservation, "예약이 신청됐어요."));
     }
 
+    @PostMapping("/requests/result")
+    public ResponseEntity<ApiResponse<ReservationResponse>> recoverReservation(
+            @Valid @RequestBody ReservationCreateRequest request) {
+        Member member = SecurityUtil.getCurrentMember();
+        if (!rateLimiter.tryConsume("reservation-result:" + member.getId(), RateLimiter.Policy.PROFILE_READ))
+            throw new ReservationException("예약 결과를 잠시 후 다시 확인해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+        return ResponseEntity.ok(ApiResponse.success(reservationService.recoverReservation(request, member), "예약 요청 결과를 확인했어요."));
+    }
+
     @GetMapping({"/my", "/my-reservations"})
-    public ResponseEntity<ApiResponse<List<ReservationResponse>>> getMyReservations() {
-        List<ReservationResponse> reservations = reservationService.getMyReservations(SecurityUtil.getCurrentMember());
+    public ResponseEntity<ApiResponse<Void>> retiredMyReservations() {
+        SecurityUtil.getCurrentMember();
+        return ResponseEntity.status(HttpStatus.GONE).cacheControl(CacheControl.noStore())
+                .body(ApiResponse.error("예약 조회 방식이 변경됐어요. 화면을 새로고침한 뒤 다시 시도해주세요."));
+    }
+
+    @GetMapping({"/my/page", "/my-reservations/page"})
+    public ResponseEntity<ApiResponse<Page<ReservationResponse>>> getMyReservationPage(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "15") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Reservation.ReservationStatus status,
+            @RequestParam(defaultValue = "recent") String sort) {
+        Page<ReservationResponse> reservations = reservationService.getMyReservations(
+                SecurityUtil.getCurrentMember(), page, size, search, status, sort);
         return ResponseEntity.ok(ApiResponse.success(reservations, "내 예약 목록 조회 성공"));
     }
 

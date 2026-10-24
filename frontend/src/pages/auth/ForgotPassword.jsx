@@ -272,15 +272,14 @@ const ForgotPassword = () => {
 
                 <Flex justify="center" style={{ marginTop: 20 }}>
                     <button
+                        type="button"
+                        className="reserve-text-link"
                         onClick={returnToLogin}
                         style={{
                             background: 'none',
                             border: 'none',
                             cursor: 'pointer',
                             fontSize: fontSize.sm,
-                            color: colors.text?.tertiary,
-                            textDecoration: 'underline',
-                            textUnderlineOffset: '3px',
                             padding: '2px 0',
                         }}
                     >

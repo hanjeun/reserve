@@ -24,6 +24,7 @@ export const benefitKeys = {
 export const reservationKeys = {
     all:    () => ['reservations'],
     my:     () => ['reservations', 'my'],
+    myPage: (params) => ['reservations', 'my', params],
     manage: () => ['reservations', 'manage'],
     managePage: (params) => ['reservations', 'manage', params],
     qrToken: (id) => ['reservations', 'qrToken', id],

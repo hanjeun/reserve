@@ -50,4 +50,36 @@ class JwtPropertiesValidationTest {
         ambiguous.getRefreshToken().setExpirationMinutes(30);
         assertThatThrownBy(ambiguous::validate).isInstanceOf(IllegalStateException.class);
     }
+
+    @Test
+    void absoluteLifetimeIsBoundedAndCannotBecomeAnUnlimitedOrSubsecondSession() {
+        for (java.time.Duration duration : new java.time.Duration[]{java.time.Duration.ZERO,
+                java.time.Duration.ofDays(-1), java.time.Duration.ofDays(366), java.time.Duration.ofMillis(500)}) {
+            JwtProperties properties = configured();
+            properties.setAbsoluteSessionLifetime(duration);
+            assertThatThrownBy(properties::validate).isInstanceOf(IllegalStateException.class);
+        }
+    }
+
+    @Test
+    void accessAndRefreshAudiencesMustBeDistinctAndNonempty() {
+        JwtProperties properties = configured();
+        properties.setAccessAudience(properties.getRefreshAudience());
+        assertThatThrownBy(properties::validate).isInstanceOf(IllegalStateException.class);
+        properties.setAccessAudience(" ");
+        assertThatThrownBy(properties::validate).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void optionalKeyringRejectsUnknownActiveKeysUnsafeIdsAndShortKeys() {
+        JwtProperties properties = configured();
+        properties.setActiveKeyId("active");
+        assertThatThrownBy(properties::validate).isInstanceOf(IllegalStateException.class);
+        properties.getSigningKeys().put("active", "short");
+        assertThatThrownBy(properties::validate).isInstanceOf(IllegalStateException.class);
+        properties.getSigningKeys().put("active", properties.getSecretKey() + "-rotated");
+        assertThatCode(properties::validate).doesNotThrowAnyException();
+        properties.getSigningKeys().put("../../unsafe", properties.getSecretKey());
+        assertThatThrownBy(properties::validate).isInstanceOf(IllegalStateException.class);
+    }
 }

@@ -16,6 +16,7 @@ const initialState = () => ({
     view: 'home',
     activeThread: false,
     selection: { kind: 'support' },
+    storeSearch: null,
     sessionIdentity: null,
     drafts: {},
 });
@@ -47,6 +48,47 @@ describe('useMessengerStore session drafts and entry points', () => {
             'store:31': '손님으로 남길 문의',
             'owner:21': '사장님으로 남길 답변',
         });
+    });
+
+    it('returns a selected store to the same in-memory search and then to its entry view', () => {
+        store().setDraft('store:31', '문의 초안');
+        store().openStoreSearch();
+        store().updateStoreSearch({ keyword: '공방', page: 2, scrollTop: 124 });
+        store().select({ kind: 'store', storeId: 31 }, { fromStoreSearch: true });
+        expect(store()).toMatchObject({ activeThread: true, storeSearch: { visible: false, selectedStoreId: 31 } });
+        store().returnToStoreSearch();
+        expect(store()).toMatchObject({ view: 'conversations', activeThread: false,
+            storeSearch: { visible: true, origin: 'home', keyword: '공방', page: 2, scrollTop: 124, selectedStoreId: 31 } });
+        store().closeStoreSearch();
+        expect(store()).toMatchObject({ view: 'home', storeSearch: null, drafts: { 'store:31': '문의 초안' } });
+        store().showConversations();
+        store().openStoreSearch();
+        store().closeStoreSearch();
+        expect(store().view).toBe('conversations');
+    });
+
+    it('does not attach a previous search to a direct conversation or footer entry', () => {
+        store().openStoreSearch();
+        store().updateStoreSearch({ keyword: '카페' });
+        store().openStore(31);
+        expect(store().storeSearch).toBeNull();
+        store().openStoreSearch();
+        store().select({ kind: 'store', storeId: 32 });
+        expect(store().storeSearch).toBeNull();
+        store().openStoreSearch();
+        store().showSettings();
+        expect(store()).toMatchObject({ view: 'settings', activeThread: false, storeSearch: null });
+    });
+
+    it('clears searches on a session change and rejects an old search callback', () => {
+        const identity = store().sessionIdentity;
+        store().openStoreSearch();
+        store().updateStoreSearch({ keyword: '이전 검색', page: 1, scrollTop: 80 }, identity);
+        useAuthStore.setState({ user: other, sessionRevision: 2 });
+        expect(store().storeSearch).toBeNull();
+        store().openStoreSearch();
+        store().updateStoreSearch({ keyword: '늦은 이전 검색' }, identity);
+        expect(store().storeSearch.keyword).toBe('');
     });
 
     it('caps each draft at 2000 characters and removes only a cleared draft', () => {
@@ -179,6 +221,8 @@ describe('useMessengerStore session drafts and entry points', () => {
         const storageRemovals = vi.spyOn(Storage.prototype, 'removeItem');
         store().openStore(31);
         store().setDraft('store:31', '메모리에만 있는 초안');
+        store().openStoreSearch();
+        store().updateStoreSearch({ keyword: '메모리에만 있는 검색' });
         store().closePanel();
         store().openPanel();
         useAuthStore.setState({ user: other, sessionRevision: 2 });

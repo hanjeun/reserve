@@ -5,6 +5,7 @@ import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.reservation.util.ReservationCodeGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -30,6 +31,7 @@ import java.util.Set;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "reservation.code-backfill.enabled", havingValue = "true", matchIfMissing = true)
 public class ReservationCodeBackfillRunner {
 
     private final ReservationRepository reservationRepository;

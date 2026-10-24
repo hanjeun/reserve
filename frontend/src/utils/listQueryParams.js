@@ -30,7 +30,7 @@ const isPage = value => /^[1-9]\d*$/.test(value)
 const schemas = {
     '/my-stores': { view: VIEW_MODES, domain: domains, sort: ownerSorts },
     '/my-favorites': { view: VIEW_MODES, kind: new Set(['all', 'stores', 'posts', 'news', 'comments']) },
-    '/my-reservations': { view: VIEW_MODES, status: reservationStatuses, sort: reservationSorts,
+    '/my-reservations': { view: VIEW_MODES, status: reservationStatuses, sort: reservationSorts, page: isPage,
         tab: new Set(['reservation', 'waiting']), waitingPage: value => isPage(value) && Number(value) <= 100_000,
         waitingStatus: new Set(['ALL', 'WAITING', 'CALLED', 'SEATED', 'CANCELLED']),
         waitingSort: new Set(['recent', 'oldest']), waitingKeyword: value => value.length <= 100 },

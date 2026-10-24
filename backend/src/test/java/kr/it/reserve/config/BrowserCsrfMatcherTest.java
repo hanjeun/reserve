@@ -19,6 +19,23 @@ class BrowserCsrfMatcherTest {
     }
 
     @Test
+    void anonymousEntryCookiesAlsoRequireBrowserOriginProofForWrites() {
+        for (String name : List.of("reserve_entry", "__Host-reserve-entry")) {
+            var request = new MockHttpServletRequest("DELETE", "/api/service-admission");
+            request.setServletPath("/api/service-admission");
+            request.setCookies(new Cookie(name, "synthetic-entry"));
+            assertThat(matcher.matches(request)).isTrue();
+            request.addHeader("Origin", "https://untrusted.example");
+            assertThat(matcher.matches(request)).isTrue();
+            request.removeHeader("Origin");
+            request.addHeader("Origin", "https://reserve.it.kr");
+            assertThat(matcher.matches(request)).isFalse();
+            request.setMethod("GET");
+            assertThat(matcher.matches(request)).isFalse();
+        }
+    }
+
+    @Test
     void browserWritesNeedAnExactTrustedOrigin() {
         var request = write();
         for (String origin : List.of("null", "http://reserve.it.kr", "https://reserve.it.kr.evil.example")) {

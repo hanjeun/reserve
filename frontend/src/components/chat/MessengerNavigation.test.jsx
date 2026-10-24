@@ -10,6 +10,15 @@ import { MESSENGER_COVER_IMAGE } from './messengerImages';
 import Avatar from '../common/Avatar';
 
 describe('MessengerHome headings', () => {
+    it('keeps the support entry without a separate store inquiry action', () => {
+        const onChoose = vi.fn();
+        render(<MessengerHome onChoose={onChoose} />);
+        expect(screen.queryByRole('button', { name: '가게에 문의' })).not.toBeInTheDocument();
+        expect(onChoose).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: '고객지원에 문의' }));
+        expect(onChoose).toHaveBeenCalledWith({ kind: 'support' });
+    });
+
     it.each([1, 2])('keeps one accessible heading at level %s without a visible cover wordmark', headingLevel => {
         const onChoose = vi.fn();
         const { container } = render(<MessengerHome onChoose={onChoose} headingLevel={headingLevel} />);

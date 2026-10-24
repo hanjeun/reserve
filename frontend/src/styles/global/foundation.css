@@ -72,23 +72,6 @@ a {
   color: inherit;
 }
 
-/* Plain text links share one neutral color through navigation and pointer states. */
-a.reserve-text-link,
-a.reserve-text-link:visited,
-a.reserve-text-link:hover,
-a.reserve-text-link:focus,
-a.reserve-text-link:active {
-    color: var(--c-text-secondary, #4e5968);
-    text-decoration-line: underline;
-    text-decoration-color: transparent;
-    text-decoration-thickness: 1px;
-    text-underline-offset: 3px;
-    transition: text-decoration-color 0.15s ease;
-}
-a.reserve-text-link:is(:hover, :focus-visible, :active, [aria-current="page"]) {
-    text-decoration-color: currentColor;
-}
-
 /* button/input은 브라우저 기본값이 폰트 상속을 안 받아서(웹 표준 동작) 전역으로 맞춰줌 */
 button, input, textarea, select {
   font-family: inherit;

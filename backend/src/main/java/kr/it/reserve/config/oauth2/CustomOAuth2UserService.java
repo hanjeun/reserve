@@ -34,6 +34,8 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
     private final MemberRepository memberRepository;
     private final OAuthSubjectSecurityService subjectSecurity;
+    @org.springframework.beans.factory.annotation.Autowired
+    private kr.it.reserve.member.service.LoginMethodService loginMethods;
 
     @Override
     @Transactional
@@ -66,13 +68,23 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
         // 4. 회원 조회 또는 생성 (Access Token도 함께 저장)
         boolean isNewUser = false;
-        Member member = processOAuth2User(provider, userInfo, accessToken, authenticatedAt,
+        var attributes = org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+        Member managed = null;
+        if (loginMethods != null && attributes instanceof org.springframework.web.context.request.ServletRequestAttributes servlet) {
+            try {
+                managed = loginMethods.completeOAuth(servlet.getRequest(), provider, userInfo, accessToken,
+                        authenticatedAt, userRequest.getAccessToken().getExpiresAt());
+            } catch (kr.it.reserve.global.error.BusinessException | IllegalArgumentException exception) {
+                throw new OAuth2AuthenticationException("login_method_expired");
+            }
+        }
+        Member member = managed != null ? managed : processOAuth2User(provider, userInfo, accessToken, authenticatedAt,
                 userRequest.getAccessToken().getExpiresAt());
         // 약관 미동의 신규 유저 체크
         if (!member.isTermsAgreed()) isNewUser = true;
 
         return new CustomOAuth2User(member, oAuth2User.getAttributes(), userNameAttributeName, isNewUser,
-                userRequest.getAccessToken().getExpiresAt());
+                userRequest.getAccessToken().getExpiresAt(), managed != null);
     }
 
     /**
@@ -172,10 +184,10 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         }
 
         // 엔티티에 정의된 메서드 호출 (이름과 프로필 이미지 업데이트)
-        member.updateOAuth(userInfo.getName(), userInfo.getProfileImage());
+        if (!member.isLoginMethodsManaged()) member.updateOAuth(userInfo.getName(), userInfo.getProfileImage());
 
         // 이메일 변경 처리 로직 (이메일은 특수한 경우이므로 별도 처리)
-        if (userInfo.getEmail() != null && !userInfo.getEmail().equals(member.getEmail())) {
+        if (!member.isLoginMethodsManaged() && userInfo.getEmail() != null && !userInfo.getEmail().equals(member.getEmail())) {
             Optional<Member> existingEmail = memberRepository.findByEmailAndDeletedAtIsNull(userInfo.getEmail());
             if (existingEmail.isEmpty()) {
                 member.setEmail(userInfo.getEmail());

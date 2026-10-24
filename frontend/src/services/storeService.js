@@ -7,7 +7,7 @@ const storeService = {
     deleteStore:              (storeId)           => api.delete(API_ENDPOINTS.STORE.DELETE(storeId)),
     getActiveReservationsCount:(storeId)          => api.get(API_ENDPOINTS.STORE.ACTIVE_RESERVATIONS_COUNT(storeId)),
     getClosureReadiness:      (storeId)           => api.get(API_ENDPOINTS.STORE.CLOSURE_READINESS(storeId)),
-    getStores:                (params = {})       => api.get(API_ENDPOINTS.STORE.LIST, { params }),
+    getStores:                (params = {}, signal) => api.get(API_ENDPOINTS.STORE.LIST, { params, ...(signal ? { signal } : {}) }),
     getRegions:               ()                  => api.get(API_ENDPOINTS.STORE.REGIONS),
     getStoreById:             (storeId)           => api.get(API_ENDPOINTS.STORE.DETAIL(storeId)),
     getStoreForEdit:          (storeId)           => api.get(API_ENDPOINTS.STORE.EDIT(storeId)),

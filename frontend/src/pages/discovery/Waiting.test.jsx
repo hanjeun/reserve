@@ -5,6 +5,9 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import Waiting from './Waiting';
 import waitingService from '../../services/waitingService';
 
+const live = vi.hoisted(() => ({ present: false, connected: false, domains: [] }));
+vi.mock('../../hooks/useLiveUpdatesStatus', () => ({ default: () => live }));
+
 vi.mock('../../services/waitingService', () => ({ default: { getStores: vi.fn() } }));
 vi.mock('../../hooks/useDocumentTitle', () => ({ default: vi.fn() }));
 vi.mock('../../components/store/StoreCard', () => ({ default: ({ store }) => <article>{store.name}</article> }));
@@ -27,7 +30,20 @@ const show = (url = '/waiting') => {
 };
 const currentParams = () => new URLSearchParams(screen.getByTestId('route').textContent);
 
-beforeEach(() => { vi.resetAllMocks(); sessionStorage.clear(); });
+beforeEach(() => { vi.resetAllMocks(); sessionStorage.clear(); Object.assign(live, { present: false, connected: false, domains: [] }); });
+
+it.each([false, true])('keeps manual refresh with the WAITING capability advertised (connected=%s)', async connected => {
+    Object.assign(live, { present: true, connected, domains: ['WAITING'] });
+    waitingService.getStores.mockResolvedValue(page('기존 웨이팅 가게'));
+    show('/waiting?view=list&status=PAUSED');
+    await screen.findByText('기존 웨이팅 가게');
+    const calls = waitingService.getStores.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: '새로고침' }));
+    await waitFor(() => expect(waitingService.getStores).toHaveBeenCalledTimes(calls + 1));
+    expect(screen.getByText('기존 웨이팅 가게')).toBeInTheDocument();
+    expect(currentParams().get('view')).toBe('list');
+    expect(currentParams().get('status')).toBe('PAUSED');
+});
 
 it.each([false, true])('keeps view and filters on refresh failure without declaring an empty cache successful (rows=%s)', async hasRows => {
     waitingService.getStores.mockResolvedValue({ content: hasRows ? [{ id: 1, name: '기존 가게' }] : [], page: { totalElements: hasRows ? 1 : 0 } });

@@ -29,6 +29,10 @@ vi.mock('../../components/common', () => ({
     PageContainer: ({ children, className }) => <main className={className}>{children}</main>,
     StoreCardSkeleton: ({ count }) => <div data-testid="card-skeleton">{count}</div>,
     Button: ({ children, onClick }) => <button type="button" onClick={onClick}>{children}</button>,
+    FilterToolbar: ({ search, onReload, initialLoading }) => initialLoading ? <div data-testid="search-skeleton" aria-hidden="true" /> : <div>
+        <input placeholder={search.placeholder} value={search.value} onChange={search.onChange} />
+        <button type="button" onClick={onReload}>새로고침</button>
+    </div>,
     DataState: ({ state = 'empty', title, subject, onRetry }) => (
         <section role={state === 'error' ? 'alert' : undefined}>
             <span>{title ?? `${subject ?? '목록'}을 불러오지 못했습니다.`}</span>
@@ -160,6 +164,8 @@ describe('store list view selection with real URL pagination', () => {
         let resolve;
         storeService.getStores.mockReturnValue(new Promise(done => { resolve = done; }));
         const { container } = renderList(url);
+        expect(screen.getByTestId('search-skeleton')).toBeInTheDocument();
+        expect(screen.queryByPlaceholderText('가게 검색')).toBeNull();
         if (skeleton === 'card-skeleton') expect(screen.getByTestId('card-skeleton')).toHaveTextContent('12');
         else expect(container.querySelectorAll('.reserve-store-list-row-skeleton')).toHaveLength(12);
         const toggleLabel = skeleton === 'card-skeleton' ? '목록형 보기로 전환' : '사진형 보기로 전환';
@@ -171,6 +177,8 @@ describe('store list view selection with real URL pagination', () => {
         if (skeleton === 'card-skeleton') expect(await screen.findByTestId('original-card')).toHaveTextContent('정상 가게');
         else expect(await screen.findByTestId('list-row')).toHaveTextContent('정상 가게');
         expect(screen.getByRole('button', { name: toggleLabel })).toBeEnabled();
+        expect(screen.queryByTestId('search-skeleton')).toBeNull();
+        expect(screen.getByPlaceholderText('가게 검색')).toBeEnabled();
     });
 
     it('normalizes an unknown view to explicit cards without discarding other URL values', async () => {
@@ -180,12 +188,33 @@ describe('store list view selection with real URL pagination', () => {
         expect(routeParams().get('utm_source')).toBe('yes');
     });
 
+    it('searches after typing settles, keeps the input mounted, and preserves the other URL selections', async () => {
+        renderList('/stores?view=list&page=3&domain=FOOD&sort=reviewCount&utm_source=yes');
+        await screen.findByTestId('list-row');
+        const input = screen.getByPlaceholderText('가게 검색');
+        input.focus();
+        fireEvent.change(input, { target: { value: '카' } });
+        fireEvent.change(input, { target: { value: '카페' } });
+        expect(input).toHaveValue('카페');
+        expect(storeService.getStores).toHaveBeenCalledTimes(1);
+        await waitFor(() => expect(storeService.getStores).toHaveBeenLastCalledWith({
+            keyword: '카페', domain: 'FOOD', sort: 'reviewCount', page: 0, size: 12,
+        }));
+        expect(storeService.getStores).toHaveBeenCalledTimes(2);
+        expect(screen.getByPlaceholderText('가게 검색')).toBe(input);
+        expect(input).toHaveFocus();
+        expect(routeParams().get('page')).toBe('1');
+        expect(routeParams().get('view')).toBe('list');
+        expect(routeParams().get('utm_source')).toBe('yes');
+    });
+
     it('retains errors and explicit retry after changing the view instead of presenting an empty list', async () => {
         storeService.getStores.mockRejectedValueOnce(new Error('실제 조회 실패'));
         const user = userEvent.setup();
         renderList();
         await screen.findByRole('alert');
         expect(screen.getByRole('alert')).toHaveTextContent('가게 목록을 불러오지 못했습니다.');
+        expect(screen.getByText('목록 확인 필요')).toBeInTheDocument();
         await user.click(screen.getByRole('button', { name: '목록형 보기로 전환' }));
         expect(screen.getByRole('alert')).toHaveTextContent('가게 목록을 불러오지 못했습니다.');
         expect(screen.queryByText('조건에 맞는 가게가 없어요.')).not.toBeInTheDocument();

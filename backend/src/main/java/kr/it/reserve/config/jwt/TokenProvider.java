@@ -1,287 +1,342 @@
 package kr.it.reserve.config.jwt;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.PersistenceContext;
 import kr.it.reserve.config.jwt.entity.RefreshToken;
+import kr.it.reserve.config.jwt.repository.LoginSessionAuthentication;
 import kr.it.reserve.config.jwt.repository.RefreshTokenRepository;
 import kr.it.reserve.global.error.AuthException;
 import kr.it.reserve.member.entity.AuthProvider;
 import kr.it.reserve.member.entity.Member;
-import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
-import java.time.Clock;
-import java.time.DateTimeException;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.List;
-import java.util.UUID;
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
+import java.security.Key;
+import java.time.*;
+import java.time.Clock;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
 
+/** JWT cryptography and the common member -> device-session issuance boundary. */
 @Slf4j
 @RequiredArgsConstructor
 @Service
 public class TokenProvider {
-
     public enum Purpose { ACCESS, REFRESH }
-
-    /** refresh 토큰을 열어 본 결과. 거절 사유 로그가 만료와 위조를 구분할 수 있게 나눈다. */
-    public enum RefreshTokenState { VALID, EXPIRED, INVALID, NOT_REFRESH }
-
-    /**
-     * @param memberId    서명이 확인된 토큰의 회원 id(만료 포함). INVALID이면 null
-     * @param authVersion claim이 없는 구버전 토큰은 0
-     */
+    public enum RefreshTokenState { VALID, EXPIRED, INVALID, NOT_REFRESH, LEGACY }
     public record RefreshTokenInspection(RefreshTokenState state, Long memberId, int authVersion,
-            LocalDateTime oauthAuthenticatedAt) {
+            LocalDateTime oauthAuthenticatedAt, String loginMethod, String sessionId, long rotationVersion,
+            String jti, LocalDateTime absoluteExpiresAt) {
         public RefreshTokenInspection(RefreshTokenState state, Long memberId, int authVersion) {
-            this(state, memberId, authVersion, null);
+            this(state, memberId, authVersion, null, null, null, -1, null, null);
+        }
+        public RefreshTokenInspection(RefreshTokenState state, Long memberId, int authVersion, LocalDateTime at) {
+            this(state, memberId, authVersion, at, null, null, -1, null, null);
+        }
+        public RefreshTokenInspection(RefreshTokenState state, Long memberId, int authVersion, LocalDateTime at, String method) {
+            this(state, memberId, authVersion, at, method, null, -1, null, null);
         }
     }
+    public record IssuedSession(String accessToken, String refreshToken, Duration refreshMaxAge) {
+        @Override public String toString() { return "IssuedSession[credentials=redacted]"; }
+    }
+    /** Contains verified context only. No raw bearer is retained in Spring's Authentication details. */
+    public record VerifiedAuthentication(Member member, LocalDateTime oauthAuthenticatedAt, String loginMethod,
+                                         String sessionId) { }
 
-    private static final String PURPOSE_CLAIM = "purpose";
-    private static final String AUTH_VERSION_CLAIM = "authVersion";
-    /** UTC epoch milliseconds of the original provider authentication, never the refresh/issuance time. */
-    private static final String OAUTH_AUTHENTICATED_AT_CLAIM = "oauth_auth_at";
+    private static final String PURPOSE = "purpose";
+    private static final String AUTH_VERSION = "authVersion";
+    private static final String OAUTH_AT = "oauth_auth_at";
+    private static final String METHOD = "login_method";
+    private static final String SID = "sid";
+    private static final String GENERATION = "rgen";
+    private static final String ABSOLUTE_EXPIRY = "session_exp";
+    public static final String RELOGIN_AFTER_UPDATE = "로그인 보안이 업데이트됐어요. 다시 로그인해주세요.";
 
     private final JwtProperties jwtProperties;
     private final MemberRepository memberRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    @PersistenceContext private EntityManager entityManager;
     private SecretKey cachedSecretKey;
+    private Map<String, SecretKey> verificationKeys = Map.of();
+    private JwtParser parser;
+    private Clock clock = Clock.systemUTC();
 
     @PostConstruct
     public void init() {
-        this.cachedSecretKey = Keys.hmacShaKeyFor(
-                jwtProperties.getSecretKey().getBytes(StandardCharsets.UTF_8)
-        );
+        cachedSecretKey = Keys.hmacShaKeyFor(jwtProperties.getSecretKey().getBytes(StandardCharsets.UTF_8));
+        Map<String, SecretKey> keys = new HashMap<>();
+        jwtProperties.getSigningKeys().forEach((id, value) ->
+                keys.put(id, Keys.hmacShaKeyFor(value.getBytes(StandardCharsets.UTF_8))));
+        verificationKeys = Map.copyOf(keys);
+        parser = Jwts.parser().keyLocator(new LocatorAdapter<Key>() {
+            @Override protected Key locate(JwsHeader header) {
+                if (!"HS512".equals(header.getAlgorithm())) throw new JwtException("Unsupported JWT algorithm");
+                return signingKey(header.getKeyId());
+            }
+        }).clock(() -> Date.from(clock.instant())).requireIssuer(jwtProperties.getIssuer())
+                .sig().clear().add(Jwts.SIG.HS512).and().build();
     }
 
-    public String generateAccessToken(Member member) {
-        return generateAccessToken(member, oauthAuthenticationAt(member));
+    /** All browser logins issue their access and refresh from the same locked device session. */
+    @Transactional
+    public IssuedSession issueSession(Member authenticated, LocalDateTime oauthAuthenticatedAt) {
+        oauthAuthenticatedAt = oauthAuthenticatedAt == null ? null : oauthAuthenticatedAt.truncatedTo(ChronoUnit.MILLIS);
+        int expectedVersion = authenticated.getAuthVersion();
+        String method = loginMethod(authenticated, oauthAuthenticatedAt);
+        AuthProvider provider = authenticated.getProvider();
+        String providerId = authenticated.getProviderId();
+        Member current = memberRepository.findActiveByIdForUpdate(authenticated.getId())
+                .orElseThrow(TokenProvider::expired);
+        entityManager.flush();
+        entityManager.refresh(current, LockModeType.PESSIMISTIC_WRITE);
+        if (current.isDeleted() || current.isSuspended() || current.getAuthVersion() != expectedVersion
+                || !isLoginSessionCurrent(current, oauthAuthenticatedAt, method)
+                || "OAUTH".equals(method) && (current.getProvider() != provider
+                    || !Objects.equals(current.getProviderId(), providerId))) throw expired();
+
+        LocalDateTime now = utcNow().truncatedTo(ChronoUnit.SECONDS);
+        LocalDateTime absolute = now.plus(jwtProperties.getAbsoluteSessionLifetime());
+        LocalDateTime expires = earlier(now.plus(jwtProperties.getRefreshTokenExpiration()), absolute);
+        RefreshToken row = new RefreshToken(current.getId(), UUID.randomUUID().toString(), UUID.randomUUID().toString(),
+                jwtProperties.getActiveKeyId(), now, expires, absolute, current.getAuthVersion(), oauthAuthenticatedAt, method);
+        String refresh = reconstructRefreshToken(row);
+        row.bindRefreshToken(refresh);
+        refreshTokenRepository.save(row);
+        List<RefreshToken> devices = refreshTokenRepository.findByMemberIdForUpdate(current.getId());
+        for (int i = 0; i < devices.size() - 5; i++) refreshTokenRepository.delete(devices.get(i));
+        refreshTokenRepository.flush();
+        return new IssuedSession(accessForSession(row), refresh, Duration.between(now, expires));
     }
 
-    public String generateAccessToken(Member member, LocalDateTime oauthAuthenticatedAt) {
-        return generateToken(member, jwtProperties.getAccessTokenExpiration(), Purpose.ACCESS, oauthAuthenticatedAt);
-    }
-
-    /**
-     * Refresh Token 발급 — 기기당 저장 방식
-     * - 한 계정당 최대 5개 유지, 초과 시 가장 오래된 것부터 삭제
-     * - @Transactional로 race condition 방지
-     */
     @Transactional
     public String generateRefreshToken(Member member) {
-        return generateRefreshToken(member, oauthAuthenticationAt(member));
+        return issueSession(member, oauthAuthenticationAt(member)).refreshToken();
     }
-
     @Transactional
-    public String generateRefreshToken(Member member, LocalDateTime oauthAuthenticatedAt) {
-        Duration expiration = jwtProperties.getRefreshTokenExpiration();
-        String token = createRefreshJwt(member, oauthAuthenticatedAt);
-        LocalDateTime expiresAt = LocalDateTime.now(Clock.systemDefaultZone()).plus(expiration);
-
-        // 새 토큰 저장
-        refreshTokenRepository.save(new RefreshToken(member.getId(), token, expiresAt));
-
-        // 한 계정당 최대 5개 유지 — 트랜잭션 내에서 한 번에 체크
-        List<RefreshToken> tokens = refreshTokenRepository.findByMemberId(member.getId());
-        if (tokens.size() > 5) {
-            tokens.stream()
-                    .sorted(Comparator.comparing(RefreshToken::getExpiresAt))
-                    .limit(tokens.size() - 5)
-                    .forEach(refreshTokenRepository::delete);
-            refreshTokenRepository.flush(); // 즉시 반영
-        }
-
-        log.info("Refresh token issued: memberId={}, totalTokens={}", member.getId(), Math.min(tokens.size(), 5));
-        return token;
-    }
-
-    /** 저장 없이 refresh JWT 문자열만 만든다. 회전(TokenService.refresh)은 기존 행을 갱신하므로 새 행을 만들면 안 된다. */
-    public String createRefreshJwt(Member member) {
-        return createRefreshJwt(member, oauthAuthenticationAt(member));
-    }
-
-    public String createRefreshJwt(Member member, LocalDateTime oauthAuthenticatedAt) {
-        return generateToken(member, jwtProperties.getRefreshTokenExpiration(), Purpose.REFRESH, oauthAuthenticatedAt);
-    }
-
-    private String generateToken(Member member, Duration expiredAt, Purpose purpose, LocalDateTime oauthAuthenticatedAt) {
-        Date now = new Date();
-        return makeToken(member, new Date(now.getTime() + expiredAt.toMillis()), purpose, oauthAuthenticatedAt);
-    }
-
-    private String makeToken(Member member, Date expiry, Purpose purpose, LocalDateTime oauthAuthenticatedAt) {
-        Date now = new Date();
-        // jjwt 0.13 API — 0.12에서 set* 계열이 전부 이름을 바꿨고 parserBuilder()는 삭제됐다.
-        // (setHeaderParam → header().add(), setIssuer → issuer, setSubject → subject 등)
-        return Jwts.builder()
-                .header().add("typ", "JWT").and()
-                // jti: iat가 초 단위라 같은 초에 같은 회원에게 발급한 토큰은 문자열까지 같아진다.
-                //      refresh 회전은 토큰 문자열로 행을 찾고 직전 토큰을 해시로 구분하므로 매번 달라야 한다.
-                .id(UUID.randomUUID().toString())
-                .issuer(jwtProperties.getIssuer())
-                .issuedAt(now)
-                .expiration(expiry)
-                .subject(member.getEmail())
-                .claim("id", member.getId())
-                .claim("role", member.getRole().name())
-                .claim(AUTH_VERSION_CLAIM, member.getAuthVersion())
-                .claim(OAUTH_AUTHENTICATED_AT_CLAIM, isOAuthMember(member) && oauthAuthenticatedAt != null
-                        ? oauthAuthenticatedAt.toInstant(ZoneOffset.UTC).toEpochMilli() : null)
-                .claim(PURPOSE_CLAIM, purpose.name())
-                .signWith(cachedSecretKey)
-                .compact();
-    }
+    public String generateRefreshToken(Member member, LocalDateTime at) { return issueSession(member, at).refreshToken(); }
 
     /**
-     * Refresh 전용 관문. 무클레임 토큰은 배포 전에 발급된 refresh와의 짧은 호환 기간에만
-     * 허용하며, 실제 사용 가능 여부는 곧바로 refresh_token 테이블에서 다시 확인한다.
+     * Compatibility minting helpers create an UNREGISTERED token. A caller must use issueSession for login.
+     * A signature alone never registers or authorizes a device session.
      */
-    public boolean isRefreshToken(String token) {
-        String purpose = getClaims(token).get(PURPOSE_CLAIM, String.class);
-        return purpose == null || Purpose.REFRESH.name().equals(purpose);
+    public String generateAccessToken(Member member) { return generateAccessToken(member, oauthAuthenticationAt(member)); }
+    public String generateAccessToken(Member member, LocalDateTime at) { return generateAccessToken(member, at, loginMethod(member, at)); }
+    public String generateAccessToken(Member member, LocalDateTime at, String method) {
+        return accessForSession(detachedSession(member, at, method));
+    }
+    public String createRefreshJwt(Member member) { return createRefreshJwt(member, oauthAuthenticationAt(member)); }
+    public String createRefreshJwt(Member member, LocalDateTime at) { return createRefreshJwt(member, at, loginMethod(member, at)); }
+    public String createRefreshJwt(Member member, LocalDateTime at, String method) {
+        return reconstructRefreshToken(detachedSession(member, at, method));
+    }
+    private RefreshToken detachedSession(Member member, LocalDateTime at, String method) {
+        LocalDateTime now = utcNow().truncatedTo(ChronoUnit.SECONDS);
+        LocalDateTime absolute = now.plus(jwtProperties.getAbsoluteSessionLifetime());
+        return new RefreshToken(member.getId(), UUID.randomUUID().toString(), UUID.randomUUID().toString(),
+                jwtProperties.getActiveKeyId(), now, earlier(now.plus(jwtProperties.getRefreshTokenExpiration()), absolute),
+                absolute, member.getAuthVersion(), at, method == null ? loginMethod(member, at) : method);
     }
 
-    /**
-     * refresh 요청 전용 검사. validToken()과 달리 만료와 서명 불일치를 구분한다.
-     * jjwt는 서명을 먼저 확인한 뒤 exp를 보므로, EXPIRED의 memberId는 서명이 확인된 값이다.
-     */
+    /** Caller holds member -> session locks. Metadata is sufficient to reconstruct the exact current refresh. */
+    public IssuedSession rotateSession(RefreshToken row) {
+        LocalDateTime now = utcNow().truncatedTo(ChronoUnit.SECONDS);
+        LocalDateTime expires = earlier(now.plus(jwtProperties.getRefreshTokenExpiration()), row.getAbsoluteExpiresAt());
+        String jti = UUID.randomUUID().toString();
+        String keyId = jwtProperties.getActiveKeyId();
+        String refresh = makeToken(row, Purpose.REFRESH, jti, now, expires, keyId, row.getRotationVersion() + 1);
+        row.rotate(refresh, jti, keyId, now, expires);
+        return new IssuedSession(accessForSession(row), refresh, Duration.between(now, expires));
+    }
+    public IssuedSession currentSessionTokens(RefreshToken row) {
+        String refresh = reconstructRefreshToken(row);
+        if (!row.isCurrentToken(refresh)) throw new JwtException("Refresh reconstruction does not match stored hash");
+        return new IssuedSession(accessForSession(row), refresh, Duration.between(utcNow(), row.getExpiresAt()));
+    }
+    private String reconstructRefreshToken(RefreshToken row) {
+        return makeToken(row, Purpose.REFRESH, row.getRefreshJti(), row.getIssuedAt(), row.getExpiresAt(),
+                row.getSigningKeyId(), row.getRotationVersion());
+    }
+    public String accessForSession(RefreshToken row) {
+        LocalDateTime now = utcNow().truncatedTo(ChronoUnit.SECONDS);
+        LocalDateTime expires = earlier(now.plus(jwtProperties.getAccessTokenExpiration()),
+                earlier(row.getExpiresAt(), row.getAbsoluteExpiresAt()));
+        return makeToken(row, Purpose.ACCESS, UUID.randomUUID().toString(), now, expires,
+                jwtProperties.getActiveKeyId(), null);
+    }
+
+    /** Stable order and stable member-id subject: profile, email and role changes cannot change a grace response. */
+    private String makeToken(RefreshToken row, Purpose purpose, String jti, LocalDateTime issuedAt,
+                             LocalDateTime expires, String keyId, Long generation) {
+        JwtBuilder builder = Jwts.builder().header().type("JWT").and();
+        if (keyId != null) builder.header().keyId(keyId).and();
+        builder.id(jti).issuer(jwtProperties.getIssuer())
+                .audience().add(audience(purpose)).and()
+                .issuedAt(date(issuedAt)).expiration(date(expires)).subject(row.getMemberId().toString())
+                .claim("id", row.getMemberId()).claim(AUTH_VERSION, row.getAuthVersion())
+                .claim(METHOD, row.getLoginMethod())
+                .claim(OAUTH_AT, row.getOauthAuthenticatedAt() == null ? null
+                        : row.getOauthAuthenticatedAt().toInstant(ZoneOffset.UTC).toEpochMilli())
+                .claim(PURPOSE, purpose.name()).claim(SID, row.getSessionId())
+                .claim(ABSOLUTE_EXPIRY, row.getAbsoluteExpiresAt().toEpochSecond(ZoneOffset.UTC));
+        if (generation != null) builder.claim(GENERATION, generation);
+        return builder.signWith(signingKey(keyId), Jwts.SIG.HS512).compact();
+    }
+
+    public boolean isRefreshToken(String token) { return inspectRefreshToken(token).state() == RefreshTokenState.VALID; }
+
     public RefreshTokenInspection inspectRefreshToken(String token) {
         Claims claims;
+        boolean expired = false;
+        try { claims = getClaims(token); }
+        catch (ExpiredJwtException exception) { claims = exception.getClaims(); expired = true; }
+        catch (JwtException | IllegalArgumentException exception) { return invalidInspection(); }
         try {
-            claims = getClaims(token);
-        } catch (ExpiredJwtException e) {
-            return new RefreshTokenInspection(RefreshTokenState.EXPIRED, readMemberId(e.getClaims()), 0);
-        } catch (JwtException | IllegalArgumentException e) {
-            return new RefreshTokenInspection(RefreshTokenState.INVALID, null, 0);
+            Long memberId = readMemberId(claims);
+            if (!Purpose.REFRESH.name().equals(claims.get(PURPOSE, String.class))) {
+                return new RefreshTokenInspection(RefreshTokenState.NOT_REFRESH, memberId, 0);
+            }
+            if (claims.get(SID) == null) return new RefreshTokenInspection(RefreshTokenState.LEGACY, memberId, 0);
+            validateSessionClaims(claims, Purpose.REFRESH);
+            Object generation = claims.get(GENERATION);
+            if (!(generation instanceof Integer || generation instanceof Long) || ((Number) generation).longValue() < 0) {
+                throw new JwtException("Invalid refresh generation");
+            }
+            return new RefreshTokenInspection(expired ? RefreshTokenState.EXPIRED : RefreshTokenState.VALID,
+                    memberId, readAuthVersion(claims), readOAuthAuthenticationAt(claims), claims.get(METHOD, String.class),
+                    claims.get(SID, String.class), ((Number) generation).longValue(), claims.getId(),
+                    readAbsoluteExpiry(claims));
+        } catch (JwtException | IllegalArgumentException exception) { return invalidInspection(); }
+    }
+
+    /** Exactly one JWT parse/signature verification and one joined current member/device-session read. */
+    @Transactional(readOnly = true)
+    public VerifiedAuthentication verifyAuthentication(String token) {
+        Claims claims = getClaims(token);
+        if (!Purpose.ACCESS.name().equals(claims.get(PURPOSE, String.class))) {
+            throw new AuthException("접근 토큰이 아니에요. 다시 로그인해주세요.");
         }
+        if (claims.get(SID) == null) throw new AuthException(RELOGIN_AFTER_UPDATE);
+        validateSessionClaims(claims, Purpose.ACCESS);
         Long memberId = readMemberId(claims);
-        String purpose = claims.get(PURPOSE_CLAIM, String.class);
-        if (purpose != null && !Purpose.REFRESH.name().equals(purpose)) {
-            return new RefreshTokenInspection(RefreshTokenState.NOT_REFRESH, memberId, 0);
-        }
-        if (memberId == null) {
-            return new RefreshTokenInspection(RefreshTokenState.INVALID, null, 0);
-        }
-        try {
-            return new RefreshTokenInspection(RefreshTokenState.VALID, memberId, readAuthVersion(claims), readOAuthAuthenticationAt(claims));
-        } catch (JwtException exception) {
-            return new RefreshTokenInspection(RefreshTokenState.INVALID, null, 0);
-        }
+        String sid = claims.get(SID, String.class);
+        LoginSessionAuthentication current = refreshTokenRepository.findAuthenticationBySessionIdAndMemberId(sid, memberId)
+                .orElseThrow(TokenProvider::expired);
+        Member member = current.member();
+        LocalDateTime oauthAt = readOAuthAuthenticationAt(claims);
+        String method = claims.get(METHOD, String.class);
+        if (member.isDeleted() || member.isSuspended() || member.getAuthVersion() != readAuthVersion(claims)
+                || !isLoginSessionCurrent(member, oauthAt, method)) throw expired();
+        RefreshToken session = current.session();
+        if (!session.isLiveAt(utcNow()) || session.getAuthVersion() != member.getAuthVersion()
+                || !Objects.equals(session.getLoginMethod(), method)
+                || !Objects.equals(session.getOauthAuthenticatedAt(), oauthAt)
+                || !session.getAbsoluteExpiresAt().equals(readAbsoluteExpiry(claims))) throw expired();
+        return new VerifiedAuthentication(member, oauthAt, method, sid);
     }
-
-    private static LocalDateTime readOAuthAuthenticationAt(Claims claims) {
-        Object raw = claims.get(OAUTH_AUTHENTICATED_AT_CLAIM);
-        if (raw == null) return null;
-        if (!(raw instanceof Long || raw instanceof Integer)) throw new JwtException("Invalid OAuth authentication time");
-        try {
-            return LocalDateTime.ofInstant(Instant.ofEpochMilli(((Number) raw).longValue()), ZoneOffset.UTC);
-        } catch (DateTimeException exception) {
-            throw new JwtException("Invalid OAuth authentication time");
-        }
+    public boolean isDeviceSessionCurrent(String sessionId, Long memberId) {
+        return sessionId != null && memberId != null
+                && refreshTokenRepository.findBySessionIdAndMemberId(sessionId, memberId)
+                .filter(session -> session.isLiveAt(utcNow())).isPresent();
     }
-
-    private static boolean isOAuthMember(Member member) {
-        return member.getProvider() != null && member.getProvider() != AuthProvider.LOCAL;
+    public Member getActiveMemberFromToken(String token) { return verifyAuthentication(token).member(); }
+    public Member getMemberFromToken(String token) { return getActiveMemberFromToken(token); }
+    public boolean validToken(String token) {
+        try { getClaims(token); return true; }
+        catch (Exception exception) { log.debug("Invalid token: errorType={}", exception.getClass().getSimpleName()); return false; }
     }
-
-    private static LocalDateTime oauthAuthenticationAt(Member member) {
-        return isOAuthMember(member) ? member.getOauthAuthenticatedAt() : null;
-    }
+    public Long getUserId(String token) { return getClaims(token).get("id", Long.class); }
+    public LocalDateTime getOAuthAuthenticationAt(String token) { return readOAuthAuthenticationAt(getClaims(token)); }
+    public String getLoginMethod(String token) { return getClaims(token).get(METHOD, String.class); }
+    public String getSessionId(String token) { return getClaims(token).get(SID, String.class); }
 
     public boolean isOAuthSessionCurrent(Member member, LocalDateTime authenticatedAt) {
         return !isOAuthMember(member) || member.getOauthSecurityRevokedAt() == null
                 || authenticatedAt != null && authenticatedAt.isAfter(member.getOauthSecurityRevokedAt());
     }
-
-    private static Long readMemberId(Claims claims) {
-        Object raw = claims == null ? null : claims.get("id");
-        return raw instanceof Number number ? number.longValue() : null;
+    public boolean isLoginSessionCurrent(Member member, LocalDateTime at, String method) {
+        if (method == null) return isOAuthSessionCurrent(member, at);
+        return switch (method) {
+            case "PASSWORD" -> !isOAuthMember(member) || member.getPassword() != null;
+            case "OAUTH" -> isOAuthMember(member) && at != null && isOAuthSessionCurrent(member, at);
+            default -> false;
+        };
     }
-
-    private static int readAuthVersion(Claims claims) {
-        Object raw = claims.get(AUTH_VERSION_CLAIM);
-        return raw instanceof Number number ? number.intValue() : 0;
-    }
-
-    public boolean validToken(String token) {
-        try {
-            getClaims(token);
-            return true;
-        } catch (Exception e) {
-            log.debug("Invalid token: errorType={}", e.getClass().getSimpleName());
-            return false;
+    private void validateSessionClaims(Claims claims, Purpose purpose) {
+        Long id = readMemberId(claims);
+        String sid = claims.get(SID, String.class);
+        if (id == null || id <= 0 || !id.toString().equals(claims.getSubject()) || !uuid(sid) || !uuid(claims.getId())
+                || claims.getIssuedAt() == null || claims.getExpiration() == null
+                || claims.getIssuedAt().after(new Date(clock.millis() + 60_000))
+                || !claims.getIssuedAt().before(claims.getExpiration())
+                || claims.getAudience() == null || !claims.getAudience().equals(Set.of(audience(purpose)))
+                || !(claims.get(AUTH_VERSION) instanceof Number) || readAuthVersion(claims) < 0
+                || !("PASSWORD".equals(claims.get(METHOD, String.class)) || "OAUTH".equals(claims.get(METHOD, String.class)))
+                || claims.getExpiration().after(date(readAbsoluteExpiry(claims)))) {
+            throw new JwtException("Invalid device-session claims");
         }
     }
-
-    public Long getUserId(String token) {
-        return getClaims(token).get("id", Long.class);
-    }
-
-    /** 서명·만료를 검증한 연결의 원인증 문맥. 현재 회원의 최신 시각으로 대체하지 않는다. */
-    public LocalDateTime getOAuthAuthenticationAt(String token) {
-        return readOAuthAuthenticationAt(getClaims(token));
-    }
-
-    /**
-     * 토큰 서명만 맞는 것으로 인증하지 않고 현재 활성 회원 행을 확인한다.
-     * 탈퇴·익명화 직후 기존 access token이 만료될 때까지 살아 있는 공백을 막는 관문이다.
-     */
-    public Member getActiveMemberFromToken(String token) {
-        Claims claims = getClaims(token);
-        // Access와 refresh가 같은 키로 서명되므로 서명·만료만 확인해서는 refresh를 Bearer로
-        // 사용할 수 있다. 무클레임 구버전 access는 짧은 access 수명 뒤 /refresh로 교체된다.
-        if (!Purpose.ACCESS.name().equals(claims.get(PURPOSE_CLAIM, String.class))) {
-            throw new AuthException("접근 토큰이 아니에요. 다시 로그인해주세요.");
-        }
-        Long userId = claims.get("id", Long.class);
-        Member member = memberRepository.findByIdAndDeletedAtIsNull(userId)
-                .orElseThrow(() -> new AuthException("토큰과 일치하는 사용자를 찾을 수 없어요."));
-        if (member.isSuspended()) {
-            throw new AuthException("현재 인증할 수 없는 사용자예요.");
-        }
-        // authVersion claim이 없던 구버전 JWT는 0으로 읽어 무중단 배포한다. 비밀번호를 한 번
-        // 바꾸면 회원 행이 1 이상이 되어 그 이전 access JWT도 즉시 전부 거부된다.
-        if (readAuthVersion(claims) != member.getAuthVersion()) {
-            throw new AuthException("로그인 세션이 만료됐어요. 다시 로그인해주세요.");
-        }
-        if (!isOAuthSessionCurrent(member, readOAuthAuthenticationAt(claims))) {
-            throw new AuthException("계정 보호를 위해 소셜 로그인을 다시 진행해주세요.");
-        }
-        return member;
-    }
-
-    public Member getMemberFromToken(String token) {
-        return getActiveMemberFromToken(token);
-    }
-
     private Claims getClaims(String token) {
-        try {
-            return Jwts.parser()
-                    .verifyWith(cachedSecretKey)
-                    .requireIssuer(jwtProperties.getIssuer())
-                    .build()
-                    .parseSignedClaims(token)
-                    .getPayload();
-        } catch (ExpiredJwtException exception) {
-            if (!jwtProperties.getIssuer().equals(exception.getClaims().getIssuer())) {
-                throw new JwtException("Invalid token issuer");
-            }
+        if (token == null || token.length() > 8192) throw new JwtException("Invalid token length");
+        try { return parser.parseSignedClaims(token).getPayload(); }
+        catch (ExpiredJwtException exception) {
+            // ExpiredJwtException is raised before required-claim checks; never trust a foreign issuer.
+            if (!jwtProperties.getIssuer().equals(exception.getClaims().getIssuer())) throw new JwtException("Invalid token issuer");
             throw exception;
         }
     }
+    private SecretKey signingKey(String keyId) {
+        SecretKey key = keyId == null ? cachedSecretKey : verificationKeys.get(keyId);
+        if (key == null) throw new JwtException("Unknown JWT signing key");
+        return key;
+    }
+    private String audience(Purpose purpose) {
+        return purpose == Purpose.ACCESS ? jwtProperties.getAccessAudience() : jwtProperties.getRefreshAudience();
+    }
+    private static RefreshTokenInspection invalidInspection() { return new RefreshTokenInspection(RefreshTokenState.INVALID, null, 0); }
+    private static Long readMemberId(Claims claims) {
+        Object raw = claims.get("id");
+        return raw instanceof Long || raw instanceof Integer ? ((Number) raw).longValue() : null;
+    }
+    private static int readAuthVersion(Claims claims) {
+        Object raw = claims.get(AUTH_VERSION);
+        if (!(raw instanceof Integer || raw instanceof Long) || ((Number) raw).longValue() > Integer.MAX_VALUE
+                || ((Number) raw).longValue() < 0) return -1;
+        return ((Number) raw).intValue();
+    }
+    private static LocalDateTime readAbsoluteExpiry(Claims claims) {
+        Object raw = claims.get(ABSOLUTE_EXPIRY);
+        if (!(raw instanceof Integer || raw instanceof Long)) throw new JwtException("Invalid absolute session expiry");
+        try { return LocalDateTime.ofEpochSecond(((Number) raw).longValue(), 0, ZoneOffset.UTC); }
+        catch (DateTimeException exception) { throw new JwtException("Invalid absolute session expiry"); }
+    }
+    private static LocalDateTime readOAuthAuthenticationAt(Claims claims) {
+        Object raw = claims.get(OAUTH_AT);
+        if (raw == null) return null;
+        if (!(raw instanceof Long || raw instanceof Integer)) throw new JwtException("Invalid OAuth authentication time");
+        try { return LocalDateTime.ofInstant(Instant.ofEpochMilli(((Number) raw).longValue()), ZoneOffset.UTC); }
+        catch (DateTimeException exception) { throw new JwtException("Invalid OAuth authentication time"); }
+    }
+    private static boolean uuid(String value) {
+        try { return value != null && UUID.fromString(value).toString().equals(value); }
+        catch (IllegalArgumentException exception) { return false; }
+    }
+    private static boolean isOAuthMember(Member member) { return member.getProvider() != null && member.getProvider() != AuthProvider.LOCAL; }
+    private static LocalDateTime oauthAuthenticationAt(Member member) { return isOAuthMember(member) ? member.getOauthAuthenticatedAt() : null; }
+    private static String loginMethod(Member member, LocalDateTime at) {
+        return isOAuthMember(member) && !(at == null && member.getPassword() != null) ? "OAUTH" : "PASSWORD";
+    }
+    private static AuthException expired() { return new AuthException("로그인 세션이 만료됐어요. 다시 로그인해주세요."); }
+    private static LocalDateTime earlier(LocalDateTime first, LocalDateTime second) { return first.isBefore(second) ? first : second; }
+    private LocalDateTime utcNow() { return LocalDateTime.now(clock); }
+    private static Date date(LocalDateTime time) { return Date.from(time.toInstant(ZoneOffset.UTC)); }
 }

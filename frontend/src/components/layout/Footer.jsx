@@ -33,13 +33,13 @@ const SocialBtn = ({ href, icon, label, variant }) => (
 );
 
 const FooterLink = ({ label, onClick }) => (
-    <button type="button" onClick={onClick} className="reserve-app-footer-link">
+    <button type="button" onClick={onClick} className="reserve-app-footer-link reserve-text-link">
         {label}
     </button>
 );
 
 const ExternalLink = ({ href, label }) => (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="reserve-app-footer-link reserve-app-footer-link--external">
+    <a href={href} target="_blank" rel="noopener noreferrer" className="reserve-app-footer-link reserve-app-footer-link--external reserve-text-link">
         {label}
         <ArrowRightOutlined aria-hidden="true" />
     </a>
@@ -111,7 +111,7 @@ const AppFooter = () => {
                         </div>
                         <div className="footer-copyright-right" style={{ color: colors.text.tertiary }}>
                             대표자 한재은 &middot; 개인정보 보호책임자 한재은<br />
-                            <a href="mailto:hanjeun111@gmail.com" className="reserve-app-footer-email">hanjeun111@gmail.com</a>
+                            <a href="mailto:hanjeun111@gmail.com" className="reserve-app-footer-email reserve-text-link">hanjeun111@gmail.com</a>
                         </div>
                     </div>
                 </div>

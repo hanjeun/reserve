@@ -44,6 +44,26 @@ RUN for REQUIRED_CLASS in \
     BOOT-INF/classes/kr/it/reserve/feed/news/service/StoreNewsService.class \
     BOOT-INF/classes/kr/it/reserve/config/updates/RedisEntityUpdateRelay.class \
     BOOT-INF/classes/kr/it/reserve/config/util/SecurityUtil\$OAuthAuthenticationDetails.class \
+    BOOT-INF/classes/kr/it/reserve/config/jwt/TokenProvider\$VerifiedAuthentication.class \
+    BOOT-INF/classes/kr/it/reserve/config/jwt/TokenProvider\$IssuedSession.class \
+    BOOT-INF/classes/kr/it/reserve/config/jwt/repository/LoginSessionAuthentication.class \
+    BOOT-INF/classes/kr/it/reserve/reservation/admission/ReservationCreationGuard.class \
+    BOOT-INF/classes/kr/it/reserve/reservation/admission/ReservationRequest.class \
+    BOOT-INF/classes/kr/it/reserve/reservation/admission/AdmissionService.class \
+    BOOT-INF/classes/kr/it/reserve/reservation/controller/ReservationEditApiController.class \
+    BOOT-INF/classes/kr/it/reserve/reservation/service/ReservationEditQueryService.class \
+    BOOT-INF/classes/kr/it/reserve/global/admission/ServiceAdmissionService.class \
+    BOOT-INF/classes/kr/it/reserve/global/admission/ServiceAdmissionAutomaticPolicy.class \
+    BOOT-INF/classes/kr/it/reserve/global/admission/ServiceAdmissionLoadSampler.class \
+    BOOT-INF/classes/kr/it/reserve/config/ServiceAdmissionHttpFilter.class \
+    BOOT-INF/classes/redis/service-admission.lua \
+    BOOT-INF/classes/redis/reservation-admission.lua \
+    BOOT-INF/classes/db/manual/jwt-session.sql \
+    BOOT-INF/classes/db/manual/login-methods.sql \
+    BOOT-INF/classes/db/manual/reservation-admission.sql \
+    BOOT-INF/classes/kr/it/reserve/member/controller/LoginMethodController.class \
+    BOOT-INF/classes/kr/it/reserve/member/service/LoginMethodService.class \
+    BOOT-INF/classes/kr/it/reserve/member/entity/LoginMethodChallenge.class \
     BOOT-INF/classes/kr/it/reserve/member/service/MemberWithdrawalService.class \
     BOOT-INF/classes/kr/it/reserve/config/oauth2/OAuthProviderTokenCipher.class \
     BOOT-INF/classes/kr/it/reserve/config/oauth2/OAuthProviderTokenConverter.class \

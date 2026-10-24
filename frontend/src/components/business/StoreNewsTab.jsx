@@ -4,6 +4,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { Link } from 'react-router-dom';
 import { Button, DataState, FilterMenu, FormModal, RefreshButton } from '../common';
 import StateIllustration from '../common/StateIllustration';
+import ListingCount from '../common/ListingCount';
 import useStoreNewsEvents from '../../hooks/useStoreNewsEvents';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
 import { WorkspaceActivityContext } from '../layout/workspaceActivity';
@@ -78,7 +79,7 @@ export default function StoreNewsTab() {
         : stores.isError ? '내 가게를 불러오지 못했어요. 다시 불러온 뒤 작성해주세요.'
             : !owned.length ? '소식을 게시할 수 있는 내 가게가 있어야 작성할 수 있어요.' : '';
     return <section ref={listRef} className="reserve-store-news-management" aria-label="내 가게 소식 관리">
-        <div className="reserve-explore-filters reserve-store-news-manage-toolbar"><StoreNewsWriteAction unavailableReason={writeUnavailable} onWrite={() => setEditor({ open: true, mounted: true })} /><span className="reserve-explore-count">{blockingError ? '소식 확인 필요' : `${total.toLocaleString('ko-KR')}개 소식`}</span>
+        <div className="reserve-explore-filters reserve-store-news-manage-toolbar"><StoreNewsWriteAction unavailableReason={writeUnavailable} onWrite={() => setEditor({ open: true, mounted: true })} /><ListingCount>{blockingError ? '소식 확인 필요' : `${total.toLocaleString('ko-KR')}개 소식`}</ListingCount>
             <div className="reserve-explore-filter-controls"><FilterMenu appearance="plain" value={storeId || 'ALL'} aria-label="내 소식 가게 필터" options={[{ value: 'ALL', label: '전체 가게' }, ...owned.map(store => ({ value: store.id, label: store.name }))]}
                 loading={stores.isPending} disabled={stores.isPending || stores.isError && !stores.data} onChange={value => change({ newsStore: value })} />
                 <FilterMenu appearance="plain" value={selectedState} options={STORE_NEWS_STATES} aria-label="내 소식 상태 필터" onChange={value => change({ newsState: value })} />

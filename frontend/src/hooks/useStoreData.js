@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import storeService from '../services/storeService';
+import reservationService from '../services/reservationService';
 import { storeKeys } from './queryKeys';
 import { httpStatusOf, isMissingRequestError } from '../utils/listErrorMessage';
 
@@ -8,18 +9,27 @@ import { httpStatusOf, isMissingRequestError } from '../utils/listErrorMessage';
  * @param {string|number} storeId
  * @param {object} options
  * @param {boolean} options.forEdit true면 인증된 /edit 엔드포인트 사용 (소유자만 접근 가능)
+ * @param {string|number|null} options.reservationId 본인 예약 변경에 필요한 공개 가게 정보 조회
  *
  * 2026-07-10: TanStack Query로 전환 — 이전엔 useState+useEffect라 캐싱이 전혀 없어서
  * 목록에서 봤던 가게를 다시 눌러 들어가도 항상 새로 요청 + 스켈레톤부터 다시 보여줬음.
  * 이제 같은 가게를 짧은 시간(staleTime) 안에 다시 열면 캐시에서 즉시 보여줌.
  */
-const useStoreData = (storeId, { forEdit = false } = {}) => {
+const useStoreData = (storeId, { forEdit = false, reservationId = null } = {}) => {
     const validId = /^\d+$/.test(String(storeId ?? ''))
         && Number.isSafeInteger(Number(storeId)) && Number(storeId) > 0;
+    const reservationEdit = reservationId !== null;
+    const validReservation = /^\d+$/.test(String(reservationId)) && Number.isSafeInteger(Number(reservationId)) && Number(reservationId) > 0;
+    const enabled = validId && (!reservationEdit || validReservation);
     const { data: store, isLoading: loading, error, refetch } = useQuery({
-        queryKey: forEdit ? [...storeKeys.detail(storeId), 'edit'] : storeKeys.detail(storeId),
-        queryFn: () => validId ? (forEdit ? storeService.getStoreForEdit(storeId) : storeService.getStoreById(storeId)) : null,
-        enabled: validId,
+        queryKey: reservationEdit ? [...storeKeys.detail(storeId), 'reservation-edit', reservationId]
+            : forEdit ? [...storeKeys.detail(storeId), 'edit'] : storeKeys.detail(storeId),
+        queryFn: ({ signal }) => {
+            if (!enabled) return null;
+            if (reservationEdit) return reservationService.getEditStore(reservationId, storeId, { signal });
+            return forEdit ? storeService.getStoreForEdit(storeId) : storeService.getStoreById(storeId);
+        },
+        enabled,
         retry: (failureCount, requestError) => {
             const status = httpStatusOf(requestError);
             if (status >= 400 && status < 500 && status !== 408 && status !== 429) return false;

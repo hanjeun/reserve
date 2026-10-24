@@ -72,11 +72,26 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
             @Param("createdAfter") LocalDateTime createdAfter,
             @Param("eligibleStatuses") List<Reservation.ReservationStatus> eligibleStatuses);
 
-    /**
-     * 특정 회원의 예약 내역 조회 (최신순) - store, member fetch join으로 N+1 방지
-     */
-    @Query("SELECT r FROM Reservation r JOIN FETCH r.store JOIN FETCH r.member WHERE r.member = :member AND r.deletedAt IS NULL ORDER BY r.createdAt DESC")
-    List<Reservation> findByMemberOrderByCreatedAtDesc(@Param("member") Member member);
+    /** 검색·상태를 회원의 전체 내역에 적용한 뒤 페이지를 자른다. to-one fetch만 사용한다. */
+    @Query(value = """
+            SELECT r FROM Reservation r JOIN FETCH r.store s JOIN FETCH r.member
+             WHERE r.member = :member AND r.deletedAt IS NULL
+               AND (:status IS NULL OR r.status = :status)
+               AND (:keyword = ''
+                    OR LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) ESCAPE '!'
+                    OR LOWER(r.reservationCode) LIKE LOWER(CONCAT('%', :keyword, '%')) ESCAPE '!'
+                    OR LOWER(r.specialRequest) LIKE LOWER(CONCAT('%', :keyword, '%')) ESCAPE '!')
+            """, countQuery = """
+            SELECT COUNT(r) FROM Reservation r JOIN r.store s
+             WHERE r.member = :member AND r.deletedAt IS NULL
+               AND (:status IS NULL OR r.status = :status)
+               AND (:keyword = ''
+                    OR LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) ESCAPE '!'
+                    OR LOWER(r.reservationCode) LIKE LOWER(CONCAT('%', :keyword, '%')) ESCAPE '!'
+                    OR LOWER(r.specialRequest) LIKE LOWER(CONCAT('%', :keyword, '%')) ESCAPE '!')
+            """)
+    Page<Reservation> searchForMember(@Param("member") Member member, @Param("keyword") String keyword,
+            @Param("status") Reservation.ReservationStatus status, Pageable pageable);
 
     /**
      * 특정 가게 소유자의 전체 예약 목록 조회 (최신순) - store, member fetch join으로 N+1 방지

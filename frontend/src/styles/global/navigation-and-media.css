@@ -358,29 +358,14 @@
     padding: 0;
     border: 0;
     background: transparent;
-    color: var(--c-text-tertiary, #8b95a1);
     font: inherit;
     font-size: 13px;
     line-height: 20px;
     text-align: left;
-    text-decoration: none;
     white-space: nowrap;
-    transition: color 0.15s ease, text-decoration-color 0.15s ease;
 }
 .reserve-app-footer-link { cursor: pointer; }
 .reserve-app-footer-link--external .anticon { font-size: 11px; }
-.reserve-app-footer-link:hover,
-.reserve-app-footer-link:focus-visible,
-.reserve-app-footer-email:hover,
-.reserve-app-footer-email:focus-visible {
-    color: var(--c-text-primary, #1a1f27);
-    text-decoration: underline;
-    text-underline-offset: 3px;
-}
-/* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
-.reserve-app-footer-email:active { color: var(--c-text-primary, #1a1f27); }
-/* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
-.reserve-app-footer-link:active { color: var(--c-text-primary, #1a1f27); }
 @media (max-width: 767px) {
     .reserve-header-inner { padding-inline: 20px !important; }
     .reserve-header-logo { font-size: 20px !important; }

@@ -1,97 +1,137 @@
 package kr.it.reserve.config;
 
+import jakarta.persistence.EntityManagerFactory;
 import kr.it.reserve.config.jwt.TokenProvider;
 import kr.it.reserve.config.jwt.entity.RefreshToken;
 import kr.it.reserve.config.jwt.repository.RefreshTokenRepository;
 import kr.it.reserve.config.service.RefreshRejectedException;
 import kr.it.reserve.config.service.TokenService;
+import kr.it.reserve.global.error.AuthException;
+import kr.it.reserve.member.entity.AuthProvider;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.member.repository.MemberRepository;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.hibernate.SessionFactory;
+import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.sql.Timestamp;
+import java.time.*;
 import java.util.UUID;
+import static org.assertj.core.api.Assertions.*;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
-/**
- * refresh 회전을 실제 JPA·H2로 한 바퀴 돌린다. 단위 테스트(TokenServiceRefreshRotationTest)가 못 보는 두 가지를 본다.
- *  1) 새 JPQL(id 조회·FOR UPDATE)이 SQL로 실행되고, 회전 결과가 커밋된다.
- *  2) 재사용 거절(401) 뒤에도 그 기기 행 삭제가 롤백되지 않는다(noRollbackFor).
- * H2의 행 잠금은 InnoDB와 다르므로 동시성 자체의 보증은 아니다.
- */
+/** Actual JPA/H2 persistence and rejection commits; InnoDB locking is checked by the opt-in MySQL fixture. */
 @SpringBootTest
 class RefreshRotationPersistenceTest {
-
     @Autowired private TokenService tokenService;
     @Autowired private TokenProvider tokenProvider;
     @Autowired private RefreshTokenRepository refreshTokenRepository;
     @Autowired private MemberRepository memberRepository;
     @Autowired private JdbcTemplate jdbcTemplate;
-
-    private Member member;
-
-    @BeforeEach
-    void setUp() {
-        member = memberRepository.save(Member.builder()
-                .name("회전 통합")
-                .email("rotation-" + UUID.randomUUID() + "@example.test")
-                .role(Role.USER)
-                .build());
+    @Autowired private EntityManagerFactory entityManagerFactory;
+    protected Member member;
+    @BeforeEach void setUp() {
+        member = memberRepository.save(Member.builder().name("회전 통합")
+                .email("rotation-" + UUID.randomUUID() + "@example.test").password("synthetic-test-hash")
+                .provider(AuthProvider.LOCAL).role(Role.USER).build());
     }
-
-    @AfterEach
-    void tearDown() {
+    @AfterEach void tearDown() {
         refreshTokenRepository.deleteAll(refreshTokenRepository.findByMemberId(member.getId()));
         memberRepository.deleteById(member.getId());
     }
+    @Test void authenticationUsesOneStatementAndImmediatelyObservesDeviceRevocation() {
+        var issued = tokenProvider.issueSession(member, null);
+        jdbcTemplate.update("UPDATE member SET role = 'ADMIN' WHERE member_id = ?", member.getId());
+        var statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        boolean previouslyEnabled = statistics.isStatisticsEnabled();
+        statistics.setStatisticsEnabled(true);
+        try {
+            long before = statistics.getPrepareStatementCount();
+            var verified = tokenProvider.verifyAuthentication(issued.accessToken());
+            assertThat(verified.member().getId()).isEqualTo(member.getId());
+            assertThat(verified.member().getRole()).isEqualTo(Role.ADMIN);
+            assertThat(statistics.getPrepareStatementCount() - before).isEqualTo(1);
 
-    @Test
-    @DisplayName("회전 → 유예 안 직전 토큰 → 유예 뒤 직전 토큰(행 삭제가 커밋됨)")
-    void rotationGraceAndReuseAreCommitted() {
-        String first = tokenProvider.generateRefreshToken(member);
+            tokenService.revoke(issued.refreshToken());
+            long afterRevocation = statistics.getPrepareStatementCount();
+            assertThat(tokenProvider.validToken(issued.accessToken())).isTrue();
+            assertThatThrownBy(() -> tokenProvider.verifyAuthentication(issued.accessToken())).isInstanceOf(AuthException.class);
+            assertThat(statistics.getPrepareStatementCount() - afterRevocation).isEqualTo(1);
+        } finally {
+            statistics.setStatisticsEnabled(previouslyEnabled);
+        }
+    }
+    @Test void aSignedSidCannotAuthenticateWhenItsDatabaseOwnerIsAnotherMember() {
+        var issued = tokenProvider.issueSession(member, null);
+        Long sessionId = refreshTokenRepository.findByMemberId(member.getId()).getFirst().getId();
+        Member other = memberRepository.saveAndFlush(Member.builder().name("다른 세션 회원")
+                .email("sid-owner-" + UUID.randomUUID() + "@example.test").password("synthetic-test-hash")
+                .provider(AuthProvider.LOCAL).role(Role.USER).build());
+        try {
+            jdbcTemplate.update("UPDATE login_session SET member_id = ? WHERE id = ?", other.getId(), sessionId);
+            assertThat(tokenProvider.validToken(issued.accessToken())).isTrue();
+            assertThatThrownBy(() -> tokenProvider.verifyAuthentication(issued.accessToken())).isInstanceOf(AuthException.class);
+        } finally {
+            refreshTokenRepository.deleteById(sessionId);
+            memberRepository.deleteById(other.getId());
+        }
+    }
+    @Test void rotationGraceAndReuseRevocationAreCommittedWithoutRawTokenStorage() {
+        var first = tokenProvider.issueSession(member, null);
+        var current = tokenService.refresh(first.refreshToken());
+        RefreshToken row = refreshTokenRepository.findByMemberId(member.getId()).getFirst();
+        assertThat(row.getRefreshTokenHash()).isEqualTo(RefreshToken.hash(current.refreshToken()));
+        assertThat(row.getPreviousTokenHash()).isEqualTo(RefreshToken.hash(first.refreshToken()));
+        assertThat(row.getRotationVersion()).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForMap("SELECT * FROM login_session WHERE id = ?", row.getId()).values().toString())
+                .doesNotContain(first.refreshToken(), current.refreshToken());
+        assertThat(tokenService.refresh(first.refreshToken()).refreshToken()).isEqualTo(current.refreshToken());
 
-        TokenService.RefreshResult rotated = tokenService.refresh(first);
-        RefreshToken row = refreshTokenRepository.findByMemberId(member.getId()).get(0);
-        assertThat(row.getRefreshToken()).isEqualTo(rotated.refreshToken());
-        assertThat(row.getPreviousTokenHash()).isEqualTo(RefreshToken.hash(first));
-        assertThat(refreshTokenRepository.findIdsByPreviousTokenHash(RefreshToken.hash(first)))
-                .containsExactly(row.getId());
-
-        // 탭 두 개가 같은 토큰으로 거의 동시에 refresh — 두 번째는 현재 토큰을 받는다.
-        assertThat(tokenService.refresh(first).refreshToken()).isEqualTo(rotated.refreshToken());
-
-        // 유예가 지난 뒤 옛 토큰이 다시 오면 재사용으로 보고 그 기기 행을 지운다.
-        jdbcTemplate.update("UPDATE refresh_token SET rotated_at = DATEADD('MINUTE', -5, CURRENT_TIMESTAMP) WHERE id = ?",
-                row.getId());
-        assertThatThrownBy(() -> tokenService.refresh(first))
+        jdbcTemplate.update("UPDATE login_session SET rotated_at = ? WHERE id = ?",
+                Timestamp.valueOf(row.getRotatedAt().minusMinutes(5)), row.getId());
+        assertThatThrownBy(() -> tokenService.refresh(first.refreshToken()))
                 .isInstanceOf(RefreshRejectedException.class)
-                .extracting(e -> ((RefreshRejectedException) e).getReason())
+                .extracting(error -> ((RefreshRejectedException) error).getReason())
                 .isEqualTo(RefreshRejectedException.Reason.REUSED_TOKEN);
         assertThat(refreshTokenRepository.findById(row.getId())).isEmpty();
-
-        // 같은 기기의 새 토큰도 함께 끊긴다.
-        String rotatedToken = rotated.refreshToken();
-        assertThatThrownBy(() -> tokenService.refresh(rotatedToken))
-                .isInstanceOf(RefreshRejectedException.class)
-                .extracting(e -> ((RefreshRejectedException) e).getReason())
-                .isEqualTo(RefreshRejectedException.Reason.UNKNOWN_TOKEN);
+        assertThatThrownBy(() -> tokenProvider.getActiveMemberFromToken(current.accessToken())).isInstanceOf(AuthException.class);
     }
-
-    @Test
-    @DisplayName("로그아웃은 현재 토큰 행을 지운다")
-    void revokeDeletesTheDeviceRow() {
-        String token = tokenProvider.generateRefreshToken(member);
-
-        tokenService.revoke(token);
-
+    @Test void logoutOfAnOlderGenerationRevokesOnlyThatDeviceImmediately() {
+        var first = tokenProvider.issueSession(member, null);
+        var other = tokenProvider.issueSession(member, null);
+        var next = tokenService.refresh(first.refreshToken());
+        tokenService.refresh(next.refreshToken());
+        tokenService.revoke(first.refreshToken());
+        assertThatThrownBy(() -> tokenProvider.getActiveMemberFromToken(first.accessToken())).isInstanceOf(AuthException.class);
+        assertThat(tokenProvider.getActiveMemberFromToken(other.accessToken()).getId()).isEqualTo(member.getId());
+        assertThat(refreshTokenRepository.findByMemberId(member.getId())).hasSize(1);
+    }
+    @Test void aTokenTwoGenerationsOldRevokesTheCurrentFamilyAndCommitsTheDeletion() {
+        var first = tokenProvider.issueSession(member, null);
+        var second = tokenService.refresh(first.refreshToken());
+        var third = tokenService.refresh(second.refreshToken());
+        assertThatThrownBy(() -> tokenService.refresh(first.refreshToken())).isInstanceOf(RefreshRejectedException.class)
+                .extracting(error -> ((RefreshRejectedException) error).getReason())
+                .isEqualTo(RefreshRejectedException.Reason.REUSED_TOKEN);
         assertThat(refreshTokenRepository.findByMemberId(member.getId())).isEmpty();
+        assertThatThrownBy(() -> tokenProvider.getActiveMemberFromToken(third.accessToken())).isInstanceOf(AuthException.class);
+    }
+    @Test void providerProofWithNanosecondsIsCanonicalizedBeforeDatabaseRoundTripAndRefresh() {
+        LocalDateTime original = LocalDateTime.now(ZoneOffset.UTC).withNano(123_456_789);
+        LocalDateTime canonical = original.withNano(123_000_000);
+        member.setProvider(AuthProvider.GOOGLE); member.setProviderId("synthetic-" + UUID.randomUUID());
+        member.setOauthAuthenticatedAt(original);
+        member = memberRepository.saveAndFlush(member);
+        var first = tokenProvider.issueSession(member, original);
+        RefreshToken row = refreshTokenRepository.findByMemberId(member.getId()).getFirst();
+        assertThat(row.getOauthAuthenticatedAt()).isEqualTo(canonical);
+        assertThat(tokenProvider.getOAuthAuthenticationAt(first.accessToken())).isEqualTo(canonical);
+        assertThat(tokenProvider.getActiveMemberFromToken(first.accessToken()).getId()).isEqualTo(member.getId());
+        var current = tokenService.refresh(first.refreshToken());
+        assertThat(tokenProvider.getOAuthAuthenticationAt(current.accessToken())).isEqualTo(canonical);
+        assertThat(tokenService.refresh(first.refreshToken()).refreshToken()).isEqualTo(current.refreshToken());
+        assertThat(tokenProvider.getActiveMemberFromToken(current.accessToken()).getId()).isEqualTo(member.getId());
     }
 }

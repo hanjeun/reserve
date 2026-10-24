@@ -10,8 +10,8 @@ import useLiveUpdatesStatus from '../../hooks/useLiveUpdatesStatus';
 // 목록형 청크 로딩 뼈대가 함께 쓰는 제목·도구줄 조각. 앱 셸 청크에 들어가는 가벼운 부품만 둔다
 // (페이지별 큰 뼈대는 RouteSkeletonPages — 별도 청크).
 
-export function ListingHeader({ title, description, marginBottom = 32 }) {
-    return <div style={{ marginBottom }}>
+export function ListingHeader({ title, description, marginBottom }) {
+    return <div className="reserve-listing-heading" style={{ marginBottom }}>
         <PageTitle>{title}</PageTitle>
         <PageDescription>{description}</PageDescription>
     </div>;

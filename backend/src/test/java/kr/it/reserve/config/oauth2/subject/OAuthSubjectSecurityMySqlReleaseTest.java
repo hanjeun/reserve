@@ -19,8 +19,10 @@ import kr.it.reserve.config.oauth2.events.VerifiedOAuthSecurityEvent;
 import kr.it.reserve.member.entity.AuthProvider;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.repository.MemberRepository;
+import kr.it.reserve.member.service.LoginMethodService;
 import kr.it.reserve.member.service.MemberService;
 import kr.it.reserve.member.service.MemberWithdrawalService;
+import kr.it.reserve.email.service.EmailService;
 import kr.it.reserve.email.service.EmailVerificationService;
 import kr.it.reserve.file.service.FileStorageService;
 import kr.it.reserve.file.service.FileDeletionOutboxService;
@@ -44,7 +46,7 @@ import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -87,7 +89,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({OAuthProviderTokenCipher.class, OAuthProviderTokenConverter.class, CustomOAuth2UserService.class,
         OAuthSessionIssuer.class, TokenProvider.class, OAuthSecurityEventTransaction.class,
-        OAuthSecurityEventService.class, MemberService.class, MemberWithdrawalService.class,
+        OAuthSecurityEventService.class, LoginMethodService.class, MemberService.class, MemberWithdrawalService.class,
         OAuthUnlinkOutboxService.class, OAuthUnlinkTokenCipher.class, FileDeletionOutboxService.class,
         OAuthSubjectSecurityMySqlReleaseTest.Fixture.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -108,7 +110,8 @@ class OAuthSubjectSecurityMySqlReleaseTest {
     @Autowired FileDeletionTaskRepository fileTasks;
     @MockitoSpyBean MemberService core;
     @MockitoSpyBean MemberRepository members;
-    @MockitoBean PasswordEncoder passwordEncoder;
+    @MockitoBean BCryptPasswordEncoder passwordEncoder;
+    @MockitoBean EmailService email;
     @MockitoBean EmailVerificationService emailVerification;
     @MockitoBean FileStorageService storage;
     @MockitoBean DataLifecycleGuard lifecycle;

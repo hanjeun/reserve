@@ -7,6 +7,7 @@ import { DataState, FilterMenu, RefreshButton } from '../../components/common';
 import useStoreNewsEvents from '../../hooks/useStoreNewsEvents';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
 import BenefitListSkeleton from '../../components/common/BenefitListSkeleton';
+import ListingCount from '../../components/common/ListingCount';
 import { BenefitRow } from '../../components/store-news/StoreNewsPresentation';
 import { StoreNewsPublicToolbarSkeleton } from '../../components/store-news/StoreNewsSkeleton';
 import StoreNewsEditor from '../../components/store-news/StoreNewsEditor';
@@ -101,7 +102,7 @@ export default function Benefits() {
         if (items.length === 0) {
             return <DataState state="empty" kind="news"
                 title={total > 0 ? '이 페이지에는 소식이 없어요.' : '아직 등록된 가게 소식이 없어요.'}
-                action={<Link to={total > 0 ? firstPageTo : '/stores'} className="reserve-benefits-text-link">{total > 0 ? '첫 페이지로' : '가게 둘러보기'} <ArrowRightOutlined aria-hidden="true" /></Link>} />;
+                action={<Link to={total > 0 ? firstPageTo : '/stores'} className="reserve-benefits-text-link reserve-text-link">{total > 0 ? '첫 페이지로' : '가게 둘러보기'} <ArrowRightOutlined aria-hidden="true" /></Link>} />;
         }
         return <div className="reserve-benefit-list" aria-busy={isFetching}>{items.map(item => <BenefitRow key={item.id} item={item} />)}</div>;
     };
@@ -113,7 +114,7 @@ export default function Benefits() {
                     <StoreNewsWriteAction unavailableReason={writeUnavailable} onWrite={() => setEditor({ mounted: true, open: true })} />
                     <StoreNewsManageAction />
                 </div>}
-                <span className="reserve-explore-count">{approvalReady && data && !blockingError ? `${total.toLocaleString('ko-KR')}개 소식` : approvalReady ? '소식 확인 필요' : '혜택 상태 확인 필요'}</span>
+                <ListingCount>{approvalReady && data && !blockingError ? `${total.toLocaleString('ko-KR')}개 소식` : approvalReady ? '소식 확인 필요' : '혜택 상태 확인 필요'}</ListingCount>
                 <div className="reserve-explore-filter-controls">
                     <FilterMenu appearance="plain" aria-label="가게 소식 종류" value={type} options={[{ value: 'ALL', label: '모든 소식' }, ...STORE_NEWS_TYPES]} onChange={value => changeFilter('newsType', value)} />
                     <FilterMenu appearance="plain" aria-label="가게 소식 기간" value={period} options={[{ value: 'ONGOING', label: '진행 소식' }, { value: 'ALL', label: '전체 기간' }]} onChange={value => changeFilter('period', value)} />

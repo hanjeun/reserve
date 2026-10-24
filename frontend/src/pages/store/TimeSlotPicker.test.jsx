@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { Form } from 'antd';
 import dayjs from 'dayjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ReservationPanel, TimeSlotPicker } from './StoreDetail';
+import { ReservationPanel, TimeSlotPicker } from '../../components/reservation/StoreReservationPanel';
 
 const api = vi.hoisted(() => ({ get: vi.fn() }));
 afterEach(async () => {

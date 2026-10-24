@@ -177,7 +177,7 @@ function ConversationSections({ lists, canAdminSupport, canOwnStores, showHidden
 }
 
 export function ConversationListPanel({
-    headingLevel, inert, lists, showHidden, onToggleHidden, canAdminSupport, canOwnStores, rowProps, navigation,
+    headingLevel, inert, lists, showHidden, onToggleHidden, onFindStore, canAdminSupport, canOwnStores, rowProps, navigation,
 }) {
     return (
         <aside className="reserve-messenger-list" aria-label="대화 목록"
@@ -185,7 +185,7 @@ export function ConversationListPanel({
             <MessengerListHeading headingLevel={headingLevel}
                 refreshing={lists.conversationListsFetching}
                 onRefresh={lists.refreshConversationLists}
-                showHidden={showHidden} onToggleHidden={onToggleHidden} />
+                showHidden={showHidden} onToggleHidden={onToggleHidden} onFindStore={onFindStore} />
 
             <div className="reserve-messenger-list-scroll" aria-busy={lists.conversationListsLoading}>
                 {lists.allConversationListsFailed ? (
@@ -237,7 +237,7 @@ function ThreadMessages({ messages, thread, selection, history, onLoadOlder, onR
 }
 
 // 대화 본문: 로딩 → 실패 → 첫 안내 → 빈 대화 → 메시지 순으로 판정한다.
-function ThreadBody({ loading, loadError, onReload, intro, emptyText, messageProps }) {
+function ThreadBody({ loading, loadError, openError, onReload, intro, emptyText, messageProps }) {
     if (loading) {
         return (
             <output className="reserve-messenger-thread-skeleton" aria-label="대화를 불러오는 중" aria-busy="true">
@@ -247,7 +247,7 @@ function ThreadBody({ loading, loadError, onReload, intro, emptyText, messagePro
     }
     if (loadError) {
         return (
-            <DataState state="error" kind="message" title="대화를 불러오지 못했어요."
+            <DataState state="error" kind="message" error={openError?.error} title={openError?.title || '대화를 불러오지 못했어요.'}
                 onRetry={onReload} />
         );
     }
@@ -313,18 +313,18 @@ function ThreadComposerArea({ closed, disabledMessage, showOwnerReplies, draft, 
 
 export function ThreadPanel({
     onAnimationEnd, onBack, returningToList, avatarProps, title, threadKind, moderationProps,
-    threadBodyRef, isSupport, bodyProps, composerAreaProps, retentionNoticeVisible = true,
+    threadBodyRef, isSupport, bodyProps, composerAreaProps, retentionNoticeVisible = true, backLabel = '대화 목록으로 돌아가기',
 }) {
     return (
         <section className="reserve-messenger-thread" aria-labelledby="reserve-messenger-thread-title"
             onAnimationEnd={onAnimationEnd}>
             <header className="reserve-messenger-thread-heading">
-                <Tooltip title="대화 목록으로 돌아가기"><button
+                <Tooltip title={backLabel}><button
                     type="button"
                     className="reserve-messenger-mobile-back"
                     onClick={onBack}
                     disabled={returningToList}
-                    aria-label="대화 목록으로 돌아가기"
+                    aria-label={backLabel}
                 >
                     <ArrowLeftOutlined />
                 </button></Tooltip>

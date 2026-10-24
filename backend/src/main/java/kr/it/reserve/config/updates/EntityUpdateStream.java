@@ -66,7 +66,15 @@ public class EntityUpdateStream {
     }
 
     public SseEmitter subscribe(Member member, LocalDateTime oauthAuthenticatedAt) {
-        var identity = UpdateStreamAccess.identity(member, oauthAuthenticatedAt);
+        return subscribe(member, oauthAuthenticatedAt, null);
+    }
+
+    public SseEmitter subscribe(Member member, LocalDateTime oauthAuthenticatedAt, String loginMethod) {
+        return subscribe(member, oauthAuthenticatedAt, loginMethod, null);
+    }
+
+    public SseEmitter subscribe(Member member, LocalDateTime oauthAuthenticatedAt, String loginMethod, String sessionId) {
+        var identity = UpdateStreamAccess.identity(member, oauthAuthenticatedAt, loginMethod, sessionId);
         if (identity == null || !access.current(identity)) {
             throw new MemberException("로그인 상태와 약관 동의를 확인해주세요.", HttpStatus.FORBIDDEN);
         }

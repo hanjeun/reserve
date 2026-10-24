@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import MyPage from './MyPage';
 import useAuthStore from '../../store/useAuthStore';
 import { businessService, memberService } from '../../services';
+vi.mock('../../components/member/LoginSecuritySection', () => ({ default: () => null }));
 
 const feedback = vi.hoisted(() => ({
     message: { error: vi.fn(), warning: vi.fn(), success: vi.fn() },

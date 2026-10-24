@@ -3,6 +3,7 @@ import { useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { DataState, FilterMenu, FilterToolbar, PageContainer, StoreCardSkeleton } from '../../components/common';
+import ListingContent from '../../components/common/ListingContent';
 import LikedContentList from '../../components/feed/LikedContentList';
 import { useFeedInteractions } from '../../hooks/feedInteractionQueries';
 import { StoreCard } from '../../components/store';
@@ -99,11 +100,11 @@ const MyFavorites = () => {
         if (blockingError) {
             return (
                 <DataState state="error" kind="favorite" subject="즐겨찾기 목록" error={error}
-                    onRetry={refetch} retrying={isFetching} style={{ marginTop: 100 }} />
+                    onRetry={refetch} retrying={isFetching} />
             );
         }
         if (favorites.length === 0) {
-            return <DataState state="empty" kind="favorite" title="아직 즐겨찾기한 가게가 없어요." style={{ marginTop: 100 }} />;
+            return <DataState state="empty" kind="favorite" title="아직 즐겨찾기한 가게가 없어요." />;
         }
         return (
             <>
@@ -123,7 +124,7 @@ const MyFavorites = () => {
     return (
         <PageContainer size="xl" paddingTop="40px" aria-busy={isFetching}>
             {/* 헤더 */}
-            <div style={styles.header}>
+            <div className="reserve-listing-heading">
                 <PageTitle loading={loading} style={styles.title}>좋아요</PageTitle>
                 <PageDescription loading={loading}>
                     {hasContentLikes ? '좋아요한 가게·게시물·소식·댓글을 한곳에서 볼 수 있어요.' : headerMessage()}
@@ -141,10 +142,10 @@ const MyFavorites = () => {
                 </div> : undefined} />
 
             {/* 컨텐츠 — 상태별 분기는 위 renderContent 주석 참고 */}
-            {showStores && <section ref={listRef} className="reserve-liked-section" aria-label="좋아요한 가게">{hasContentLikes && <h2>가게</h2>}
-                {error && !blockingError && <DataState state="error" kind="favorite" subject="즐겨찾기 목록" error={error}
+            {showStores && <section ref={listRef} className="reserve-liked-section reserve-liked-section--listing" aria-label="좋아요한 가게">{hasContentLikes && <h2>가게</h2>}
+                <ListingContent notice={error && !blockingError && <DataState state="error" kind="favorite" subject="즐겨찾기 목록" error={error}
                     title="최신 즐겨찾기를 확인하지 못해 이전 목록을 보여드리고 있어요."
-                    onRetry={refetch} retrying={isFetching} compact style={{ marginBottom: 16 }} />}{renderContent()}</section>}
+                    onRetry={refetch} retrying={isFetching} compact />}>{renderContent()}</ListingContent></section>}
             {hasContentLikes && kind !== 'stores' && <section className="reserve-liked-section" aria-label="좋아요한 게시물과 소식">
                 {kind === 'all' && <h2>게시물 · 가게 소식 · 댓글</h2>}<LikedContentList type={kind === 'posts' ? 'POST' : kind === 'news' ? 'NEWS' : kind === 'comments' ? 'COMMENT' : 'ALL'} />
             </section>}
@@ -153,8 +154,6 @@ const MyFavorites = () => {
 };
 
 const styles = {
-    // 아래 새로고침 툴바가 생겨 '내 예약' 화면과 같은 간격(32)으로 맞춘다.
-    header: { marginBottom: 32 },
     title:  { margin: '0 0 8px', },
 };
 

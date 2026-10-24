@@ -8,7 +8,7 @@ import { invalidateReservationData } from './invalidateAfterWrite';
 import { queryErrorStatus } from './liveUpdateQueries';
 import useLiveUpdatesStatus from './useLiveUpdatesStatus';
 
-const useReservations = () => {
+const useReservations = (params = {}) => {
     const { message } = useMessage();
     const queryClient = useQueryClient();
     const live = useLiveUpdatesStatus();
@@ -18,14 +18,13 @@ const useReservations = () => {
     // 백그라운드 재조회나 focus 재검증처럼 "조용히 갱신"되는 순간에도 화면 전체가 다시
     // 스켈레톤으로 바뀌었음(이미 데이터가 있는데도). isLoading(최초 로딩)과 isFetching(그
     // 외 백그라운드 재조회)을 분리해서 노출 — StoreList.jsx의 refetching과 동일한 패턴.
-    const { data, isLoading, isFetching, refetch, error } = useQuery({
-        queryKey: reservationKeys.my(),
-        queryFn: () => reservationService.getMyReservations(),
-        select: (data) => (Array.isArray(data) ? data : []),
+    const { data, isLoading, isFetching, error } = useQuery({
+        queryKey: reservationKeys.myPage(params),
+        queryFn: () => reservationService.getMyReservations(params),
         // 사업자 승인은 서버에서 즉시 확정된다. 대기 예약이 화면에 있을 때만 짧게 재검증해
         // 다른 계정/기기에서 승인한 결과도 열린 "내 예약" 화면에 10초 안에 반영한다.
-        refetchInterval: query => !liveReservations && Array.isArray(query.state.data)
-            && query.state.data.some(reservation => reservation.status === 'PENDING')
+        refetchInterval: query => !liveReservations && query.state.data?.content
+            ?.some(reservation => reservation.status === 'PENDING')
             ? 10000 : false,
         refetchIntervalInBackground: false,
         refetchOnWindowFocus: 'always',
@@ -37,37 +36,23 @@ const useReservations = () => {
 
     const cancelMutation = useMutation({
         mutationFn: (reservationId) => reservationService.cancelReservation(reservationId),
-        // 낙관적 업데이트: 실패 시 원복
-        onMutate: async (reservationId) => {
-            await queryClient.cancelQueries({ queryKey: reservationKeys.my() });
-            const prev = queryClient.getQueryData(reservationKeys.my());
-            queryClient.setQueryData(reservationKeys.my(), (old) =>
-                (old || []).map(r => r.id === reservationId ? { ...r, status: 'CANCELLED' } : r)
-            );
-            return { prev };
-        },
+        // 취소는 서버 필터·총 건수·페이지 경계를 바꾼다. 관리 목록과 같이 모든 내 예약 페이지를 재검증한다.
         onSuccess: () => message.success('예약이 취소됐어요'),
-        onError: (err, _, ctx) => {
-            if (ctx?.prev) queryClient.setQueryData(reservationKeys.my(), ctx.prev);
-            handleApiError(err, message, '예약 취소에 실패했어요');
-        },
-        // 코드리뷰 지적사항 반영(2026-07): 낙관적 업데이트는 status만 미리 바꿔주는 거라, 서버가
-        // 같이 계산하는 다른 필드(환불 여부 등)는 반영이 안 될 수 있음 — 성공/실패 관계없이 마지막에
-        // 한 번 더 실제 서버 데이터로 재검증(refetching만 true가 되고 loading은 안 바뀌므로 스켈레톤
-        // 깜빡임 없이 조용히 정정됨).
-        // 2026-09: my() 만이 아니라 예약 달력(빈자리)까지 같이 무효화한다 — invalidateAfterWrite.js 참고.
+        onError: (err) => handleApiError(err, message, '예약 취소에 실패했어요'),
         onSettled: () => invalidateReservationData(queryClient),
     });
 
     const accessDenied = [401, 403].includes(queryErrorStatus(error));
     return {
-        reservations: accessDenied ? [] : data || [],
+        reservations: accessDenied ? [] : data?.content ?? [],
+        total: accessDenied ? 0 : data?.page?.totalElements ?? data?.totalElements ?? 0,
+        totalPages: accessDenied ? 0 : data?.page?.totalPages ?? data?.totalPages ?? 0,
         loading: isLoading,
         refetching: isFetching && !isLoading,
         hasData: data !== undefined && !accessDenied,
         error: error ?? null,
         cancelReservation: cancelMutation.mutateAsync,
-        refetch,
+        refetch: () => queryClient.invalidateQueries({ queryKey: reservationKeys.my() }),
     };
 };
 

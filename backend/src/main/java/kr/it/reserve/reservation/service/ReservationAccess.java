@@ -14,6 +14,18 @@ final class ReservationAccess {
         }
     }
 
+    static void editable(Reservation reservation, Member member) {
+        member(reservation, member);
+        if (reservation.getStatus() != Reservation.ReservationStatus.PENDING
+                && reservation.getStatus() != Reservation.ReservationStatus.CONFIRMED) {
+            throw new ReservationException("완료·취소·거절·노쇼된 예약은 변경할 수 없어요.", HttpStatus.BAD_REQUEST);
+        }
+        if (Boolean.TRUE.equals(reservation.getDepositPaid())) {
+            throw new ReservationException(
+                    "이미 결제된 예약은 변경할 수 없어요. 취소 후 다시 예약해주세요.", HttpStatus.BAD_REQUEST);
+        }
+    }
+
     static void owner(Reservation reservation, Member owner) {
         if (owner.isAdmin()) return; // 관리자는 모든 예약 접근 가능
         if (!reservation.getStore().getOwner().getId().equals(owner.getId())) {

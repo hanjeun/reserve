@@ -104,18 +104,19 @@ const handleCoverError = (event) => {
     if (event.currentTarget.src !== new URL(fallback, window.location.href).href) event.currentTarget.src = fallback;
 };
 
-Card.Cover = ({ src, alt, width, height }) => (
-    <div style={{ overflow: 'hidden', lineHeight: 0, margin: 0 }}>
+Card.Cover = ({ src, alt, width, height, aspectRatio, imageClassName, referrerPolicy }) => (
+    <div style={{ overflow: 'hidden', lineHeight: 0, margin: 0, aspectRatio }}>
         <LoadingImage
             alt={alt}
             src={src}
             loading="lazy"
             decoding="async"
+            referrerPolicy={referrerPolicy}
             width={width}
             height={height}
             onError={handleCoverError}
-            style={{ width: '100%', height: 'auto', aspectRatio: `auto ${width || 1} / ${height || 1}`, objectFit: 'cover', transition: 'transform 0.3s', display: 'block' }}
-            className="reserve-card-image"
+            style={{ width: '100%', height: aspectRatio ? '100%' : 'auto', aspectRatio: aspectRatio ?? `auto ${width || 1} / ${height || 1}`, objectFit: 'cover', transition: 'transform 0.3s', display: 'block' }}
+            className={['reserve-card-image', imageClassName].filter(Boolean).join(' ')}
         />
     </div>
 );
@@ -184,6 +185,9 @@ Card.Cover.propTypes = {
     alt: PropTypes.string,
     width: PropTypes.number,
     height: PropTypes.number,
+    aspectRatio: PropTypes.number,
+    imageClassName: PropTypes.string,
+    referrerPolicy: PropTypes.string,
 };
 
 Card.Body.propTypes = {

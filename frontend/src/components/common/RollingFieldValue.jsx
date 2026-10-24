@@ -7,7 +7,7 @@ const hasMotionValue = value => value != null && value !== ''
     && (typeof value !== 'number' || Number.isFinite(value));
 
 /** Only the visible value rolls; form state and the accessible current label update immediately. */
-const RollingFieldValue = ({ value, children, modalOpen = false, motionKey, order, onMotionChange }) => {
+const RollingFieldValue = ({ value, children, modalOpen = false, motionKey, order, direction: forcedDirection, onMotionChange }) => {
     const currentRef = useRef(null);
     const previousRef = useRef(null);
     const snapshotRef = useRef({ value, text: children, modalOpen, motionKey, order });
@@ -65,8 +65,8 @@ const RollingFieldValue = ({ value, children, modalOpen = false, motionKey, orde
         const numeric = Number.isFinite(value) && Number.isFinite(before.value);
         const ordered = Number.isFinite(order) && Number.isFinite(before.order) && order !== before.order;
         // 메뉴에서 위 항목은 위로, 아래 항목은 아래로 들어온다. 숫자·날짜의 기존 방향은 유지한다.
-        let direction = numeric ? Math.sign(value - before.value) : 1;
-        if (ordered) direction = Math.sign(before.order - order);
+        let direction = forcedDirection === 'down' ? -1 : forcedDirection === 'up' ? 1 : numeric ? Math.sign(value - before.value) : 1;
+        if (!forcedDirection && ordered) direction = Math.sign(before.order - order);
         previous.textContent = String(before.text);
         previous.style.visibility = 'visible';
         const duration = Number.parseFloat(transitions.fast) * 1000;
@@ -89,7 +89,7 @@ const RollingFieldValue = ({ value, children, modalOpen = false, motionKey, orde
             if (motionRef.current?.incoming === incoming) stopMotion();
         };
         motionChangeRef.current?.(true);
-    }, [value, children, reducedMotion, modalOpen, motionKey, order, onMotionChange, stopMotion]);
+    }, [value, children, reducedMotion, modalOpen, motionKey, order, onMotionChange, forcedDirection, stopMotion]);
 
     return (
         <span className="reserve-rolling-field-value" style={styles.surface}>
@@ -113,6 +113,7 @@ RollingFieldValue.propTypes = {
     modalOpen: PropTypes.bool,
     motionKey: PropTypes.number,
     order: PropTypes.number,
+    direction: PropTypes.oneOf(['up', 'down']),
     onMotionChange: PropTypes.func,
 };
 

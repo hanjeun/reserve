@@ -2,6 +2,9 @@ import axios from 'axios';
 import { currentSession, assertCurrentSession, StaleSessionError } from './sessionScope';
 import { skeletonDelayInterceptor } from '../utils/skeletonDelay';
 import { canonicalApiPath, versionedApiUrl } from './apiVersion';
+import { ServiceAdmissionRequiredError, observeServiceAdmission, isServiceAdmissionBlocked,
+    notifyServiceAdmission, waitForServiceAdmission } from './serviceAdmissionGate';
+import { assertOverloadCooldown, observeOverloadCooldown } from './overloadCooldown';
 
 const instance = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL,
@@ -77,6 +80,13 @@ instance.interceptors.request.use(
         config._sessionEpoch ??= session.epoch;
         assertCurrentSession(config._sessionEpoch);
         config.signal = config.signal ? AbortSignal.any([config.signal, session.signal]) : session.signal;
+        assertOverloadCooldown(config);
+        if (isServiceAdmissionBlocked(config)) {
+            notifyServiceAdmission(config);
+            if (!['get', 'head'].includes((config.method || 'get').toLowerCase())) throw new ServiceAdmissionRequiredError();
+            await waitForServiceAdmission(config._sessionEpoch, config.signal);
+            assertCurrentSession(config._sessionEpoch);
+        }
         config.url = versionedApiUrl(config.url);
         await skeletonDelayInterceptor(config);
         assertCurrentSession(config._sessionEpoch);
@@ -103,10 +113,26 @@ instance.interceptors.response.use(
         throw new Error(res.message ?? '요청에 실패했어요.');
     },
     async (error) => {
-        if (error instanceof StaleSessionError) throw error;
+        if (error instanceof StaleSessionError || error?.isServiceAdmissionRequired || error?.isOverloadRateLimited || error?.name === 'AbortError') throw error;
         const originalRequest = error.config;
         if (originalRequest?._sessionEpoch != null) assertCurrentSession(originalRequest._sessionEpoch);
         if (axios.isCancel(error)) throw error;
+
+        const gate = error.response?.data?.data;
+        if ([429, 503].includes(error.response?.status) && originalRequest
+            && canonicalApiPath(originalRequest.url) !== '/api/service-admission'
+            && observeServiceAdmission(originalRequest, gate)) {
+            // Only read requests may be resumed. A rejected write is never replayed implicitly.
+            if (['get', 'head'].includes((originalRequest.method || 'get').toLowerCase()) && !originalRequest._serviceAdmissionRetry) {
+                await waitForServiceAdmission(originalRequest._sessionEpoch, originalRequest.signal);
+                assertCurrentSession(originalRequest._sessionEpoch);
+                return instance({ ...originalRequest, _serviceAdmissionRetry: true });
+            }
+            const denied = new ServiceAdmissionRequiredError(error.response.data?.message);
+            denied.status = error.response.status;
+            denied.data = gate;
+            throw denied;
+        }
 
         if (
             error.response?.status === 401 &&
@@ -120,6 +146,8 @@ instance.interceptors.response.use(
         }
 
         if (error.response) {
+            const overloaded = originalRequest && observeOverloadCooldown(originalRequest, error.response);
+            if (overloaded) throw overloaded;
             const msg = error.response.data?.message || getStatusMessage(error.response.status);
             const err = new Error(msg);
             // 구조화된 에러 데이터(예: 정지 status/until/reason)를 손실 없이 동행

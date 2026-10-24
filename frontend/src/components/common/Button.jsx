@@ -11,7 +11,7 @@
  *   link      - 링크형
  */
 
-import React from 'react';
+import React, { useId } from 'react';
 import PropTypes from 'prop-types';
 import { SpinIndicator } from './Loading';
 import Tooltip from './Tooltip';
@@ -163,6 +163,8 @@ const Button = ({
     block = false,
     loading = false,
     disabled = false,
+    unavailableReason = '',
+    onUnavailable,
     htmlType = 'button',
     icon,
     loadingIcon,
@@ -172,6 +174,7 @@ const Button = ({
     className,
     ...rest
 }) => {
+    const reasonId = useId();
     const isGhostSm = variant.startsWith('ghost-sm');
     const iconOnly = icon != null && React.Children.count(children) === 0;
     const smallButtonRadius = iconOnly ? radius.md : radius.pill;
@@ -187,9 +190,9 @@ const Button = ({
         alignItems: 'center',
         justifyContent: 'center',
         gap: '5px',
-        cursor: disabled ? 'not-allowed' : 'pointer',
+        cursor: disabled || unavailableReason ? 'not-allowed' : 'pointer',
         // 평상시 인라인 opacity를 넣으면 전역 hover/active 규칙을 이겨 피드백이 사라진다.
-        opacity: disabled ? 0.45 : undefined,
+        opacity: disabled || unavailableReason ? 0.45 : undefined,
         fontWeight: isGhostSm ? fontWeight.medium : fontWeight.bold,
         fontSize: buttonFontSize,
         height: buttonHeight,
@@ -205,6 +208,11 @@ const Button = ({
 
     const handleClick = (e) => {
         if (disabled || loading) return;
+        if (unavailableReason) {
+            e.preventDefault();
+            onUnavailable?.(unavailableReason);
+            return;
+        }
         onClick?.(e);
     };
 
@@ -219,6 +227,8 @@ const Button = ({
             className={['reserve-btn', `reserve-btn--${variant}`, iconOnly && 'reserve-btn--icon-only', className].filter(Boolean).join(' ')}
             style={baseStyle}
             {...rest}
+            aria-disabled={unavailableReason ? true : rest['aria-disabled']}
+            aria-describedby={[rest['aria-describedby'], unavailableReason && reasonId].filter(Boolean).join(' ') || undefined}
             title={iconOnly ? undefined : rest.title}
         >
             {/* 로딩 중에도 children 을 그대로 둔다. 스피너는 **아이콘 자리**를 대신할 뿐이다.
@@ -230,7 +240,8 @@ const Button = ({
             {children}
         </button>
     );
-    return iconOnly && rest['aria-label'] ? <Tooltip title={rest['aria-label']}>{button}</Tooltip> : button;
+    const content = iconOnly && rest['aria-label'] ? <Tooltip title={rest['aria-label']}>{button}</Tooltip> : button;
+    return unavailableReason ? <>{content}<span id={reasonId} className="reserve-sr-only">{unavailableReason}</span></> : content;
 };
 /* hover·active 등 상호작용 CSS 는 index.css 의 "Button 상호작용 상태" 블록에 있다.
    예전에는 이 파일 안의 <style> 태그였는데, JSX 안의 style 은 **인스턴스마다 렌더**되어
@@ -246,6 +257,8 @@ Button.propTypes = {
     block: PropTypes.bool,
     loading: PropTypes.bool,
     disabled: PropTypes.bool,
+    unavailableReason: PropTypes.string,
+    onUnavailable: PropTypes.func,
     htmlType: PropTypes.oneOf(['button', 'submit', 'reset']),
     icon: PropTypes.node,
     loadingIcon: PropTypes.node,

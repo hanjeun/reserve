@@ -3,6 +3,7 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import Pagination from '../../components/common/Pagination';
 import { useSearchParams } from 'react-router-dom';
 import { DataState, FilterToolbar, PageContainer } from '../../components/common';
+import ListingContent from '../../components/common/ListingContent';
 import StoreCard from '../../components/store/StoreCard';
 import StoreListRow from '../../components/store/StoreListRow';
 import LoadingStatus from '../../components/common/LoadingStatus';
@@ -84,8 +85,8 @@ export default function Waiting() {
             onRegionOpen={() => setRegionOpen(true)} status={status} onStatusChange={value => change('status', value)}
             sort={sort} onSortChange={value => change('sort', value)} disabled={false} />
         <FilterToolbar search={{ value: keyword, onChange: event => change('keyword', event.target.value),
-            placeholder: '웨이팅 가게 검색' }} onReload={reload} loading={refreshing} autoRefreshDomain="WAITING" />
-        {result.error && result.data && !blockingError && <DataState compact state="error" subject="웨이팅 가게 갱신" error={result.error} onRetry={reload} retrying={result.isFetching} />}
+            placeholder: '웨이팅 가게 검색' }} onReload={reload} loading={refreshing} />
+        <ListingContent notice={result.error && result.data && !blockingError && <DataState compact state="error" subject="웨이팅 가게 갱신" error={result.error} onRetry={reload} retrying={result.isFetching} />}>
         {result.isPending ? <LoadingStatus aria-label="웨이팅 가게를 불러오는 중" aria-busy="true">
             <WaitingStoresContentSkeleton view={view} />
         </LoadingStatus> : blockingError ? <DataState state="error" subject="웨이팅 가게" error={result.error} onRetry={reload} retrying={result.isFetching} />
@@ -93,11 +94,12 @@ export default function Waiting() {
                     {stores.map(store => <Item key={store.id} store={store} extraTools={<WaitingStoreSummary store={store} />} />)}
                 </div> : <DataState state="empty" kind="waiting" title={term ? '검색에 맞는 웨이팅 가게가 없어요.' : '접수 가능한 가게가 없어요.'}
                     description="가게가 웨이팅 접수를 켜면 여기에 표시돼요." />}
-        {!blockingError && total > PAGE_SIZE && <nav className="reserve-waiting-pagination" aria-label="웨이팅 가게 목록 페이지">
+        </ListingContent>
+        {!blockingError && total > PAGE_SIZE && <nav className="reserve-listing-pagination" aria-label="웨이팅 가게 목록 페이지">
             <Pagination current={page + 1} total={total} pageSize={PAGE_SIZE} onChange={next => {
                 change('page', String(next));
                 window.scrollTo({ top: 0, left: 0, behavior: reducedMotion ? 'instant' : 'smooth' });
-            }} showSizeChanger={false} showLessItems={isMobile} size={isMobile ? 'small' : 'default'} />
+            }} showSizeChanger={false} showLessItems={isMobile} size={isMobile ? 'small' : 'default'} align="end" />
         </nav>}
         <RegionSheet open={regionOpen} value={region} onClose={() => setRegionOpen(false)} onApply={value => {
             change('region', value); setRegionOpen(false);

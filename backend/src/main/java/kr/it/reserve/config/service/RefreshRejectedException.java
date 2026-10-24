@@ -14,15 +14,19 @@ public class RefreshRejectedException extends AuthException {
     public enum Reason {
         /** refresh_token 쿠키가 없다. 쿠키 Max-Age가 끝났거나 이미 로그아웃한 브라우저. */
         MISSING_COOKIE,
+        /** The deployment deliberately requires one new login for sid-less legacy cookies. */
+        LEGACY_SESSION,
+        /** Reconstruction metadata/key no longer reproduces the stored current-token hash. */
+        SESSION_INCONSISTENT,
         /** JWT exp가 지났다. */
         EXPIRED_JWT,
         /** 서명 불일치·형식 오류. */
         INVALID_JWT,
         /** access 토큰을 refresh로 보냈다. */
         NOT_REFRESH_TOKEN,
-        /** DB에 없는 토큰. 로그아웃·비밀번호 변경·기기 5개 초과·두 세대 이상 지난 토큰. */
+        /** 등록되지 않았거나 회수된 기기 가족. 로그아웃·비밀번호 변경·기기 수 제한 등. */
         UNKNOWN_TOKEN,
-        /** 유예가 지난 직전 토큰이 다시 왔다. 탈취 재사용으로 보고 그 기기 세션을 끊는다. */
+        /** 두 세대 이상 지난 토큰 또는 60초 유예가 지난 직전 토큰. 그 기기 가족 전체를 회수한다. */
         REUSED_TOKEN,
         /** DB 행의 만료 시각이 지났다. */
         EXPIRED_SESSION,

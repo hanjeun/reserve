@@ -366,15 +366,9 @@
     padding: 2px 0;
     border: 0;
     background: transparent;
-    color: inherit;
     font: inherit;
-    text-decoration: underline;
-    text-decoration-thickness: 1px;
-    text-underline-offset: 3px;
     cursor: pointer;
 }
-.reserve-payment-result__recovery button:hover { color: var(--c-text-secondary, #4e5968); }
-.reserve-payment-result__recovery button:active { opacity: 0.65; }
 .reserve-payment-result__recovery button:focus { outline: none; }
 .reserve-payment-result__recovery button:focus-visible {
     outline: var(--reserve-focus-ring);

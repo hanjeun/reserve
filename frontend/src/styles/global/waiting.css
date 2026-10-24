@@ -1,6 +1,5 @@
-.reserve-waiting-tab { display: flex; flex-direction: column; gap: 20px; }
-.reserve-waiting-tab > .reserve-filter-toolbar { margin-bottom: 0; }
-.reserve-waiting-filters { justify-content: flex-start; flex-wrap: nowrap; margin-bottom: 0; }
+.reserve-waiting-tab { min-width: 0; }
+.reserve-waiting-filters { justify-content: flex-start; flex-wrap: nowrap; }
 .reserve-waiting-filters .reserve-filter-menu { max-width: min(240px, 65vw); }
 .reserve-waiting-view-toggle { flex: 0 0 auto; }
 .reserve-waiting-filter-options { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; margin-left: auto; }
@@ -41,7 +40,6 @@
 .reserve-waiting-card-body .reserve-waiting-actions { justify-content: flex-end; }
 .reserve-waiting-form-help { margin: 0; color: var(--c-text-secondary); font-size: 13px; line-height: 20px; }
 .reserve-waiting-heading { margin-bottom: 24px; }
-.reserve-waiting-pagination { display: flex; justify-content: center; margin-top: 32px; }
 .reserve-waiting-join--after-reservation { margin-top: 24px; }
 .reserve-waiting-join-lead { margin: 0 0 24px; color: var(--c-text-secondary); font-size: 14px; line-height: 22px; }
 .reserve-waiting-join-status { margin: 0 0 24px; padding: 12px; border-radius: 12px; background: var(--c-gray-100); color: var(--c-text-primary); font-size: 14px; line-height: 22px; }

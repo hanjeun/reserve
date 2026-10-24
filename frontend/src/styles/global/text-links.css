@@ -1,0 +1,16 @@
+/* Footer links and neutral text actions share the same pointer and keyboard states. */
+a.reserve-text-link,
+a.reserve-text-link:visited,
+a.reserve-text-link:focus,
+button.reserve-text-link,
+span.reserve-text-link {
+    color: var(--c-text-tertiary, #8b95a1);
+    text-decoration: none;
+    text-underline-offset: 3px;
+    transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+a.reserve-text-link:is(:hover, :focus-visible, :active, [aria-current="page"]),
+button.reserve-text-link:enabled:is(:hover, :focus-visible, :active) {
+    color: var(--c-text-primary, #1a1f27);
+    text-decoration: underline;
+}

@@ -45,6 +45,8 @@ public class AuthApiController {
     private final TokenService tokenService;
     private final RateLimiter rateLimiter;
     private final CookieUtil cookieUtil;
+    @org.springframework.beans.factory.annotation.Autowired
+    private kr.it.reserve.member.service.LoginMethodService loginMethods;
     private static final String ACCESS_TOKEN_COOKIE = "access_token";
 
     /**
@@ -162,6 +164,7 @@ public class AuthApiController {
 
     @PostMapping("/refresh")
     public ApiResponse<Void> refresh(HttpServletRequest request, HttpServletResponse response) {
+        try {
         String refreshToken = CookieUtil.getCookie(request, REFRESH_TOKEN_COOKIE);
         if (refreshToken == null || refreshToken.isBlank()) {
             throw tokenService.rejectMissingCookie();
@@ -178,6 +181,11 @@ public class AuthApiController {
 
         // 토큰은 HttpOnly 쿠키로만 전달한다. 응답 본문에 복제하면 XSS 노출면만 넓어진다.
         return ApiResponse.success(null, "토큰 재발급 성공");
+        } catch (AuthException rejected) {
+            cookieUtil.deleteCookie(response, ACCESS_TOKEN_COOKIE);
+            cookieUtil.deleteCookie(response, REFRESH_TOKEN_COOKIE);
+            throw rejected;
+        }
     }
 
     /**
@@ -196,21 +204,27 @@ public class AuthApiController {
 
     @PostMapping("/logout")
     public ApiResponse<Void> logout(HttpServletRequest request, HttpServletResponse response) {
-        String refreshToken = CookieUtil.getCookie(request, REFRESH_TOKEN_COOKIE);
-        if (refreshToken != null && !refreshToken.isBlank()) {
+        try {
+        if (loginMethods != null) loginMethods.cancelOAuth(request);
+        for (String refreshToken : CookieUtil.getCookieValues(request, REFRESH_TOKEN_COOKIE)) {
             tokenService.revoke(refreshToken);
         }
+        } finally {
         cookieUtil.deleteCookie(response, ACCESS_TOKEN_COOKIE);
         cookieUtil.deleteCookie(response, REFRESH_TOKEN_COOKIE);
+
+        var session = request.getSession(false);
+        if (session != null) session.invalidate();
+        cookieUtil.deleteCookie(response, "JSESSIONID");
+        }
 
         return ApiResponse.success(null, "로그아웃 성공");
     }
 
     private void handleTokenIssue(HttpServletResponse response, Member member) {
-        String accessToken = tokenProvider.generateAccessToken(member);
-        String refreshToken = tokenProvider.generateRefreshToken(member);
+        TokenProvider.IssuedSession pair = tokenProvider.issueSession(member, null);
 
-        cookieUtil.addCookie(response, ACCESS_TOKEN_COOKIE, accessToken, (int) jwtProperties.getAccessTokenExpiration().toSeconds());
-        cookieUtil.addCookie(response, REFRESH_TOKEN_COOKIE, refreshToken, (int) jwtProperties.getRefreshTokenExpiration().toSeconds());
+        cookieUtil.addCookie(response, ACCESS_TOKEN_COOKIE, pair.accessToken(), (int) jwtProperties.getAccessTokenExpiration().toSeconds());
+        cookieUtil.addCookie(response, REFRESH_TOKEN_COOKIE, pair.refreshToken(), (int) pair.refreshMaxAge().toSeconds());
     }
 }

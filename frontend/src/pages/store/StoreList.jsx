@@ -4,7 +4,8 @@ import PropTypes from 'prop-types';
 import Pagination from '../../components/common/Pagination';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation, useSearchParams } from 'react-router-dom';
-import { DataState, PageContainer, StoreCardSkeleton } from '../../components/common';
+import { DataState, FilterToolbar, PageContainer, StoreCardSkeleton } from '../../components/common';
+import ListingContent from '../../components/common/ListingContent';
 import { StoreCard } from '../../components/store';
 import StoreListRow from '../../components/store/StoreListRow';
 import StoreListRowSkeleton from '../../components/store/StoreListRowSkeleton';
@@ -166,14 +167,13 @@ const StoreList = () => {
         if (blockingError) {
             return (
                 <DataState state="error" kind="store" subject="가게 목록" error={error}
-                    onRetry={refetch} retrying={refetching} style={{ marginTop: 100 }} />
+                    onRetry={refetch} retrying={refetching} />
             );
         }
         if (stores.length === 0) {
             return (
                 <DataState state="empty" kind="store"
-                    title={searchParams.region ? '이 지역에 등록된 가게가 없어요.' : '조건에 맞는 가게가 없어요.'}
-                    style={{ marginTop: 100 }} />
+                    title={searchParams.region ? '이 지역에 등록된 가게가 없어요.' : '조건에 맞는 가게가 없어요.'} />
             );
         }
         return (
@@ -208,6 +208,7 @@ const StoreList = () => {
                 view={view}
                 onViewChange={setView}
                 count={!loading && hasData && !blockingError ? totalElements : undefined}
+                countUnavailable={blockingError}
                 region={searchParams.region}
                 regionOpen={regionOpen}
                 onRegionOpen={() => setRegionOpen(true)}
@@ -225,15 +226,20 @@ const StoreList = () => {
                 }}
             />
 
+            <FilterToolbar search={{ value: searchParams.keyword,
+                onChange: event => setSearchParams({ keyword: event.target.value }),
+                placeholder: '가게 검색' }} onReload={refetch} loading={refetching} initialLoading={initialLoading} />
+
             {/* 스켈레톤은 첫 조회나 쿼리 전환으로 이전 결과를 그대로 보여줄 수 없을 때만 쓴다.
                 수동 새로고침은 현재 카드와 읽던 위치를 유지하고, 툴바 버튼만 진행 상태를 표시한다.
                 grid는 고정 4열(rsv-store-grid)로 시작해 화면 폭에 따라 반응형으로 줄어든다. */}
-            {error && !blockingError && <DataState state="error" kind="store" subject="가게 목록" error={error}
+            <ListingContent notice={error && !blockingError && <DataState state="error" kind="store" subject="가게 목록" error={error}
                 title="최신 가게 정보를 확인하지 못해 이전 목록을 보여드리고 있어요."
-                onRetry={refetch} retrying={refetching} compact style={{ marginBottom: 16 }} />}
-            {renderResult()}
+                onRetry={refetch} retrying={refetching} compact />}>
+                {renderResult()}
+            </ListingContent>
             {hasData && !blockingError && totalElements > 0 && (
-                <nav aria-label="가게 목록 페이지" style={{ marginTop: 24 }}>
+                <nav aria-label="가게 목록 페이지" className="reserve-listing-pagination">
                     <Pagination
                         current={page}
                         pageSize={pageSize}
@@ -248,6 +254,7 @@ const StoreList = () => {
                         showSizeChanger={false}
                         showLessItems={isMobile}
                         size={isMobile ? 'small' : 'default'}
+                        align="end"
                         disabled={loading}
                     />
                 </nav>

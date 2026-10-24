@@ -30,7 +30,7 @@ describe('store detail for an address that is not a store', () => {
     it('does not send a non-numeric id to the API and shows the not-found state without a retry', () => {
         renderAt('/store/abc');
 
-        expect(useStoreData).toHaveBeenCalledWith(null);
+        expect(useStoreData).toHaveBeenCalledWith(null, { reservationId: null });
         expect(screen.getByText('요청하신 가게를 찾을 수 없어요.')).toBeInTheDocument();
         expect(screen.queryByRole('alert')).toBeNull();
         expect(screen.queryByRole('button', { name: '다시 불러오기' })).toBeNull();
@@ -40,7 +40,7 @@ describe('store detail for an address that is not a store', () => {
         useStoreData.mockReturnValue({ ...idle, error: Object.assign(new Error('매장을 찾을 수 없어요.'), { status: 404 }) });
         renderAt('/store/999');
 
-        expect(useStoreData).toHaveBeenCalledWith('999');
+        expect(useStoreData).toHaveBeenCalledWith('999', { reservationId: null });
         expect(screen.getByRole('alert')).toHaveTextContent('요청하신 가게 정보를 찾을 수 없어요.');
         expect(screen.getByRole('alert').querySelector('.reserve-state-illustration img'))
             .toHaveAttribute('src', expect.stringContaining('not-found-512.webp'));

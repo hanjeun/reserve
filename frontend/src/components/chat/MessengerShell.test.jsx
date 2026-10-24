@@ -16,7 +16,8 @@ vi.mock('../../services', () => ({
 }));
 
 vi.mock('./MessengerContent', () => ({
-    default: () => <div><button type="button">첫 작업</button><textarea aria-label="테스트 입력" /></div>,
+    default: () => <div><button type="button">첫 작업</button><textarea aria-label="테스트 입력" />
+        <input aria-label="가게 검색어" onKeyDown={event => { if (event.key === 'Escape') event.preventDefault(); }} /></div>,
 }));
 
 const renderShell = (props = {}) => {
@@ -50,6 +51,7 @@ describe('MessengerShell accessibility', () => {
             activeThread: false,
             drafts: {},
             selection: { kind: 'support' },
+            storeSearch: null,
             sessionIdentity: messengerIdentityOf(useAuthStore.getState()),
         });
     });
@@ -91,6 +93,23 @@ describe('MessengerShell accessibility', () => {
 
         await waitFor(() => expect(screen.queryByRole('dialog', { name: '메시지' })).not.toBeInTheDocument());
         expect(launcher).toHaveFocus();
+    });
+
+    it('includes search inputs in its focus cycle and honors an inner Escape handler', async () => {
+        const user = userEvent.setup();
+        renderShell();
+        await user.click(await screen.findByRole('button', { name: '메시지, 읽지 않은 메시지 2개 열기' }));
+        const dialog = await screen.findByRole('dialog', { name: '메시지' });
+        const input = await screen.findByRole('textbox', { name: '가게 검색어' });
+        const close = screen.getByRole('button', { name: '메시지 닫기' });
+        close.focus();
+        fireEvent.keyDown(close, { key: 'Tab', shiftKey: true });
+        expect(input).toHaveFocus();
+        fireEvent.keyDown(input, { key: 'Tab' });
+        expect(close).toHaveFocus();
+        fireEvent.keyDown(input, { key: 'Escape' });
+        expect(useMessengerStore.getState().open).toBe(true);
+        expect(dialog).not.toHaveClass('is-closing');
     });
 
     it('replays the existing opening animation for store contact in an open panel without remounting its conversation', async () => {

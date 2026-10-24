@@ -1,6 +1,6 @@
 import { PageTitle, PageDescription } from '../../components/common/PageTypography';
 import LoadingStatus from '../../components/common/LoadingStatus';
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { Typography } from 'antd';
 import {
@@ -8,6 +8,7 @@ import {
     CloseOutlined, StarOutlined, EditOutlined,
 } from '../../components/common/icons';
 import { PageContainer, Button, DataState, FilterToolbar, MyReservationCardSkeleton, ReservationSummaryCardSkeleton, SpinIndicator, SegmentedControl } from '../../components/common';
+import ListingContent from '../../components/common/ListingContent';
 import MyWaiting from '../../components/waiting/MyWaiting';
 import ReservationRow from '../../components/reservation/ReservationRow';
 import ReservationListingToolbar from '../../components/reservation/ReservationListingToolbar';
@@ -18,6 +19,7 @@ import { useReservations, useMessage, usePayment } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useViewModeParam from '../../hooks/useViewModeParam';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
+import { useWindowWidth } from '../../hooks/useWindowWidth';
 import { isBlockingListReadError, queryErrorStatus } from '../../hooks/liveUpdateQueries';
 import useDebounce from '../../hooks/useDebounce';
 import useAuthStore from '../../store/useAuthStore';
@@ -26,6 +28,8 @@ import api from '../../api/axios';
 import { formatCurrency } from '../../utils';
 import { API_ENDPOINTS, RESERVATION_STATUS_FILTER_OPTIONS, RESERVATION_SORT_OPTIONS } from '../../constants';
 import { colors, fontSize } from '../../styles/tokens';
+import Pagination from '../../components/common/Pagination';
+import { DEFAULT_PAGE_SIZE, MOBILE_PAGINATION_BREAKPOINT } from '../../constants/pagination';
 
 const { Text } = Typography;
 
@@ -127,36 +131,15 @@ const withToolbarParam = (current, key, value) => {
     const next = new URLSearchParams(current);
     if (value != null) next.set(key, String(value));
     else next.delete(key);
+    if (key !== 'page') next.set('page', '1');
     return next;
-};
-
-const matchesReservationKeyword = (r, kw) =>
-    r.storeName?.toLowerCase().includes(kw) ||
-    r.specialRequest?.toLowerCase().includes(kw) ||
-    r.reservationCode?.toLowerCase().includes(kw);
-
-const visitSortKey = (r) => (r.reservationDate ? `${r.reservationDate}T${r.reservationTime || ''}` : '9999');
-
-const filterAndSortReservations = (reservations, { statusFilter, keyword, sort }) => {
-    let list = statusFilter !== 'ALL'
-        ? reservations.filter(r => r.status === statusFilter)
-        : reservations;
-    if (keyword.trim()) {
-        const kw = keyword.toLowerCase();
-        list = list.filter(r => matchesReservationKeyword(r, kw));
-    }
-    // 서버 응답은 생성 최신순이며 응답 DTO에는 생성 시각이 없다. 이 순서만 뒤집고,
-    // 방문일은 응답의 예약 날짜·시간 필드를 사용한다.
-    if (sort === 'oldest') return [...list].reverse();
-    if (sort === 'visit') return [...list].sort((a, b) => visitSortKey(a).localeCompare(visitSortKey(b)));
-    return list;
 };
 
 // 목록 결과 — 빈 안내 또는 카드/목록형 항목들.
 const ReservationResults = ({ filtered, view, filtersActive, renderItem }) => {
     if (filtered.length === 0) {
         return (
-            <DataState state="empty" kind="reservation" style={{ marginTop: 100 }}
+            <DataState state="empty" kind="reservation"
                 title={filtersActive
                     ? '조건에 맞는 예약이 없어요.'
                     : '예약 내역이 없어요.'} />
@@ -179,8 +162,6 @@ const ReservationHistory = () => {
     const location = useLocation();
     const [urlSearchParams, setUrlSearchParams] = useSearchParams();
     const { message, confirm } = useMessage();
-    const { reservations, loading, refetching, error, cancelReservation, refetch,
-        hasData = reservations.length > 0 || !loading && !error } = useReservations();
     const { user } = useAuthStore();
     const { pay, paying } = usePayment();
     useDocumentTitle('내 예약');
@@ -191,13 +172,27 @@ const ReservationHistory = () => {
     const setToolbarParam = (key, value) => setUrlSearchParams(current => withToolbarParam(current, key, value));
     const [keyword, setKeyword] = useState('');
     const debouncedKeyword = useDebounce(keyword, 300);
+    const requestedPage = Number(urlSearchParams.get('page') ?? 1);
+    const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+    const isMobile = useWindowWidth() < MOBILE_PAGINATION_BREAKPOINT;
+    const { reservations, total, totalPages, loading, refetching, error, cancelReservation, refetch,
+        hasData = reservations.length > 0 || !loading && !error } = useReservations({
+        page: page - 1, size: DEFAULT_PAGE_SIZE,
+        search: debouncedKeyword.trim() || undefined,
+        status: statusFilter === 'ALL' ? undefined : statusFilter,
+        sort,
+    });
     const [qrReservationId, setQrReservationId] = useState(null);
     const [detailReservation, setDetailReservation] = useState(null);
     const currentDetailReservation = detailReservation ? reservations.find(item => item.id === detailReservation.id) ?? null : null;
     const listRef = React.useRef(null);
     const accessDenied = [401, 403].includes(queryErrorStatus(error));
     const blockingError = isBlockingListReadError(error, reservations);
-    useListRefreshAnchor(listRef, JSON.stringify([view, statusFilter, sort, debouncedKeyword]), refetching, hasData ? reservations : null);
+    useListRefreshAnchor(listRef, JSON.stringify([view, page, statusFilter, sort, debouncedKeyword]), refetching, hasData ? reservations : null);
+    useEffect(() => {
+        if (!hasData || loading || refetching || error || page <= Math.max(totalPages, 1)) return;
+        setUrlSearchParams(current => withToolbarParam(current, 'page', Math.max(totalPages, 1)), { replace: true });
+    }, [hasData, loading, refetching, error, page, totalPages, setUrlSearchParams]);
     if (accessDenied) {
         if (qrReservationId !== null) setQrReservationId(null);
         if (detailReservation !== null) setDetailReservation(null);
@@ -217,13 +212,8 @@ const ReservationHistory = () => {
             message.warning({ content: location.state.warnMsg, key: 'review_warn' });
         }
         if (location.state?.refetch) void refetch();
-        if (location.state) navigate(location.pathname, { replace: true, state: {} });
+        if (location.state) navigate(`${location.pathname}${location.search}`, { replace: true, state: {} });
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-    const filtered = useMemo(
-        () => filterAndSortReservations(reservations, { statusFilter, keyword: debouncedKeyword, sort }),
-        [reservations, statusFilter, debouncedKeyword, sort],
-    );
 
     const handlePay = async (res) => {
         await pay(
@@ -348,21 +338,13 @@ const ReservationHistory = () => {
         listBody = (
             // 처음부터 못 불러오면 목록 자리에 띄운다 — 제목·툴바 옆이 아니라 결과가 나올 자리.
             <DataState state="error" kind="reservation" subject="예약 목록" error={error}
-                onRetry={refetch} retrying={loading || refetching} style={{ marginTop: 100 }} />
+                onRetry={refetch} retrying={loading || refetching} />
         );
     } else {
         listBody = (
-            <>
-                {/* 다시 불러오기만 실패했으면 이전 목록은 그대로 두고, 그 위에 작은 띠로만 알린다. */}
-                {error && (
-                    <DataState state="error" kind="reservation" subject="예약 목록" error={error}
-                        title="최신 예약을 확인하지 못해 이전 목록을 보여드리고 있어요."
-                        onRetry={refetch} retrying={loading || refetching} compact style={{ marginBottom: 16 }} />
-                )}
-                <ReservationResults filtered={filtered} view={view}
-                    filtersActive={statusFilter !== 'ALL' || Boolean(debouncedKeyword.trim())}
-                    renderItem={renderReservationItem} />
-            </>
+            <ReservationResults filtered={reservations} view={view}
+                filtersActive={statusFilter !== 'ALL' || Boolean(debouncedKeyword.trim())}
+                renderItem={renderReservationItem} />
         );
     }
 
@@ -374,10 +356,10 @@ const ReservationHistory = () => {
                 status={statusFilter} onStatusChange={nextStatus => setToolbarParam('status', nextStatus)}
                 statusOptions={STATUS_OPTIONS} sort={sort}
                 onSortChange={nextSort => setToolbarParam('sort', nextSort)} sortOptions={SORT_OPTIONS}
-                count={loading || !hasData || blockingError ? undefined : filtered.length} disabled={loading} />
+                count={loading || !hasData || blockingError ? undefined : total} disabled={loading} />
             <FilterToolbar
                 autoRefreshDomain="RESERVATION"
-                search={{ value: keyword, onChange: e => setKeyword(e.target.value), placeholder: '가게명, 예약번호로 검색', disabled: loading }}
+                search={{ value: keyword, onChange: e => { setKeyword(e.target.value); setToolbarParam('page', 1); }, placeholder: '가게명, 예약번호로 검색', disabled: loading }}
                 onReload={refetch}
                 loading={loading || refetching}
                 initialLoading={loading}
@@ -385,7 +367,20 @@ const ReservationHistory = () => {
 
             {/* 첫 조회에만 스켈레톤을 표시한다. 폴링·창 포커스·수동 새로고침은 현재 예약과
                 읽던 위치를 유지하고 툴바에서만 진행 상태를 알린다. */}
-            {listBody}
+            <ListingContent notice={!loading && error && !blockingError && (
+                <DataState state="error" kind="reservation" subject="예약 목록" error={error}
+                    title="최신 예약을 확인하지 못해 이전 목록을 보여드리고 있어요."
+                    onRetry={refetch} retrying={loading || refetching} compact />
+            )}>{listBody}</ListingContent>
+            {hasData && !blockingError && total > 0 && (
+                <nav aria-label="내 예약 목록 페이지" className="reserve-listing-pagination">
+                    <Pagination current={page} pageSize={DEFAULT_PAGE_SIZE} total={total}
+                        onChange={nextPage => setToolbarParam('page', nextPage)}
+                        showSizeChanger={false} showLessItems={isMobile}
+                        size={isMobile ? 'small' : 'default'} align="end"
+                        disabled={loading || keyword !== debouncedKeyword} />
+                </nav>
+            )}
             {!accessDenied && <><QrCodeModal
                 reservationId={qrReservationId}
                 open={qrReservationId != null}
@@ -406,7 +401,7 @@ const MyReservations = () => {
     const waiting = params.get('tab') === 'waiting';
     useDocumentTitle('내 예약');
     return <PageContainer size="xl" paddingTop="40px" className="reserve-myreservation-page">
-        <div style={{ marginBottom: 24 }}>
+        <div className="reserve-listing-heading">
             <PageTitle style={styles.title}>내 예약 확인</PageTitle>
             <PageDescription>예약과 웨이팅 현황을 확인해요</PageDescription>
         </div>

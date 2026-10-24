@@ -5,6 +5,7 @@ import { Typography, Modal, Flex } from 'antd';
 import { EditOutlined, DeleteOutlined, ExclamationCircleFilled, PlusOutlined } from '../../components/common/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageContainer, Button, Card, DataState, StoreCardSkeleton, ModalLoading, Tooltip } from '../../components/common';
+import ListingContent from '../../components/common/ListingContent';
 import { useMyStores } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useViewModeParam from '../../hooks/useViewModeParam';
@@ -237,7 +238,7 @@ const OwnedStoresBody = ({ stores, visibleStores, view, onEdit, onDelete, onRegi
         );
     }
     return (
-        <DataState state="empty" kind="store" style={{ marginTop: '100px' }}
+        <DataState state="empty" kind="store"
             title={stores.length > 0 ? '조건에 맞는 내 가게가 없어요.' : '등록된 가게가 없어요.'}
             action={stores.length > 0
                 ? <Button variant="secondary" size="sm" onClick={onResetFilters}>필터 초기화</Button>
@@ -314,29 +315,21 @@ const MyStores = () => {
         storesContent = (
             // 처음부터 못 불러오면 목록 자리에 띄운다 — 제목·툴바 옆이 아니라 결과가 나올 자리.
             <DataState state="error" kind="store" subject="가게 목록" error={error}
-                onRetry={handleRetry} retrying={retrying || refetching} style={{ marginTop: 100 }} />
+                onRetry={handleRetry} retrying={retrying || refetching} />
         );
     } else {
         storesContent = (
-            <>
-                {/* 다시 불러오기만 실패했으면 이전 목록은 그대로 두고, 그 위에 작은 띠로만 알린다. */}
-                {error && (
-                    <DataState state="error" kind="store" subject="가게 목록" error={error}
-                        title="최신 가게 정보를 확인하지 못해 이전 목록을 보여드리고 있어요."
-                        onRetry={handleRetry} retrying={retrying || refetching} compact style={{ marginBottom: 16 }} />
-                )}
-                <OwnedStoresBody stores={stores} visibleStores={visibleStores} view={view}
-                    listRef={listRef}
-                    onEdit={handleEdit} onDelete={handleDeleteClick}
-                    onRegister={() => navigate('/store/register')} onResetFilters={resetOwnedFilters} />
-            </>
+            <OwnedStoresBody stores={stores} visibleStores={visibleStores} view={view}
+                listRef={listRef}
+                onEdit={handleEdit} onDelete={handleDeleteClick}
+                onRegister={() => navigate('/store/register')} onResetFilters={resetOwnedFilters} />
         );
     }
 
     return (
         <PageContainer size="xl" paddingTop="40px" className="reserve-mystore-page" aria-busy={loading || refetching || retrying}>
             {/* 헤더 */}
-            <div style={{ marginBottom: '40px' }}>
+            <div className="reserve-listing-heading">
                 <PageTitle loading={loading} style={{ margin: '0 0 8px 0' }}>
                     내 가게 관리
                 </PageTitle>
@@ -362,7 +355,11 @@ const MyStores = () => {
 
             {/* 카드 영역 — 2026-07 수정: 고정 4열 그리드(rsv-mystore-grid)로 통일(위 GRID_STYLE 참고).
                 Card.Add도 같은 시점에 borderRadius를 0(각짐)으로 맞춰서 실제 가게 카드와 모서리가 일치한다. */}
-            {storesContent}
+            <ListingContent notice={!loading && error && !blockingError && (
+                <DataState state="error" kind="store" subject="가게 목록" error={error}
+                    title="최신 가게 정보를 확인하지 못해 이전 목록을 보여드리고 있어요."
+                    onRetry={handleRetry} retrying={retrying || refetching} compact />
+            )}>{storesContent}</ListingContent>
 
             {/* 삭제 모달 */}
             {!accessDenied && <DeleteStoreModal

@@ -378,7 +378,7 @@ function RecommendedStores({ region = '' }) {
         <section className="reserve-discovery-recommended" aria-labelledby="home-recommended-title">
             <SectionHeading
                 title={<span id="home-recommended-title">이런 곳은 어때요?</span>}
-                action={<Link to={withRegion('/stores?sort=rating', region)} className="reserve-discovery-more">전체 보기 <ArrowRightOutlined aria-hidden="true" /></Link>}
+                action={<Link to={withRegion('/stores?sort=rating', region)} className="reserve-discovery-more reserve-text-link">전체 보기 <ArrowRightOutlined aria-hidden="true" /></Link>}
             />
             {renderStores()}
         </section>
@@ -445,7 +445,7 @@ export default function Home() {
                 </button>
                 <button
                     type="button"
-                    className="reserve-discovery-current-location"
+                    className="reserve-discovery-current-location reserve-text-link"
                     onClick={handleCurrentLocation}
                     disabled={locating}
                     aria-busy={locating}

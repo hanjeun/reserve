@@ -41,9 +41,10 @@ public class MemberWithdrawalService {
                 || oauth && !providerId.equals(current.getProviderId())) throw reauthenticate();
         if (subject != null) {
             subject.mergeMemberState(current.getOauthAuthenticatedAt(), current.getOauthSecurityRevokedAt());
-            if (!tokens.isOAuthSessionCurrent(current, oauthAuthenticatedAt)
+            boolean passwordSession = oauthAuthenticatedAt == null && current.getPassword() != null && current.isLoginMethodsManaged();
+            if (!passwordSession && (!tokens.isOAuthSessionCurrent(current, oauthAuthenticatedAt)
                     || subject.getRevokedAt() != null && (oauthAuthenticatedAt == null
-                    || !oauthAuthenticatedAt.isAfter(subject.getRevokedAt()))) throw reauthenticate();
+                    || !oauthAuthenticatedAt.isAfter(subject.getRevokedAt())))) throw reauthenticate();
             LocalDateTime now = subjects.now();
             LocalDateTime cutoff = subject.getLastAuthenticatedAt() != null && subject.getLastAuthenticatedAt().isAfter(now)
                     ? subject.getLastAuthenticatedAt() : now;

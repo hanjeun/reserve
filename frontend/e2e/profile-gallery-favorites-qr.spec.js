@@ -202,7 +202,7 @@ test('an empty favorites cache shows only the refresh error and can recover with
 for (const [label, path, menu, destination] of [
     ['favorites', '/api/favorites/my', '즐겨찾기', '/my-favorites'],
     ['owned stores', '/api/stores/my', '내 가게 관리', '/my-stores'],
-    ['reservations', '/api/reservations/my', '내 예약 확인', '/my-reservations'],
+    ['reservations', '/api/reservations/my/page', '내 예약 확인', '/my-reservations'],
 ]) {
     test(`three-second ${label} loading stays still during SPA navigation`, async ({ page }) => {
         test.setTimeout(60_000);

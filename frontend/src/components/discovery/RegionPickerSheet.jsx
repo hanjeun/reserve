@@ -6,7 +6,7 @@ import { Skeleton } from 'antd';
 import ResponsiveModal from '../common/ResponsiveModal';
 import { EnvironmentOutlined } from '../common/icons';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import TextLink from '../common/TextLink';
 import Button from '../common/Button';
 import { ModalActionGroup } from '../common/ModalActions';
 import DataState from '../common/DataState';
@@ -227,9 +227,9 @@ export default function RegionPickerSheet({ open, value = '', onClose, onApply, 
                             : <PopularAreaList isLoading={isLoading} hasAreas={popularAreas.length > 0}
                                 areas={popularAreasWithPhoto} draft={draft} emptyPopular={copy.emptyPopular} onPick={pickArea} />}
                         {!regionError && hasPhotoAttribution && (
-                            <Link className="reserve-region-sheet-attribution-link" to="/content-sources#region-photos">
+                            <TextLink className="reserve-region-sheet-attribution-link" to="/content-sources#region-photos">
                                 사진·콘텐츠 출처 및 이용조건
-                            </Link>
+                            </TextLink>
                         )}
                     </section>
                     <div className="reserve-region-sheet-regions" aria-label="지역 목록">

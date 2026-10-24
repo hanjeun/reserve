@@ -20,7 +20,8 @@ public class EntityUpdateController {
     @GetMapping(value = "/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter events(HttpServletResponse response) {
         headers(response);
-        return streams.subscribe(SecurityUtil.getCurrentMember("로그인이 필요해요."), SecurityUtil.getOAuthAuthenticationAt());
+        return streams.subscribe(SecurityUtil.getCurrentMember("로그인이 필요해요."), SecurityUtil.getOAuthAuthenticationAt(),
+                SecurityUtil.getLoginMethod(), SecurityUtil.getSessionId());
     }
 
     @GetMapping(value = "/public/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

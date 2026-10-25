@@ -75,6 +75,13 @@ test('three chat photos keep tools clear, animate after load and retry only the 
     await page.goto('/messages?storeId=81');
     const input = page.getByLabel('첨부할 사진 선택');
     await expect(page.getByRole('button', { name: '사진 첨부', exact: true })).toBeEnabled();
+    // Bounding boxes include ancestor transforms, so capture the baseline after the panel/route entrance settles.
+    await expect.poll(() => page.locator('.reserve-chat-composer').evaluate(element => {
+        for (let ancestor = element; ancestor; ancestor = ancestor.parentElement) {
+            if (ancestor.getAnimations().some(animation => animation.playState === 'running')) return false;
+        }
+        return true;
+    })).toBe(true);
     const emptyComposer = await page.locator('.reserve-chat-composer').boundingBox();
     const emptyToolbar = await page.locator('.reserve-chat-composer-toolbar').boundingBox();
     await page.evaluate(() => {

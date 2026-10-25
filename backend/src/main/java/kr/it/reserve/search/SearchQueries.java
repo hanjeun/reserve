@@ -7,7 +7,9 @@ import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.From;
 import jakarta.persistence.criteria.Predicate;
-import kr.it.reserve.chat.service.ChatRetentionPolicy;
+import kr.it.reserve.chat.search.ChatSearchReader;
+import kr.it.reserve.reservation.search.ReservationSearchReader;
+import kr.it.reserve.waiting.search.WaitingSearchReader;
 import kr.it.reserve.feed.entity.FeedPost;
 import kr.it.reserve.feed.service.FeedService;
 import kr.it.reserve.global.common.ServiceTime;
@@ -17,8 +19,6 @@ import kr.it.reserve.promotion.entity.Promotion;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.repository.StoreSearchSpecification;
 import kr.it.reserve.store.search.StoreFulltextSearch;
-import kr.it.reserve.waiting.entity.WaitingStatus;
-import kr.it.reserve.waiting.repository.WaitingEntryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
@@ -28,26 +28,41 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 
 @Repository
 @RequiredArgsConstructor
-@Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW)
 public class SearchQueries {
     private final FeedService feeds;
+    private final ReservationSearchReader reservationSearch;
+    private final WaitingSearchReader waitingSearch;
+    private final ChatSearchReader chatSearch;
     private final StoreFulltextSearch storeFulltextSearch;
     @Value("${search.store.fulltext-enabled:true}") private boolean fulltextEnabled;
     @Value("${search.store.unified-fulltext-enabled:false}") private boolean unifiedFulltextEnabled;
     @PersistenceContext private EntityManager entityManager;
 
+    @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW, timeout = 3)
     public List<SearchResponse.Item> stores(SearchQuery input) {
-        var visible = StoreSearchSpecification.publicSearch(input.keyword(), "recent", null, null,
+        Specification<Store> visible = StoreSearchSpecification.publicSearch(input.term(), "recent", null, input.region(),
                 new StoreSearchSpecification.DistanceCandidates(null, null, 0), ServiceTime.today());
-        Specification<Store> literal = (root, query, cb) -> cb.and(visible.toPredicate(root, query, cb),
-                activeMember(root.join("owner"), cb));
+        for (String related : input.related()) visible = visible.or(StoreSearchSpecification.publicSearch(related, "recent", null, input.region(),
+                new StoreSearchSpecification.DistanceCandidates(null, null, 0), ServiceTime.today()));
+        Specification<Store> matches = visible;
+        Specification<Store> literal = (root, query, cb) -> {
+            Predicate predicate = cb.and(matches.toPredicate(root, query, cb), activeMember(root.join("owner"), cb));
+            if (query.getResultType() != Long.class && query.getResultType() != long.class) {
+                var order = new java.util.ArrayList<>(query.getOrderList());
+                Predicate original = cb.or(java.util.stream.Stream.of("name", "description", "address", "category", "keywords")
+                        .map(field -> cb.like(cb.lower(root.get(field)), input.pattern(), '!')).toArray(Predicate[]::new));
+                var rank = cb.<Integer>selectCase().when(cb.equal(cb.lower(root.get("name")), input.exact()), 0)
+                        .when(cb.like(cb.lower(root.get("name")), input.prefix(), '!'), 1).when(original, 2).otherwise(3);
+                order.addFirst(cb.asc(rank)); query.orderBy(order);
+            }
+            return predicate;
+        };
         if (fulltextEnabled && unifiedFulltextEnabled) {
-            String candidate = storeFulltextSearch.candidateQuery(input.keyword());
+            String candidate = storeFulltextSearch.candidateQuery(input.term());
             if (!candidate.isEmpty()) {
                 try {
                     return storeFulltextSearch.preview(literal, candidate, input.limit() + 1).stream()
@@ -55,7 +70,7 @@ public class SearchQueries {
                                     SearchQuery.text(row.category(), 50) + " · " + SearchQuery.text(row.address(), 100),
                                     "/store/" + row.id())).toList();
                 } catch (DataAccessException failure) {
-                    // The failed MATCH transaction has ended before this source's literal read starts.
+                    // 실패한 MATCH 트랜잭션이 끝난 뒤 원문 조회로 복귀한다.
                     storeFulltextSearch.disable();
                 }
             }
@@ -72,6 +87,7 @@ public class SearchQueries {
                         "/store/" + row.get("id", Long.class))).toList();
     }
 
+    @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW, timeout = 3)
     public List<SearchResponse.Item> benefits(SearchQuery input) {
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<Tuple> query = cb.createTupleQuery();
@@ -82,12 +98,15 @@ public class SearchQueries {
         query.where(cb.and(StoreNewsPolicy.publicSpecification(null, null, true).toPredicate(root, query, cb),
                 cb.or(cb.like(cb.lower(root.get("title")), keyword, '!'),
                         cb.like(cb.lower(root.get("content")), keyword, '!'), cb.like(cb.lower(root.get("tags")), keyword, '!'))));
-        query.orderBy(cb.desc(root.get("createdAt")), cb.desc(root.get("id")));
+        query.orderBy(cb.asc(cb.<Integer>selectCase().when(cb.equal(cb.lower(root.get("title")), input.exact()), 0)
+                .when(cb.like(cb.lower(root.get("title")), input.prefix(), '!'), 1).otherwise(2)),
+                cb.desc(root.get("createdAt")), cb.desc(root.get("id")));
         return entityManager.createQuery(query).setParameter("keyword", input.pattern()).setMaxResults(input.limit() + 1)
                 .getResultList().stream().map(row -> item(row.get("id", Long.class), "BENEFIT", row.get("title", String.class),
                         row.get("description", String.class), "/benefits/" + row.get("id", Long.class))).toList();
     }
 
+    @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW, timeout = 3)
     public List<SearchResponse.Item> feed(SearchQuery input) {
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<Tuple> query = cb.createTupleQuery();
@@ -107,78 +126,26 @@ public class SearchQueries {
     }
 
     public List<SearchResponse.Item> reservations(SearchQuery input, Long memberId) {
-        return entityManager.createQuery("""
-                SELECT r.id, s.name, r.reservationCode, r.reservationDate, r.reservationTime
-                  FROM Reservation r JOIN r.store s JOIN r.member viewer
-                 WHERE viewer.id = :memberId AND viewer.deletedAt IS NULL AND r.deletedAt IS NULL
-                   AND (viewer.status = :active OR (viewer.status = :suspended AND viewer.suspendedUntil < :sanctions))
-                   AND (LOWER(s.name) LIKE :keyword ESCAPE '!'
-                        OR LOWER(r.reservationCode) LIKE :keyword ESCAPE '!'
-                        OR LOWER(r.specialRequest) LIKE :keyword ESCAPE '!')
-                 ORDER BY r.createdAt DESC, r.id DESC
-                """, Object[].class).setParameter("memberId", memberId).setParameter("keyword", input.pattern())
-                .setParameter("active", MemberStatus.ACTIVE).setParameter("suspended", MemberStatus.SUSPENDED)
-                .setParameter("sanctions", LocalDateTime.now(Clock.systemDefaultZone())).setMaxResults(input.limit() + 1)
-                .getResultList().stream().map(row -> item((Long) row[0], "RESERVATION", (String) row[1],
-                        (row[2] == null ? "예약" : row[2]) + " · " + row[3] + " " + row[4],
-                        "/my-reservations?reservationId=" + row[0])).toList();
+        return reservationSearch.search(memberId, input.pattern(), input.date(), input.limit() + 1).stream()
+                .map(row -> item(row.id(), "RESERVATION", row.storeName(),
+                        (row.code() == null ? "예약" : row.code()) + " · " + row.date() + " " + row.time(),
+                        "/my-reservations?reservationId=" + row.id())).toList();
     }
 
     public List<SearchResponse.Item> waiting(SearchQuery input, Long memberId) {
-        var today = ServiceTime.today().atStartOfDay(ServiceTime.ZONE).withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime();
-        return entityManager.createQuery("""
-                SELECT w.id, COALESCE(s.name, '가게'), w.entryNumber, w.businessDate
-                  FROM WaitingEntry w LEFT JOIN Store s ON s.id = w.storeId
-                 WHERE w.memberId = :memberId AND
-                """ + WaitingEntryRepository.PERSONAL_VISIBLE_WINDOW + """
-                   AND EXISTS (SELECT viewer.id FROM Member viewer WHERE viewer.id = :memberId AND viewer.deletedAt IS NULL
-                     AND (viewer.status = :memberActive OR (viewer.status = :memberSuspended AND viewer.suspendedUntil < :sanctions)))
-                   AND (LOWER(COALESCE(s.name, '가게')) LIKE :keyword ESCAPE '!'
-                        OR CAST(w.entryNumber AS string) LIKE :keyword ESCAPE '!')
-                 ORDER BY w.createdAt DESC, w.id DESC
-                """, Object[].class).setParameter("memberId", memberId).setParameter("keyword", input.pattern())
-                .setParameter("active", WaitingStatus.ACTIVE).setParameter("dayStart", today)
-                .setParameter("memberActive", MemberStatus.ACTIVE).setParameter("memberSuspended", MemberStatus.SUSPENDED)
-                .setParameter("sanctions", LocalDateTime.now(Clock.systemDefaultZone())).setMaxResults(input.limit() + 1)
-                .getResultList().stream().map(row -> item((Long) row[0], "WAITING", (String) row[1],
-                        "접수 " + row[2] + "번 · " + row[3], "/my-reservations?tab=waiting&entryId=" + row[0])).toList();
+        return waitingSearch.search(memberId, input.pattern(), input.date(), input.limit() + 1).stream()
+                .map(row -> item(row.id(), "WAITING", row.storeName(),
+                        "접수 " + row.entryNumber() + "번 · " + row.date(),
+                        "/my-reservations?tab=waiting&entryId=" + row.id())).toList();
     }
 
     public List<SearchResponse.Item> messages(SearchQuery input, Long memberId, boolean business) {
-        // Search is narrower than archived conversation reads: blocked rooms and messages older than 90 days are omitted.
-        // Sender IDs, images, storage keys, encrypted payloads and signed URLs never enter this projection.
-        return entityManager.createQuery("""
-                SELECT message.id, room.id, room.type, room.storeId, room.storeNameSnapshot,
-                       SUBSTRING(message.content, 1, 160), room.member.id
-                  FROM ChatMessage message JOIN message.room room
-                 WHERE message.purgedAt IS NULL AND message.retractedAt IS NULL AND message.createdAt >= :cutoff
-                   AND (room.type = kr.it.reserve.chat.entity.ChatRoom.RoomType.SUPPORT
-                        OR (room.type = kr.it.reserve.chat.entity.ChatRoom.RoomType.STORE AND room.storeId > 0))
-                   AND room.memberBlockedAt IS NULL AND room.ownerBlockedAt IS NULL
-                   AND NOT EXISTS (SELECT hidden.id FROM ChatMessageHidden hidden
-                                    WHERE hidden.message.id = message.id AND hidden.member.id = :memberId)
-                   AND EXISTS (SELECT viewer.id FROM Member viewer WHERE viewer.id = :memberId AND viewer.deletedAt IS NULL
-                     AND (viewer.status = :active OR (viewer.status = :suspended AND viewer.suspendedUntil < :sanctions)))
-                   AND ((room.member.id = :memberId AND room.memberHiddenAt IS NULL)
-                     OR (:business = true AND room.type = kr.it.reserve.chat.entity.ChatRoom.RoomType.STORE
-                       AND (room.ownerHiddenAt IS NULL OR room.ownerHiddenByMemberId <> :memberId)
-                       AND EXISTS (SELECT store.id FROM Store store WHERE store.id = room.storeId
-                            AND store.owner.id = :memberId AND store.owner.role = kr.it.reserve.member.entity.Role.BUSINESS)))
-                   AND LOWER(message.content) LIKE :keyword ESCAPE '!'
-                 ORDER BY message.createdAt DESC, message.id DESC
-                """, Object[].class).setParameter("memberId", memberId).setParameter("business", business)
-                .setParameter("keyword", input.pattern()).setParameter("cutoff", LocalDateTime.now(Clock.systemDefaultZone())
-                        .minusDays(ChatRetentionPolicy.MESSAGE_RETENTION_DAYS))
-                .setParameter("active", MemberStatus.ACTIVE).setParameter("suspended", MemberStatus.SUSPENDED)
-                .setParameter("sanctions", LocalDateTime.now(Clock.systemDefaultZone())).setMaxResults(input.limit() + 1)
-                .getResultList().stream().map(row -> {
-                    boolean customer = memberId.equals(row[6]);
-                    boolean support = row[2] == kr.it.reserve.chat.entity.ChatRoom.RoomType.SUPPORT;
-                    String path = !customer ? "/messages?ownerRoomId=" + row[1]
-                            : support ? "/messages?kind=support" : "/messages?storeId=" + row[3];
-                    String title = support ? "RESERVE 고객지원" : SearchQuery.text((String) row[4], 80);
-                    return item((Long) row[0], "MESSAGE", title.isBlank() ? "가게 문의" : title, (String) row[5], path);
-                }).toList();
+        return chatSearch.search(memberId, business, input.pattern(), input.date(), input.limit() + 1).stream().map(row -> {
+            String path = !row.customer() ? "/messages?ownerRoomId=" + row.roomId()
+                    : row.support() ? "/messages?kind=support" : "/messages?storeId=" + row.storeId();
+            String title = row.support() ? "RESERVE 고객지원" : SearchQuery.text(row.storeName(), 80);
+            return item(row.id(), "MESSAGE", title.isBlank() ? "가게 문의" : title, row.excerpt(), path);
+        }).toList();
     }
 
     private Predicate activeMember(From<?, ?> member, CriteriaBuilder cb) {

@@ -11,7 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @RequiredArgsConstructor
-@Service
+@Repository
 public class StoreFulltextSearch {
     private static final Set<String> MATCH_COLUMNS = Set.of(
             "store_name", "description", "address", "category", "keywords");
@@ -68,14 +68,17 @@ public class StoreFulltextSearch {
         return result.map(StoreResponse::fromEntity);
     }
 
-    /** 통합검색은 원문과 후보의 전체 개수가 같을 때만 후보로 좁히고, 공개 텍스트만 최대 여섯 건 조회한다. */
-    @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW, isolation = Isolation.REPEATABLE_READ)
+    /** 누락 행 한 건으로 후보의 완전성을 확인하고, 같은 스냅샷에서 공개 텍스트만 제한 조회한다. */
+    @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW, isolation = Isolation.REPEATABLE_READ, timeout = 3)
     public List<Preview> preview(Specification<Store> literalSearch, String candidate, int resultLimit) {
         if (resultLimit < 1 || resultLimit > 6) throw new IllegalArgumentException("Invalid store preview limit");
-        long literalTotal = storeRepository.count(literalSearch);
-        Specification<Store> narrowed = StoreSearchSpecification.withFulltextCandidate(literalSearch, candidate);
-        Specification<Store> selected = storeRepository.count(narrowed) == literalTotal ? narrowed : literalSearch;
         var builder = entityManager.getCriteriaBuilder();
+        var missingQuery = builder.createQuery(Long.class);
+        var missingRoot = missingQuery.from(Store.class);
+        missingQuery.select(missingRoot.get("id")).where(StoreSearchSpecification.withoutFulltextCandidate(literalSearch, candidate)
+                .toPredicate(missingRoot, missingQuery, builder));
+        boolean missing = !entityManager.createQuery(missingQuery).setMaxResults(1).getResultList().isEmpty();
+        Specification<Store> selected = missing ? literalSearch : StoreSearchSpecification.withFulltextCandidate(literalSearch, candidate);
         var query = builder.createQuery(Preview.class);
         var root = query.from(Store.class);
         query.select(builder.construct(Preview.class, root.get("id"), root.get("name"),

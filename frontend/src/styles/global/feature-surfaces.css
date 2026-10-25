@@ -1,89 +1,43 @@
-/* 정기 휴무 요일 — 7칸 고정 그리드
-   AntD Checkbox.Group 기본은 inline-flex 자연 줄바꿈이라, 360px 화면에서
-   월~토 여섯 개가 한 줄에 들어가고 **'일' 하나만 다음 줄로 떨어졌다.**
-   PC 에서는 한 줄에 다 들어가서 안 보이던 문제라 오래 남아 있었다.
-
-   요일은 개수가 7로 고정이고 순서에 의미가 있으므로, 자연 줄바꿈에 맡기지 않고
-   7칸 그리드로 고정한다 — 폭이 좁아지면 칸이 같이 좁아질 뿐 줄이 나뉘지 않는다.
-
-   클래스는 StoreBasicInfo.jsx 의 Checkbox.Group 에 붙어 있다.
-     전역 CSS 를 여기 두는 이유는 docs/technical/design-system.md 참고 —
-     컴포넌트 안 <style> 에 두면 그 컴포넌트를 안 쓰는 화면에는 규칙이 존재하지 않는다. */
+/* 요일 순서를 유지하도록 좁은 화면에서도 7열을 고정한다. */
 .reserve-weekday-group.ant-checkbox-group {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: 10px 2px;
     width: 100%;
 }
-/* AntD 가 item 에 margin-inline-end 를 주는데, 그리드에서는 gap 이 그 역할을 하므로
-   남겨두면 마지막 칸이 밀려 나간다. */
+/* 그리드 간격과 겹치는 AntD 항목 여백을 제거한다. */
 .reserve-weekday-group.ant-checkbox-group .ant-checkbox-group-item,
 .reserve-weekday-group.ant-checkbox-group .ant-checkbox-wrapper {
     margin: 0;
     margin-inline-end: 0;
     min-width: 0;
 }
-/* 320px 같은 극단적 폭에서 칸당 약 39px 밖에 안 남는다. 체크박스(16) + 글자(13) 사이
-   기본 간격이 8px 이라 아슬아슬해서, 이 그룹에서만 좁힌다. */
+/* 좁은 화면의 요일 칸 안에서만 체크박스 간격을 줄인다. */
 .reserve-weekday-group.ant-checkbox-group .ant-checkbox-label {
     padding-inline-start: 5px;
     padding-inline-end: 0;
 }
-/* 관리자 메일함 목록 행
-   예전엔 행 전체가 인라인 style 을 가진 <button> 하나였고 transition 만 걸려 있었다.
-   인라인 style 로는 :hover 를 표현할 수 없으므로 **바뀌는 값이 없었다** —
-   전환 대상만 있고 전환할 상태가 없는, 눌리는 느낌이 0인 상태였다.
-
-   지금은 행이 div 껍데기 + 형제 버튼 둘(본문 선택 / 휴지통)이다.
-   <button> 안에 <button> 은 HTML 상 허용되지 않아서 나눈 구조다.
-
-   선택 상태를 왼쪽 4px 띠로 표시한다. 배경만으로 구분하면 라이트 테마에서
-     hover 색과 선택 색이 비슷해져 "지금 뭘 보고 있는지"가 흐려진다. */
+/* 본문 선택과 휴지통 버튼을 분리해 중첩 버튼을 피한다. */
 .reserve-maillist-item {
     position: relative;
     background: transparent;
     transition: background 0.15s ease;
 }
 
-/* 2026-08-25 — `:not(.is-selected)` 가 붙은 이유. 지우지 말 것.
- *
- * 증상: 방을 클릭하면 파란 배경이 **뒤늦게** 떴다. 정확히는, 클릭 직후에는 회색이었다가
- *      포커스가 입력칸으로 옮겨간 뒤에야 파랗게 변했다.
- *
- * 원인: 아래 세 규칙의 명시도가 `.is-selected` 와 **똑같이 (0,2,0)** 이다.
- *      CSS 는 명시도가 같으면 **나중에 선언된 쪽**이 이긴다. 그런데 `:focus-within` 이
- *      `.is-selected` 보다 아래에 있었다 → 클릭한 행은 포커스를 갖고 있으므로
- *      선택 파란색이 회색에 덮였다. 포커스가 떠나야 비로소 파란색이 보였던 것이다.
- *
- * 순서를 바꿔 고칠 수도 있지만 그러면 "왜 이 순서여야 하는가"가 코드에 안 남는다.
- * `:not(.is-selected)` 는 의도를 선언으로 적는다 — **선택은 hover·focus 보다 강하다.** */
+/* 선택된 행의 면을 hover·focus가 덮지 않게 한다. */
 .reserve-maillist-item:not(.is-selected):hover { background: var(--c-bg-subtle, rgba(0, 0, 0, 0.03)); }
 .reserve-maillist-item:not(.is-selected):active { background: rgba(0, 0, 0, 0.06); }
 /* 키보드로 이동했을 때도 행 전체가 선택 대상임이 보여야 한다. */
 .reserve-maillist-item:not(.is-selected):focus-within { background: var(--c-bg-subtle, rgba(0, 0, 0, 0.03)); }
 
-/* 선택된 행은 **면**으로 표시한다. 왼쪽 레일(4px 세로줄)을 잠깐 뒀다가 뺐다(2026-08-24) —
-   연한 회색 면만으로 이미 충분히 읽히는데 줄이 하나 더 붙으니 목록마다 세로선이 생겨
-   레이아웃이 어긋나 보였다. 표시가 둘이면 하나는 잉여다. */
+/* 선택 상태는 별도 레일 없이 중립 면으로 표시한다. */
 .reserve-maillist-item.is-selected { background: var(--c-gray-100, #f2f4f6); }
-/* 선택된 행에도 hover 피드백은 있어야 한다 — 없으면 "이 행은 안 눌리나?" 로 읽힌다.
-   같은 회색 계열에서 한 단계만 진하게(2026-09-23 파랑 → 회색). */
+/* 선택된 행의 hover도 같은 회색 계열을 사용한다. */
 .reserve-maillist-item.is-selected:hover {
     background: var(--c-gray-200, #e5e8eb);
 }
 
-/* 예약 달력 칸 (2026-08-25)
-   BookingCalendar 는 바로 아래 "예약 시간" pill 그리드와 **같은 언어**로 반응해야 한다.
-   같은 폼에서 두 칸이 다르게 반응하면 "디자인이 안 맞는다"가 된다.
-   짝이 되는 규칙은 StoreDetail 의 .rsv-time-pill 이다 - 한쪽만 고치지 말 것.
-
-   왜 index.css 인가 - hover 는 인라인 스타일로 표현할 수 없고,
-   전역 CSS 는 index.css 에 둔다는 규칙이 있다(docs/technical/design-system.md). StoreDetail 의 style 블록은
-   head 맨 뒤에 붙어 index.css 를 덮으므로, 거기 넣으면 나중에 찾기 어려운 함정이 된다.
-
-   주의: 선택 상태에 transform 을 쓰지 않는다. 칸에는 scaleSpringIn 이 both 로 걸려 있어서
-      애니메이션이 끝난 뒤에도 transform: scale(1) 이 남고, 그건 일반 선언보다 우선한다.
-      (.rsv-time-pill.rsv-selected 의 scale(1.04) 도 같은 이유로 실제로는 안 먹는다.) */
+/* 예약 날짜와 시간 선택은 같은 상태를 쓴다. 진입 애니메이션의 transform을 선택 상태로 덮지 않는다. */
 .reserve-cal-cell {
     position: relative;
     background: transparent;
@@ -94,8 +48,7 @@
 .reserve-cal-cell:hover:not(:disabled) {
     background-color: var(--c-gray-100, #f2f4f6);
 }
-/* 선택한 날은 회색 면 + 진한 글자다. 예약 달력(BookingCalendar)·시간 칩(.rsv-time-pill)과 같은 무채색 규칙이다.
-   2026-09-22 에 이 공통 칸이 primary 로 바뀌면서 폼 날짜 선택과 예약 달력이 함께 파래졌다 → 되돌림(2026-09-23). */
+/* 날짜와 시간의 선택 상태는 같은 중립 면과 글자를 사용한다. */
 .reserve-cal-cell.is-selected {
     background-color: var(--c-gray-200, #e5e8eb);
     color: var(--c-text-primary, #1a1f27);
@@ -117,11 +70,10 @@
     content: '';
     transform: translateX(-50%);
 }
-/* 빨간날 — 달력의 오래된 약속이라 상태색과는 다른 역할이다.
-   막힌 날에는 주지 않는다(아래 :disabled 가 이긴다): 연한 회색이 "못 고른다"를 말해야 한다. */
-/* 공휴일도 같은 빨강이다. 판정은 서버가 준다(HolidayService) — 키가 없으면 일요일만 남는다. */
+/* 일요일·공휴일의 날짜 색과 선택 불가 상태를 구분한다. */
+/* 공휴일 판정은 서버에서 받고 정보가 없으면 일요일 표시만 유지한다. */
 .reserve-cal-cell.is-holiday { color: var(--c-error, #f04452); }
-/* 영업 안 하는 날 — 연한 회색 하나로만 말한다. 취소선까지 그으면 사유 라벨이 안 읽힌다. */
+/* 선택 불가 상태는 사유를 읽을 수 있는 중립색으로 표시한다. */
 .reserve-cal-cell:disabled {
     color: var(--c-text-disabled, #b5b8bd);
     cursor: not-allowed;
@@ -167,7 +119,7 @@ button.reserve-date-part-label { width: 100%; padding: 0; border: 0; background:
 button.reserve-date-part-label:focus-visible { outline: none; }
 .reserve-date-input-hint { margin: 10px 0 0; font-size: 12px; line-height: 1.6; color: var(--c-text-tertiary, #8b95a1); }
 
-/* 달 넘기기 — 버튼이 작아서 항상 판을 깔면 답답하다. hover 에만 둥근 회색 판을 준다. */
+/* 달 이동 버튼은 hover에서만 면을 표시한다. */
 .reserve-cal-nav {
     width: 30px;
     height: 30px;
@@ -190,7 +142,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     cursor: not-allowed;
 }
 
-/* 달력 모달 — 시간 pill 이 놓인 배경과 같은 흰 바탕. 여백만 조금 좁힌다. */
+/* 달력은 시간 선택과 같은 배경을 쓴다. */
 .reserve-cal-modal .ant-modal-body { padding: 10px 6px 6px; }
 
 /* 시간 입력도 날짜 모달의 중립 선택면을 사용한다. 스크롤은 브라우저가 맡는다. */
@@ -259,25 +211,15 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 .reserve-time-session:hover { background: var(--c-gray-200, #e5e8eb); }
 .reserve-time-session:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 2px; }
 .reserve-time-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--c-border-light, #f2f4f6); }
-/* 인앱 채팅 — 런처·패널·입력칸 (MessengerShell / 관리자 ChatTab 공용)
-   2026-08-24 2차 수정. 1차 때 JSX 에 className 만 써두고 **여기에 대응하는 규칙을
-     한 줄도 안 넣었다.** 그래서 열고 닫을 때 창이 그냥 뿅 나타났다 사라졌고
-     (= "애니메이션이 없다"), 런처에 hover 피드백도 없었다.
-     인라인 style 로는 :hover 도 @keyframes 도 쓸 수 없다. 이게 그 자리다. */
+/* 메신저 런처·패널·입력의 공통 상태를 관리한다. */
 
-/* 런처 — 원이 아니라 둥근 네모다. 서비스 전체가 쓰는 모서리 언어를 따른다
-   (radius 토큰 · field.radius). 떠 있는 버튼 하나만 원형이면 그것만 이물감이 든다. */
+/* 런처는 기존 둥근 네모 형태를 유지한다. */
 .reserve-chat-launcher {
-    /* 런처의 표면·전경·상태 그림자는 여기서 함께 관리한다.
-       인라인 style 로 주면 아래 :hover 의 box-shadow 가 무시된다. */
+    /* 런처의 면·전경·상태 그림자는 전역 규칙에서 함께 관리한다. */
     /* 흰 브랜드 타일은 다크에서도 유지한다. 흰 면의 아이콘은 primary-dark를 쓴다. */
     background: var(--c-messenger-launcher-bg, #fff);
     color: var(--c-messenger-launcher-fg, var(--c-primary-dark, #2272eb));
-    /* 그림자는 **무채색**이다 (2026-08-24 수정).
-       처음엔 rgba(49,130,246,.35) 로 파란 글로우를 줬는데, 반경 20px 짜리 파란 번짐이
-       작은 버튼 둘레에 고르게 퍼지면서 **테두리가 하나 더 있는 것처럼** 보였다.
-       (마우스 클릭 시 outline 은 0px none 임을 브라우저 실측으로 확인했다 — 포커스 링이 아니라
-       이 그림자가 범인이었다.) 값은 shadows.cardHover 계열의 무채색 톤을 따른다. */
+    /* 런처 그림자는 중립색 토큰과 맞춘다. */
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
     opacity: 1;
     transition: opacity 0.14s ease, box-shadow 0.18s ease, background 0.15s ease;
@@ -286,7 +228,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     box-shadow: 0 8px 22px rgba(0, 0, 0, 0.16);
 }
 .reserve-chat-launcher:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 3px; }
-/* 아이콘이 뚝 바뀌지 않게 — 닫기로 바뀔 때 살짝 돈다. */
+/* 런처와 닫기 아이콘은 회전으로 전환한다. */
 .reserve-chat-launcher .anticon { transition: transform 0.2s ease; }
 .reserve-chat-launcher.is-open {
     opacity: 1;
@@ -294,8 +236,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 }
 .reserve-chat-launcher.is-open .anticon { transform: rotate(90deg); }
 
-/* 패널 — 런처(우하단)에서 자라 나오는 느낌.
-   transform-origin 이 핵심이다. 가운데에서 커지면 "어느 버튼에서 나온 창인지"가 안 보인다. */
+/* 패널은 런처가 있는 오른쪽 아래를 기준으로 열린다. */
 @keyframes reserve-chat-in {
     0% {
         opacity: 0.08;
@@ -343,11 +284,9 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     animation: reserve-chat-out 0.26s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
-/* 입력 껍데기 — 포커스 표시는 안쪽 textarea 가 아니라 **껍데기 전체**에 나와야 한다.
-   실제 포커스를 받는 건 textarea 이므로 :focus-within 이다. */
+/* 내부 입력의 포커스를 껍데기에 표시한다. */
 .reserve-chat-composer {
-    /* 주의: 테두리는 :focus-within 에서 색이 바뀐다 — 인라인에 두면 포커스링이 안 뜬다.
-       모서리(radius)는 상태와 무관하므로 field 토큰을 쓰는 인라인 쪽에 남긴다. */
+    /* 상태 테두리는 CSS에서, 고정 모서리는 인스턴스 토큰에서 관리한다. */
     border: 1px solid var(--c-border-default, #e5e8eb);
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -357,11 +296,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 }
 .reserve-chat-composer textarea::placeholder { color: var(--c-text-tertiary, #8b95a1); }
 
-/* 패널 닫기(X) — **모달 X 버튼과 같은 규칙을 쓴다.**
-   위 .ant-modal-close 블록과 값이 같다: 평소 투명, hover 는 회색 판, 키보드에는 포커스 링.
-   처음엔 .reserve-backlink 를 재사용했는데 그건 링크용이라 hover 에서 글자가 primary 로
-   물들고 포커스 링도 파랗다 — 이 프로젝트가 예전에 "모달 하늘색 테두리"로 한참 잡았던
-   그 인상이 X 버튼에 그대로 돌아왔다. 닫기 버튼은 링크가 아니다. */
+/* 패널 닫기는 모달 닫기와 같은 hover 면·키보드 링을 사용한다. */
 .reserve-chat-close,
 .reserve-chat-icon-button {
     background: transparent;
@@ -378,8 +313,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 }
 .reserve-chat-close:focus,
 .reserve-chat-icon-button:focus { outline: none; box-shadow: none; }
-/* 헤더 안의 아이콘 버튼(대화 관리 ⋮ 등) — 닫기(X)와 같은 44×44 크기·아이콘 크기.
-   대화를 불러오는 동안·목록으로 돌아가는 동안에는 비활성(옅게, hover 면 없음). */
+/* 헤더 도구와 닫기는 같은 클릭 영역을 쓰고 대기 중에는 비활성 상태를 유지한다. */
 .reserve-chat-icon-button:disabled,
 .reserve-chat-icon-button:disabled:hover { background: transparent; color: var(--c-text-tertiary, #8b95a1); opacity: 0.4; cursor: default; }
 .reserve-chat-icon-button { width: 44px; height: 44px; padding: 0; border: 0; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: var(--reserve-icon-glyph-size); cursor: pointer; }
@@ -426,7 +360,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 .reserve-chat-send:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 2px; }
 .reserve-chat-send:disabled { opacity: 0.3; cursor: not-allowed; }
 
-/* 통합 MessengerShell — 고객지원·가게 문의·사장님 받은 문의 ══════════════ */
+/* 고객지원·가게 문의·사업자 받은 문의는 같은 메신저 틀을 쓴다. */
 .reserve-messenger,
 .reserve-messenger-launcher-wrap {
     --reserve-messenger-unread-bg: var(--c-error-solid, #c93643);
@@ -512,9 +446,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     padding: 28px 24px;
     box-sizing: border-box;
 }
-/* 모바일 메시지 화면(/messages) 열기·닫기 — 운영(v2.5.1)의 채팅 패널과 같은 원래 애니메이션으로 되돌렸다(2026-09-24).
-   채팅 버튼이 있는 오른쪽 아래를 기준으로 살짝 떠오르며 커지고, 닫을 때 살짝 가라앉으며 사라진다.
-   (한때 버튼 크기에서 화면 전체로 부풀어 오르는 변형을 썼는데, 휩쓸리는 스와이프처럼 보여 원래대로 둔다.) */
+/* 모바일 메시지 화면은 오른쪽 아래를 기준으로 열고 닫는다. */
 @keyframes reserve-messages-route-in {
     from { opacity: 0; transform: translateY(12px) scale(0.93); }
     to   { opacity: 1; transform: translateY(0)    scale(1); }
@@ -655,7 +587,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 .reserve-messenger-settings-email { display: block; margin-top: 4px; color: var(--c-text-tertiary, #8b95a1); font-size: 12px; overflow-wrap: anywhere; }
 .reserve-messenger-settings-link { min-height: 44px; display: inline-flex; align-items: center; padding: 0 14px; border-radius: 10px; background: var(--c-gray-50, #f9fafb); color: var(--c-text-secondary, #4e5968); font-size: 12px; }
 .reserve-messenger-settings-link:hover { background: var(--c-gray-100, #f2f4f6); color: var(--c-text-primary, #191f28); }
-/* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
+
 .reserve-messenger-settings-link:active { color: var(--c-text-primary, #191f28); }
 .reserve-messenger-settings-link:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 2px; }
 .reserve-messenger-settings-environment { padding-block: 22px; border-top: 1px solid var(--c-border-light, #f2f4f6); }
@@ -1234,7 +1166,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     .reserve-messenger-composer textarea { font-size: 16px; }
 }
 
-/* 목록에서 대화를 열 때는 뒤로가기의 반대 — 대화가 오른쪽에서 들어온다(2026-09-23, 들어가기·나가기 짝). */
+/* 목록에서 대화는 오른쪽으로 들어오고 뒤로가기는 반대로 전환한다. */
 .reserve-messenger--panel > .reserve-messenger-thread { grid-area: 1 / 1 / -1 / 2; }
 @media (max-width: 767.98px) {
     .reserve-messenger--page > .reserve-messenger-thread { grid-area: 1 / 1 / -1 / 2; }
@@ -1320,9 +1252,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 }
 .reserve-chat-message-actions:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 2px; }
 
-/* 주의: animation: none 으로 끄면 안 된다 — 패널을 DOM 에서 내리는 신호가 animationend 라
-   애니메이션이 아예 없으면 **닫기 후에도 패널이 영영 남는다.**
-   그래서 duration 만 0 에 가깝게 줄인다(즉시 끝나고 animationend 는 그대로 발생). */
+/* 모션 줄이기에서도 닫힘 완료 이벤트가 발생하도록 짧은 애니메이션을 유지한다. */
 @media (prefers-reduced-motion: reduce) {
     .reserve-btn,
     .reserve-card,
@@ -1370,9 +1300,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     .reserve-messenger-primary-action:active { transform: none; }
 }
 
-/* 정적 전역 스타일 관문 (2026-09-02)
-   App·StoreList·StoreDetail·QR·Home 하위 컴포넌트가 런타임에 주입하던
-   <style> 7개를 이곳으로 모았다. 컴포넌트 마운트 순서와 무관하게 항상 같은 규칙이 존재한다. */
+/* 전역 규칙은 컴포넌트 마운트 순서와 관계없이 적용한다. */
 
 /* 재사용 애니메이션 토큰(styles/tokens/animations.js)이 참조하는 키프레임. */
 @keyframes fadeIn        { from { opacity: 0; }                              to { opacity: 1; } }
@@ -1428,7 +1356,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     grid-template-columns: repeat(4, 1fr);
     gap: 24px;
 }
-/* 검색은 공통 헤더 한 곳에 둔다. 종류·정렬은 같은 텍스트 메뉴로 나란히 둔다. */
+/* 가게 목록의 조건·정렬 메뉴는 같은 도구막대를 사용한다. */
 .reserve-explore-filters {
     display: flex;
     flex: 0 0 auto;
@@ -1509,7 +1437,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     border-radius: var(--reserve-store-list-image-radius);
 }
 .reserve-store-list-row-link:hover { color: var(--c-text-primary); }
-/* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
+
 .reserve-store-list-row-link:active { color: var(--c-text-primary); }
 /* 링크 안의 사진·본문이 함께 눌린다. 하트·관리 액션과 미리보기 span은 제외한다. */
 a.reserve-store-list-row-link[href] { transition: transform 0.12s ease, opacity 0.12s ease; transform-origin: left center; -webkit-tap-highlight-color: transparent; }
@@ -1535,10 +1463,10 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 .reserve-store-list-row-rating .anticon { color: var(--c-warning); }
 .reserve-store-list-row-rating > span { color: var(--c-text-secondary); }
 .reserve-store-identity-text { display: inline-flex; flex-wrap: wrap; align-items: center; min-width: 0; gap: 2px 4px; color: var(--c-text-secondary); font-size: 12px; line-height: 20px; }
-/* 종류·AD·우리동네 사이는 가운뎃점 하나 (2026-09-23 — "카페 · AD"). 점은 글자가 아니라 장식이라 ::before 로 그린다. */
+/* 분류 사이의 가운뎃점은 장식 요소로 표시한다. */
 .reserve-store-identity-text > * + *::before { content: '·'; margin-right: 4px; color: var(--c-text-tertiary, #8b95a1); }
 .reserve-store-identity-text > span { white-space: nowrap; }
-/* 광고 표시(AdMark) — "AD". 크기·자간은 옆 글자와 같게 두고(따로 줄이면 글꼴이 달라 보인다) 색만 한 단계 옅다(2026-09-23). */
+/* 광고 표시는 주변 글자와 크기·자간을 맞추고 색으로 구분한다. */
 .reserve-ad-mark { font-weight: 500; }
 .reserve-store-identity-text-ad { color: var(--c-text-tertiary, #8b95a1); }
 .reserve-store-list-row-meta .reserve-store-identity-text { flex: 0 1 auto; }
@@ -1639,52 +1567,8 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     transition: opacity 0.16s ease, transform 0.16s ease !important;
 }
 .reserve-header-logo-wordmark { display: block; font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, sans-serif; font-size: 22px; font-weight: 850; letter-spacing: -0.8px; line-height: 1; white-space: nowrap; }
-.reserve-header-query {
-    --reserve-header-query-height: 44px;
-    --reserve-header-query-radius: 100px;
-    --reserve-header-query-max-width: 560px;
-    flex: 1 1 0;
-    min-width: 0;
-    max-width: var(--reserve-header-query-max-width);
-    height: var(--reserve-header-query-height);
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    gap: 0;
-    padding: 0;
-    border: 1px solid var(--c-border-light, #f2f4f6);
-    border-radius: var(--reserve-header-query-radius);
-    background: var(--c-gray-50, #f9fafb);
-    color: var(--c-text-primary, #191f28);
-    text-decoration: none;
-    font-size: 16px;
-    line-height: 1.5;
-}
-.reserve-header-query > .anticon { display: grid; place-items: center; flex: 0 0 44px; color: var(--c-text-tertiary, #8b95a1); font-size: 18px; }
-.reserve-header-query-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* PC 검색 결과: 검색 화면(/search)의 입력칸과 똑같은 자리 — 화면 가운데·최대 560px — 에 둔다(2026-09-23).
-   [로고][검색창][계정] 3칸 격자라 양쪽 폭이 달라도 검색창이 정확히 가운데다. 좁은 폭에서 로고·계정이 더 넓으면
-   가운데 칸이 줄어든다. 헤더 안쪽의 display:flex 는 인라인 스타일이라 !important 로만 바꿀 수 있다. */
-@media (min-width: 768px) {
-    .reserve-header-has-query .reserve-header-inner {
-        display: grid !important;
-        grid-template-columns: 1fr minmax(0, 560px) 1fr;
-        align-items: center;
-    }
-    .reserve-header-has-query .reserve-header-brand { justify-self: start; }
-    .reserve-header-has-query .reserve-header-query { width: 100%; }
-    .reserve-header-has-query .reserve-header-actions { justify-self: end; }
-}
-.reserve-header-query:hover { color: var(--c-text-primary, #191f28); border-color: var(--c-border-default, #e5e8eb); }
-/* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
-.reserve-header-query:active { color: var(--c-text-primary, #191f28); }
-.reserve-header-query:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 2px; }
 @media (max-width: 767px) {
-    /* 모바일 검색 결과는 뒤로가기 + 검색어 필드만 둔다. 22px R 한 글자는 작고 어색했다(2026-09-23). PC 는 워드마크 유지. */
-    .reserve-header-has-query .reserve-header-logo { display: none; }
-    /* 검색은 44px 터치 영역을 유지하되, 게스트 헤더의 실제 아이콘과 로그인 글자가
-       버튼 안쪽 여백만큼 멀어 보이지 않도록 검색·로그인 사이의 빈 면을 없앤다.
-       로그인과 시작하기 사이는 별도 guest-actions gap(4px)을 그대로 둔다. */
+    /* 검색의 클릭 영역은 유지하고 게스트 로그인과의 시각 간격만 조정한다. */
     .reserve-header-is-guest .reserve-header-actions { gap: 0; }
     .reserve-header-is-guest .reserve-header-guest-actions .reserve-btn--ghost {
         min-width: 44px;
@@ -1765,7 +1649,7 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 .reserve-header-search:hover {
     color: var(--c-text-primary, #191f28) !important;
 }
-/* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
+
 .reserve-header-search:active { color: var(--c-text-primary, #191f28) !important; }
 @media (hover: hover) and (pointer: fine) {
     .reserve-header-back:hover,
@@ -1817,14 +1701,14 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     .reserve-app-layout[data-search-restored] > .reserve-header:not(.reserve-header--search-leaving) .reserve-header-control-slot:not(.reserve-header-control-slot--leaving) {
         animation: none;
     }
-    .reserve-header--search-leaving :is(.reserve-header-back, .reserve-header-workspace-menu, .reserve-header-actions, .reserve-header-query) {
+    .reserve-header--search-leaving :is(.reserve-header-back, .reserve-header-workspace-menu, .reserve-header-actions) {
         animation: reserve-search-controls-leave var(--reserve-search-motion-duration, 220ms) cubic-bezier(.4, 0, 1, 1) both;
     }
     .reserve-app-layout:has(> .reserve-header--search-leaving) > :is(.ant-layout-content, .reserve-discovery-top-nav) {
         animation: reserve-search-surface-leave var(--reserve-search-motion-duration, 220ms) cubic-bezier(.4, 0, 1, 1) both;
         pointer-events: none;
     }
-    .reserve-app-layout[data-search-restored] > .reserve-header:not(.reserve-header--search-leaving) :is(.reserve-header-back:not(.reserve-header-back--leaving), .reserve-header-workspace-menu, .reserve-header-actions, .reserve-header-query) {
+    .reserve-app-layout[data-search-restored] > .reserve-header:not(.reserve-header--search-leaving) :is(.reserve-header-back:not(.reserve-header-back--leaving), .reserve-header-workspace-menu, .reserve-header-actions) {
         animation: reserve-search-controls-enter var(--reserve-search-motion-duration, 220ms) cubic-bezier(.22, 1, .36, 1) both;
     }
     .reserve-app-layout[data-search-restored]:not(:has(> .reserve-header--search-leaving)) > :is(.ant-layout-content, .reserve-discovery-top-nav) {
@@ -1918,7 +1802,7 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     height: 2px;
     background: currentColor;
 }
-/* 탭을 바꾸는 동안에만 쓰는 임시 밑줄. 도착하면 사라지고 활성 탭의 ::after 가 다시 보인다(2026-09-25). */
+/* 탭 이동 중 임시 밑줄을 쓰고 도착하면 활성 탭의 밑줄로 교체한다. */
 .reserve-discovery-top-nav-indicator {
     position: absolute;
     bottom: -1px;
@@ -1949,10 +1833,7 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     border-bottom: 1px solid var(--c-border-light, #f2f4f6);
 }
 .reserve-route-store-toolbar-spacer { flex: 1; min-width: 0; }
-/* 안쪽 PageContainer·실제 페이지 틀이 폭과 여백을 직접 정한다. 바깥 틀이 여백·최대 폭을 또 주면 안 된다.
-   클래스 두 개로 적는 이유: 아래 모바일 규칙(.reserve-route-skeleton { padding-inline: 20px })과 명시도가 같으면
-   뒤에 선언된 그쪽이 이겨 여백이 두 번 들어가고, 1200px 제한이 혜택(1248px) 틀을 좁혀 로딩 뒤 넓어졌다(2026-09-29 실측).
-   2026-09-29: 로그인·약관·결제 결과·관리자·파트너·메시지·가게 상세·준비 중 화면도 실제 틀을 그대로 그리게 바꿔 전부 여기로 모았다. */
+/* 실제 페이지와 골격이 같은 틀을 사용하므로 바깥 여백과 최대 폭을 중복 적용하지 않는다. */
 .reserve-route-skeleton.reserve-route-skeleton--reservations,
 .reserve-route-skeleton.reserve-route-skeleton--store-list,
 .reserve-route-skeleton.reserve-route-skeleton--cards,
@@ -1974,14 +1855,14 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 .reserve-route-skeleton.reserve-route-skeleton--messages,
 .reserve-route-skeleton.reserve-route-skeleton--detail { max-width: none; padding: 0; }
 .reserve-route-skeleton.reserve-route-skeleton--my-page { padding: 0; }
-/* 404 스켈레톤은 NotFound 와 같은 PageContainer(sm)를 직접 그린다 — 바깥 여백을 겹치지 않는다. */
+/* 404 골격은 NotFound의 PageContainer를 사용해 바깥 여백을 겹치지 않는다. */
 .reserve-route-skeleton.reserve-route-skeleton--not-found { max-width: none; padding: 0; }
 .reserve-route-skeleton-copy { display: flex; flex-direction: column; gap: 24px; }
 .reserve-messenger-skeleton-row { display: flex; align-items: center; gap: 12px; padding: 18px; }
 .reserve-messenger-skeleton-row > div:last-child { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .reserve-messenger-thread-skeleton { display: block; }
 .reserve-messenger-thread-skeleton > div { display: flex; flex-direction: column; gap: 16px; }
-/* 관리자·파트너 패널의 알약 탭(.reserve-pill-tabs) 자리 — 탭 한 칸 40px(≤768px 38px), 탭 사이 4, 아래 16. */
+/* 관리자·사업자 골격은 실제 알약 탭의 크기와 간격을 유지한다. */
 .reserve-route-panel-tabs { display: flex; align-items: center; margin-bottom: 16px; }
 .reserve-route-panel-tabs-list { display: flex; gap: 4px; flex: 1; min-width: 0; overflow: hidden; }
 .reserve-route-panel-tab {
@@ -2069,7 +1950,7 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 }
 .reserve-benefit-row::before { content: ''; grid-area: banner; width: 100%; aspect-ratio: var(--reserve-benefit-banner-ratio, 3.2 / 1); pointer-events: none; }
 .reserve-benefit-row:hover { color: var(--reserve-benefit-photo-fg, #fff); }
-/* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
+
 .reserve-benefit-row:active { color: var(--reserve-benefit-photo-fg, #fff); }
 .reserve-benefit-row:focus { outline: none; }
 .reserve-benefit-row:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 4px; }
@@ -2092,7 +1973,7 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 .reserve-benefit-store-pagination { margin-top: 24px; }
 .reserve-benefits-disclaimer { margin: 20px 0 0; font-size: 12px; line-height: 1.7; color: var(--c-text-secondary, #4e5968); }
 .reserve-benefits-text-link { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding-inline: 4px; border-radius: 4px; font-size: 14px; }
-/* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
+
 .reserve-benefits-text-link:focus { outline: none; }
 .reserve-benefits-text-link:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 3px; }
 .reserve-benefit-store-discovery { margin-top: var(--reserve-benefit-section-spacing); padding-top: var(--reserve-benefit-section-spacing); border-top: var(--reserve-benefit-divider-size) solid var(--c-gray-50, #f9fafb); scroll-margin-top: 132px; }
@@ -2141,7 +2022,7 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 .reserve-discovery-coming-soon .reserve-page-description { max-width: 360px; word-break: keep-all; }
 .reserve-discovery-coming-soon-link { min-height: 44px; margin-top: 8px; display: flex; align-items: center; gap: 8px; color: var(--c-text-secondary, #4e5968); text-decoration: none; font-size: 14px; -webkit-tap-highlight-color: transparent; transition: transform 0.12s ease, opacity 0.16s ease; }
 .reserve-discovery-coming-soon-link:hover { color: var(--c-text-primary, #191f28); }
-/* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
+
 .reserve-discovery-coming-soon-link:active { color: var(--c-text-primary, #191f28); transform: scale(0.97); opacity: 0.88; }
 .reserve-discovery-coming-soon-link:focus { outline: none; }
 .reserve-discovery-coming-soon-link:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 3px; }
@@ -2310,11 +2191,11 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     transition: transform 0.16s ease, opacity 0.16s ease;
 }
 .reserve-discovery-shortcut:hover { color: var(--c-text-primary, #191f28); }
-/* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
+
 .reserve-discovery-shortcut:active {
     color: var(--c-text-primary, #191f28);
 }
-/* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
+
 .reserve-discovery-shortcut:hover img { opacity: 0.88; }
 /* 텍스트와 scroll-snap 배너는 크기를 고정한다. 작은 사진·물체 링크만 눌림을 유지한다. */
 .reserve-discovery-top-nav a:hover { color: var(--c-text-primary, #191f28); }
@@ -2450,12 +2331,9 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 @media (min-width: 900px) {
     .reserve-app-layout--home { --reserve-home-banner-ratio: 2.5; }
     .reserve-header-inner { gap: 24px; }
-    /* 하위 화면의 뒤로가기는 PC에서도 모바일과 같은 브랜드 묶음 안에 둔다.
-       Header가 루트 경로에서는 렌더하지 않으므로, 여기서 화면 크기만으로 숨기면
-       PC 경로의 이동 맥락이 사라진다. */
+    /* 하위 화면의 뒤로가기는 PC에서도 브랜드 영역에 표시한다. */
     .reserve-header-actions { justify-content: flex-end; }
-    /* PC는 로그인 버튼의 기존 4px 여백 때문에 CTA와 붙어 보이므로, 두 버튼 사이만 시각적으로 맞춘다.
-       모바일의 검색·로그인 압축 규칙은 위의 max-width: 767px 범위에 한정한다. */
+    /* 게스트 버튼 간격은 PC와 모바일의 기존 배치를 구분해 조정한다. */
     .reserve-header-guest-actions { gap: 12px !important; }
     .reserve-discovery-featured { margin-inline: var(--reserve-home-gutter); }
     .reserve-discovery-banner-track { padding-inline: 0; scroll-padding-inline: 0; }
@@ -2572,7 +2450,6 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     appearance: none;
 }
 /* 입력과 결과의 검색어는 같은 아이콘 칸·텍스트 여백·글꼴 기준선을 쓴다. */
-.reserve-header-query-text,
 .reserve-search-field input {
     padding: 0 10px 0 0;
     font-family: inherit;
@@ -2681,12 +2558,11 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 }
 .reserve-search-domain:hover,
 .reserve-search-clear:hover { color: var(--c-text-primary, #191f28); }
-/* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
+
 .reserve-search-domain:active { color: var(--c-text-primary, #191f28); }
 .reserve-search-keywords button:hover,
-.reserve-search-cancel:hover,
 .reserve-search-browse-all:hover { color: var(--c-text-secondary, #4e5968); opacity: 0.75; }
-/* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
+
 .reserve-search-browse-all:active { color: var(--c-text-secondary, #4e5968); }
 .reserve-search-keywords button:hover { background: var(--c-gray-100, #f2f4f6); opacity: 1; }
 .reserve-search-domain:hover img { opacity: 0.88; }
@@ -2700,9 +2576,7 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 .reserve-search-recent-remove:active:not(:disabled) { transform: scale(0.96); }
 .reserve-search-domain:active,
 .reserve-search-keywords button:active:not(:disabled) { transform: scale(0.98); opacity: 0.88; }
-.reserve-search-cancel:active:not(:disabled),
 .reserve-search-browse-all:active { opacity: 0.7; }
-.reserve-search-recent-clear:active:not(:disabled) { opacity: 0.7; }
 .reserve-search-page a:focus,
 .reserve-search-page button:focus,
 .reserve-search-controls button:focus { outline: none; }
@@ -2713,8 +2587,7 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     outline-offset: -2px;
 }
 @media (min-width: 900px) {
-    /* 입력칸 자체를 화면 가운데에 둔다 — 왼쪽에 취소와 같은 폭의 빈 칸을 둬서, 결과 화면 헤더의 검색창과
-       같은 자리가 된다(검색 ↔ 결과를 오갈 때 검색창이 움직이지 않는다, 2026-09-23). */
+    /* 취소 버튼과 같은 너비의 반대쪽 공간으로 검색 입력의 중앙 위치를 유지한다. */
     .reserve-search-header {
         display: grid;
         grid-template-columns: var(--reserve-search-action-size) minmax(0, 1fr) var(--reserve-search-action-size);
@@ -2783,7 +2656,7 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 .reserve-store-contact-action:hover {
     color: var(--c-text-primary, #191f28);
 }
-/* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
+
 .reserve-store-contact-action:active { color: var(--c-text-primary, #191f28); transform: scale(0.96); }
 .reserve-store-contact-action:focus-visible,
 .reserve-store-detail .reserve-store-identity-actions .reserve-favorite-button:focus-visible {
@@ -2826,11 +2699,11 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     height: auto !important;
     display: block !important;
 }
-/* 각 슬라이드도 자른다 — 이동 중 드러나는 사진 경계까지 둥글게. 원본 미리보기에는 적용하지 않는다. */
+/* 이동 중 사진 경계도 같은 윤곽으로 자르고 원본 미리보기는 유지한다. */
 .reserve-store-gallery .ant-image {
     border-radius: 16px;
     overflow: hidden;
-    /* hover cover는 사진 위에 그려진다. 이동 중에도 둘을 같은 윤곽으로 자른다. */
+    /* 사진 위 hover 면도 같은 윤곽으로 자른다. */
     clip-path: inset(0 round 16px);
 }
 .reserve-store-gallery .ant-image-img { border-radius: inherit; }
@@ -2865,7 +2738,7 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     text-decoration: line-through;
 }
 
-/* FAQ Collapse — AntD 6의 실제 -title/-arrow 클래스에 맞춘다. */
+/* FAQ는 AntD 6의 제목·화살표 선택자를 사용한다. */
 .faq-collapse.ant-collapse {
     background: transparent !important;
     border: none !important;

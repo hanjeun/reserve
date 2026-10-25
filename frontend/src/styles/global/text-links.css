@@ -1,16 +1,27 @@
-/* Footer links and neutral text actions share the same pointer and keyboard states. */
+/* 중립 텍스트 링크와 동작은 푸터의 포인터·키보드 상태를 공유한다. */
 a.reserve-text-link,
 a.reserve-text-link:visited,
 a.reserve-text-link:focus,
 button.reserve-text-link,
+button.reserve-search-cancel,
+button.reserve-search-cancel:enabled,
+button.reserve-search-recent-clear,
+button.reserve-search-recent-clear:enabled,
 span.reserve-text-link {
     color: var(--c-text-tertiary, #8b95a1);
     text-decoration: none;
     text-underline-offset: 3px;
     transition: color 0.15s ease, text-decoration-color 0.15s ease;
 }
-a.reserve-text-link:is(:hover, :focus-visible, :active, [aria-current="page"]),
-button.reserve-text-link:enabled:is(:hover, :focus-visible, :active) {
+
+a.reserve-text-link:not([aria-disabled="true"]):is(:hover, :focus-visible, :active, [aria-current="page"]),
+button.reserve-text-link:enabled:not([aria-disabled="true"]):is(:hover, :focus-visible, :active),
+button.reserve-search-cancel:enabled:not([aria-disabled="true"]):is(:hover, :focus-visible, :active),
+button.reserve-search-recent-clear:enabled:not([aria-disabled="true"]):is(:hover, :focus-visible, :active) {
     color: var(--c-text-primary, #1a1f27);
     text-decoration: underline;
+}
+
+button.reserve-btn.reserve-text-link:enabled:not([aria-disabled="true"]):is(:hover, :focus-visible, :active) {
+    opacity: 1;
 }

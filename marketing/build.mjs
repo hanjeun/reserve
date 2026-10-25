@@ -74,10 +74,11 @@ function sharedRules(container, selectors = /\.reserve-(?:card|btn)/) {
 const componentCss = sharedRules(postcss.parse(await readFile(resolve(root, '../frontend/src/styles/global/components-and-forms.css'), 'utf8'))).toString();
 const storeCardCss = sharedRules(postcss.parse(await readFile(resolve(root, '../frontend/src/styles/global/feature-surfaces.css'), 'utf8')),
     /\.reserve-store-(?:card|identity-text)/).toString();
+const textLinkCss = await readFile(resolve(root, '../frontend/src/styles/global/text-links.css'), 'utf8');
 const iconTokens = await readFile(resolve(root, '../frontend/src/styles/tokens/icon-controls.css'), 'utf8');
 const iconCss = sharedRules(postcss.parse(await readFile(resolve(root, '../frontend/src/styles/global/icons.css'), 'utf8')),
     /\.anticon\.reserve-ui-icon|\.reserve-favorite-button/).toString();
-await writeFile(resolve(output, 'site.css'), [await readFile(resolve(root, 'site.css'), 'utf8'), page.css, componentCss, storeCardCss, iconTokens, iconCss,
+await writeFile(resolve(output, 'site.css'), [await readFile(resolve(root, 'site.css'), 'utf8'), page.css, componentCss, storeCardCss, textLinkCss, iconTokens, iconCss,
     ...[...styles].map(([name, value]) => `:root .${name}{${value}}`)].join('\n'));
 await build({ ...bundler, entryPoints: [resolve(root, 'site.js')], platform: 'browser', target: ['es2022'], format: 'iife', minify: true, outfile: resolve(output, 'site.js') });
 await copyFile(resolve(root, '../frontend/src/styles/theme.css'), resolve(output, 'theme.css'));

@@ -41,7 +41,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 
-/** All DDL and rows belong to the runner's disposable loopback schema, never an application/restored DB. */
+/** DDL과 데이터는 실행 도구가 소유한 일회성 로컬 스키마에만 적용한다. */
 @SpringBootTest
 @Import(SearchStoreFulltextMySqlTest.QueryCaptureConfiguration.class)
 @EnabledIfEnvironmentVariable(named = "RESERVE_MYSQL_LOGIN_TEST_ISOLATED", matches = "1")
@@ -120,7 +120,8 @@ class SearchStoreFulltextMySqlTest {
         var indexed = read("사진");
         assertThat(indexed.items()).containsExactlyElementsOf(literal.items()).hasSize(6);
         assertThat(indexed.items().getFirst().id()).isEqualTo(first[0]);
-        assertThat(indexed.sql()).hasSize(3).filteredOn(sql -> sql.contains("match(")).hasSize(2);
+        assertThat(indexed.sql()).hasSize(2).filteredOn(sql -> sql.contains("match(")).hasSize(2);
+        assertThat(indexed.sql()).noneMatch(sql -> sql.contains("count("));
         assertThat(indexed.sql()).allSatisfy(sql -> assertThat(sql).doesNotContain("main_image_url", "detail_images", "password"));
         var plan = jdbc.queryForList("EXPLAIN SELECT store_id FROM store WHERE " + MATCH, fulltext.candidateQuery("사진"));
         assertThat(plan).anySatisfy(row -> {
@@ -157,7 +158,19 @@ class SearchStoreFulltextMySqlTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store WHERE " + MATCH, Long.class, candidate)).isZero();
         var literal = read("an"); unified(true); var indexed = read("an");
         assertThat(indexed.items()).containsExactlyElementsOf(literal.items()).hasSize(1);
-        assertThat(indexed.sql()).hasSize(3);
+        assertThat(indexed.sql()).hasSize(2);
+        assertThat(indexed.sql().getLast()).doesNotContain("match(");
+    }
+
+    @Test void aRelatedMatchOutsideTheFirstWindowStillForcesCompleteLiteralFallback() {
+        correctIndex(); tx.executeWithoutResult(status -> {
+            store("도자기 오래된 관련 결과");
+            for (int i = 0; i < 8; i++) store("도예 " + i);
+        });
+        var literal = read("도예"); unified(true); var indexed = read("도예");
+        assertThat(indexed.items()).containsExactlyElementsOf(literal.items());
+        assertThat(indexed.sql()).hasSize(2).noneMatch(sql -> sql.contains("count("));
+        assertThat(indexed.sql().getFirst()).contains("match(", "coalesce(");
         assertThat(indexed.sql().getLast()).doesNotContain("match(");
     }
 
@@ -167,11 +180,45 @@ class SearchStoreFulltextMySqlTest {
         assertThat(fulltext.candidateQuery("사진")).isEqualTo("+\"사진\""); dropIndex(); unified(true);
         var recovered = read("사진");
         assertThat(recovered.items()).containsExactlyElementsOf(literal.items());
-        assertThat(recovered.sql()).hasSize(3).anyMatch(sql -> sql.contains("match("));
+        assertThat(recovered.sql()).hasSize(2).anyMatch(sql -> sql.contains("match("));
         assertThat(fulltext.candidateQuery("사진")).isEmpty();
         literalOnly(read("사진"));
     }
 
+    @Test void comparesBoundedRealQueriesAndNgramPlanOnOneSyntheticDataset() {
+        correctIndex(); tx.executeWithoutResult(status -> { store("사진"); for (int i = 0; i < 240; i++) store("사진 공개 " + i); });
+        unified(false); var literal = read("사진"); literalOnly(literal);
+        unified(true); var indexed = read("사진");
+        assertThat(indexed.items()).containsExactlyElementsOf(literal.items()).hasSize(6);
+        assertThat(indexed.sql()).hasSize(2); assertThat(indexed.connections()).isLessThanOrEqualTo(2);
+        long[] literalTimes = new long[9], indexedTimes = new long[9];
+        long[] examined = new long[2];
+        boolean measureRows = "true".equals(System.getenv("RESERVE_SEARCH_COST_TEST"));
+        for (int i = 0; i < 9; i++) {
+            unified(false); long before = measureRows ? rowsExamined() : 0;
+            long start = System.nanoTime(); read("사진"); literalTimes[i] = System.nanoTime() - start;
+            if (measureRows) examined[0] += rowsExamined() - before;
+            unified(true); before = measureRows ? rowsExamined() : 0;
+            start = System.nanoTime(); read("사진"); indexedTimes[i] = System.nanoTime() - start;
+            if (measureRows) examined[1] += rowsExamined() - before;
+        }
+        java.util.Arrays.sort(literalTimes); java.util.Arrays.sort(indexedTimes);
+        var plan = jdbc.queryForList("EXPLAIN SELECT store_id FROM store WHERE deleted_at IS NULL AND " + MATCH, fulltext.candidateQuery("사진"));
+        assertThat(plan).anySatisfy(row -> assertThat(row.get("type")).isEqualTo("fulltext"));
+        var analyzed = jdbc.queryForObject("EXPLAIN ANALYZE SELECT store_id FROM store WHERE deleted_at IS NULL AND " + MATCH + " LIMIT 6", String.class, fulltext.candidateQuery("사진"));
+        assertThat(analyzed).contains("actual time", "rows=");
+        System.out.printf(java.util.Locale.ROOT, "Synthetic search: rows=241 samples=9 literalP95Ms=%.3f fulltextP95Ms=%.3f literalQueries=1 fulltextQueries=2 literalConnections=%d fulltextConnections=%d%n",
+                literalTimes[8] / 1_000_000.0, indexedTimes[8] / 1_000_000.0, literal.connections(), indexed.connections());
+        System.out.println("Synthetic ngram plan: " + analyzed.replaceAll("[\r\n]+", " "));
+        if (measureRows) {
+            assertThat(examined[0]).isPositive(); assertThat(examined[1]).isPositive();
+            System.out.printf("Synthetic search rows examined: samples=9 literalTotal=%d fulltextTotal=%d%n", examined[0], examined[1]);
+        }
+    }
+    private long rowsExamined() {
+        return jdbc.queryForObject("SELECT COALESCE(SUM(SUM_ROWS_EXAMINED),0) FROM performance_schema.events_statements_summary_by_digest "
+                + "WHERE SCHEMA_NAME=DATABASE() AND DIGEST_TEXT LIKE 'SELECT%' AND DIGEST_TEXT LIKE '%`store`%'", Long.class);
+    }
     private Measured read(String keyword) {
         SQL.get().clear(); long connections = statistics.getConnectCount();
         var result = queries.stores(SearchQuery.from(keyword, 5));
@@ -197,7 +244,7 @@ class SearchStoreFulltextMySqlTest {
     }
     private void correctIndex() { index("store_name, description, address, category, keywords", true); }
     private void index(String columns, boolean ngram) {
-        // Same five-column DDL contract as the existing manual preparation; only this disposable schema is changed.
+        // 기존 다섯 컬럼 색인 계약을 재사용하며 이 일회성 스키마만 변경한다.
         jdbc.execute("ALTER TABLE store ADD FULLTEXT INDEX ft_store_search (" + columns + ")" + (ngram ? " WITH PARSER ngram" : ""));
     }
     private void dropIndex() {

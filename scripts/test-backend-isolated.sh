@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# Disposable synthetic release checks. Never opens application DBs or the application's Redis.
+# 앱의 DB·Redis에 연결하지 않고 폐기 가능한 합성 환경에서 검사한다.
 set +x
 set -euo pipefail
 
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 gradle_filters=()
+measure_search=false
 while (($#)); do
+    if [[ "$1" == --search-cost ]]; then measure_search=true; shift; continue; fi
     if [[ "$1" != --tests || $# -lt 2 || ! "$2" =~ ^[A-Za-z0-9_.*?$]+$ ]]; then
-        printf 'Only pairs of --tests and Java test patterns are accepted\n' >&2
+        printf 'Only --search-cost and pairs of --tests and Java test patterns are accepted\n' >&2
         exit 2
     fi
     gradle_filters+=(--tests "$2")
@@ -76,13 +78,15 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
+fixture_performance_schema=OFF
+[[ "$measure_search" == false ]] || fixture_performance_schema=ON
 fixture_id=$(MYSQL_ROOT_PASSWORD="$fixture_root_password" docker --context default run --detach --rm \
     --name "$fixture_name" --label "kr.it.reserve.isolated-test-owner=$fixture_owner" \
     --memory=768m --memory-swap=768m --pids-limit=256 \
     --tmpfs /var/lib/mysql:rw,nosuid,nodev,size=768m --tmpfs /var/run/mysqld:rw,nosuid,nodev,size=16m \
     --publish 127.0.0.1::3306 --env MYSQL_ROOT_PASSWORD "$mysql_image" \
     --default-time-zone=+00:00 --innodb-buffer-pool-size=64M --innodb-redo-log-capacity=32M \
-    --max-connections=100 --performance-schema=OFF --skip-log-bin)
+    --max-connections=100 --performance-schema="$fixture_performance_schema" --skip-log-bin)
 [[ "$fixture_id" =~ ^[0-9a-f]{64}$ ]] || { printf 'Invalid owned MySQL fixture identity\n' >&2; exit 1; }
 mysql_ready=false
 for ((attempt=0; attempt<60; attempt++)); do
@@ -106,7 +110,7 @@ fixture_login_user="reserve_login_test$fixture_suffix"
 fixture_admission_user="reserve_admission_test$fixture_suffix"
 fixture_capacity_user="reserve_capacity_test$fixture_suffix"
 fixture_oauth_user="reserve_oauth_test$fixture_suffix"
-# Generated identifiers and passwords are hex/alphanumeric; raw SQL and credentials are never printed.
+# 생성 값의 문자 범위를 제한하고 원문 SQL·자격증명은 출력하지 않는다.
 if ! docker --context default exec -i "$fixture_id" sh -c \
     'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql --protocol=socket --user=root --batch --silent' \
     >/dev/null 2>&1 <<SQL
@@ -127,13 +131,21 @@ then
     printf 'Synthetic MySQL account/schema preparation failed\n' >&2
     exit 1
 fi
+if [[ "$measure_search" == true ]]; then
+    docker --context default exec -i "$fixture_id" sh -c \
+        'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql --protocol=socket --user=root --batch --silent' \
+        >/dev/null 2>&1 <<SQL
+GRANT SELECT ON performance_schema.events_statements_summary_by_digest TO '$fixture_login_user'@'%';
+SQL
+fi
 printf 'Owned MySQL fixture ready; backend checks use synthetic login/admission/capacity/OAuth databases\n'
-# env -i also removes foreign environment names that Bash does not expose through compgen/unset.
+# Bash의 변수 목록에 드러나지 않는 외부 환경변수도 env -i로 제거한다.
 runtime_environment=()
 for variable in PATH HOME USERPROFILE USERNAME APPDATA LOCALAPPDATA SYSTEMROOT SystemRoot WINDIR windir COMSPEC ComSpec PATHEXT TEMP TMP TMPDIR JAVA_HOME GRADLE_USER_HOME LANG LC_ALL LC_CTYPE MSYSTEM; do
     if [[ -v "$variable" ]]; then runtime_environment+=("$variable=${!variable}"); fi
 done
 fixture_environment=(
+    "RESERVE_SEARCH_COST_TEST=$measure_search"
     "DOCKER_CONTEXT=default" "DOCKER_CONFIG=$HOME/.docker" "MSYS_NO_PATHCONV=1" "AWS_EC2_METADATA_DISABLED=true"
     "RESERVE_MYSQL_LOGIN_TEST_ISOLATED=1" "RESERVE_ADMISSION_MYSQL_TEST=1" "RESERVE_CAPACITY_MYSQL_TEST=1" "RESERVE_MYSQL_OAUTH_TEST_ISOLATED=1"
     "RESERVE_ADMISSION_REDIS_TEST=1" "RESERVE_SERVICE_ADMISSION_HELPER_REDIS_TEST=1" "RESERVE_ISOLATED_TEST_OWNER=$fixture_owner"

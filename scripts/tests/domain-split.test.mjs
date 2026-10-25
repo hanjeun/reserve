@@ -55,3 +55,19 @@ test('CLI uses a reviewed source without replacing it, including on invalid argu
         await rmdir(directory);
     }
 });
+
+test('CSP aliases share the exact collector before generic API routing on both hosts', () => {
+    for (const input of [installed, installed.replace(/ {4}# 내부 재매핑[^\n]*\n {4}location = \/api\/v1\/csp-reports \{[^\n]*\n/, '')]) {
+        const candidate = domainSplitNginx(input);
+        const https = candidate.split(/(?=^server\s*\{)/m).filter(part => /listen 443 ssl/.test(part)
+            && /server_name (?:app\.reserve\.it\.kr|reserve\.it\.kr www\.reserve\.it\.kr);/.test(part));
+        assert.equal(https.length, 2);
+        for (const host of https) {
+            assert.match(host, /location = \/api\/v1\/csp-reports \{ rewrite \^ \/api\/csp-reports last; \}/);
+            const legacy = host.slice(host.indexOf('location = /api/csp-reports {'), host.indexOf('}', host.indexOf('location = /api/csp-reports {')));
+            assert.match(legacy, /client_max_body_size 32k;/);
+            assert.match(legacy, /limit_req zone=csp_zone burst=10 nodelay;/);
+            assert.ok(host.indexOf('location = /api/csp-reports {') < host.indexOf('location ^~ /api/ {'));
+        }
+    }
+});

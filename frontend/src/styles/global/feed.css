@@ -1,4 +1,4 @@
-/* Feed styles belong to these new surfaces; existing cards and forms keep their rules. */
+/* 피드 화면 범위만 지정하고 공통 카드·폼 규칙을 보존한다. */
 .reserve-feed-page { min-width: 0; }
 .reserve-account-public-profile-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .reserve-account-public-profile-actions:empty { display: none; }
@@ -74,9 +74,9 @@
 .reserve-feed-photos--1 .reserve-feed-photo { aspect-ratio: 4 / 3; }
 .reserve-feed-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .reserve-feed-store-links { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-top: 8px; }
-.reserve-feed-store-links :is(a, span) { color: var(--c-text-secondary); font-size: 13px; }
+.reserve-feed-store-links :is(a, span) { font-size: 13px; }
 .reserve-feed-store-links > :is(a, span) { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; }
-.reserve-feed-store-links a:hover { color: var(--c-text-primary); }
+
 .reserve-feed-store-links .anticon { font-size: 16px; }
 .reserve-feed-post-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .reserve-feed-post-actions button { min-height: 36px; }
@@ -113,7 +113,7 @@
 .reserve-feed-comment { min-width: 0; padding: 16px 0; border-bottom: 1px solid var(--c-border-default); }
 .reserve-feed-comment-attachments.ant-upload-wrapper .ant-upload-list.ant-upload-list-picture-card { display: flex; flex-wrap: nowrap; gap: 8px; width: max-content; }
 .reserve-feed-comment-attachments.ant-upload-wrapper.ant-upload-picture-card-wrapper .ant-upload-list.ant-upload-list-picture-card:not(:empty) { min-height: 0; }
-/* 44px photo + 4px gap + 44px removal target; AntD's full photo-card minimum is not used here. */
+/* 44px 사진·4px 간격·44px 제거 도구를 사용해 AntD 사진 카드 최소 크기와 구분한다. */
 .reserve-feed-comment-attachments.ant-upload-wrapper .ant-upload-list.ant-upload-list-picture-card > .ant-upload-list-item-container { flex: 0 0 92px; width: 92px; height: 44px; margin: 0; }
 .reserve-feed-comment-attachment { display: flex; align-items: center; gap: 4px; height: 100%; }
 .reserve-feed-comment.is-thread-comment { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; border-bottom: 0; }

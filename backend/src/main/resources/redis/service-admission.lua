@@ -1,7 +1,7 @@
--- Dedicated visitor capacity. It confers no member or reservation authority.
--- KEYS control(hash), waiting(zset), active(zset), heartbeats(zset), born(hash), sequence(string)
--- Automatic uses existingTicket=writer UUID, newServerTicket=signal, and adds pressure/recovery/minimum ms.
--- The eight optional auto fields never change pass identity, capacity, or lifetime.
+-- 방문 입장량만 제어하며 회원 인증이나 예약 권한을 부여하지 않는다.
+-- KEYS: control(hash), waiting(zset), active(zset), heartbeats(zset), born(hash), sequence(string)
+-- 자동 제어는 existingTicket에 쓰기 주체 UUID, newServerTicket에 관측 신호를 넣고 압력·복구·최소 유지 시간을 추가한다.
+-- 선택적인 자동 제어 필드 여덟 개는 입장권 식별·정원·수명을 바꾸지 않는다.
 local control = redis.call('HMGET', KEYS[1], 'marker', 'mode', 'autoState', 'autoOwner', 'autoLeaseUntil',
     'autoObservedAt', 'autoHighMs', 'autoClearMs', 'autoEmergencyMs', 'autoSignal')
 local mode = control[2]
@@ -23,7 +23,7 @@ local function writer(value)
     return #compact == 32
 end
 local autoState, owner, lease, observed, highMs, clearMs, emergencyMs, previousSignal
--- Manual OFF/EMERGENCY always take precedence, including when an auto field needs operator repair.
+-- 자동 설정에 문제가 있어도 수동 OFF·EMERGENCY 모드가 우선한다.
 if mode == 'CORE' then
     local present = 0
     for i = 3, 10 do if control[i] then present = present + 1 end end
@@ -55,7 +55,7 @@ if action == 'automatic' then
         or not pressure or pressure < 30000 or pressure > 600000
         or not recovery or recovery < 120000 or recovery > 3600000
         or not minimum or minimum < 120000 or minimum > 3600000 then return {'UNAVAILABLE'} end
-    -- A second Blue/Green process cannot reset or advance the current writer's evidence.
+    -- 다른 Blue/Green 프로세스가 현재 쓰기 주체의 근거를 초기화하거나 전진시키지 못한다.
     if owner and owner ~= ticket and lease > now then return result('MODE') end
     local continuous = owner == ticket and now > observed and now - observed <= 15000
     local credit = continuous and math.min(now - observed, 5000) or 0
@@ -80,7 +80,7 @@ end
 if action == 'mode' then return result('MODE') end
 local capacity, sessionMs, maxSessionMs, heartbeatMs = tonumber(ARGV[5]), tonumber(ARGV[6]), tonumber(ARGV[7]), tonumber(ARGV[8])
 
--- Pure inspection precedes every renewal, so bounded cleanup can never revive its unvisited expired tail.
+-- 갱신 전에 상태를 검사해 전역 정리에서 방문하지 못한 만료 항목도 되살리지 않는다.
 local function inspect(id)
     local lease = redis.call('ZSCORE', KEYS[3], id)
     if lease then
@@ -99,7 +99,7 @@ local function inspect(id)
     return 'EXPIRED', 0, 0, 0
 end
 
--- The app-request fast path must not scan, promote, create, remove, or keep a waiting visitor alive.
+-- 일반 앱 요청은 대기자를 탐색·승격·생성·삭제하거나 대기 생존 시각을 연장하지 않는다.
 if action == 'check' then
     if ticket == '' then return result('NOT_JOINED') end
     local lease = redis.call('ZSCORE', KEYS[3], ticket)
@@ -118,7 +118,7 @@ local function forget(id)
     redis.call('ZREM', KEYS[4], id)
     redis.call('HDEL', KEYS[5], id)
 end
--- At most 100 stale tickets and 100 promotion candidates are processed per queue operation.
+-- 대기열 작업마다 만료 항목과 승격 후보를 각각 최대 100개만 처리한다.
 local cleanupBudget = 100
 for _, id in ipairs(redis.call('ZRANGEBYSCORE', KEYS[3], '-inf', now, 'LIMIT', 0, cleanupBudget)) do
     forget(id)
@@ -150,7 +150,7 @@ local state, position, expires, absolute = inspect(ticket)
 if state == 'EXPIRED' and ticket ~= '' then forget(ticket) end
 if action == 'join' then
     if state == 'EXPIRED' then
-        -- Existing FIFO waiters receive vacancies before a new arrival is queued.
+        -- 새 방문자를 넣기 전에 기존 대기자에게 순번대로 빈자리를 준다.
         promote()
         if redis.call('ZCARD', KEYS[2]) >= tonumber(ARGV[9]) then return result('FULL') end
         ticket = ARGV[3]

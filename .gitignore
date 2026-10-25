@@ -1,8 +1,5 @@
-# .gitignore
+# Java·Gradle 빌드
 
-# ========================
-# Java / Gradle
-# ========================
 .gradle/
 build/
 out/
@@ -12,9 +9,8 @@ out/
 !**/src/main/**/out/
 !**/src/test/**/out/
 
-# ========================
 # IDE
-# ========================
+
 .idea/
 .vscode/
 *.iws
@@ -45,9 +41,8 @@ bin/
 /nbdist/
 /.nb-gradle/
 
-# ========================
-# Node / Frontend
-# ========================
+# 프론트 빌드·의존성
+
 node_modules/
 dist/
 dist-ssr/
@@ -57,9 +52,8 @@ blob-report/
 .ci-evidence/
 /frontend/coverage/
 
-# ========================
 # 환경변수 (보안)
-# ========================
+
 .env
 .env.local
 .env.production
@@ -68,14 +62,10 @@ frontend/.env
 frontend/.env.local
 frontend/.env.production
 
-# application-secret.yml 은 여기에 넣지 않는다.
-# 이미 추적 중인 파일이라 .gitignore가 효력이 없고(거짓 안심), application.yml이
-# secret 프로파일을 include하므로 레포에 있어야 앱이 뜬다.
-# 그 파일에는 실제 값 대신 ${ENV_VAR} 플레이스홀더만 적는다 — 값은 배포 환경변수로 주입.
+# 추적 중인 비밀 설정에는 환경변수 참조만 두고 실제 값은 배포 환경에서 주입한다.
 
-# ========================
 # 로그
-# ========================
+
 *.log
 logs/
 npm-debug.log*
@@ -83,31 +73,28 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# ========================
 # OS 시스템 파일
-# ========================
+
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# ========================
 # 기타
-# ========================
+
 HELP.md
 cookies.txt
 *.deprecated.jsx
 *.unused
-# ========================
+
 # 에이전트 로컬 지침
-# ========================
+
 # AI 에이전트용 로컬 지침은 저장소에 올리지 않는다.
 AGENTS.md
 CLAUDE.md
 
-# ========================
-# README 실화면 캡처용 임시 로그인 상태 (capture-readme-live.mjs --login)
-# ========================
-# 세션 쿠키(리프레시 토큰 포함)가 들어 있다. npm run capture:readme:clean 전까지 남아 있으니 절대 올라가지 않게 막는다.
+# README 캡처의 임시 인증 상태
+
+# 인증 쿠키를 포함하는 임시 캡처 상태는 저장소에 올리지 않는다.
 frontend/.readme-capture/
 docs/images/.*.tmp
 docs/images/*.new.png

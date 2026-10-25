@@ -167,4 +167,29 @@ describe('explicit unified search scope and cancellation', () => {
         expect(view.result.current.remoteConfirmed).toBe(false);
     });
 
+    it('모호한 날짜 검색은 선택 전 원격 요청을 만들지 않는다', async () => {
+        login(); const view = setup(committed('내일 예약'));
+        await act(async () => { await Promise.resolve(); });
+        expect(view.result.current.awaitingChoice).toBe(true);
+        expect(searchService.public).not.toHaveBeenCalled(); expect(searchService.personal).not.toHaveBeenCalled();
+        view.rerender({ ...committed('내일 예약'), choice: 'reservations', submittedAt: Date.parse('2026-10-25T15:01:00Z') });
+        await waitFor(() => expect(searchService.personal).toHaveBeenCalledOnce());
+        expect(searchService.personal.mock.calls[0][3]).toMatchObject({ scope: 'reservations', term: '', date: '2026-10-27' });
+        expect(searchService.public).not.toHaveBeenCalled();
+    });
+    it('지역 의도는 공개 가게 한 요청으로 제한하고 같은 조건의 캐시를 공유한다', async () => {
+        login(); const view = setup(committed('강남 공방'));
+        await waitFor(() => expect(searchService.public).toHaveBeenCalledOnce());
+        expect(searchService.public.mock.calls[0][2]).toMatchObject({ scope: 'stores', region: '서울 강남구', term: '공방' });
+        expect(searchService.personal).not.toHaveBeenCalled();
+        view.rerender({ keyword: '', confirmed: false }); view.rerender(committed('강남 공방'));
+        await act(async () => { await Promise.resolve(); });
+        expect(searchService.public).toHaveBeenCalledOnce();
+    });
+    it('개인 날짜 필터도 인증 대기나 로그아웃 상태에서 요청하지 않는다', async () => {
+        const view = setup({ ...committed('내 예약 내일'), submittedAt: Date.parse('2026-10-25T15:01:00Z') });
+        await act(async () => { await Promise.resolve(); });
+        expect(view.result.current.authRequired).toBe(true);
+        expect(searchService.public).not.toHaveBeenCalled(); expect(searchService.personal).not.toHaveBeenCalled();
+    });
 });

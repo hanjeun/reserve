@@ -1,5 +1,5 @@
--- Additive preparation only. Apply using the approved DDL account before schema validation.
--- Inspect information_schema first; do not run repeatedly or enable ddl-auto:update in production.
+-- 스키마 검증 전에 승인된 DDL 계정으로 추가한다. information_schema에서 기존 구조를 확인한다.
+-- 반복 실행하거나 운영 ddl-auto:update로 우회하지 않는다.
 CREATE TABLE reservation_request (
     request_id BIGINT NOT NULL AUTO_INCREMENT,
     member_id BIGINT NOT NULL,

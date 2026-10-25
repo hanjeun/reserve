@@ -2,7 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/** Keeps the current app proxy/security policy; emits a candidate, never installs/reloads it. */
+/** 기존 앱의 프록시·보안 정책을 유지하는 후보만 만들며 설치하거나 재적용하지 않는다. */
 function block(source, marker) {
     const start = source.indexOf(marker);
     if (start < 0) throw new Error(`Missing nginx contract: ${marker}`);
@@ -24,13 +24,13 @@ const headers = `add_header Strict-Transport-Security "max-age=31536000; include
     add_header X-Frame-Options "DENY" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;`;
 
-/** Bootstrap HTTP-01 before the new host has a certificate. Existing hosts stay intact. */
+/** 새 호스트의 인증서 발급 전에 HTTP-01 경로를 준비하며 기존 호스트 설정은 유지한다. */
 export function domainSplitHttpNginx(source) {
     if (/server_name\s+app\.reserve\.it\.kr(?:\s|;)/.test(source)) throw new Error('The app host is already configured; review the installed configuration instead');
     const acme = block(source, 'location ^~ /.well-known/acme-challenge/ {');
     return `${source.trimEnd()}
 
-# App certificate bootstrap. Replace with the full candidate after certificate issuance.
+# 인증서 발급 뒤 검토한 전체 후보로 교체한다.
 server {
     listen 80; listen [::]:80;
     server_name app.reserve.it.kr;
@@ -42,19 +42,23 @@ server {
 }
 export function domainSplitNginx(source) {
     if (/server_name\s+app\.reserve\.it\.kr(?:\s|;)/.test(source)) throw new Error('Use the preserved pre-bootstrap configuration; the app host is already configured');
+    if (!source.includes('location = /api/v1/csp-reports {')) source = source.replace('location = /api/csp-reports {',
+        'location = /api/v1/csp-reports { rewrite ^ /api/csp-reports last; }\n    location = /api/csp-reports {');
     const parts = source.split(/(?=^server\s*\{)/m);
     if (parts.filter(part => /server_name reserve\.it\.kr www\.reserve\.it\.kr;/.test(part)).length !== 2) throw new Error('Expected current HTTP and HTTPS application hosts');
     const app = parts.map((part, index) => index === 0 || /server_name reserve\.it\.kr www\.reserve\.it\.kr;/.test(part)
         ? part.replaceAll('https://reserve.it.kr', 'https://app.reserve.it.kr').replaceAll('server_name reserve.it.kr www.reserve.it.kr;', 'server_name app.reserve.it.kr;')
             .replaceAll('/live/reserve.it.kr/', '/live/app.reserve.it.kr/') : part).join('');
     const api = block(source, 'location ^~ /api/ {');
+    const cspLegacy = block(source, 'location = /api/csp-reports {');
+    const cspVersioned = block(source, 'location = /api/v1/csp-reports {');
     const oauth = block(source, 'location /oauth2/authorization/ {');
     const callback = block(source, 'location /login/oauth2/ {');
     const csp = source.match(/add_header Content-Security-Policy-Report-Only "[^\n]+;[\r]?/);
     if (!csp) throw new Error('Current app CSP policy is required for legacy draft recovery');
     return `${app}
 map $args $reserve_legacy_home_selection { default 0; ~(^|&)region(=|&|$) 1; }
-# Domain split candidate. Keep the legacy app release at html/legacy-domain.current during draft recovery.
+# 복구용 기존 앱 릴리스는 html/legacy-domain.current에 유지한다.
 server {
     listen 80; listen [::]:80;
     server_name reserve.it.kr www.reserve.it.kr;
@@ -73,10 +77,12 @@ server {
     ${headers}
     add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; form-action 'self'" always;
     add_header Cache-Control "no-cache";
+    ${cspVersioned}
+    ${cspLegacy}
     ${api}
     ${oauth}
     ${callback}
-    # In-flight OAuth and account-scoped local draft export stay on the legacy origin.
+    # 진행 중인 OAuth와 계정별 초안 내보내기는 기존 출처를 유지한다.
     location ~ ^/(drafts/transfer|login|signup/social|oauth2/callback)/?$ { try_files /does-not-exist @legacy_spa; }
     location @legacy_spa {
         root /usr/share/nginx/html/legacy-domain.current;
@@ -94,7 +100,7 @@ server {
     }
     location ^~ /images/ { root /usr/share/nginx/html/legacy-domain.current; try_files $uri =404; }
     location ^~ /icons/ { root /usr/share/nginx/html/legacy-domain.current; try_files $uri =404; }
-    # The browser preserves a QR fragment across this 302. Query choices keep their exact names.
+    # QR 프래그먼트와 쿼리 선택값을 리다이렉트에서도 보존한다.
     location ~ ^/(stores|store|waiting|benefits|feed|my-page|my-stores|my-favorites|my-reservations|business|admin|messages|payment|search|signup|forgot-password|terms|privacy|content-sources|operation-guide|guide)(/|$) {
         if ($request_method !~ ^(GET|HEAD)$) { return 405; }
         return 302 https://app.reserve.it.kr$request_uri;

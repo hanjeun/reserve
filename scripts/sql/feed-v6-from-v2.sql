@@ -1,9 +1,7 @@
--- Selected first-v6 candidate for the verified MySQL 8.0.45 / reserve / pre-feed v2 schema.
--- Preparation only: production execution requires the approved candidate, fresh backup/restore,
--- compatible recovery inputs, and explicit production DDL approval from manual-ddl.md section 15.
--- Run in the mysql CLI WITHOUT --force. A failed preflight stops this script before DDL.
--- After any partial failure, compare metadata and prepare only the remaining statements.
--- Do not concatenate manual-ddl.md 15.1/15.5 or the three included SQL files again.
+-- 대상은 MySQL 8.0.45의 피드 v2 스키마이며 현재 메타데이터를 먼저 대조한다.
+-- 최종 JAR·직전 백업/격리 복원·호환 복구 입력과 운영 DDL 승인이 필요하다.
+-- mysql CLI에 --force를 사용하지 않으며, 부분 실패 시 남은 구문만 준비한다.
+-- 아래 포함된 SQL과 같은 내용을 별도로 다시 실행하지 않는다.
 
 SET @reserve_v6_preflight_sql = IF(
     DATABASE() = 'reserve' AND VERSION() = '8.0.45'
@@ -35,7 +33,6 @@ PREPARE reserve_v6_preflight FROM @reserve_v6_preflight_sql;
 EXECUTE reserve_v6_preflight;
 DEALLOCATE PREPARE reserve_v6_preflight;
 
--- Section 15 includes the section 15.1 benefit columns and initial report revisions.
 
 
 ALTER TABLE promotion
@@ -174,7 +171,6 @@ CREATE TABLE feed_audit_record (
   INDEX ix_feed_audit_news (promotion_id,report_id,created_at,audit_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Section 15.2: the new feed_post region is already VARCHAR(50).
 
 CREATE TABLE content_like (
   like_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -233,14 +229,13 @@ CREATE TABLE feed_comment_report (
   INDEX ix_feed_comment_report_retention (status,hold,resolved_at,report_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- Section 15.5: the two new report tables already contain revision.
 
 ALTER TABLE chat_report ADD COLUMN revision BIGINT NOT NULL DEFAULT 0;
 
--- Included candidate: feed-comment-v6.sql; do not run it a second time.
+-- feed-comment-v6.sql 내용이 포함되어 있으므로 별도로 다시 실행하지 않는다.
 
--- Candidate DDL: apply with a reviewed DDL account after the manual-ddl.md 15.6 prerequisites.
--- Existing two-target check may have a Hibernate-generated name. Replace it in the same ALTER.
+-- 사전 조건과 복구 경로를 확인한 뒤 승인된 DDL 계정으로 적용한다.
+-- 기존 CHECK 이름을 확인하고 같은 ALTER에서 새 조건으로 교체한다.
 SET @legacy_like_check = (
     SELECT IF(COUNT(*)=1,MIN(tc.CONSTRAINT_NAME),NULL)
     FROM information_schema.TABLE_CONSTRAINTS tc
@@ -295,18 +290,18 @@ CREATE TABLE feed_notification (
     CONSTRAINT fk_feed_notification_comment FOREIGN KEY (comment_id) REFERENCES feed_comment(comment_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Included candidate: benefit-design.sql; do not run it a second time.
+-- benefit-design.sql 내용이 포함되어 있으므로 별도로 다시 실행하지 않는다.
 
--- Apply once after checking the target and information_schema.COLUMNS.
--- Existing rows and clients keep the standard template.
+-- 대상과 메타데이터를 대조한 뒤 한 번만 적용한다.
+-- 기존 행과 클라이언트는 기본 템플릿을 유지한다.
 ALTER TABLE promotion
   ADD COLUMN benefit_design VARCHAR(16) NOT NULL DEFAULT 'STANDARD',
   ADD CONSTRAINT ck_promotion_benefit_design CHECK (benefit_design IN ('STANDARD', 'PHOTO', 'COMPACT'));
 
--- Included candidate: feed-profile-avatar.sql; do not run it a second time.
+-- feed-profile-avatar.sql 내용이 포함되어 있으므로 별도로 다시 실행하지 않는다.
 
--- Apply once after checking the target and information_schema.COLUMNS / TABLE_CONSTRAINTS.
--- Existing opt-outs stay private; no use_account_avatar backfill is performed.
+-- 대상과 메타데이터를 대조한 뒤 한 번만 적용한다.
+-- 기존 비공개 선택을 유지하며 use_account_avatar를 일괄 보정하지 않는다.
 ALTER TABLE feed_profile
   ADD COLUMN custom_avatar_key VARCHAR(1024) NULL,
   ADD CONSTRAINT ck_feed_profile_avatar_source

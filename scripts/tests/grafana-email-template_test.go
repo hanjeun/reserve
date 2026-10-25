@@ -17,7 +17,7 @@ const (
 	rejectedURLMarker   = "#ZgotmplZ"
 )
 
-// Only synthetic data is used. No SMTP connection or production API is called.
+// 합성 데이터만 사용하며 SMTP나 운영 API에 연결하지 않는다.
 type pair struct{ Name, Value string }
 type labels map[string]string
 
@@ -91,7 +91,7 @@ func render(t *testing.T, data message) string {
 			return *subject
 		},
 	}
-	// Sprig's splitList uses (separator, value), unlike strings.Split.
+	// splitList는 구분자·문자열 순서로 인자를 받는다.
 	functions["splitList"] = func(separator, value string) []string { return strings.Split(value, separator) }
 	parsed, err := template.New(filepath.Base(path)).Funcs(functions).Option("missingkey=zero").ParseFiles(path)
 	if err != nil {

@@ -1,6 +1,6 @@
--- KEYS share a Redis hash tag. Every call has bounded cleanup/promotion work.
--- 1 waiting, 2 leases, 3 heartbeats, 4 owners, 5 members, 6 states, 7 claims, 8 sequence, 9 marker
--- ARGV action/member/ticket/request/marker/open/close/concurrent/leaseMs/idleMs/maxWaiting/maxParticipants
+-- 모든 키는 같은 Redis 해시 태그를 사용하고 정리·승격 작업량은 호출별로 제한한다.
+-- KEYS: 1 대기, 2 임대, 3 생존 시각, 4 소유자, 5 회원, 6 상태, 7 점유, 8 순번, 9 준비 표식
+-- ARGV: action/member/ticket/request/marker/open/close/concurrent/leaseMs/idleMs/maxWaiting/maxParticipants
 if redis.call('GET', KEYS[9]) ~= ARGV[5] then return {'UNAVAILABLE'} end
 local t = redis.call('TIME')
 local now = tonumber(t[1]) * 1000 + math.floor(tonumber(t[2]) / 1000)
@@ -19,12 +19,12 @@ local function forget(id)
     redis.call('HDEL', KEYS[6], id)
     redis.call('HDEL', KEYS[7], id)
 end
--- Claims retain a lease for the full bounded transaction timeout; never promote a replacement early.
+-- 점유는 트랜잭션 제한 시간 동안 임대를 유지하며 대체 인원을 미리 승격하지 않는다.
 for _, id in ipairs(redis.call('ZRANGEBYSCORE', KEYS[2], '-inf', now, 'LIMIT', 0, 100)) do forget(id) end
 for _, id in ipairs(redis.call('ZRANGEBYSCORE', KEYS[3], '-inf', now, 'LIMIT', 0, 100)) do forget(id) end
 if ARGV[1] == 'join' then
     local existing = redis.call('HGET', KEYS[5], member)
-    -- A committed request retains its consumed receipt, but a deliberate new booking joins FIFO again.
+    -- 커밋된 요청의 사용 영수증은 보존하되 사용자가 새 예약을 시작하면 다시 순번대로 대기한다.
     if existing and redis.call('HGET', KEYS[6], existing) == 'CONSUMED' then existing = nil end
     if existing then ticket = existing
     else
@@ -40,7 +40,7 @@ if ARGV[1] == 'join' then
 end
 if redis.call('HGET', KEYS[4], ticket) ~= member then return short('EXPIRED') end
 local state = redis.call('HGET', KEYS[6], ticket)
--- Bounded global cleanup must never let its unvisited expired tail renew an individual ticket.
+-- 전역 정리에서 방문하지 못한 만료 항목도 개별 요청에서 갱신해 되살리지 않는다.
 if state == 'WAITING' or state == 'ADMITTED' or state == 'CLAIMED' then
     local expiry = redis.call('ZSCORE', state == 'WAITING' and KEYS[3] or KEYS[2], ticket)
     if not expiry or tonumber(expiry) <= now then forget(ticket); return short('EXPIRED') end

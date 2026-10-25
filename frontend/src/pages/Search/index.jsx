@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import useUnifiedSearch from '../../hooks/useUnifiedSearch';
 import SearchResults from './SearchResults';
+import { recordSearchMetric } from '../../utils/searchDiagnostics';
 import { normalizeSearchKeyword, SEARCH_KEYWORD_MAX_LENGTH } from '../../constants/searchCatalog';
 import { CloseOutlined, SearchOutlined } from '../../components/common/icons';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
@@ -20,7 +21,7 @@ const searchStateForUrl = (params, state) => {
     const keyword = params.get('keyword') || '';
     const submittedKeyword = normalizeSearchKeyword(keyword);
     const wasDraft = state?.searchReturn?.keyword === submittedKeyword && state.searchReturn.confirmed === false;
-    return { keyword, submittedKeyword, confirmed: Boolean(submittedKeyword) && submittedKeyword.length <= SEARCH_KEYWORD_MAX_LENGTH && !wasDraft };
+    return { keyword, submittedKeyword, choice: params.get('choice') || '', submittedAt: Date.now(), confirmed: Boolean(submittedKeyword) && submittedKeyword.length <= SEARCH_KEYWORD_MAX_LENGTH && !wasDraft };
 };
 
 export default function SearchPage() {
@@ -29,7 +30,7 @@ export default function SearchPage() {
     const { state } = location;
     const [searchParams] = useSearchParams();
     const [search, setSearch] = useState(() => searchStateForUrl(searchParams, state));
-    const { keyword, submittedKeyword, confirmed } = search;
+    const { keyword, submittedKeyword, confirmed, choice, submittedAt } = search;
     const previousSearchRef = useRef(location.search);
     const [composing, setComposing] = useState(false);
     const restoredRef = useRef(null);
@@ -42,7 +43,7 @@ export default function SearchPage() {
     // 연달아 누른 취소가 뒤로가기를 두 번 하지 않게 한다(뒤로가기는 비동기라 화면이 잠깐 남아 있다).
     const closingRef = useRef(false);
     const exitTimerRef = useRef(null);
-    const result = useUnifiedSearch({ keyword, submittedKeyword, confirmed, composing, enabled: !isClosing });
+    const result = useUnifiedSearch({ keyword, submittedKeyword, confirmed, composing, enabled: !isClosing, choice, submittedAt });
     useDocumentTitle('검색', '가게와 메뉴, 도움말과 내 예약·웨이팅·메시지를 찾아보세요.');
 
     useEffect(() => { inputRef.current?.focus({ preventScroll: true }); }, []);
@@ -50,7 +51,7 @@ export default function SearchPage() {
     useEffect(() => () => window.clearTimeout(exitTimerRef.current), []);
 
     // 결과 선택·취소·Esc 모두 같은 아래로 내려가는 모션 뒤 이동한다. 원래 화면은 옆으로 밀리지 않는다.
-    // (routeEntryMotion 이 검색 화면을 떠나는 이동에는 페이지 전환을 걸지 않는다, 2026-09-23).
+
     const leaveSearch = leave => {
         if (closingRef.current) return;
         closingRef.current = true;
@@ -68,28 +69,30 @@ export default function SearchPage() {
         else navigate('/', { replace: true });
     });
 
-    const searchFor = value => {
+    const searchFor = (value, selection = '', source = 'submitted') => {
         const normalized = value.trim();
         if (composing || !normalized || normalized.length > SEARCH_KEYWORD_MAX_LENGTH) {
             inputRef.current?.focus();
             return;
         }
         restoreDisabledRef.current = true;
-        setSearch({ keyword: normalized, submittedKeyword: normalized, confirmed: true });
+        setSearch({ keyword: normalized, submittedKeyword: normalized, confirmed: true, choice: selection, submittedAt: Date.now() });
         rememberSearch(normalized);
-        navigate('/search?keyword=' + encodeURIComponent(normalized), { replace: true, state: { ...state, searchReturn: undefined } });
+        inputRef.current?.focus({ preventScroll: true });
+        recordSearchMetric(selection ? 'choice' : source);
+        navigate('/search?keyword=' + encodeURIComponent(normalized) + (selection ? '&choice=' + encodeURIComponent(selection) : ''), { replace: true, state: { ...state, searchReturn: undefined } });
     };
 
     const clearSearchReturn = empty => {
         const params = new URLSearchParams(searchParams);
-        if (empty) params.delete('keyword');
+        if (empty) { params.delete('keyword'); params.delete('choice'); }
         const nextSearch = empty ? (params.size ? '?' + params.toString() : '') : location.search;
         navigate(location.pathname + nextSearch, { replace: true, state: { ...state, searchReturn: undefined } });
     };
     const changeKeyword = value => {
         restoreDisabledRef.current = true;
         const empty = !normalizeSearchKeyword(value);
-        setSearch(current => ({ ...current, keyword: value, confirmed: false, ...(empty ? { submittedKeyword: '' } : {}) }));
+        setSearch(current => ({ ...current, keyword: value, confirmed: false, choice: '', ...(empty ? { submittedKeyword: '' } : {}) }));
         if (empty) {
             restoredRef.current = null;
             clearSearchReturn(true);
@@ -105,7 +108,7 @@ export default function SearchPage() {
     useEffect(() => {
         if (previousSearchRef.current === location.search) return;
         previousSearchRef.current = location.search;
-        // An actual URL change owns confirmation; an edited draft never inherits it from matching text.
+        // 실제 URL 변경만 확정 상태를 부여하며 같은 단어의 재입력은 확정으로 처리하지 않는다.
         setSearch(searchStateForUrl(searchParams, state));
     }, [location.search, searchParams, state]);
     useEffect(() => {
@@ -127,10 +130,11 @@ export default function SearchPage() {
         if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
         event.preventDefault();
         const normalized = keyword.trim();
+        recordSearchMetric('selected');
         const searchReturn = { keyword: normalized, confirmed: result.confirmed, path: destination, left: window.scrollX, top: window.scrollY };
         leaveSearch(() => {
             rememberSearch(normalized);
-            navigate('/search?keyword=' + encodeURIComponent(normalized), { replace: true, state: { ...state, searchReturn } });
+            navigate('/search?keyword=' + encodeURIComponent(normalized) + (choice ? '&choice=' + encodeURIComponent(choice) : ''), { replace: true, state: { ...state, searchReturn } });
             navigate(destination);
         });
     };

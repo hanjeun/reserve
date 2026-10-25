@@ -1,12 +1,8 @@
--- PREPARATION ONLY. No application startup hook executes this file.
--- With the separately approved DDL role, create this additive table BEFORE starting the matching JAR with validate.
--- Business/member/payment records are untouched. UTC DATETIME values are independent of the server session zone.
--- Compatibility contract v10: all sid-less access/refresh cookies require ONE new login.
--- Old images cannot read this session contract; do not relabel or select an older image for rollback.
--- Recovery must use an image supporting login_session + sid/rgen/aud + hash-only refresh.
--- Keep the existing JWT secret as-is unless a separate key-rotation procedure is approved.
--- Optional jwt.signing-keys / active-key-id must retain the key of every live refresh generation during overlap.
--- Default absolute lifetime is 30 days; a refresh extends idle expiry by at most 14 days within that bound.
+-- 준비용 SQL이며 앱 기동 시 실행하지 않는다. 승인된 DDL 계정으로 대응 JAR의 validate 기동 전에 추가한다.
+-- 호환 계약 v10: sid 없는 이전 쿠키는 재로그인이 필요하며, 복구 이미지도 login_session·sid/rgen/aud·해시 리프레시를 지원해야 한다.
+-- 회원·사업·거래 데이터는 보존한다. UTC DATETIME은 세션 시간대와 독립이다.
+-- 기존 JWT 키는 별도 승인 없이 바꾸지 않는다. 키 교체 중에는 유효한 모든 리프레시 세대의 키를 유지한다.
+-- 기본 절대 수명은 30일이며 갱신은 그 안에서 최대 14일의 유휴 수명만 연장한다.
 
 CREATE TABLE login_session (
     id BIGINT NOT NULL AUTO_INCREMENT,
@@ -32,7 +28,5 @@ CREATE TABLE login_session (
     INDEX idx_login_session_expiry (expires_at)
 );
 
--- The application never reads or writes the former refresh_token table after this cutover.
--- Preserve the existing refresh_token table and rows during this additive preparation.
--- Any later credential purge requires separate backup/recovery review and explicit approval.
--- Do not copy old bearer strings into login_session. Reissuing sid-less credentials would undo revocation guarantees.
+-- 기존 refresh_token 테이블은 조회·갱신하지 않으며 테이블과 행을 보존한다.
+-- 원문 토큰을 login_session에 복사하지 않는다. 이후 폐기는 별도 백업·복구 검토와 승인이 필요하다.

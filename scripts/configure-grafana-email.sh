@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Apply only after approval for the HTML upload and Grafana-only recreation.
-# A public-url change requires its own explicit approval and the fourth argument.
+# HTML 교체와 Grafana 단독 재생성은 승인 범위에서만 수행한다.
+# 공개 URL 변경은 별도 승인과 네 번째 인자가 필요하다.
 set -euo pipefail
 set +x
 umask 077
@@ -52,8 +52,7 @@ while IFS= read -r entry; do
 done < <(sudo -n docker inspect grafana --format '{{range .Config.Env}}{{println .}}{{end}}')
 : "${RESEND_API_KEY:?existing app SMTP credential is missing}"
 : "${MAIL_FROM:?existing app sender is missing}"
-# Keep the existing seed exactly, including an empty value after DB setup.
-# Do not invent a password or reset the already initialized Grafana account.
+# 초기화된 계정을 재설정하지 않도록 기존 시드 값을 빈 값까지 그대로 유지한다.
 [[ "${GRAFANA_ADMIN_PASSWORD+x}" = x ]]
 
 compose() {
@@ -83,7 +82,7 @@ db.rollback()
 db.close()
 PY
 }
-# Expanded configuration is piped only into a validator; it is never printed.
+# 보간된 설정은 검증기로만 전달하며 출력하지 않는다.
 compose -f "$base" -f "$smtp" -f "$override_candidate" config --quiet
 if [[ "$public_url_approved" = --public-url-approved ]]; then
     compose -f "$base" -f "$smtp" -f "$override_candidate" config --format json | python3 -c \

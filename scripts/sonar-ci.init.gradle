@@ -1,4 +1,4 @@
-// Keep scanner tooling outside runtime dependencies and their lockfile.
+// 분석 도구를 앱의 런타임 의존성과 잠금 파일에서 분리한다.
 initscript {
     repositories {
         maven { url = uri('https://plugins.gradle.org/m2/') }
@@ -24,7 +24,7 @@ allprojects { project ->
                     property 'sonar.host.url', 'https://sonarcloud.io'
                     property 'sonar.projectBaseDir', repositoryRoot.absolutePath
                     property 'sonar.qualitygate.wait', 'false'
-                    // Reuse explicit source/test boundaries; do not import rule suppressions.
+                    // 소스·테스트 범위만 재사용하며 규칙 제외 설정은 가져오지 않는다.
                     ['sonar.sources', 'sonar.tests', 'sonar.exclusions', 'sonar.sourceEncoding'].each { key ->
                         def value = configuration.getProperty(key)
                         if (value == null || value.isBlank()) {
@@ -32,7 +32,7 @@ allprojects { project ->
                         }
                         property key, value
                     }
-                    // The Gradle scanner derives Java binaries and libraries from source sets.
+                    // Java 바이너리와 라이브러리는 Gradle 소스 집합에서 유도한다.
                 }
             }
         }

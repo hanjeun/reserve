@@ -72,3 +72,20 @@ it('renders one shared partial-failure retry and preserves successful groups wit
     fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
     expect(value.publicQuery.refetch).toHaveBeenCalledTimes(1); expect(value.personalQuery.refetch).toHaveBeenCalledTimes(1);
 });
+
+it('교정 후보를 원문과 구분하고 선택했을 때만 검색을 확정한다', () => {
+    const { onSubmit } = show(result({ keyword: '스터디오', confirmed: false, remoteConfirmed: false }));
+    expect(screen.getByRole('heading', { name: '이 검색어를 찾으세요?' })).toBeInTheDocument();
+    expect(screen.getByText('입력한 검색어: 스터디오')).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '스튜디오 검색하기' })).toHaveAccessibleDescription('입력한 검색어: 스터디오');
+    fireEvent.click(screen.getByRole('button', { name: '스튜디오 검색하기' }));
+    expect(onSubmit).toHaveBeenCalledExactlyOnceWith('스튜디오', '', 'correction');
+});
+it('모호한 대상은 기존 칩으로 선택하고 무결과나 로딩으로 표시하지 않는다', () => {
+    const { onSubmit } = show(result({ keyword: '내일 예약', remoteConfirmed: false, awaitingChoice: true,
+        plan: { choices: [{ id: 'reservations', label: '내일 내 예약' }, { id: 'stores', label: '예약할 가게 찾기' }] } }));
+    expect(screen.queryByText('검색 결과가 없어요.')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '내일 내 예약' }));
+    expect(onSubmit).toHaveBeenCalledExactlyOnceWith('내일 예약', 'reservations');
+});

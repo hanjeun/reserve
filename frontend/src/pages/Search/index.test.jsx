@@ -120,7 +120,8 @@ describe('dedicated search submission and result editing', () => {
         await user.type(field(), '다른 가게');
         await user.click(screen.getByRole('button', { name: '취소' }));
         expect(path()).toBe(original);
-        expect(screen.getByRole('button', { name: '목록 검색어 수정: 공방' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: '목록 검색어 수정: 공방' })).toBeNull();
+        expect(screen.getByRole('link', { name: '통합 검색' })).toHaveAttribute('href', '/search');
     });
 
     it('opens global search without inheriting a list term and explicitly confirms its own new query', async () => {

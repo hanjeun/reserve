@@ -19,7 +19,7 @@ const workspaceEntries = (groups, base, roles) => groups.flatMap(group => group.
         : item.key === 'qr-checkin' ? ['큐알', 'QR', '체크인', '방문 확인'] : [],
 })));
 
-// Only existing destinations belong here. Route guards and server checks remain authoritative.
+// 실제 경로만 등록하며 권한은 라우트 관문과 서버에서 검증한다.
 const entryIcons = { stores: ShopOutlined, benefits: NotificationOutlined, waiting: ClockCircleOutlined,
     feed: NotificationOutlined, reservations: CalendarOutlined, 'my-waiting': ClockCircleOutlined,
     favorites: HeartOutlined, messages: MessageOutlined, 'my-page': SettingOutlined,
@@ -59,12 +59,12 @@ export function searchCatalog(keyword, auth, limit = SEARCH_GROUP_LIMIT) {
             const score = title === needle ? 100 : comparable(entry.path) === needle ? 95 : aliases.includes(needle) ? 90
                 : title.startsWith(needle) ? 80 : title.includes(needle) ? 70
                     : aliases.some(alias => alias.includes(needle)) ? 60 : comparable(entry.path).includes(needle) ? 50 : 0;
-            return { ...entry, score };
+            return { ...entry, score, aliasMatched: score === 90, description: score === 90 ? [entry.description, '별칭 일치'].filter(Boolean).join(' · ') : entry.description };
         }).filter(entry => entry.score > 0).sort((a, b) => b.score - a.score)
         .filter((entry, index, all) => all.slice(0, index).filter(previous => previous.group === entry.group).length < limit);
 }
 
-/** Only one explicit navigation destination can skip server content search; substrings never do. */
+/* 명확한 단일 이동 목적지만 원격 조회를 생략하고 부분 일치는 검색한다. */
 export function isLocalNavigationSearch(keyword, auth) {
     const exact = searchCatalog(keyword, auth).filter(entry => entry.score >= 90
         && (entry.authenticated || entry.roles || entry.score === 95 || entry.group === 'help' && entry.score === 100));

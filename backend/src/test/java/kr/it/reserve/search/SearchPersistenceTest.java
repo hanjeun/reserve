@@ -25,7 +25,7 @@ import java.time.*;
 import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 
-/** Committed synthetic rows exercise SQL filtering before the bounded result window, with no external effects. */
+/** 커밋된 합성 행으로 DB 필터가 결과 상한보다 먼저 적용되는지 확인한다. */
 @SpringBootTest(properties = "FEED_ENABLED=true")
 class SearchPersistenceTest {
     @Autowired SearchQueries queries;
@@ -199,12 +199,81 @@ class SearchPersistenceTest {
                 failure -> assertThat(failure.getStatus().value()).isEqualTo(404));
     }
 
+    @Test void privateReadersRecheckDatabaseMemberStateEvenWithAnOldPrincipal() {
+        tx.executeWithoutResult(status -> {
+            reservation(customer, false); waiting(customer, false);
+            message(room(customer, store, false, false, false));
+        });
+        var input = SearchQuery.from(needle, 5);
+        for (int state = 0; state < 4; state++) {
+            final int current = state;
+            tx.executeWithoutResult(status -> {
+                var viewer = em.find(Member.class, customer.getId());
+                if (current == 0) viewer.suspend(LocalDateTime.now().plusDays(1), "synthetic");
+                if (current == 1) viewer.suspend(LocalDateTime.now().minusDays(1), "synthetic");
+                if (current == 2) viewer.ban("synthetic");
+                if (current == 3) viewer.setDeletedAt(utc());
+            });
+            for (var hits : List.of(queries.reservations(input, customer.getId()), queries.waiting(input, customer.getId()),
+                    queries.messages(input, customer.getId(), false))) {
+                if (state == 1) assertThat(hits).hasSize(1); else assertThat(hits).isEmpty();
+            }
+        }
+    }
+
     private List<Long> counts() {
         return List.of(jdbc.queryForObject("SELECT COUNT(*) FROM reservation", Long.class),
                 jdbc.queryForObject("SELECT COUNT(*) FROM waiting_entry", Long.class),
                 jdbc.queryForObject("SELECT COUNT(*) FROM chat_room", Long.class),
                 jdbc.queryForObject("SELECT COALESCE(SUM(view_count),0) FROM promotion", Long.class),
                 jdbc.queryForObject("SELECT COALESCE(SUM(member_unread+owner_unread+admin_unread),0) FROM chat_room", Long.class));
+    }
+    @Test void exactNameAndPrefixRankBeforeNewerDescriptionMatchesAtTheDatabaseLimit() {
+        Long[] expected = new Long[2];
+        tx.executeWithoutResult(status -> {
+            expected[0] = store(owner, needle).getId(); expected[1] = store(owner, needle + " 앞부분").getId();
+            for (int index = 0; index < 8; index++) { var row = store(owner, "다른 이름 " + index); row.setKeywords(needle); }
+        });
+        var result = queries.stores(SearchQuery.from(needle, 5));
+        assertThat(result).hasSize(6); assertThat(result.get(0).id()).isEqualTo(expected[0]);
+        assertThat(result.get(1).id()).isEqualTo(expected[1]);
+    }
+    @Test void scopedRegionsAndRelatedTermsKeepVisibilityAndOriginalMatchesFirst() {
+        Long[] expected = new Long[3];
+        tx.executeWithoutResult(status -> {
+            var exact = store(owner, "도예"); exact.setAddress("서울특별시 강남구 테스트"); expected[0] = exact.getId();
+            var prefix = store(owner, "도예 교실"); prefix.setAddress("서울 강남구 테스트"); expected[1] = prefix.getId();
+            var related = store(owner, "도자기 체험"); related.setAddress("서울 강남구 테스트"); expected[2] = related.getId();
+            var foreign = store(owner, "도예 타지역"); foreign.setAddress("부산 중구 테스트");
+            var hidden = store(owner, "도자기 숨김"); hidden.setAddress("서울 강남구 테스트"); hidden.setDeletedAt(utc());
+        });
+        var query = SearchQuery.from("강남 도예", 5, new SearchFilter("stores", "도예", null, "서울 강남구"));
+        assertThat(queries.stores(query)).extracting(SearchResponse.Item::id).containsExactly(expected);
+    }
+    @Test void scopedReservationDatesRemainOwnedAndRunOnlyTheSelectedGroup() {
+        Long[] expected = new Long[1];
+        tx.executeWithoutResult(status -> {
+            expected[0] = reservation(customer, false).getId(); reservation(other, false);
+            reservation(customer, false).setReservationDate(ServiceTime.today().plusDays(2)); reservation(customer, true);
+        });
+        var filter = new SearchFilter("reservations", "", ServiceTime.today().plusDays(1), "");
+        var groups = service.personalSearch("내일 예약", 5, customer, filter).groups();
+        assertThat(groups.get(0).items()).extracting(SearchResponse.Item::id).containsExactly(expected[0]);
+        assertThat(groups.subList(1, 3)).allMatch(group -> group.items().isEmpty() && group.error() == null);
+    }
+    @Test void koreanMessageDayBoundariesDoNotBroadenOwnershipOrRetention() {
+        Long[] expected = new Long[1]; LocalDate day = ServiceTime.today();
+        LocalDateTime start = day.atStartOfDay(ServiceTime.ZONE).withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime();
+        tx.executeWithoutResult(status -> {
+            var own = room(customer, store, false, false, false);
+            expected[0] = message(own).getId(); var before = message(own); var after = message(own);
+            var foreign = message(room(other, store, false, false, false)); em.flush();
+            for (Long id : List.of(expected[0], foreign.getId())) jdbc.update("UPDATE chat_message SET created_at = ? WHERE id = ?", Timestamp.valueOf(start), id);
+            jdbc.update("UPDATE chat_message SET created_at = ? WHERE id = ?", Timestamp.valueOf(start.minusNanos(1000)), before.getId());
+            jdbc.update("UPDATE chat_message SET created_at = ? WHERE id = ?", Timestamp.valueOf(start.plusDays(1)), after.getId());
+        });
+        var query = SearchQuery.from("내 메시지 오늘", 5, new SearchFilter("messages", "", day, ""));
+        assertThat(queries.messages(query, customer.getId(), false)).extracting(SearchResponse.Item::id).containsExactly(expected[0]);
     }
     private Member member(Role role) {
         Member row = Member.builder().name("synthetic").email("search-" + UUID.randomUUID() + "@example.test")

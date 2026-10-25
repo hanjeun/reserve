@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Called by the existing approved release workflow. Never changes DNS or provider settings.
+# 승인된 릴리스에서만 실행하며 DNS나 공급자 설정은 변경하지 않는다.
 OPERATION=${1:?operation required}
 RELEASE=${2:?release SHA required}
 [[ "$RELEASE" =~ ^[0-9a-f]{40}$ ]] || { echo 'Invalid domain release SHA'; exit 1; }

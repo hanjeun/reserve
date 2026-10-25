@@ -91,16 +91,11 @@ describe('shared wordmark and result search header', () => {
     it.each(['/stores', '/waiting'])('edits only the current list and leaves the separate global entry blank at %s', async path => {
         const original = path + '?keyword=' + encodeURIComponent('카페 안산') + '&view=list&sort=reviewCount&page=2';
         render(<MemoryRouter initialEntries={[original]}><Header /><CurrentListSearch /><CurrentRoute /></MemoryRouter>);
-        const query = screen.getByRole('button', { name: '목록 검색어 수정: 카페 안산' });
+        expect(screen.queryByRole('button', { name: /목록 검색어 수정/ })).toBeNull();
         const input = screen.getByPlaceholderText('현재 목록 검색');
-        Object.defineProperty(input, 'getClientRects', { configurable: true, value: () => [{}] });
-        input.scrollIntoView = vi.fn();
-        expect(query).toHaveClass('reserve-header-query');
-        expect(query.textContent).toBe('카페 안산'); expect(query).not.toHaveAttribute('href');
-        expect(screen.getByRole('banner')).toHaveClass('reserve-header-has-query');
+        expect(screen.getByRole('banner')).not.toHaveClass('reserve-header-has-query');
+        expect(screen.getByRole('link', { name: 'RESERVE 홈' })).toBeVisible();
         expect(screen.getByRole('link', { name: '통합 검색' })).toHaveAttribute('href', '/search');
-        fireEvent.click(query);
-        expect(input).toHaveFocus(); expect(input.scrollIntoView).toHaveBeenCalledWith({ block: 'center', behavior: 'instant' });
         expect(screen.getByLabelText('현재 경로').textContent).toBe(original);
         fireEvent.change(input, { target: { value: '공방' } });
         fireEvent.keyDown(input, { key: 'Enter' });
@@ -173,13 +168,11 @@ describe('shared wordmark and result search header', () => {
         expect(screen.queryByRole('button', { name: '목록 검색어 수정: 공방' })).toBeNull();
     });
 
-    it('renders a list query as text and never embeds it in the global link', () => {
+    it('does not render a list query in the header or embed it in the global link', () => {
         const term = '<img src=x onerror=alert(1)> & 공방';
         renderHeader('/stores/?keyword=' + encodeURIComponent(term));
-        const query = screen.getByRole('button', { name: '목록 검색어 수정: ' + term });
-        expect(query.querySelector('.reserve-header-query-text').textContent).toBe(term);
-        expect(query.querySelector('img')).toBeNull();
-        expect(query).not.toHaveAttribute('href');
+        expect(screen.queryByText(term)).toBeNull();
+        expect(screen.getByRole('banner')).not.toHaveClass('reserve-header-has-query');
         expect(screen.getByRole('link', { name: '통합 검색' })).toHaveAttribute('href', '/search');
     });
 

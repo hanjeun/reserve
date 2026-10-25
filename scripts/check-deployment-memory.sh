@@ -2,9 +2,8 @@
 set -euo pipefail
 export LC_ALL=C
 
-# Initial Blue/Green policy, not a capacity guarantee. Swap is never counted as available RAM.
-# Call immediately before starting/recreating the same fixed target slot, never before a third app.
-# A running target already occupies RAM: budget only its remaining growth plus the full spare.
+# 대상 Blue/Green 슬롯을 기동하기 직전에 확인하며, 세 번째 앱 기동에는 사용하지 않는다.
+# 대상의 추가 메모리와 여유분을 실제 RAM으로 계산한다. 스왑은 포함하지 않는다.
 die() { printf '[deployment-memory] %s\n' "$1" >&2; exit 1; }
 [[ $# == 2 ]] || die 'usage: check-deployment-memory.sh LIVE TARGET (blue/green)'
 live=$1
@@ -17,7 +16,7 @@ bounded() {
     local remaining=$((deadline - SECONDS))
     (( remaining > 0 )) || return 124
     (( remaining <= 5 )) || remaining=5
-    # Only the read-only CLI child is bounded; no container/service stop or mutation is issued.
+    # 조회 명령의 실행 시간만 제한하며 컨테이너나 서비스를 변경하지 않는다.
     timeout --signal=TERM --kill-after=1s "${remaining}s" "$@" 2>/dev/null
 }
 

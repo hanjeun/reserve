@@ -58,6 +58,25 @@ class SearchApiSecurityTest {
     @Test void invalidInputNeverReachesADatabaseSource() throws Exception {
         mvc.perform(get("/api/search").param("keyword", "x".repeat(101))).andExpect(status().isBadRequest());
         mvc.perform(get("/api/search").param("keyword", "x").param("limit", "6")).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/search").param("keyword", "any").param("scope", "all").param("term", ""))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(sources);
+    }
+    @Test void scopedPrivateSearchStillUsesOnlyThePrincipalAndRejectsUnsupportedFilters() throws Exception {
+        var member = Member.builder().id(7L).role(Role.USER).build();
+        var auth = new UsernamePasswordAuthenticationToken(member, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        mvc.perform(get("/api/search/me").with(authentication(auth)).param("keyword", "내일 예약").param("scope", "reservations")
+                .param("term", "").param("date", "2026-10-26").param("memberId", "99"))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")));
+        verify(sources).reservations(argThat(query -> query.scope().equals("reservations") && query.term().isEmpty()
+                && query.date().toString().equals("2026-10-26")), eq(7L));
+        verify(sources, never()).waiting(any(), any()); verify(sources, never()).messages(any(), any(), anyBoolean());
+        clearInvocations(sources);
+        mvc.perform(get("/api/search").param("keyword", "공방").param("scope", "admin")).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/search").param("keyword", "공방").param("scope", "stores").param("date", "2026-02-30"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/search/me").param("keyword", "내일 예약").param("scope", "reservations").param("term", ""))
+                .andExpect(status().isUnauthorized());
         verifyNoInteractions(sources);
     }
     @Test void emergencyPreservesOnlyPersonalSearchAndTheExistingWaitingRead() {

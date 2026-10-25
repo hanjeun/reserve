@@ -6,8 +6,7 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
-  # dev·main 대상 PR을 검증하고 배포는 main push에서만 실행한다.
-  # dev push는 같은 PR 검증을 중복 실행하지 않도록 제외한다.
+  # PR에서 검증하고 서버 변경은 main push에서만 수행한다.
   pull_request:
     branches: [ "main", "dev" ]
   workflow_dispatch:
@@ -108,7 +107,7 @@ jobs:
         run: ./scripts/design-system-snapshot.ps1 -Stage Verify -InstallGitGuard
       - name: Validate operations scripts
         run: |
-          node --test scripts/tests/observability-config.test.mjs scripts/tests/deployment-memory.test.mjs scripts/tests/release-schema-readonly.test.mjs
+          node --test scripts/tests/observability-config.test.mjs scripts/tests/deployment-memory.test.mjs scripts/tests/release-schema-readonly.test.mjs scripts/tests/backup-engine.test.mjs
           bash -n scripts/backup-mysql.sh
           bash -n scripts/restore-mysql.sh
           bash -n scripts/verify-post-deploy-readonly.sh
@@ -171,13 +170,12 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  # 1. 백엔드 빌드 + Docker 이미지 푸시
   build-backend:
     permissions:
       contents: read
       actions: read
     needs: [test-backend, build-frontend]
-    # 필수 build 체크가 의존 테스트 실패를 skipped/success로 숨기지 않게 직접 실패시킨다.
+    # 의존 검사 실패가 필수 빌드의 성공이나 건너뜀으로 가려지지 않도록 직접 확인한다.
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     steps:
@@ -202,7 +200,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "frontend-release-$GITHUB_SHA" --dir frontend/dist
 
-      # 앞 단계가 성공해야 패키징한다. test를 다시 실행하거나 -x test로 우회하지 않는다.
+      # 성공한 테스트 입력을 포장하며 테스트를 반복하거나 우회하지 않는다.
       - name: Package backend bootJar
         id: backend_package
         working-directory: backend
@@ -242,7 +240,7 @@ jobs:
           docker push "$DOCKERHUB_USERNAME/reserve:sha-$COMMIT_SHA"
           docker push "$DOCKERHUB_USERNAME/reserve:latest"
 
-  # 2. 프론트엔드 빌드 + 실행 ID에 묶인 dist 아티팩트. 서버 쓰기는 stage-release에만 둔다.
+  # 빌드 산출물을 실행 SHA에 묶으며 서버 쓰기는 준비 작업과 배포 작업으로 제한한다.
   build-frontend:
     needs: test-frontend
     if: ${{ always() && !cancelled() }}
@@ -266,7 +264,6 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      # .env.production 파일을 GitHub Secrets로 생성
       - name: Create .env.production
         working-directory: frontend
         env:
@@ -373,7 +370,6 @@ jobs:
           source: "scripts/domain-release.sh"
           target: "/home/ubuntu"
           strip_components: 1
-      # 빌드 결과물(dist/)을 EC2로 전송
       - name: Deploy frontend to EC2
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
@@ -386,7 +382,6 @@ jobs:
           target: "/home/ubuntu/reserve-frontend-${{ github.sha }}"
           strip_components: 2
 
-      # nginx 설정 파일 EC2로 전송
       - name: Deploy nginx config
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
@@ -434,7 +429,7 @@ jobs:
             test ! -L "$RELEASE_DIR"
             sudo mkdir -p "$RELEASE_ROOT"
             if [ -d "$RELEASE_DIR" ]; then
-              # A retry must contain the same build, including its domain configuration.
+              # 재시도에서도 도메인 설정을 포함해 같은 산출물인지 확인한다.
               diff -qr --exclude=assets --exclude=reserve-assets.sha256 "$UPLOAD_DIR" "$RELEASE_DIR"
               OWNED_RECORDS=$(cd "$UPLOAD_DIR" && find assets -mindepth 1 -maxdepth 1 -type f -print0 | sort -z | xargs -0 -r sha256sum --binary)
               test -n "$OWNED_RECORDS"
@@ -449,14 +444,13 @@ jobs:
               sudo chown -R nginx:nginx "$INCOMING_DIR" 2>/dev/null || true
               sudo mv "$INCOMING_DIR" "$RELEASE_DIR"
             fi
-            # Verify the marker shipped with the build; never relabel an existing release.
+            # 빌드에 포함된 식별자를 검증하며 기존 릴리스의 식별자는 바꾸지 않는다.
             test "$(tr -d '\r\n' < "$RELEASE_DIR/release-id.txt")" = "$FRONTEND_RELEASE"
             if [ "$RESERVE_DOMAIN_SPLIT" = true ]; then
               sudo bash /home/ubuntu/domain-release.sh stage "$FRONTEND_RELEASE"
             fi
 
-            # 공용 default.conf 이름을 그대로 두면 재실행 때 다른 SHA 템플릿과 섞일 수 있다.
-            # 배포 SHA에 묶인 읽기 전용 후보로 고정하고, 아직 nginx에는 적용하지 않는다.
+            # 다른 SHA의 설정과 섞이지 않도록 후보 파일명을 배포 SHA에 고정한다.
             test -f /home/ubuntu/default.conf
             install -m 0644 /home/ubuntu/default.conf "$NGINX_TEMPLATE"
             rm -f /home/ubuntu/default.conf
@@ -469,10 +463,8 @@ jobs:
             echo "Frontend staged at $RELEASE_DIR; live configuration is unchanged"
             RESERVE_STAGE
 
-  # 3. Blue/Green 백엔드 배포 (프론트엔드 배포까지 완료된 뒤 실행)
   deploy-backend:
-    # production Environment의 자동 기록만 사용한다. 수동 createDeployment는 중복을 만든다.
-    # 잡 권한이 기본값을 대체하므로 체크아웃에 필요한 contents: read도 명시한다.
+    # production 환경의 자동 배포 기록만 사용하고 체크아웃에 필요한 읽기 권한을 유지한다.
     permissions:
       contents: read
       deployments: write
@@ -485,9 +477,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # nginx service-env.inc를 live 정본으로 읽고 해당 컨테이너의 내부 health와 교차 확인한다.
-      # 양쪽 컨테이너가 모두 정상일 수 있으므로 health 응답 순서로 live를 추측하지 않는다.
-      # 앱 포트를 외부에 열지 않고 SSH 안에서 확인하며 판별 실패 시 배포를 중단한다.
+      # SSH 안에서 nginx의 실제 연결 대상과 내부 health를 대조한다.
+      # 양쪽 앱이 모두 정상일 수 있으므로 health 응답 순서로 대상을 추측하지 않는다.
       - name: Detect active upstream (inside server)
         id: detect
         env:
@@ -502,8 +493,7 @@ jobs:
         run: |
           CURRENT_UPSTREAM="$DETECTED_UPSTREAM"
 
-          # 판별 자체가 실패했으면(출력 파싱 불가) 배포를 멈춘다.
-          # 여기서 조용히 none으로 넘어가면 예전과 똑같이 매번 blue를 덮어쓰게 된다.
+          # 실제 연결 대상을 알 수 없으면 기존 앱을 덮어쓰지 않도록 중단한다.
           if [ -z "$CURRENT_UPSTREAM" ]; then
             echo "::error::Failed to detect active upstream from SSH output"
             exit 1
@@ -529,7 +519,6 @@ jobs:
             ;;
           esac
 
-  # SSH 접속 정보 (AWS Lightsail — 변수명은 EC2 시절 레거시, 실제론 Lightsail)
       - name: Deploy docker-compose files to EC2
         uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
         with:
@@ -607,11 +596,9 @@ jobs:
           envs: IMAGE_TAG,DOCKERHUB_USERNAME,JWT_SECRET_KEY,OAUTH_UNLINK_ENCRYPTION_KEY,OAUTH_PROVIDER_TOKEN_ENCRYPTION_ENABLED,OAUTH_PROVIDER_TOKEN_ENCRYPTION_KEY,OAUTH_SECURITY_EVENTS_GOOGLE_ENABLED,OAUTH_SECURITY_EVENTS_KAKAO_ENABLED,OAUTH_SECURITY_EVENTS_NAVER_ENABLED,KAKAO_APP_ID,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,RESEND_API_KEY,PORTONE_V2_SECRET,PORTONE_STORE_ID,PORTONE_WEBHOOK_SECRET,QR_TOKEN_SECRET,DB_APP_PASSWORD,MAIL_FROM,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,S3_BUCKET_NAME,CLOUDFRONT_DOMAIN,SENTRY_DSN,KAKAO_REST_API_KEY,HOLIDAY_API_KEY,TOURISM_API_SERVICE_KEY,CHAT_IMAGE_ENCRYPTION_KEY,FEED_ENABLED,FEED_INTERACTIONS_ENABLED,STORE_NEWS_ENABLED,RESERVE_DOMAIN_SPLIT,FEED_IMAGE_ENCRYPTION_KEY,CHAT_RETENTION_ENABLED,CHAT_RETENTION_NOTICE_PUBLISHED_AT,CHAT_RETENTION_ACCESS_AUDIT_YEARS,WAITING_RETENTION_ENABLED,WAITING_RETENTION_NOTICE_PUBLISHED_AT,WAITING_CUSTOMER_RETENTION_NOTICE_PUBLISHED_AT,RESERVE_REDIS_ENABLED,RESERVE_REDIS_HOST,RESERVE_REDIS_PORT,RESERVE_REDIS_PASSWORD,RESERVE_REDIS_USERNAME,RESERVE_SERVICE_ADMISSION_ENABLED,RESERVE_SERVICE_ADMISSION_CAPACITY,RESERVE_SERVICE_ADMISSION_SESSION_SECONDS,RESERVE_SERVICE_ADMISSION_MAX_SESSION_SECONDS,RESERVE_SERVICE_ADMISSION_HEARTBEAT_TIMEOUT_SECONDS,RESERVE_SERVICE_ADMISSION_MAX_WAITING,RESERVE_SERVICE_ADMISSION_EPOCH,RESERVE_SERVICE_ADMISSION_AUTOMATIC_ENABLED
           script: |
             set -e
-            # 커밋 SHA로 고정된 이미지를 배포한다. :latest는 언제든 다른 커밋으로 바뀔 수 있어
-            # "지금 뜬 게 어느 커밋인지"를 사후에 특정할 수 없었다.
-            # compose 파일은 ${IMAGE_TAG:-latest}로 읽으므로 미설정 시 기존 동작(:latest)으로 폴백한다.
+            # latest가 가리키는 이미지가 바뀌어도 같은 입력을 유지하도록 SHA 태그를 명시한다.
             : "${DB_APP_PASSWORD:?DB_APP_PASSWORD is required for deployment}"
-            # A missing new Actions secret must not shadow an existing protected server .env key.
+            # 빈 Actions 비밀값으로 서버의 보호된 기존 키를 가리지 않는다.
             if [ -z "${OAUTH_UNLINK_ENCRYPTION_KEY:-}" ]; then
               unset OAUTH_UNLINK_ENCRYPTION_KEY
             fi
@@ -774,7 +761,7 @@ jobs:
             test -f "$RELEASE_DIR/index.html"
             test -f "$NGINX_TEMPLATE"
 
-            # Refuse cutover before changing routing if either image cannot retain the new contract.
+            # 후보와 복구 이미지가 모두 같은 계약을 지원해야 경로를 전환한다.
             LIVE_ROUTING=$(sudo docker exec nginxserver cat /etc/nginx/conf.d/service-env.inc | tr -d '\r\n')
             if [ "$LIVE_ROUTING" != "set \$service_url $CURRENT_UPSTREAM;" ]; then
               echo "Live routing changed after upstream detection; refusing cutover"
@@ -1014,8 +1001,7 @@ jobs:
             esac
             RESERVE_ROLLBACK
 
-      # 새 릴리스는 이미 smoke를 통과했다. 여기서 SSH가 끊겨도 live를 되돌리기보다
-      # 이전 컨테이너를 남겨 다음 운영 점검에서 정리하는 편이 안전하다.
+      # 새 릴리스 확인 후 정리 실패는 활성 버전을 되돌리지 않으며 남은 컨테이너는 후속 점검한다.
       - name: Stop old server (best effort)
         if: success()
         continue-on-error: true
@@ -1026,8 +1012,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
           script: |
-            # 최초 기동처럼 이전 컨테이너가 없는 경우 CURRENT_UPSTREAM=none 이다.
-            # `docker stop none`은 매번 에러를 뱉으므로(예전 로그를 오래 오염시켰다) 건너뛴다.
+            # 이전 컨테이너가 없는 경우에는 정리를 건너뛴다.
             if [ "${{ env.CURRENT_UPSTREAM }}" = "none" ]; then
               echo "No previous container to stop (first deploy or both were down)"
             else

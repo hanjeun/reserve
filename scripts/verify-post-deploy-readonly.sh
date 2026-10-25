@@ -1,15 +1,7 @@
 #!/usr/bin/env bash
-#
-# RESERVE 배포 후 DB 구조와 운영 큐를 읽기 전용으로 점검한다.
-#
-#   sudo RESERVE_VERIFY_ENV=/etc/reserve-backup.env \
-#     /usr/local/bin/reserve-post-deploy-verify
-#   DDL 11/12/13 후보 적용 후에만 RESERVE_VERIFY_WAITING_SIGNUP_SCHEMA=1을 추가한다.
-#   로그인 수단·기기 세션·예약 멱등성 DDL 준비 후에는 RESERVE_VERIFY_AUTH_ADMISSION_SCHEMA=1을 추가한다.
-#   이 추가 검사는 실제 릴리스 JAR의 Hibernate validate를 대체하지 않는다.
-#
-# 이 스크립트는 테이블·컬럼·인덱스와 현재 큐 상태만 조회한다. PortOne 재조회,
-# 웹훅 재처리, S3 객체 삭제, READY 결제 상태 변경은 의도적으로 하지 않는다.
+# 운영 큐와 스키마만 조회하며 실제 결제·재처리·삭제·보정은 수행하지 않는다.
+# 해당 DDL 준비 후 RESERVE_VERIFY_WAITING_SIGNUP_SCHEMA=1 또는 RESERVE_VERIFY_AUTH_ADMISSION_SCHEMA=1로 추가 검사한다.
+# 추가 SQL 검사는 실제 릴리스 JAR의 Hibernate validate를 대체하지 않는다.
 
 set -euo pipefail
 
@@ -108,8 +100,7 @@ require_index_contract() {
 require_enum_check() {
     local table="$1" constraint="$2" column="$3"
     shift 3
-    # MySQL emits charset introducers and, on some servers, escaped literal quotes.
-    # Match only the declared IN list; additional expressions and NOT ENFORCED fail.
+    # MySQL의 문자셋 접두사·따옴표 이스케이프는 허용하되 추가 조건과 비활성 CHECK는 거부한다.
     local quote="[\\\\]?'" charset="(_utf8mb4|_utf8mb3|_utf8|_latin1|_ascii|_binary)?"
     local pattern="^[[:space:]]*[(]*[[:space:]]*\`?${column}\`?[[:space:]]+[iI][nN][[:space:]]*[(][[:space:]]*"
     local separator="" value
@@ -164,7 +155,7 @@ require_index oauth_unlink_task idx_oauth_unlink_retry
 require_index marketing_consent_history idx_marketing_consent_member_created
 require_index refresh_token idx_refresh_token_previous_hash
 
-# 기존 운영 점검은 그대로 유지한다. 승인된 프리뷰 후보가 배포된 뒤에만 추가 구조를 요구한다.
+# 해당 후보를 배포한 경우에만 추가 스키마를 요구한다.
 if [[ "${RESERVE_VERIFY_PREVIEW_SCHEMA:-0}" = "1" ]]; then
     for table in ad_payment_attempt chat_room chat_message chat_report chat_intro chat_intro_item; do
         require_table "$table"
@@ -180,7 +171,7 @@ if [[ "${RESERVE_VERIFY_PREVIEW_SCHEMA:-0}" = "1" ]]; then
     require_index chat_room idx_chat_room_store_type
     require_index chat_report uk_chat_report_key
     require_index chat_intro uk_chat_intro_scope
-    # 기존 MySQL ENUM에 OWNER가 없으면 health는 200이어도 사장님 첫 답장이 실패한다.
+    # health 응답만으로 드러나지 않는 사장님 발신자 ENUM 계약을 확인한다.
     CHAT_SENDER_TYPE="$(mysql_query "SELECT column_type FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'chat_message' AND column_name = 'sender_role';")"
     if [[ "$CHAT_SENDER_TYPE" == enum\(* ]]; then
         [[ "$CHAT_SENDER_TYPE" == *"'ADMIN'"* && "$CHAT_SENDER_TYPE" == *"'MEMBER'"* && "$CHAT_SENDER_TYPE" == *"'OWNER'"* ]] \

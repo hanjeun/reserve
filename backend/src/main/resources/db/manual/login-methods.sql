@@ -1,5 +1,5 @@
--- Manual, additive preparation. Apply with the approved DDL role before deploying the matching application.
--- Existing member IDs, roles, provider links and business/transaction foreign keys are preserved.
+-- 대응 앱 배포 전에 승인된 DDL 계정으로 추가하는 수동 준비 SQL이다.
+-- 기존 회원 ID·역할·제공자 연결과 사업·거래 외래 키는 보존한다.
 ALTER TABLE member ADD COLUMN login_methods_managed BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE TABLE login_method_challenge (

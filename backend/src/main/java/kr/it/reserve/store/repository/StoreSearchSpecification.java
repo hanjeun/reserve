@@ -45,6 +45,13 @@ public final class StoreSearchSpecification {
                 0.0));
     }
 
+    /** 후보에서 빠진 원문 일치 행만 찾으며 NULL 점수도 누락으로 본다. */
+    public static Specification<Store> withoutFulltextCandidate(Specification<Store> literalSearch, String candidate) {
+        return literalSearch.and((root, query, builder) -> builder.lessThanOrEqualTo(builder.coalesce(
+                builder.function("store_search_match", Double.class, root.get("name"), root.get("description"),
+                        root.get(ADDRESS_FIELD), root.get(CATEGORY_FIELD), root.get("keywords"), builder.literal(candidate)), 0.0), 0.0));
+    }
+
     public static Specification<Store> publicSearch(
             String keyword,
             String sort,

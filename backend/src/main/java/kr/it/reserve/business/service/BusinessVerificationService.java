@@ -39,9 +39,6 @@ public class BusinessVerificationService {
     private final EmailService emailService;
     private final AuditLogService auditLogService;
 
-    /**
-     * 사업자 인증 신청
-     */
     @Transactional
     public BusinessVerificationResponse submitVerification(Member member, BusinessVerificationRequest request) {
         Member activeMember = memberRepository.findActiveByIdForUpdate(member.getId())
@@ -285,8 +282,6 @@ public class BusinessVerificationService {
     public long getPendingCount() {
         return verificationRepository.countByStatus(VerificationStatus.PENDING);
     }
-
-    // --- Helper Methods ---
 
     private BusinessVerification findVerificationOrThrow(Long id) {
         return verificationRepository.findById(id)

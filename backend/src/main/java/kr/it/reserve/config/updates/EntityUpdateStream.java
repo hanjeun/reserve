@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
-/** A bounded, ephemeral stream: every ready event requires REST reconciliation, never event replay. */
+/** 유실 구간을 재생하지 않는 제한된 임시 스트림이다. ready 뒤에는 REST로 상태를 다시 확인한다. */
 @Component
 public class EntityUpdateStream {
     static final int MAX_SUBSCRIBERS = 256;
@@ -66,7 +66,15 @@ public class EntityUpdateStream {
     }
 
     public SseEmitter subscribe(Member member, LocalDateTime oauthAuthenticatedAt) {
-        var identity = UpdateStreamAccess.identity(member, oauthAuthenticatedAt);
+        return subscribe(member, oauthAuthenticatedAt, null);
+    }
+
+    public SseEmitter subscribe(Member member, LocalDateTime oauthAuthenticatedAt, String loginMethod) {
+        return subscribe(member, oauthAuthenticatedAt, loginMethod, null);
+    }
+
+    public SseEmitter subscribe(Member member, LocalDateTime oauthAuthenticatedAt, String loginMethod, String sessionId) {
+        var identity = UpdateStreamAccess.identity(member, oauthAuthenticatedAt, loginMethod, sessionId);
         if (identity == null || !access.current(identity)) {
             throw new MemberException("로그인 상태와 약관 동의를 확인해주세요.", HttpStatus.FORBIDDEN);
         }
@@ -104,7 +112,7 @@ public class EntityUpdateStream {
 
     @EventListener
     public synchronized void relayReconnected(RedisEntityUpdateRelay.Reconnected ignored) {
-        // Pub/Sub cannot replay a disconnected interval; the next ready performs authorized REST reconciliation.
+        // Pub/Sub의 끊긴 구간은 재생되지 않으므로 ready 뒤에 권한 있는 REST 조회로 동기화한다.
         disconnectAll();
     }
 
@@ -167,7 +175,7 @@ public class EntityUpdateStream {
 
     private void complete(SseEmitter emitter) {
         try { emitter.complete(); }
-        catch (IllegalStateException disconnected) { /* Already closed by the Servlet container. */ }
+        catch (IllegalStateException disconnected) { /* 서블릿 컨테이너가 이미 연결을 닫았다. */ }
     }
 
     private void send(SseEmitter emitter, String name, Object data, String id) {

@@ -47,7 +47,7 @@ for size in (512,768):
 
 (ROOT/'previews').mkdir(exist_ok=True)
 for theme,color,ink in [('light','#FFFFFF','#223047'),('dark','#161C27','#E8EEF7')]:
-    # Actual 48 and 64-pixel canvases, not enlarged screenshots of small icons.
+    # 48·64픽셀의 실제 출력 크기로 확인용 캔버스를 만든다.
     small = Image.new('RGB',(960,260),color)
     draw = ImageDraw.Draw(small)
     draw.text((20,12),'Actual icon canvas: 48 px (top) / 64 px (bottom)',fill=ink)
@@ -60,7 +60,7 @@ for theme,color,ink in [('light','#FFFFFF','#223047'),('dark','#161C27','#E8EEF7
             small.paste(icon,(x,y),icon)
             draw.text((index*160+28,y+size+9),f'{name} {size}px',fill=ink)
     small.save(ROOT/'previews'/f'{theme}-actual-48-64.png',optimize=True)
-    # A larger overview lets reviewers see materials and silhouette details.
+
     large = Image.new('RGB',(1296,256),color)
     draw = ImageDraw.Draw(large)
     for index,name in enumerate(NAMES):

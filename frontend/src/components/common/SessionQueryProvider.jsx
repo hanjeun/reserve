@@ -9,7 +9,7 @@ const SessionQueryProvider = ({ children }) => {
         queryCache: new QueryCache({ onError: clearDeniedQueryData }),
         defaultOptions: {
             queries: { staleTime: 1000 * 60 * 3, gcTime: 1000 * 60 * 10,
-                retry: (count, error) => !isReadAccessDenied(error) && count < 1, refetchOnWindowFocus: false },
+                retry: (count, error) => !isReadAccessDenied(error) && !error?.isServiceAdmissionRequired && count < 1, refetchOnWindowFocus: false },
         },
     }));
     useEffect(() => () => { client.clear(); }, [client]);

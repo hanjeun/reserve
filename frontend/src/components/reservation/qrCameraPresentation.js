@@ -1,5 +1,5 @@
 export const cameraFailurePresentation = error => {
-    // html5-qrcode wraps getUserMedia failures in a string, while browsers use DOMException.
+    // html5-qrcode의 문자열 오류와 브라우저 DOMException을 함께 분류한다.
     const name = error?.name || String(error || '').match(/\b(NotAllowedError|PermissionDeniedError|NotReadableError|TrackStartError|NotFoundError|OverconstrainedError)\b/)?.[1] || '';
     if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
         return { icon: 'camera-denied', message: '카메라 권한이 거부됐어요. 브라우저 설정에서 허용한 뒤 다시 시도해주세요.' };

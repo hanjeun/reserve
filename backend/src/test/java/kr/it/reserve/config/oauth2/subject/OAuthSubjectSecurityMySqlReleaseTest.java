@@ -19,8 +19,10 @@ import kr.it.reserve.config.oauth2.events.VerifiedOAuthSecurityEvent;
 import kr.it.reserve.member.entity.AuthProvider;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.repository.MemberRepository;
+import kr.it.reserve.member.service.LoginMethodService;
 import kr.it.reserve.member.service.MemberService;
 import kr.it.reserve.member.service.MemberWithdrawalService;
+import kr.it.reserve.email.service.EmailService;
 import kr.it.reserve.email.service.EmailVerificationService;
 import kr.it.reserve.file.service.FileStorageService;
 import kr.it.reserve.file.service.FileDeletionOutboxService;
@@ -44,7 +46,7 @@ import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -78,7 +80,7 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
-/** One disposable, synthetic MySQL fixture. No restored data, provider API or real account is accepted. */
+/** 일회성 합성 MySQL만 사용하며 복원 데이터·제공자 API·실제 계정은 허용하지 않는다. */
 @EnabledIfEnvironmentVariable(named = "RESERVE_MYSQL_OAUTH_TEST_ISOLATED", matches = "1")
 @DataJpaTest(showSql = false, properties = {
         "oauth.provider-tokens.encryption-enabled=true",
@@ -87,7 +89,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({OAuthProviderTokenCipher.class, OAuthProviderTokenConverter.class, CustomOAuth2UserService.class,
         OAuthSessionIssuer.class, TokenProvider.class, OAuthSecurityEventTransaction.class,
-        OAuthSecurityEventService.class, MemberService.class, MemberWithdrawalService.class,
+        OAuthSecurityEventService.class, LoginMethodService.class, MemberService.class, MemberWithdrawalService.class,
         OAuthUnlinkOutboxService.class, OAuthUnlinkTokenCipher.class, FileDeletionOutboxService.class,
         OAuthSubjectSecurityMySqlReleaseTest.Fixture.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -108,7 +110,8 @@ class OAuthSubjectSecurityMySqlReleaseTest {
     @Autowired FileDeletionTaskRepository fileTasks;
     @MockitoSpyBean MemberService core;
     @MockitoSpyBean MemberRepository members;
-    @MockitoBean PasswordEncoder passwordEncoder;
+    @MockitoBean BCryptPasswordEncoder passwordEncoder;
+    @MockitoBean EmailService email;
     @MockitoBean EmailVerificationService emailVerification;
     @MockitoBean FileStorageService storage;
     @MockitoBean DataLifecycleGuard lifecycle;
@@ -167,7 +170,7 @@ class OAuthSubjectSecurityMySqlReleaseTest {
         });
         clock.time.set(NOW);
         doAnswer(invocation -> {
-            // The actual SimpleJpaRepository.flush operation, with a post-INSERT coordination point.
+            // 실제 flush를 수행하고 INSERT 뒤에 동시성 조정 지점을 둔다.
             entityManager.flush();
             Runnable action = afterNextFlush.getAndSet(null);
             if (action != null) action.run();
@@ -177,7 +180,7 @@ class OAuthSubjectSecurityMySqlReleaseTest {
         provider = MockRestServiceServer.createServer(rest);
         provider.expect(ExpectedCount.manyTimes(), requestTo("https://provider.invalid/userinfo"))
                 .andRespond(withSuccess("{\"sub\":\"" + SUBJECT + "\",\"email\":\"synthetic-oauth@example.invalid\",\"name\":\"fixture\"}", APPLICATION_JSON));
-        // DefaultOAuth2UserService's final setter cannot be intercepted on the transaction proxy.
+        // 트랜잭션 프록시에서 final 설정자를 가로챌 수 없어 실제 대상에 설정한다.
         CustomOAuth2UserService target = AopTestUtils.getUltimateTargetObject(login);
         target.setRestOperations(rest);
     }
@@ -238,7 +241,7 @@ class OAuthSubjectSecurityMySqlReleaseTest {
         assertThat(retained.getAuthVersion()).isEqualTo(1);
         assertThat(retained.getOauthSecurityRevokedAt()).isEqualTo(time(NOW));
         assertThat(retained.getDeletedAt()).isNull();
-        // The success handler may run after loadUser committed; it must not recreate a refresh row.
+        // loadUser 커밋 뒤 콜백이 실행되어도 폐기된 세션을 다시 만들면 안 된다.
         assertThatThrownBy(() -> issuer.issue(principal)).isInstanceOf(OAuth2AuthenticationException.class);
         assertThat(refreshTokens.count()).isZero();
         assertThat(events.count()).isEqualTo(1);
@@ -281,7 +284,7 @@ class OAuthSubjectSecurityMySqlReleaseTest {
     @Test
     void aNewerLegacyAuthenticationHydratesAnEmptySubjectAndThePrincipalCannotBorrowALaterAuthentication() {
         CustomOAuth2User old = authenticate(NOW.minusSeconds(30), NOW.plusSeconds(3600));
-        // Simulate the lazy cutover from a pre-subject state using only synthetic data.
+        // 합성 데이터로 주체 연결 이전 상태에서의 전환을 재현한다.
         new TransactionTemplate(transactions).executeWithoutResult(status -> {
             subjects.deleteAllInBatch();
             Member member = members.findActiveByIdForUpdate(old.getId()).orElseThrow();

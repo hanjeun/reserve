@@ -84,7 +84,7 @@ public class StorePageService {
         if (value == null || value.isBlank()) return null;
         try {
             URI uri = new URI(value);
-            // Only this public store's managed photo is eligible; never signed/private URLs.
+            // 공개 가게의 관리 경로 사진만 사용하며 비공개·서명 URL은 제외한다.
             String path = uri.getPath();
             return "https".equals(uri.getScheme()) && uri.getHost() != null
                     && IMAGE_HOSTS.contains(uri.getHost().toLowerCase(Locale.ROOT))
@@ -111,7 +111,7 @@ public class StorePageService {
                 return url != null && positive(meta.getWidth()) && positive(meta.getHeight())
                         ? new ImageHint(url, meta.getWidth(), meta.getHeight()) : null;
             }
-            // Main thumbnail dimensions never describe an unmeasured detail photo.
+            // 대표 사진 크기를 측정하지 않은 상세 사진의 크기로 사용하지 않는다.
             return null;
         }
         String url = publicThumbnail(store);
@@ -140,7 +140,7 @@ public class StorePageService {
     private static String withImageHint(String html, StoreResponse store) {
         ImageHint image = coverImage(store);
         if (image == null) return html;
-        // Inert metadata, not executable code or a full/private DTO. The SPA checks the store id again.
+        // 실행 코드나 비공개 DTO가 아닌 메타데이터만 담고 화면에서 가게 ID를 다시 확인한다.
         String hint = """
                 <meta name="reserve-store-image-id" content="%s" />
                 <meta name="reserve-store-image-url" content="%s" />
@@ -150,7 +150,7 @@ public class StorePageService {
                 """.formatted(store.getId(), escape(image.url()), image.width(), image.height(), escape(image.url()));
         Double layoutRatio = galleryLayoutRatio(store);
         if (layoutRatio != null) {
-            // Separate layout scalar: first-photo dimensions/preload and OG metadata keep their identities.
+            // 배치 값은 사진 크기·미리 읽기·OG 메타데이터와 별도로 유지한다.
             hint += "<meta name=\"reserve-store-image-layout-ratio\" content=\"" + layoutRatio + "\" />\n";
         }
         return html.replace("</head>", hint + "</head>");

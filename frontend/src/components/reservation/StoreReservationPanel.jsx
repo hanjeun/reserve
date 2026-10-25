@@ -11,6 +11,8 @@ import { VALIDATION_RULES } from '../../utils/validation';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import RollingFieldValue from '../../components/common/RollingFieldValue';
+import ReservationEntryNotice from './ReservationEntryNotice';
+import reservationService from '../../services/reservationService';
 
 const GuestCountInput = ({ value = 1, onChange, disabled = false }) => {
     const dec = () => { if (value > 1) onChange?.(value - 1); };
@@ -96,7 +98,7 @@ const useTimeSlotAvailability = ({ store, dateValue, form, onAvailabilityChange,
     const loading = requestKey != null && (!isCurrent || availability.status === 'loading');
     const slots = isCurrent && availability.status === 'success' ? availability.slots : [];
     const failed = isCurrent && availability.status === 'error';
-    // The displayed state and submit validator must observe the same lookup transition.
+    // 표시 상태와 제출 검증은 같은 시간 조회 상태를 사용한다.
     const commitAvailability = React.useCallback(next => {
         onAvailabilityChange?.(next);
         setAvailability({ ...next, request });
@@ -106,13 +108,16 @@ const useTimeSlotAvailability = ({ store, dateValue, form, onAvailabilityChange,
         if (!requestKey) return;
         let cancelled = false;
         const controller = new AbortController();
-        // Loading is derived from the request key; only the form's external validator needs notification.
+        // 로딩은 요청 키로 판별하고 외부 폼 검증기에만 변경을 알린다.
         onAvailabilityChange?.({ key: requestKey, status: 'loading', slots: [] });
-        api.get(API_ENDPOINTS.RESERVATION.AVAILABILITY, { params: { storeId, date: dateKey }, signal: controller.signal })
+        const lookup = editingReservation?.id != null
+            ? reservationService.getEditAvailability(editingReservation.id, storeId, dateKey, { signal: controller.signal })
+            : api.get(API_ENDPOINTS.RESERVATION.AVAILABILITY, { params: { storeId, date: dateKey }, signal: controller.signal });
+        lookup
             .then((data) => {
                 if (cancelled) return;
                 if (!Array.isArray(data)) throw new Error('Invalid availability results');
-                // An edit prefill survives a successful lookup only if the server still offers that time.
+                // 수정 초기값은 조회 성공 뒤에도 서버가 허용한 시간일 때만 유지한다.
                 clearUnofferedTime(form, data, storeId, dateKey, editingReservation);
                 commitAvailability({ key: requestKey, status: 'success', slots: data });
             })
@@ -124,22 +129,13 @@ const useTimeSlotAvailability = ({ store, dateValue, form, onAvailabilityChange,
         return () => { cancelled = true; controller.abort(); };
     }, [dateKey, storeId, requestKey, retryCount, form, editingReservation, commitAvailability, onAvailabilityChange]);
 
-    // 날짜가 바뀌면 이전에 고른 시간은 무조건 초기화.
-    // 2026-07 버그 수정: 예전엔 "새 날짜에 그 시간이 없거나 마감된 경우에만" 초기화해서,
-    // 우연히 새 날짜에도 같은 시간대(예: 15:00)가 비어있으면 사용자가 그 날짜에 대해 한 번도
-    // 클릭한 적 없는데도 계속 선택된 채로 남아있었음 — 예약은 날짜+시간이 한 세트로 재확인돼야
-    // 하므로, 날짜를 바꾸면(최초 마운트 제외) 항상 시간 선택을 비워서 새 날짜에 대해 다시
-    // 명시적으로 고르게 함.
-    //
-    // 2026-07 회귀 버그 수정: 처음엔 onChange?.(undefined)로 초기화했는데, 이건 Form.Item이
-    // 자동 주입한 onChange라서 호출하는 순간 AntD가 즉시 그 필드를 재검증함(validateTrigger
-    // 기본값이 onChange) — required 규칙에 걸려서 사용자가 아무것도 안 했는데 "시간을
-    // 선택해주세요" 에러가 날짜 바꾸자마자 튀어나왔음. form.setFields로 값만 조용히 비우고
-    // 에러도 명시적으로 지워서, 검증은 실제 제출 시에만 일어나게 함.
-    // Reset the time selection only when the date actually changes (previous date -> different date).
-    // A null -> date transition (user's first pick, or edit-mode prefill) must NOT reset, so a time value
-    // injected by edit prefill is preserved. The old isFirstRender approach cleared the prefilled time,
-    // because by the time the async prefill ran the first render had already passed.
+    // 날짜가 바뀌면 이전 시간 선택을 초기화한다.
+
+    // 빈 선택은 폼에서 값 삭제로 처리할 수 있도록 전달한다.
+
+    // 서로 다른 날짜로 바뀔 때만 선택 시간을 초기화한다.
+    // 첫 날짜 선택·수정 초기값 주입에서는 시간 값을 유지한다.
+
     const prevDateKeyRef = React.useRef(null);
     React.useEffect(() => {
         const prev = prevDateKeyRef.current;
@@ -162,13 +158,8 @@ export const TimeSlotPicker = ({ store, dateValue, value, onChange, form, onAvai
         store, dateValue, form, onAvailabilityChange, editingReservation,
     });
 
-    // ── 예약 방식 DAY (2026-08-24) ────────────────────────────────────────
-    // 서버가 슬롯을 딱 하나 내려준다("하루 = 슬롯 한 개"). 고를 게 없으므로 자동으로 채우고
-    // 그리드 대신 안내 한 줄만 보여준다.
-    //
-    // ★ 시간 칸을 아예 없애지 않는 이유 — 서버는 여전히 reservationTime 을 필수로 받는다.
-    //   칸을 지우면 값을 넣을 곳이 사라져서 화면마다 따로 채워 넣어야 하고, 그러면 빠뜨리는 곳이 생긴다.
-    //   같은 칸을 그대로 두고 **채우는 방법만** 바꾸는 쪽이 갈라지지 않는다.
+    // 날짜 단위 예약
+
     const isDayBooking = store?.bookingType === 'DAY';
     const onlySlot = isDayBooking ? slots[0] : null;
 
@@ -259,25 +250,14 @@ const TimeSlotPill = ({ slot, selected, selectable, onClick, delay }) => (
     </button>
 );
 
-/**
- * 시간 선택 자리표시자.
- *
- * ★ 2026-08-06 — 왜 컴포넌트로 뺐나
- *   이 칸은 AntD TimePicker 가 아니라 커스텀 div 다(시간은 pill 그리드로 고르므로).
- *   그래서 Form.Item 이 붙여주는 `ant-picker-status-error` 클래스가 존재하지 않았고,
- *   바로 위 "예약 날짜"(BookingCalendar)는 미입력 시 아이콘과 링이 빨개지는데
- *   "예약 시간"만 회색으로 남아 **같은 폼에서 두 칸이 다르게 반응**했다.
- *   → Form.Item.useStatus() 로 에러 상태를 직접 읽어 같은 언어로 반응시킨다.
- *
- *   타이포도 field 토큰으로 함께 맞춘다. 두 커스텀 표면 모두 글자와 아이콘 크기를 같은 값에서 읽는다.
+/*
+ * 기본 Picker가 아닌 표면은 Form.Item.useStatus로 필드 검증 상태를 반영한다.
  */
 const TimePlaceholder = ({ text }) => {
     const { status } = Form.Item.useStatus();
     const isError = status === 'error';
-    // 2026-09 수정 — 예전 주석은 "날짜 칸이 AntD DatePicker(filled)라 에러에도 선이 안 생기니
-    // 여기도 그리지 않는다"였다. 그런데 2026-08-25에 날짜 칸이 BookingCalendar 로 바뀌면서
-    // 그쪽은 빨간 링을 그리기 시작했고, 이 칸만 아이콘만 빨개져 같은 폼에서 두 칸이 다르게
-    // 반응했다(사용자 제보). 링은 field.errorRing 관문 하나를 같이 쓴다.
+    // 날짜 필드와 같은 오류 테두리·아이콘 규칙을 사용한다.
+
     return (
         <div style={{
             ...timeSlotStyles.placeholder,
@@ -296,7 +276,7 @@ const timeSlotStyles = {
     placeholder: {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         height: heights.input, padding: '0 11px', boxSizing: 'border-box',
-        // ★ 색을 하드코딩하지 말 것 — 여기 rgba(0,0,0,0.25)가 박혀 있어서 다크모드에서
+        // 색을 하드코딩하지 말 것 — 여기 rgba(0,0,0,0.25)가 박혀 있어서 다크모드에서
         //   배경만 어두워지고 글자는 검은색 그대로라 "날짜를 먼저 선택해주세요"가 안 보였다.
         //   colors.*는 var(--c-...) 문자열이라 브라우저가 페인트 시점에 테마별로 해석한다.
         //   colors.text.placeholder는 AntD의 colorTextPlaceholder와 같은 값이라
@@ -317,13 +297,16 @@ const timeSlotStyles = {
 
 export const ReservationPanel = ({
     store, form, onFinish, paying, isPC, isEditMode, editingReservation,
+    reservationEntry = null,
     editLoadError = null, editRetrying = false, onRetryEditLoad, preview = false,
 }) => {
     const dateValue = Form.useWatch('reservationDate', form);
+    const timeValue = Form.useWatch('reservationTime', form);
+    const entry = reservationEntry?.slot === `${store?.id}:${dateValue?.format('YYYY-MM-DD')}:${formatTime(timeValue)}` ? reservationEntry : null;
     const reservationStore = React.useMemo(() => preview ? { ...store, id: undefined } : store, [preview, store]);
     const timeAvailabilityRef = React.useRef({ key: /** @type {string | null} */ (null), status: 'idle', slots: [] });
-    // DAY auto-fill runs in the same effect batch as lookup completion. Validation must see that
-    // completion immediately, rather than the previous render's pending state.
+    // DAY 자동 입력과 조회 완료가 같은 효과 배치에 있어 완료 상태를 검증에 즉시 반영한다.
+
     const handleAvailabilityChange = React.useCallback(next => { timeAvailabilityRef.current = next; }, []);
     let submitLabel = isEditMode ? '예약 변경하기' : '예약 신청하기';
     if (paying) submitLabel = '처리 중...';
@@ -341,31 +324,20 @@ export const ReservationPanel = ({
                 <>
                     <Form.Item label="예약 날짜" name="reservationDate"
                         rules={[{ required: true, message: '날짜를 선택해주세요.' }]}>
-                        {/* ★ 2026-08-25 — AntD DatePicker 팝업에서 인라인 BookingCalendar 로 교체.
-                            예전에는 disabledDate 로 막았는데 그건 **회색밖에 못 칠한다** — 정기휴무,
-                            임시휴무, 운영기간 밖, 예약범위 초과, 정원 마감이 전부 같은 회색이라
-                            "왜 안 눌리지"를 알 방법이 없었다. 게다가 그 다섯 판정이 서버(isBookableOn)와
-                            **프론트에도 따로**(makeDisabledDate) 있어서 언젠가 어긋날 자리였다.
-                            이제 사유는 서버가 내려주고 달력은 그리기만 한다. */}
-                        <BookingCalendar storeId={reservationStore?.id} disabled={preview} />
+                        {/*
+                         * 예약 가능 여부·불가 사유는 서버 달력 응답을 표시하고 프론트에서 재판정하지 않는다.
+                         */}
+                        <BookingCalendar storeId={reservationStore?.id} reservationId={editingReservation?.id} disabled={preview} />
                     </Form.Item>
                     {/* 라벨·에러 문구가 예약 방식을 따라간다. DAY 는 시간을 고르는 게 아니라
                         "이 날 예약이 되는지"를 보는 칸이라, "시간을 선택해주세요"가 말이 안 된다. */}
                     <Form.Item
                         label={reservationTimeLabel(store?.bookingType)}
                         name="reservationTime"
-                        // 날짜를 고르기 전에는 이 칸에 넣을 값 자체가 없다(슬롯을 날짜로 조회한다).
-                        // 그런데도 required 를 걸어두면 아무것도 안 채우고 제출했을 때 날짜와 시간이
-                        // 동시에 빨개져서, 지금 고칠 수 없는 칸까지 고치라고 지시하게 된다.
-                        // 실제로 고쳐야 할 곳은 바로 위 날짜 칸 하나이고 그 칸이 이미 막고 있다.
-                        // (interactions.css 의 "비활성은 에러보다 우선한다"와 같은 규칙이다)
-                        //
-                        // ⚠️ dependencies={['reservationDate']} 를 붙이면 안 된다 — rc-field-form 은
-                        //    의존 필드가 바뀌는 즉시 이 칸을 재검증해서, 날짜를 고르자마자 아직 아무것도
-                        //    안 한 시간 칸에 "시간을 선택해주세요"가 튀어나온다(2026-07에 이미 한 번
-                        //    고쳤던 회귀다 — TimeSlotPicker 의 setFields 주석 참고).
-                        //    함수형 rule 은 검증 시점에 getFieldValue 로 최신 날짜를 직접 읽으므로
-                        //    dependencies 없이도 제출 때 올바르게 평가된다.
+                        // 시간 필수 검증은 날짜를 고른 경우에만 적용한다.
+
+                        // 의존 필드의 즉시 재검증 대신 제출 시 최신 날짜를 읽는다.
+
                         rules={[({ getFieldValue }) => ({
                             required: !!getFieldValue('reservationDate'),
                             message: store?.bookingType === 'DAY' ? '날짜를 선택해주세요.' : '시간을 선택해주세요.',
@@ -395,6 +367,7 @@ export const ReservationPanel = ({
                         <FormTextArea rows={3} placeholder="요청 사항을 입력하세요." disabled={preview} />
                     </Form.Item>
                     <div style={{ marginTop: 24 }}>
+                        {entry && <ReservationEntryNotice expiresAt={entry.expiresAt} />}
                         <Button variant="primary" htmlType={preview ? 'button' : 'submit'} block loading={paying} disabled={preview}>
                             {submitLabel}
                         </Button>

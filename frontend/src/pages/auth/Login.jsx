@@ -6,35 +6,16 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Form, Typography, Divider, Flex, Modal } from 'antd';
 import { ExclamationCircleFilled } from '../../components/common/icons';
 import { PageContainer, Button, FormInput } from '../../components/common';
+import SocialLoginButton from '../../components/common/SocialLoginButton';
 import { useMessage } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
-import { API_ENDPOINTS, API_BASE_URL } from '../../constants';
+import { API_ENDPOINTS } from '../../constants';
 import { VALIDATION_RULES } from '../../utils/validation';
 import { saveRedirect, safeRedirectPath, consumeLoginRedirect } from '../../utils/redirect';
-import { colors, radius, heights, fontSize } from '../../styles/tokens';
+import { oauthAuthorizationUrl } from '../../utils/oauthAuthorization';
+import { colors, fontSize } from '../../styles/tokens';
 
 const { Text } = Typography;
-
-const GoogleIcon = () => (
-    <svg width="20" height="20" viewBox="0 0 24 24">
-        <path fill="#4285F4" d="M23.745 12.27c0-.79-.07-1.54-.19-2.27h-11.3v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z" />
-        <path fill="#34A853" d="M12.255 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96h-3.98v3.09C3.515 21.3 7.565 24 12.255 24z" />
-        <path fill="#FBBC05" d="M5.525 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.62h-3.98a11.86 11.86 0 000 10.76l3.98-3.09z" />
-        <path fill="#EA4335" d="M12.255 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C18.205 1.19 15.495 0 12.255 0c-4.69 0-8.74 2.7-10.71 6.62l3.98 3.09c.95-2.85 3.6-4.96 6.73-4.96z" />
-    </svg>
-);
-
-const NaverIcon = () => (
-    <svg width="18" height="18" viewBox="0 0 24 24">
-        <path fill="currentColor" d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727v12.845z" />
-    </svg>
-);
-
-const KakaoIcon = () => (
-    <svg width="22" height="22" viewBox="0 0 24 24">
-        <path fill="#191919" d="M12 3C5.925 3 1 6.925 1 11.5c0 2.925 1.875 5.5 4.75 7.05l-.975 3.625c-.075.275.225.5.475.35l4.35-2.875c.775.125 1.575.2 2.4.2 6.075 0 11-3.925 11-8.75S18.075 3 12 3z" />
-    </svg>
-);
 
 const suspensionInfo = (status, until, reason) => ({
     title: status === 'BANNED' ? '영구 정지된 계정이에요' : '이용이 제한된 계정이에요',
@@ -76,6 +57,14 @@ const Login = () => {
 
     useEffect(() => {
         if (hasHandledRef.current) return;
+        const params = new URLSearchParams(location.search);
+        // 연결·재인증을 취소해도 기존 로그인은 유효하다. 오류를 먼저 알리고 보안 설정으로 돌려보낸다.
+        if (isLoggedIn && params.get('error') === 'oauth2') {
+            hasHandledRef.current = true;
+            message.error(params.get('message') || '소셜 로그인하지 못했어요. 다시 시도해주세요.');
+            navigate('/my-page', { replace: true });
+            return;
+        }
         // 계정 경계에서 재마운트돼도 원래 요청한 경로로 돌아간다.
         if (isLoggedIn) { navigate(consumeLoginRedirect(fromRef.current), { replace: true }); return; }
 
@@ -89,19 +78,13 @@ const Login = () => {
         if (location.state?.prevented) {
             hasHandledRef.current = true;
             message.warning('로그인이 필요한 서비스예요.');
-            // 2026-07 버그 수정: 예전엔 여기서 state를 통째로 비웠다({}).
-            // 그런데 그 state 안엔 PrivateRoute가 넣어준 from(원래 가려던 페이지)도 같이 들어 있어서,
-            // 안내 메시지를 띄우는 순간 복귀 경로가 사라지고 로그인 성공 후 항상 '/'로 가버렸다.
-            // (아래 onLoginSubmit에 navigate(from) 복귀 코드가 이미 있었는데도 이 한 줄 때문에 무력화)
-            // -> 메시지를 한 번만 띄우기 위해 prevented 플래그만 지우고 from은 그대로 남긴다.
+            // 로그인 화면 상태에서 복귀 경로를 보존한다.
+
             navigate('/login', { replace: true, state: { from: location.state.from } });
             return;
         }
 
-        // OAuth2 소셜 로그인 시 정지 처리 (URL 파라미터)
-        // 소셜 로그인은 브라우저가 따라가는 리다이렉트 흐름이라 URL 파라미터로 정보 전달
-        // 구조: ?suspended=true&status=SUSPENDED&until=2026-08-15
-        const params = new URLSearchParams(window.location.search);
+        // 정지 정보는 suspended·status·until 쿼리로 전달된다.
         const isSuspended = params.get('suspended') === 'true';
         const suspendStatus = params.get('status');    // 'SUSPENDED' | 'BANNED'
 
@@ -115,10 +98,10 @@ const Login = () => {
         const oauthMessage = params.get('message');
         if (oauthError === 'oauth2' && oauthMessage) {
             hasHandledRef.current = true;
-            message.error(decodeURIComponent(oauthMessage));
+            message.error(oauthMessage);
             window.history.replaceState({}, '', '/login');
         }
-    }, [isLoggedIn, location.state, navigate, message]);
+    }, [isLoggedIn, location.state, location.search, navigate, message]);
 
     const onLoginSubmit = async (values) => {
         setLoading(true);
@@ -154,7 +137,7 @@ const Login = () => {
         // 살아남지 못한다 — 떠나기 직전에 복귀 경로를 sessionStorage에 남긴다.
         // (같은 탭 안의 왕복이라 sessionStorage는 유지된다. OAuthCallback/SocialAgreement가 소비)
         if (fromRef.current) saveRedirect(fromRef.current);
-        window.location.href = `${API_BASE_URL}/oauth2/authorization/${provider}`;
+        window.location.href = oauthAuthorizationUrl(provider);
     };
 
     return (
@@ -188,15 +171,9 @@ const Login = () => {
                 </Divider>
 
                 <Flex justify="center" gap={20}>
-                    <button type="button" className="reserve-social-login" aria-label="카카오로 로그인" onClick={() => handleSocialLogin('kakao')} style={{ ...styles.socialCircle, backgroundColor: '#FEE500' }}>
-                        <KakaoIcon />
-                    </button>
-                    <button type="button" className="reserve-social-login" aria-label="네이버로 로그인" onClick={() => handleSocialLogin('naver')} style={{ ...styles.socialCircle, backgroundColor: '#03C75A', color: '#fff' }}>
-                        <NaverIcon />
-                    </button>
-                    <button type="button" className="reserve-social-login" aria-label="Google로 로그인" onClick={() => handleSocialLogin('google')} style={{ ...styles.socialCircle, backgroundColor: '#fff', border: '1px solid #dadce0' }}>
-                        <GoogleIcon />
-                    </button>
+                    <SocialLoginButton provider="kakao" label="카카오로 로그인" onClick={() => handleSocialLogin('kakao')} />
+                    <SocialLoginButton provider="naver" label="네이버로 로그인" onClick={() => handleSocialLogin('naver')} />
+                    <SocialLoginButton provider="google" label="Google로 로그인" onClick={() => handleSocialLogin('google')} />
                 </Flex>
 
                 <Flex vertical gap={20} style={{ width: '100%', marginTop: '32px' }} align="center">
@@ -209,9 +186,9 @@ const Login = () => {
                     {/* 법적 고지 라인 */}
                     <Text type="secondary" style={{ fontSize: fontSize.xs, color: colors.text.tertiary, textAlign: 'center' }}>
                         로그인 시{' '}
-                        <button type="button" style={styles.linkBtn} onClick={() => navigate('/terms')}>이용약관</button>
+                        <button type="button" className="reserve-text-link" style={styles.linkBtn} onClick={() => navigate('/terms')}>이용약관</button>
                         {' · '}
-                        <button type="button" style={styles.linkBtn} onClick={() => navigate('/privacy')}>개인정보처리방침</button>에 동의해요.
+                        <button type="button" className="reserve-text-link" style={styles.linkBtn} onClick={() => navigate('/privacy')}>개인정보처리방침</button>에 동의해요.
                     </Text>
                 </Flex>
             </div>
@@ -257,25 +234,12 @@ const styles = {
         display: 'block',
         marginBottom: '48px',
     },
-    socialCircle: {
-        width: heights.socialBtn,
-        height: heights.socialBtn,
-        borderRadius: radius.full,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
-        border: 'none',
-        padding: 0,
-    },
     linkBtn: {
         background: 'none',
         border: 'none',
         padding: 0,
         cursor: 'pointer',
-        textDecoration: 'underline',
         fontSize: 'inherit',
-        color: 'inherit',
         fontFamily: 'inherit',
     },
 };

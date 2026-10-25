@@ -21,7 +21,6 @@ vi.mock('./components/layout/Header', () => ({
 }));
 vi.mock('./components/layout/Footer', () => ({ default: () => <footer>푸터</footer> }));
 vi.mock('./components/layout/OfflineBanner', () => ({ default: () => null }));
-vi.mock('./components/layout/DiscoveryNav', () => ({ default: () => null }));
 vi.mock('./components/chat/MessengerShell', () => ({ default: () => null }));
 vi.mock('./pages/member/MessagesPage', () => ({ default: () => <h1>메시지 화면</h1> }));
 vi.mock('./pages/auth/Login', () => ({ default: () => <h1>로그인 화면</h1> }));
@@ -38,7 +37,7 @@ const renderAt = (path) => {
 };
 
 describe('app route table fallbacks', () => {
-    // Test the route table with the real page, not the first Vite transform of its lazy module.
+    // 지연 모듈 변환 시간과 분리해 실제 페이지의 라우트 연결을 확인한다.
     beforeAll(() => Promise.all([
         import('./pages/NotFound'), import('./pages/legal/UserGuide'), import('./pages/legal/BusinessGuide'),
         import('./pages/legal/CommonGuide'), import('./pages/legal/OperationGuide'),
@@ -58,6 +57,18 @@ describe('app route table fallbacks', () => {
         vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
     });
     afterEach(() => { vi.restoreAllMocks(); });
+
+    it.each(['/', '/stores', '/waiting', '/benefits', '/feed'])('keeps discovery tabs in the boot shell for filtered %s', path => {
+        authState.initializeAuth = () => new Promise(() => {});
+        renderAt(path + '?keyword=' + encodeURIComponent('공방') + '&page=2');
+        expect(screen.getByRole('navigation', { name: '서비스 탐색' })).toBeVisible();
+    });
+
+    it.each(['/store/3', '/benefits/3', '/feed/posts/3', '/business', '/admin', '/search'])('does not promote detail or workspace search %s to a discovery tab', path => {
+        authState.initializeAuth = () => new Promise(() => {});
+        renderAt(path + '?keyword=' + encodeURIComponent('공방'));
+        expect(screen.queryByRole('navigation', { name: '서비스 탐색' })).toBeNull();
+    });
 
     it('uses the messenger frame without a site header or footer during boot and after authentication', async () => {
         let finishAuth;

@@ -21,15 +21,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 채팅 첫 안내 설정 — 공지사항·인사말·(고객지원) 표시 이름·사진·자동 문답 (2026-09-23 신설, 09-24 채팅 관리로 확장).
- *
- * <p>고객지원 한 벌(scope_key = {@code SUPPORT})과 가게마다 한 벌(scope_key = {@code STORE:가게ID})을
- * 같은 모양으로 저장한다. 손님 화면·사장님 설정·관리자 설정이 모두 같은 컴포넌트를 쓰기 때문이다.
- *
- * <p>scope_key 를 따로 두는 이유 — store_id 를 NULL 로 고객지원을 표시하면 MySQL 의 UNIQUE 는
- * NULL 을 여러 개 허용해서 "고객지원 설정이 두 벌" 생길 수 있다. 문자열 키 하나로 유일성을 DB 가 보장한다.
- */
+/** 고객지원과 가게 안내를 같은 구조로 저장한다. 고객지원 설정의 중복을 막기 위해 NULL 대신 유일한 scope_key를 사용한다. */
 @Entity
 @Table(name = "chat_intro",
         uniqueConstraints = @UniqueConstraint(name = "uk_chat_intro_scope", columnNames = "scope_key"))
@@ -50,10 +42,7 @@ public class ChatIntro {
     @Column(name = "store_id", updatable = false)
     private Long storeId;
 
-    /**
-     * 대화창 맨 위 확성기 줄의 공지사항. 비어 있으면 화면이 "안녕하세요. {이름}입니다." 를 보인다.
-     * (2026-09-24 인사말 → 공지사항. 배포 전이라 컬럼을 새 이름으로 바꿨다 — 로컬 DB 에 남은 greeting 컬럼은 쓰지 않는다.)
-     */
+    /** 공지가 비어 있으면 기본 인사말을 표시한다. */
     @Column(name = "notice", length = 100)
     private String notice;
 

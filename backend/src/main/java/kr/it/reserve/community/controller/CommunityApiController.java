@@ -83,7 +83,6 @@ public class CommunityApiController {
         return ApiResponse.success(communityService.getComments(postId, memberId), "댓글 목록 조회 성공");
     }
 
-    // 댓글 작성
     @PostMapping("/posts/{postId}/comments")
     public ApiResponse<CommunityDto.CommentResponse> createComment(
             @PathVariable Long postId,
@@ -91,7 +90,6 @@ public class CommunityApiController {
         return ApiResponse.success(communityService.createComment(postId, SecurityUtil.getCurrentMemberId(), request), "댓글이 작성됐어요.");
     }
 
-    // 댓글 삭제
     @DeleteMapping("/comments/{commentId}")
     public ApiResponse<Void> deleteComment(@PathVariable Long commentId) {
         communityService.deleteComment(commentId, SecurityUtil.getCurrentMemberId());

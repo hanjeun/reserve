@@ -31,7 +31,7 @@ def cylinder(name, location, radius, depth, material="white", rotation=(0, 0, 0)
 
 
 def cup():
-    # A hollow ceramic body, rather than a solid sphere pretending to be a cup.
+    # 컵 내부를 비워 그릇 두께를 표현한다.
     profile = [(0, .26), (.4, .26), (.51, .31), (.58, .43), (.61, 1.35),
                (.6, 1.43), (.56, 1.46), (.51, 1.41), (.49, .48), (.4, .42), (0, .42)]
     segments = 64
@@ -113,7 +113,7 @@ for name, build in [("food", cup), ("beauty", bottle), ("sports", dumbbell),
     g.normalize_geometry()
     g.setup("service-" + name)
     scene = bpy.context.scene
-    # A tighter crop lets these small navigation icons retain the library's rounded silhouette.
+    # 작은 아이콘에서도 외곽이 잘 보이도록 화면을 가깝게 잡는다.
     scene.camera.data.ortho_scale = 3.1
     scene.render.resolution_percentage = 100
     scene.render.resolution_x = scene.render.resolution_y = 768

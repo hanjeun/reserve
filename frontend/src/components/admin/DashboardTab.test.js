@@ -29,7 +29,7 @@ vi.mock('recharts', async importOriginal => {
     const actual = await importOriginal();
     return {
         ...actual,
-        // jsdom has no measured layout; only fix chart size and disable motion.
+        // 레이아웃을 측정하지 않는 jsdom에서는 차트 크기만 고정하고 모션을 끈다.
         ResponsiveContainer: ({ children }) => cloneElement(children, { width: 130, height: 130 }),
         Pie: props => createElement(actual.Pie, { ...props, isAnimationActive: false }),
     };

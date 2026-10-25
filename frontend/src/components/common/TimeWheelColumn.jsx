@@ -13,7 +13,7 @@ const stopMotion = (motionRef, scroller) => {
     if (scroller) scroller.style.scrollSnapType = '';
 };
 
-/** Native scrolling keeps touch momentum and wheel/trackpad input on the same selection path. */
+/* 터치 관성과 휠·트랙패드가 같은 기본 스크롤 선택 경로를 사용한다. */
 const TimeWheelColumn = ({ label, options, value, onChange }) => {
     const id = useId();
     const scrollerRef = useRef(null);
@@ -57,7 +57,7 @@ const TimeWheelColumn = ({ label, options, value, onChange }) => {
             scroller.style.scrollSnapType = '';
             return;
         }
-        // Only explicit picks and the final snap animate; direct manipulation stays native.
+        // 직접 조작은 기본 스크롤을 쓰고 명시적 선택·마지막 정렬만 전환한다.
         const motion = { from, to, start: null, frame: null };
         motionRef.current = motion;
         scroller.style.scrollSnapType = 'none';
@@ -81,7 +81,7 @@ const TimeWheelColumn = ({ label, options, value, onChange }) => {
     useLayoutEffect(() => {
         const scroller = scrollerRef.current;
         const align = () => {
-            // AntD mounts modal children before the opening surface has a measurable height.
+            // AntD는 모달 높이를 측정하기 전에 자식 요소를 붙인다.
             if (!scroller.clientHeight || lastValueRef.current === value) return;
             const initialized = lastValueRef.current !== null;
             lastValueRef.current = value;
@@ -116,7 +116,7 @@ const TimeWheelColumn = ({ label, options, value, onChange }) => {
             if (motionRef.current || touchActiveRef.current || dragRef.current?.moved || lastValueRef.current === null) return;
             const scroller = scrollerRef.current;
             const index = clamp(Math.round(scroller.scrollTop / ROW_HEIGHT), options.length - 1);
-            // Some touch engines stop between snap points. Wait until momentum has stopped before aligning.
+            // 관성이 멈춘 뒤 스냅 사이에 남은 터치 위치를 정렬한다.
             if (options[index].value !== lastValueRef.current) selectIndex(index);
             alignIndex(index);
         }, 160);

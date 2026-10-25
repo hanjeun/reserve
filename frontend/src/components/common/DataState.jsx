@@ -57,9 +57,8 @@ const ERROR_ICON_BY_KIND = {
     unknown: ExclamationCircleOutlined,
 };
 
-/**
- * 조회 결과가 비었을 때와 조회 자체가 실패했을 때를 한 형태로 보여 주는 관문이다.
- * 폼 검증·결제 제출처럼 사용자의 입력을 다시 보내는 오류에는 쓰지 않는다.
+/*
+ * 조회 빈 결과·오류를 표시하며 폼 검증·결제 제출 오류와 구분한다.
  */
 const DataState = ({
     state = 'empty',

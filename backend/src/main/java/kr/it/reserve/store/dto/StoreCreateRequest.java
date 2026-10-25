@@ -53,7 +53,7 @@ public class StoreCreateRequest {
     // 노쇼 방지금 (0원이면 무료)
     private Integer noShowDeposit = 0;
     
-    // ========== 환불 정책 ==========
+    // 환불 정책
     // 전액 환불 가능 일수 (예약일 N일 전까지 전액 환불)
     private Integer fullRefundDays = 3;
     
@@ -63,7 +63,7 @@ public class StoreCreateRequest {
     // 부분 환불 비율 (퍼센트, 예: 50 = 50%)
     private Integer partialRefundRate = 50;
 
-    // ========== 예약 슬롯 정책 ==========
+    // 예약 슬롯 정책
     // 빈 문자열("") 허용: 빈 문자열 = 무제한(null), 숫자 = 제한 인원
     private String maxCapacityPerSlotRaw;
 
@@ -101,7 +101,7 @@ public class StoreCreateRequest {
      */
     private List<Integer> closedDays;
 
-    /** 임시 휴무일 — ISO 날짜 문자열 목록("2026-09-15"). 지난 날짜는 저장 시 걸러진다. */
+    /** 임시 휴무일은 ISO 날짜 목록이며 지난 날짜는 저장 시 제외한다. */
     private List<String> closedDates;
 
     /**
@@ -116,14 +116,7 @@ public class StoreCreateRequest {
     /** SESSION 전용 회차 시각 목록("11:00"). SLOT·DAY 에서는 무시된다. */
     private List<String> sessionTimes;
 
-    /**
-     * 운영 시작일 — ISO 날짜 문자열("2026-09-01"). null·빈 값 = 시작일 제한 없음.
-     *
-     * <p>{@code LocalDate} 가 아니라 {@code String} 인 이유 — 이 요청은 multipart 라
-     * {@code @ModelAttribute} 로 바인딩되는데, 날짜 타입은 별도 컨버터가 있어야 붙는다.
-     * 형식이 깨졌을 때 {@code BindException} 으로 새어나가면 기존 에러 규격과 달라진다.
-     * {@code closedDates} 가 같은 이유로 {@code List<String>} 이다.
-     */
+    /** 잘못된 날짜도 공통 오류 형식으로 처리하기 위해 문자열로 받아 직접 파싱한다. 빈 값은 시작일 제한이 없음을 뜻한다. */
     private String openDate;
 
     /** 운영 종료일 — 당일까지 영업. null·빈 값 = 무기한. */

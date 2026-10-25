@@ -16,7 +16,7 @@ const subscribeMobile = callback => {
     return () => media.removeEventListener('change', callback);
 };
 
-/** AntD owns the portal, focus trap and close lifecycle; mobile changes only the surface. */
+/* 포털·포커스 제한·닫힘 수명은 AntD에 맡기고 모바일 표면만 조정한다. */
 export default function ResponsiveModal({
     mobileSize = 'content', mobileSheet = true, open: requestedOpen, title, rootClassName,
     panelRef: forwardedPanelRef, afterOpenChange, transitionName, maskTransitionName,
@@ -41,7 +41,7 @@ export default function ResponsiveModal({
         if (!openRef.current || !panel || !initialFocusPending.current) return;
         initialFocusPending.current = false;
         const active = document.activeElement;
-        // Preserve an input explicitly focused by the caller or a user during entry.
+        // 진입 중 호출부나 사용자가 지정한 입력 포커스를 유지한다.
         if (panel.contains(active) && active !== panel && !active.matches('.ant-modal-close')) return;
         (titleRef.current ?? panel).focus({ preventScroll: true });
     }, []);
@@ -52,7 +52,7 @@ export default function ResponsiveModal({
         if (focusFrame.current !== null) cancelAnimationFrame(focusFrame.current);
         if (panel) {
             initialFocusPending.current = true;
-            // Wait for rc-dialog to record the trigger before moving initial focus.
+            // rc-dialog가 실행 도구를 기록한 뒤 초기 포커스를 옮긴다.
             focusFrame.current = requestAnimationFrame(focusInitialContent);
         }
     }, [focusInitialContent]);
@@ -83,7 +83,7 @@ export default function ResponsiveModal({
         const sync = () => {
             surface = panelRef.current?.closest('.ant-modal-root');
             if (!surface || !viewport) return;
-            // DOM variables avoid rerendering the form as Safari opens or pans its keyboard.
+            // Safari 키보드 이동 중 폼 재렌더 없이 DOM 변수로 뷰포트를 맞춘다.
             surface.style.setProperty('--reserve-modal-viewport-height', `${viewport.height}px`);
             surface.style.setProperty('--reserve-modal-viewport-top', `${viewport.offsetTop}px`);
             const body = panelRef.current.querySelector('.ant-modal-body');

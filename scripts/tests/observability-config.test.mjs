@@ -9,7 +9,7 @@ const quotedPattern = nginxJob.match(/selector: '\{job="nginx"\} !~ (".+")'/)?.[
 let allowedTiming;
 before(() => {
   assert.ok(quotedPattern, 'Promtail 2.9 match selectors require a double-quoted pattern');
-  // JS lacks RE2's POSIX whitespace class; this one class has the same test meaning.
+  // JavaScript에서 지원하지 않는 RE2 공백 클래스를 같은 의미의 클래스로 바꿔 검사한다.
   allowedTiming = new RegExp(JSON.parse(quotedPattern).replaceAll('[[:space:]]', String.raw`\s`));
 });
 const timing = {

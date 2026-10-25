@@ -16,21 +16,7 @@ import java.time.LocalDateTime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * 비밀번호 재설정 코드의 시도 횟수 상한 검증.
- *
- * <h2>왜 단위 테스트가 아니라 통합 테스트인가</h2>
- * 검증하려는 것이 <b>트랜잭션 경계의 동작</b>이기 때문이다. {@code BusinessException} 은
- * {@code RuntimeException} 이라, 실패 카운터를 올린 뒤 예외를 던지면 스프링 기본 규칙상
- * 트랜잭션이 롤백되면서 <b>그 증가분까지 같이 사라진다.</b> 그러면 카운터는 코드상 존재하는데
- * DB 에는 영원히 0 으로 남아, 상한이 있는 것처럼 보이지만 실제로는 무제한이 된다.
- *
- * <p>Mockito 단위 테스트에는 트랜잭션이 없으므로 이 함정을 <b>재현조차 못 한다</b> —
- * 카운터가 메모리에서 올라가는 것만 보고 통과한다. 그래서 실제 DB 와 프록시를 태운다.
- *
- * <p>{@code @Transactional} 을 테스트 클래스에 붙이지 않는 것도 의도적이다. 붙이면 테스트가
- * 하나의 트랜잭션 안에서 돌아 서비스의 커밋이 관찰되지 않는다.
- */
+/** 실패 횟수가 예외 뒤에도 커밋되는지 실제 DB·서비스 프록시로 확인한다. 시험을 외부 트랜잭션으로 감싸지 않는다. */
 @SpringBootTest
 class PasswordResetAttemptLimitTest {
 
@@ -70,7 +56,7 @@ class PasswordResetAttemptLimitTest {
     }
 
     /**
-     * ★ 이 테스트가 이 파일의 존재 이유다.
+     * 이 테스트가 이 파일의 존재 이유다.
      *
      * <p>{@code noRollbackFor} 를 빼면 여기서 {@code attemptCount} 가 0 으로 나오며 실패한다.
      */
@@ -105,11 +91,7 @@ class PasswordResetAttemptLimitTest {
                 .hasMessageContaining("초과");
     }
 
-    /**
-     * {@code /reset} 은 {@code verified} 를 보기 <b>전에</b> 코드를 대조하므로
-     * {@code verify-code} 를 건너뛰고 여기만 두드리는 우회가 가능했다.
-     * 검증 경로가 둘이면 카운터도 둘 다 걸려야 한다.
-     */
+    /** 재설정 경로도 코드별 실패 횟수를 소모해 검증 API 우회를 막는다. */
     @Test
     void resetPathAlsoCountsFailedAttempts() {
         assertThatThrownBy(() -> passwordResetService.resetPassword(EMAIL, WRONG_CODE, "Str0ng!Passw0rd#2026"))

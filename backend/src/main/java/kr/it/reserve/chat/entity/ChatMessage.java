@@ -8,7 +8,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.LocalDateTime;
 
 /**
- * 채팅 메시지 한 줄 (2026-08-24 신설).
+ * 채팅 메시지 한 줄.
  *
  * <p>전송 취소와 90일 파기는 구분한다. 신고 증거는 별도 불변 원장으로 고정한다.
  */

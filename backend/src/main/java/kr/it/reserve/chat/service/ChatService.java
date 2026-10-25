@@ -36,18 +36,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 
-/**
- * 고객지원과 가게 문의를 분리된 권한 축으로 다루는 통합 인앱 채팅.
- *
- * <p><b>★ 실시간을 WebSocket 이 아니라 폴링으로 하는 이유</b>
- * <ul>
- *   <li><b>블루/그린 배포마다 모든 연결이 끊긴다.</b> 재연결·유실 복구를 직접 짜야 한다</li>
- *   <li>서버 메모리 여유가 실측 600MB 뿐이다(2026-08-19). 연결 상태를 들고 있을 여유가 적다</li>
- *   <li>예약 플랫폼 문의는 <b>실시간성이 낮다.</b> 3~5초 폴링이면 체감이 거의 같다</li>
- * </ul>
- * 그래서 {@link #getNewMessages}(증분 조회)를 두고, 화면은 <b>대화가 보일 때만</b> 짧게 폴링한다.
- * 닫혀 있을 때도 돌리면 모든 접속자가 5초마다 서버를 두드린다.
- */
+/** 고객지원과 가게 문의의 접근 권한을 분리한다. */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -55,7 +44,6 @@ import java.util.function.Supplier;
 public class ChatService {
     private static final String MEMBER_VIEWER_ROLE = "MEMBER";
     private static final String OWNER_VIEWER_ROLE = "OWNER";
-
 
     /** 한 번에 내려줄 메시지 수. 채팅은 끝에서 시작하므로 이 정도면 첫 화면이 다 찬다. */
     private static final int PAGE_SIZE = 50;
@@ -69,7 +57,7 @@ public class ChatService {
     private final StoreRepository storeRepository;
     private final ChatMessageHiddenRepository hiddenRepository;
 
-    // ── 손님 ────────────────────────────────────────────────────────────────
+    // 손님
 
     /**
      * 내 문의방을 연다. <b>없으면 만든다.</b>
@@ -309,7 +297,7 @@ public class ChatService {
         return append(room, SenderRole.OWNER, owner.getId(), content, clientMessageId);
     }
 
-    // ── 관리자 ──────────────────────────────────────────────────────────────
+    // 관리자
 
     public Page<ChatRoomResponse> listRoomsForAdmin(int page) {
         return listRoomsForAdmin(page, null);
@@ -390,17 +378,9 @@ public class ChatService {
         return roomRepository.countRoomsWaitingForAdmin(ChatRoom.RoomType.SUPPORT);
     }
 
-    // ── 폴링 (양쪽 공용) ────────────────────────────────────────────────────
+    // 폴링 (양쪽 공용)
 
-    /**
-     * {@code afterId} 뒤에 온 메시지만. 화면이 3~5초마다 부른다.
-     *
-     * <p>한 번에 최대 50건을 오래된 것부터 반환한다. 누적된 메시지는 마지막으로 받은
-     * 서버 ID를 다음 커서로 보내 이어받는다.
-     *
-     * <p><b>읽음 처리를 하지 않는다.</b> 폴링은 "화면이 살아 있다"는 뜻일 뿐,
-     * 사람이 보고 있다는 뜻이 아니다. 탭을 띄워만 놓아도 안 읽은 수가 0이 되면 배지가 거짓말을 한다.
-     */
+    /** 최대 50건을 오래된 순서로 반환하고 마지막 ID로 이어 조회한다. 증분 조회는 읽음 상태를 바꾸지 않는다. */
     public List<ChatMessageResponse> getNewMessages(Long roomId, Long afterId) {
         return getNewMessages(roomId, afterId, null);
     }
@@ -467,7 +447,7 @@ public class ChatService {
         markReadThrough(room, SenderRole.MEMBER, readThroughId);
     }
 
-    // ── 내부 ────────────────────────────────────────────────────────────────
+    // 내부
 
     /** 송신과 같은 방 잠금 안에서 권한 확인 후 호출한다. cursor 없는 기존 요청은 전체 읽음이다. */
     private void markReadThrough(ChatRoom room, SenderRole reader, Long readThroughId) {
@@ -582,7 +562,7 @@ public class ChatService {
         return previews;
     }
 
-    /** 현재 대표 사진을 한 페이지당 한 번에 읽는다. 방 생성 당시의 사진 스냅샷에 고정하지 않는다. */
+    /** 대표 사진은 생성 시점에 고정하지 않고 페이지별로 일괄 조회한다. */
     private Map<Long, String> storeImageUrls(List<ChatRoom> rooms) {
         List<Long> storeIds = rooms.stream().map(ChatRoom::getStoreId)
                 .filter(Objects::nonNull).distinct().toList();

@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Card, DataState, FilterMenu, FilterToolbar, FormField, FormInput, FormModal } from '../common';
+import ListingContent from '../common/ListingContent';
 import StoreListViewToggle from '../store/StoreListViewToggle';
 import { useMyStores, useQueryParamsState } from '../../hooks';
 import useViewModeParam from '../../hooks/useViewModeParam';
@@ -194,27 +195,30 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
     if (storesLoading || board.isLoading) return <WaitingTabSkeleton view={view}
         intakeMode={store?.waitingIntakeMode ?? 'BOTH'} paused={store?.waitingPaused === true} />;
     let content;
+    let notice;
     if (storesError && !stores.length) content = <DataState state="error" kind="store" subject="가게 목록" error={storesError} onRetry={refetchStores} />;
     else if (!store) content = <DataState state="empty" kind="store" title="등록된 가게가 없어요." />;
-    else content = <>
-        <div className="reserve-waiting-summary">
-            <div><h3>대기 명단</h3><p>{board.data
-                ? `${dateLabel(board.data.businessDate)} · 대기 ${active.filter(entry => entry.status === 'WAITING').length}팀 · 호출 ${active.filter(entry => entry.status === 'CALLED').length}팀`
-                : '대기 현황을 확인하지 못했어요.'}</p></div>
-            <div className="reserve-waiting-actions">
-                <Button variant={paused ? 'primary' : 'outline'} size="sm" disabled={busy || !board.data} loading={pending === 'intake'}
-                    onClick={() => write('intake', signal => waitingService.updateIntake(storeId, !paused, signal),
-                        paused ? '웨이팅 접수를 시작했어요.' : '신규 접수를 중지했어요. 기존 대기는 유지돼요.')}>
-                    {paused ? '접수 시작' : '접수 중지'}
-                </Button>
-                {['ONSITE', 'BOTH'].includes(intakeMode) && <Button variant="outline" size="sm" disabled={paused || busy || !board.data} onClick={() => setQrOpen(true)}>현장 접수 QR</Button>}
-                <Button variant="primary" size="sm" disabled={busy || paused || !board.data} onClick={showForm}>대기 접수</Button>
+    else {
+        notice = <>
+            <div className="reserve-waiting-summary">
+                <div><h3>대기 명단</h3><p>{board.data
+                    ? `${dateLabel(board.data.businessDate)} · 대기 ${active.filter(entry => entry.status === 'WAITING').length}팀 · 호출 ${active.filter(entry => entry.status === 'CALLED').length}팀`
+                    : '대기 현황을 확인하지 못했어요.'}</p></div>
+                <div className="reserve-waiting-actions">
+                    <Button variant={paused ? 'primary' : 'outline'} size="sm" disabled={busy || !board.data} loading={pending === 'intake'}
+                        onClick={() => write('intake', signal => waitingService.updateIntake(storeId, !paused, signal),
+                            paused ? '웨이팅 접수를 시작했어요.' : '신규 접수를 중지했어요. 기존 대기는 유지돼요.')}>
+                        {paused ? '접수 시작' : '접수 중지'}
+                    </Button>
+                    {['ONSITE', 'BOTH'].includes(intakeMode) && <Button variant="outline" size="sm" disabled={paused || busy || !board.data} onClick={() => setQrOpen(true)}>현장 접수 QR</Button>}
+                    <Button variant="primary" size="sm" disabled={busy || paused || !board.data} onClick={showForm}>대기 접수</Button>
+                </div>
             </div>
-        </div>
-        {board.data && <p className="reserve-waiting-form-help" role="status">{paused ? '신규 접수를 잠시 중지했어요. 기존 대기는 호출·입장 처리할 수 있어요.'
-            : intakeMode === 'OFF' ? '직원 접수를 받고 있어요. 고객 접수 방식은 가게 수정에서 설정할 수 있어요.' : '웨이팅 접수를 받고 있어요.'}</p>}
-        {board.error && board.data && !blockingError && <DataState compact state="error" kind="waiting" subject="대기 명단 갱신" error={board.error} onRetry={refresh} retrying={board.isFetching} />}
-        {blockingError ? <DataState state="error" kind="waiting" subject="대기 명단 갱신"
+            {board.data && <p className="reserve-waiting-form-help" role="status">{paused ? '신규 접수를 잠시 중지했어요. 기존 대기는 호출·입장 처리할 수 있어요.'
+                : intakeMode === 'OFF' ? '직원 접수를 받고 있어요. 고객 접수 방식은 가게 수정에서 설정할 수 있어요.' : '웨이팅 접수를 받고 있어요.'}</p>}
+            {board.error && board.data && !blockingError && <DataState compact state="error" kind="waiting" subject="대기 명단 갱신" error={board.error} onRetry={refresh} retrying={board.isFetching} />}
+        </>;
+        content = blockingError ? <DataState state="error" kind="waiting" subject="대기 명단 갱신"
             error={board.error} onRetry={refresh} retrying={board.isFetching} />
             : visibleEntries.length ? <ul ref={listRef} className={entryClass} aria-label="대기 접수 목록">
             {visibleEntries.map(entry => <WaitingEntry key={entry.id} entry={entry} businessDate={board.data?.businessDate} view={view}
@@ -223,8 +227,8 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
             title={keyword ? '검색에 맞는 대기 접수가 없어요.'
                 : status === 'ACTIVE' ? '대기 중인 팀이 없어요.' : '선택한 상태의 대기 접수가 없어요.'}
             description={keyword ? '이름이나 대기번호를 다시 확인해주세요.'
-                : status === 'ACTIVE' ? '손님이 오면 대기 접수를 등록해주세요.' : '다른 상태를 선택해 확인해주세요.'} />}
-    </>;
+                : status === 'ACTIVE' ? '손님이 오면 대기 접수를 등록해주세요.' : '다른 상태를 선택해 확인해주세요.'} />;
+    }
 
     return <div className="reserve-waiting-tab">
         <div className="reserve-explore-filters reserve-waiting-filters" aria-label="웨이팅 목록 필터">
@@ -242,8 +246,10 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
         </div>
         <FilterToolbar search={{ value: search, onChange: onSearchChange, placeholder: '이름, 대기번호로 검색' }}
             onReload={store ? refresh : refetchStores} loading={storesLoading || board.isFetching} autoRefreshDomain="WAITING" />
-        {storesError && stores.length > 0 && <DataState compact state="error" kind="store" subject="가게 목록 갱신" error={storesError} onRetry={refetchStores} />}
-        {content}
+        <ListingContent notice={<>
+            {storesError && stores.length > 0 && <DataState compact state="error" kind="store" subject="가게 목록 갱신" error={storesError} onRetry={refetchStores} />}
+            {notice}
+        </>}>{content}</ListingContent>
         {!accessLost && <WaitingQrModal open={qrOpen} storeId={storeId} onClose={() => setQrOpen(false)} />}
         {!accessLost && <WaitingDetailModal detail={detail} open={Boolean(detail)} onClose={() => setDetailId(null)} />}
         {!accessLost && <FormModal title="대기 접수" open={open} mobileSize="content" width={440}

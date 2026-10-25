@@ -12,7 +12,7 @@ public class FileException extends BusinessException {
         super(message, status);
     }
 
-    // ========== 정적 팩토리 메서드 ==========
+    // 정적 팩토리 메서드
 
     /** 500 - 파일 업로드 실패 */
     public static FileException uploadFailed() {

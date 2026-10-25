@@ -1,6 +1,6 @@
 import { feedMediaUrl } from './feed';
 
-/** Reuse geometry only; a list response never becomes the detail query's initial data. */
+/* 사진 크기만 재사용하며 목록 응답을 상세 쿼리의 초기 데이터로 사용하지 않는다. */
 export function readFeedMediaHint(client, postId) {
     const id = Number(postId);
     if (!Number.isSafeInteger(id) || id <= 0) return undefined;

@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import Pagination from '../common/Pagination';
 import { Button, Card, DataState, FilterToolbar } from '../common';
+import ListingContent from '../common/ListingContent';
 import ReservationListingToolbar from '../reservation/ReservationListingToolbar';
 import WaitingQrModal from './WaitingQrModal';
 import WaitingDetailModal from './WaitingDetailModal';
@@ -158,17 +159,20 @@ function MyWaitingSession({ revision, loggedIn, memberId }) {
             count={blockingError ? undefined : total} disabled={false} />
         <FilterToolbar search={{ value: keyword, onChange: event => setWaitingFilter('waitingKeyword', event.target.value.slice(0, 100)),
             placeholder: '가게명, 대기번호로 검색' }} onReload={reload} loading={refreshing} autoRefreshDomain="WAITING" />
-        <p className="reserve-waiting-form-help" role="status">{MY_WAITING_HELP}</p>
-        {mine.error && mine.data && !blockingError && <DataState compact state="error" subject="내 웨이팅 갱신" error={mine.error} onRetry={refresh} retrying={mine.isFetching} />}
+        <ListingContent notice={<>
+            <p className="reserve-waiting-form-help" role="status">{MY_WAITING_HELP}</p>
+            {mine.error && mine.data && !blockingError && <DataState compact state="error" subject="내 웨이팅 갱신" error={mine.error} onRetry={refresh} retrying={mine.isFetching} />}
+        </>}>
         {blockingError ? <DataState state="error" subject="내 웨이팅" error={mine.error} onRetry={refresh} retrying={mine.isFetching} />
                 : mine.isPending ? <WaitingListSkeleton view={view} personal />
                     : rows.length ? <ul ref={listRef} className={`reserve-waiting-entries reserve-waiting-entries--${view}${view === 'cards' ? ' rsv-store-grid' : ''}`} aria-label="내 웨이팅 목록">{rows.map(render)}</ul>
                         : <DataState state="empty" kind="waiting"
                             title={status !== 'ALL' || debouncedKeyword.trim() ? '조건에 맞는 웨이팅이 없어요.' : '대기 중인 웨이팅이 없어요.'}
                             description={status !== 'ALL' || debouncedKeyword.trim() ? '검색어나 상태를 바꿔 다시 찾아보세요.' : '가게 상세에서 웨이팅을 접수할 수 있어요.'} />}
-        {!blockingError && total > 20 && <nav className="reserve-waiting-pagination" aria-label="내 웨이팅 목록 페이지">
+        </ListingContent>
+        {!blockingError && total > 20 && <nav className="reserve-listing-pagination" aria-label="내 웨이팅 목록 페이지">
             <Pagination current={page + 1} total={total} pageSize={20} showSizeChanger={false} showLessItems={isMobile}
-                size={isMobile ? 'small' : 'default'} disabled={searchPending} onChange={next => {
+                size={isMobile ? 'small' : 'default'} align="end" disabled={searchPending} onChange={next => {
                     setParams(current => {
                         const updated = new URLSearchParams(current); updated.set('waitingPage', String(next)); return updated;
                     });

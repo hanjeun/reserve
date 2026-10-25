@@ -25,7 +25,7 @@ RESERVE는 맛집·카페, 뷰티, 운동, 클래스, 팝업까지 업종을 가
 
 ## 화면
 
-아래 화면은 운영 사이트([reserve.it.kr](https://reserve.it.kr))를 그대로 찍은 것이에요.
+예약 서비스([app.reserve.it.kr](https://app.reserve.it.kr))의 화면 예시예요.
 
 | 홈 | 가게 목록 |
 |---|---|
@@ -73,7 +73,7 @@ RESERVE는 맛집·카페, 뷰티, 운동, 클래스, 팝업까지 업종을 가
 |---|---|
 | **Backend** | Spring Boot 3.5.16 · Java 21 · Spring Security · JWT · OAuth2 |
 | **Frontend** | React 19 · Vite · Ant Design 6 · TanStack Query 5 · Zustand · Recharts |
-| **Database** | MySQL 8.0 |
+| **Database** | MySQL 8.0 · Redis 8.2 |
 | **Infra** | AWS Lightsail · Docker · Nginx · GitHub Actions · S3 + CloudFront |
 | **결제 · 메일** | 포트원 V2 (카카오페이) · Resend |
 | **모니터링** | Grafana · Loki · Alloy · Sentry · UptimeRobot |

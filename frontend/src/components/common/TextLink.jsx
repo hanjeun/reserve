@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 
-/** Text navigation keeps its color; hover, keyboard focus and the current page use an underline. */
+/* 푸터의 텍스트 링크 상태를 공유한다. */
 export default function TextLink({ to, href, className = '', children, ...props }) {
     const Component = to == null ? 'a' : Link;
     const destination = to == null ? { href } : { to };

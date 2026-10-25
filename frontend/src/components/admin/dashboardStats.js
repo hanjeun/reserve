@@ -8,7 +8,7 @@ const SOURCE_LABELS = {
     audit: '감사 로그',
 };
 
-/** 네 개의 독립 API를 합치되 일부 실패를 정상 0건으로 숨기지 않는다. */
+/* 독립 API의 일부 실패를 정상 0건으로 숨기지 않는다. */
 export const fetchDashboardStats = async () => {
     const [bizAll, reservationSummary, trash, auditLogs] = await Promise.allSettled([
         api.get(API_ENDPOINTS.BUSINESS.ADMIN_LIST, { params: { page: 0, size: 1 } }),
@@ -32,7 +32,7 @@ export const fetchDashboardStats = async () => {
         .filter(([, available]) => !available)
         .map(([name]) => SOURCE_LABELS[name]);
 
-    // 네 요청이 모두 실패했는데 빈 대시보드로 정상 반환하면 운영자가 "0건"으로 오해한다.
+    // 모든 요청이 실패하면 빈 집계 대신 오류를 반환한다.
     if (failedSources.length === Object.keys(sources).length) {
         throw new Error('Every dashboard source failed');
     }

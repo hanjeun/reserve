@@ -5,7 +5,7 @@ import { resolveBin } from './resolve-bin.mjs';
 
 export const REQUIRED_CHECKS = ['build-backend', 'build-frontend'];
 
-/** A successful unrelated check must not hide missing build checks. This never approves or merges a PR. */
+/** 무관한 검사 성공으로 필수 빌드 누락을 가리지 않으며 PR 승인·머지는 수행하지 않는다. */
 export function assessPullRequest(pr) {
     const checks = pr.statusCheckRollup ?? [];
     const nameOf = (check) => check.name ?? check.context;

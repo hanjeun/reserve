@@ -1,11 +1,6 @@
 import { colors } from '../../../../frontend/src/styles/tokens/index.js';
 
-/**
- * scrollIntoView + scroll-margin-top 조합
- * — 브라우저가 fixed 헤더 오프셋을 자연적으로 처리
- * — Safari 동적 뷰포트(dvh 잔퇄) 문제를 피함
- * — sectionMobile/section 스타일에 scrollMarginTop: heights.header 이미 설정됨
- */
+/* 섹션 이동과 헤더 높이 보정은 공통 탐색 처리에 맡긴다. */
 
 export default function BounceArrow({ targetId, style = {} }) {
     return (

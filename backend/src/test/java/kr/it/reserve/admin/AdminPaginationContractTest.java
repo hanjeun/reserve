@@ -297,7 +297,7 @@ class AdminPaginationContractTest {
         assertThat(response.getMessage()).isEqualTo(message);
         assertThat(response.getData()).isInstanceOf(Page.class);
         Page<?> result = (Page<?>) response.getData();
-        // Repository methods/JPQL own ordering; adding a Pageable sort would change that contract.
+        // 저장소 쿼리가 정렬을 소유하므로 Pageable 정렬을 추가하지 않는다.
         assertThat(result.getPageable()).isEqualTo(PageRequest.of(page, size));
         assertThat(result.getTotalElements()).isEqualTo(TOTAL_ROWS);
         assertThat(result.getContent()).hasSize(1);

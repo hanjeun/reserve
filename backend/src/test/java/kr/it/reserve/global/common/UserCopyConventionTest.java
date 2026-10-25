@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Source literals enforce copy and logging conventions without touching stored user content. */
+/** 저장된 사용자 내용을 건드리지 않고 소스 리터럴의 사용자 문구·로그 규칙을 확인한다. */
 class UserCopyConventionTest {
     private static final Pattern FORMAL = Pattern.compile("[가-힣]*(?:니다|니까)(?![가-힣])");
     private static final Pattern THREAT = Pattern.compile("(?:고소|고발)(?:$|[^가-힣]|장|하|할|해|합|했|당|되|를)|처벌|법적\\s*(?:조치|대응)|(?:민사|형사)\\s*책임");

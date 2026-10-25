@@ -1,6 +1,4 @@
-/**
- * RESERVE Design System - Spacing & Effects
- */
+
 
 export const spacing = {
   0: '0',

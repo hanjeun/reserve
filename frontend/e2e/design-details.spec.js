@@ -75,6 +75,13 @@ test('three chat photos keep tools clear, animate after load and retry only the 
     await page.goto('/messages?storeId=81');
     const input = page.getByLabel('첨부할 사진 선택');
     await expect(page.getByRole('button', { name: '사진 첨부', exact: true })).toBeEnabled();
+    // 부모 transform이 측정값에 섞이지 않도록 진입 애니메이션 뒤 기준값을 잰다.
+    await expect.poll(() => page.locator('.reserve-chat-composer').evaluate(element => {
+        for (let ancestor = element; ancestor; ancestor = ancestor.parentElement) {
+            if (ancestor.getAnimations().some(animation => animation.playState === 'running')) return false;
+        }
+        return true;
+    })).toBe(true);
     const emptyComposer = await page.locator('.reserve-chat-composer').boundingBox();
     const emptyToolbar = await page.locator('.reserve-chat-composer-toolbar').boundingBox();
     await page.evaluate(() => {
@@ -98,7 +105,7 @@ test('three chat photos keep tools clear, animate after load and retry only the 
     await expect(page.getByRole('button', { name: '첨부 사진 크게 보기' })).toHaveCount(2);
     await input.setInputFiles([files[1]]);
     await expect(page.getByRole('button', { name: '첨부 사진 크게 보기' })).toHaveCount(3);
-    // Reopen starts with the selected order: first, third, second.
+    // 재첨부 순서는 first, third, second다.
     await page.getByRole('button', { name: '첨부 사진 제거: third.webp' }).click();
     await expect(page.getByRole('button', { name: '첨부 사진 크게 보기' })).toHaveCount(2);
     await input.setInputFiles([files[2]]);
@@ -181,7 +188,7 @@ test('the shared store favorite keeps its circular hover in cards and list rows'
     await capture(page, 'store-list-favorite', testInfo);
 });
 
-test('home and benefit counters share a skin while fullscreen keeps its default counter', async ({ page }, testInfo) => {
+test('home keeps its counter, benefits use gallery dots, and fullscreen keeps its default counter', async ({ page }, testInfo) => {
     await setup(page);
     const skin = element => {
         const style = getComputedStyle(element);
@@ -190,18 +197,27 @@ test('home and benefit counters share a skin while fullscreen keeps its default 
     await page.goto('/');
     const main = page.locator('.reserve-discovery-banner-next');
     await expect(main).toBeVisible();
+    await expect(main).toHaveClass(/reserve-photo-count/);
     const mainSkin = await main.evaluate(skin);
+    expect(mainSkin).toMatchObject({ backgroundColor: 'rgba(0, 0, 0, 0.58)', color: 'rgb(255, 255, 255)', borderRadius: '30px' });
     await capture(page, 'home-counter', testInfo);
     await page.goto('/benefits/7');
-    const benefit = page.locator('.reserve-benefit-photo-count');
-    await expect(benefit).toHaveText('1 / 3');
-    expect(await benefit.evaluate(skin)).toEqual(mainSkin);
-    await capture(page, 'benefit-counter', testInfo);
+    const gallery = page.locator('.reserve-benefit-photos .reserve-carousel');
+    const dots = gallery.locator('.slick-dots li');
+    await expect(page.locator('.reserve-benefit-photo-count')).toHaveCount(0);
+    await expect(dots).toHaveCount(3);
+    await expect(dots.nth(0)).toHaveClass(/slick-active/);
+    await expect(gallery.locator('.slick-slide.slick-active').getByAltText('혜택 사진 1', { exact: true })).toBeVisible();
+    await dots.nth(1).getByRole('button').click();
+    await expect(dots.nth(1)).toHaveClass(/slick-active/);
+    await expect(gallery.locator('.slick-slide.slick-active').getByAltText('혜택 사진 2', { exact: true })).toBeVisible();
+    await capture(page, 'benefit-gallery-dots', testInfo);
     await page.goto('/feed/posts/8');
     await page.getByAltText('게시물 사진 1', { exact: true }).click();
     const progress = page.locator('.reserve-image-preview .ant-image-preview-progress');
     await expect(progress).toHaveText('1 / 3');
     await expect(progress).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await expect(progress).toHaveCSS('border-radius', '0px');
+    expect(await progress.evaluate(skin)).not.toEqual(mainSkin);
     await capture(page, 'feed-preview-counter', testInfo);
 });

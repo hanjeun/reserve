@@ -22,8 +22,8 @@ export default function DiscoveryNav({ pendingPathname }) {
     const location = useLocation();
     const { pathname } = location;
     const currentPath = (pendingPathname || pathname).replace(/\/$/, '') || '/';
-    // 탭을 누르면 지금 탭의 밑줄 자리에서 누른 탭으로 밑줄 하나가 미끄러진다(2026-09-25).
-    // 평소에는 활성 탭의 ::after 밑줄을 그대로 쓰고, 미끄러지는 동안에만 임시 밑줄을 보인다.
+    // 선택한 탭 사이에서 밑줄 하나를 이동한다.
+
     const innerRef = useRef(null);
     const [slide, setSlide] = useState(null);
 

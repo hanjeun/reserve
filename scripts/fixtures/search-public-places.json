@@ -1,0 +1,312 @@
+{
+  "license": "CC0-1.0",
+  "source": "https://www.wikidata.org/",
+  "licenseUrl": "https://www.wikidata.org/wiki/Wikidata:Licensing",
+  "query": "SELECT ?item ?itemLabel ?itemDescription WHERE { VALUES ?type { wd:Q33506 wd:Q22698 wd:Q24354 wd:Q11635 } ?item wdt:P31 ?type; wdt:P17 wd:Q884. SERVICE wikibase:label { bd:serviceParam wikibase:language \"ko\". } } LIMIT 80",
+  "scope": "공개 장소의 이름·설명 비교용이며 실제 예약 가능 여부나 운영 수용량을 나타내지 않아요.",
+  "documents": [
+    {
+      "id": "Q485465",
+      "name": "서울어린이대공원",
+      "description": "대한민국 서울특별시에 있는 공원 및 스포츠 시설",
+      "source": "http://www.wikidata.org/entity/Q485465",
+      "visibility": "public"
+    },
+    {
+      "id": "Q486172",
+      "name": "낙성대",
+      "description": "강감찬 생가 터가 있는 곳",
+      "source": "http://www.wikidata.org/entity/Q486172",
+      "visibility": "public"
+    },
+    {
+      "id": "Q486694",
+      "name": "올림픽공원",
+      "description": "서울시의 공원",
+      "source": "http://www.wikidata.org/entity/Q486694",
+      "visibility": "public"
+    },
+    {
+      "id": "Q483357",
+      "name": "탑골공원",
+      "description": "대한민국 서울특별시 종로구 종로2가에 있는 공원",
+      "source": "http://www.wikidata.org/entity/Q483357",
+      "visibility": "public"
+    },
+    {
+      "id": "Q484054",
+      "name": "국립현대미술관",
+      "description": "대한민국의 현대미술관",
+      "source": "http://www.wikidata.org/entity/Q484054",
+      "visibility": "public"
+    },
+    {
+      "id": "Q489493",
+      "name": "임진각평화누리공원",
+      "description": "파주시의 관광지",
+      "source": "http://www.wikidata.org/entity/Q489493",
+      "visibility": "public"
+    },
+    {
+      "id": "Q490411",
+      "name": "국립중앙극장",
+      "description": "대한민국의 문화 예술기관",
+      "source": "http://www.wikidata.org/entity/Q490411",
+      "visibility": "public"
+    },
+    {
+      "id": "Q623629",
+      "name": "서대문독립공원",
+      "description": "서울 서대문구 현저동에 있는 공원",
+      "source": "http://www.wikidata.org/entity/Q623629",
+      "visibility": "public"
+    },
+    {
+      "id": "Q495391",
+      "name": "서울대공원",
+      "description": "대한민국 경기도 과천시에 위치한 공원",
+      "source": "http://www.wikidata.org/entity/Q495391",
+      "visibility": "public"
+    },
+    {
+      "id": "Q623956",
+      "name": "마로니에공원",
+      "description": "대한민국 서울 종로구 동숭동에 위치한 공원(公園)",
+      "source": "http://www.wikidata.org/entity/Q623956",
+      "visibility": "public"
+    },
+    {
+      "id": "Q624528",
+      "name": "엑스포과학공원",
+      "description": "대전광역시에 있었던 과학 테마 파크",
+      "source": "http://www.wikidata.org/entity/Q624528",
+      "visibility": "public"
+    },
+    {
+      "id": "Q496974",
+      "name": "세종문화회관",
+      "description": "대한민국 서울 종로구의 예술극장",
+      "source": "http://www.wikidata.org/entity/Q496974",
+      "visibility": "public"
+    },
+    {
+      "id": "Q625037",
+      "name": "여의도공원",
+      "description": "한국 서울의 공원",
+      "source": "http://www.wikidata.org/entity/Q625037",
+      "visibility": "public"
+    },
+    {
+      "id": "Q625203",
+      "name": "국채보상운동기념공원",
+      "description": "대구광역시 중구에 있는 공원",
+      "source": "http://www.wikidata.org/entity/Q625203",
+      "visibility": "public"
+    },
+    {
+      "id": "Q626736",
+      "name": "화정박물관",
+      "description": "대한민국 서울특별시 종로구에 소재한 박물관",
+      "source": "http://www.wikidata.org/entity/Q626736",
+      "visibility": "public"
+    },
+    {
+      "id": "Q626811",
+      "name": "독립기념관",
+      "description": "대한민국의 국가보훈부 산하 위탁집행 준정부기관이자 역사박물관",
+      "source": "http://www.wikidata.org/entity/Q626811",
+      "visibility": "public"
+    },
+    {
+      "id": "Q3375188",
+      "name": "치악산국립공원",
+      "description": "대한민국의 국립공원",
+      "source": "http://www.wikidata.org/entity/Q3375188",
+      "visibility": "public"
+    },
+    {
+      "id": "Q4845110",
+      "name": "부엉이박물관",
+      "description": "대한민국 서울특별시 종로구 삼청동에 소재한 '부엉이'를 주제로 한 박물관",
+      "source": "http://www.wikidata.org/entity/Q4845110",
+      "visibility": "public"
+    },
+    {
+      "id": "Q4997505",
+      "name": "분당중앙공원",
+      "description": "경기도 성남시 분당구에 위치한 공원",
+      "source": "http://www.wikidata.org/entity/Q4997505",
+      "visibility": "public"
+    },
+    {
+      "id": "Q5116372",
+      "name": "충현박물관",
+      "description": "경기도 광명시에 있는 오리 이원익 후손이 건립한 종가박물관",
+      "source": "http://www.wikidata.org/entity/Q5116372",
+      "visibility": "public"
+    },
+    {
+      "id": "Q6477301",
+      "name": "일산 호수공원",
+      "description": "경기도 고양시 일산동구에 위치한 공원",
+      "source": "http://www.wikidata.org/entity/Q6477301",
+      "visibility": "public"
+    },
+    {
+      "id": "Q5316832",
+      "name": "두류공원",
+      "description": "대한민국 대구광역시 달서구에 위치한 도시근린공원",
+      "source": "http://www.wikidata.org/entity/Q5316832",
+      "visibility": "public"
+    },
+    {
+      "id": "Q5624080",
+      "name": "경상감영",
+      "description": "대구광역시에 있는 옛 경상도의 감영",
+      "source": "http://www.wikidata.org/entity/Q5624080",
+      "visibility": "public"
+    },
+    {
+      "id": "Q5624093",
+      "name": "계룡산국립공원",
+      "description": "대한민국의 국립공원",
+      "source": "http://www.wikidata.org/entity/Q5624093",
+      "visibility": "public"
+    },
+    {
+      "id": "Q6431701",
+      "name": "말박물관",
+      "description": "경기도 과천시에 있는 한국마사회의 박물관",
+      "source": "http://www.wikidata.org/entity/Q6431701",
+      "visibility": "public"
+    },
+    {
+      "id": "Q6431745",
+      "name": "고려대학교 박물관",
+      "description": "고려대학교의 부속 박물관",
+      "source": "http://www.wikidata.org/entity/Q6431745",
+      "visibility": "public"
+    },
+    {
+      "id": "Q6684938",
+      "name": "롯데월드 민속박물관",
+      "description": "롯데월드 안에 만들어진 민속박물관",
+      "source": "http://www.wikidata.org/entity/Q6684938",
+      "visibility": "public"
+    },
+    {
+      "id": "Q8035876",
+      "name": "세계장신구박물관",
+      "description": "대한민국 서울에 있는 박물관",
+      "source": "http://www.wikidata.org/entity/Q8035876",
+      "visibility": "public"
+    },
+    {
+      "id": "Q10854396",
+      "name": "5·18기념공원",
+      "description": "5·18 민주화운동을 기념하기 위해 광주광역시 서구에 조성된 공원이다. 옛 상무대 터를 활용하였다.",
+      "source": "http://www.wikidata.org/entity/Q10854396",
+      "visibility": "public"
+    },
+    {
+      "id": "Q10855091",
+      "name": "간절곶",
+      "description": "새해가 먼저 뜨는 곶",
+      "source": "http://www.wikidata.org/entity/Q10855091",
+      "visibility": "public"
+    },
+    {
+      "id": "Q10855565",
+      "name": "국립어린이과학관",
+      "description": "서울 종로구에 위치한 과학관",
+      "source": "http://www.wikidata.org/entity/Q10855565",
+      "visibility": "public"
+    }
+  ],
+  "queries": [
+    {
+      "id": "q1",
+      "kind": "exact",
+      "text": "국립현대미술관",
+      "expected": [
+        "Q484054"
+      ]
+    },
+    {
+      "id": "q2",
+      "kind": "prefix",
+      "text": "국립현대",
+      "expected": [
+        "Q484054"
+      ]
+    },
+    {
+      "id": "q3",
+      "kind": "spacing",
+      "text": "국립 현대 미술관",
+      "expected": [
+        "Q484054"
+      ]
+    },
+    {
+      "id": "q4",
+      "kind": "typo",
+      "text": "올림픽공웡",
+      "expected": [
+        "Q486694"
+      ]
+    },
+    {
+      "id": "q5",
+      "kind": "meaning",
+      "text": "강감찬이 태어난 장소",
+      "expected": [
+        "Q486172"
+      ]
+    },
+    {
+      "id": "q6",
+      "kind": "meaning",
+      "text": "과천에 있는 공원",
+      "expected": [
+        "Q495391"
+      ]
+    },
+    {
+      "id": "q7",
+      "kind": "meaning",
+      "text": "서울 종로의 예술 극장",
+      "expected": [
+        "Q496974"
+      ]
+    },
+    {
+      "id": "q8",
+      "kind": "meaning",
+      "text": "대전의 과학 테마 파크",
+      "expected": [
+        "Q624528"
+      ]
+    },
+    {
+      "id": "q9",
+      "kind": "exact",
+      "text": "서울어린이대공원",
+      "expected": [
+        "Q485465"
+      ]
+    },
+    {
+      "id": "q10",
+      "kind": "none",
+      "text": "양자컴퓨터 수리 예약",
+      "expected": []
+    },
+    {
+      "id": "q11",
+      "kind": "none",
+      "text": "인공위성 엔진 정비",
+      "expected": []
+    }
+  ]
+}

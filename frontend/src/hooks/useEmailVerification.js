@@ -2,14 +2,14 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import api from '../api/axios';
 import useMessage from './useMessage';
 
-// ─── 상수 ────────────────────────────────────────────────────────────────────
+// 상수
 const STORAGE_KEY = 'reserve_email_verify'; // { endTime: number, email: string }
 const clearStorage = () => {
     try { localStorage.removeItem(STORAGE_KEY); } catch { /* 저장소 제한은 인증을 막지 않는다. */ }
 };
 
-// ─── 순수 헬퍼 ───────────────────────────────────────────────────────────────
-/** localStorage에서 저장된 인증 상태를 읽어온다. 실패 시 null 반환. */
+// 순수 헬퍼
+/* 저장된 인증 상태를 읽지 못하면 null로 처리한다. */
 const getStoredState = () => {
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
@@ -29,7 +29,6 @@ const formatTimer = (sec) => {
     return `${m}:${s}`;
 };
 
-// ─── Hook ────────────────────────────────────────────────────────────────────
 export default function useEmailVerification({
     sendEndpoint,
     verifyEndpoint,
@@ -67,7 +66,7 @@ export default function useEmailVerification({
         clearStorage();
     }, []);
 
-    // ── 타이머 시작 (절대 시간 기반) ──────────────────────────────────────────
+    // 타이머 시작 (절대 시간 기반)
     // setInterval이 아니라 Date.now()와 endTime을 매번 비교한다.
     // 브라우저가 탭을 백그라운드에서 throttling해도, 다시 활성화되는 순간
     // 남은 시간이 실제 경과량만큼 단숨에 줄어들어 서버 시간과 동기화된다.
@@ -82,7 +81,7 @@ export default function useEmailVerification({
         }, 1000);
     };
 
-    // ── 마운트: localStorage 복원 ─────────────────────────────────────────────
+    // 마운트: localStorage 복원
     // 모바일 OS가 탭을 메모리에서 날리거나, 이메일 확인 후 브라우저로 복귀할 때
     // endTime이 localStorage에 남아있으면 상태를 그대로 복원한다.
     useEffect(() => {
@@ -106,7 +105,7 @@ export default function useEmailVerification({
         };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // ── visibilitychange: 탭 복귀 시 즉시 재계산 ─────────────────────────────
+    // visibilitychange: 탭 복귀 시 즉시 재계산
     // setInterval은 백그라운드 탭에서 최대 ~1분으로 throttling된다.
     // 이메일 앱에서 돌아오는 순간 visibilitychange 이벤트로 즉각 보정한다.
     useEffect(() => {
@@ -122,7 +121,7 @@ export default function useEmailVerification({
         return () => document.removeEventListener('visibilitychange', onVisible);
     }, [expireVerification]);
 
-    // ── 코드 발송 ─────────────────────────────────────────────────────────────
+    // 코드 발송
     const sendCode = async () => {
         if (!mountedRef.current || sendBusyRef.current) return;
         sendBusyRef.current = true;
@@ -162,7 +161,7 @@ export default function useEmailVerification({
         }
     };
 
-    // ── 코드 검증 ─────────────────────────────────────────────────────────────
+    // 코드 검증
     const verifyCode = async () => {
         if (!mountedRef.current || verifyBusyRef.current || sendBusyRef.current) return;
         // 이 화면은 AntD Form 을 쓰므로 인라인 에러도 Form 의 기계(setFields)로 붙인다.
@@ -218,7 +217,7 @@ export default function useEmailVerification({
         return proof.ticket;
     };
 
-    // ── timerInfo (렌더링용) ──────────────────────────────────────────────────
+    // timerInfo (렌더링용)
     let timerInfo = null;
     if (timeLeft > 0) timerInfo = { text: `${isVerified ? '가입까지 남은 시간' : '남은 시간'} ${formatTimer(timeLeft)}`, isWarning: timeLeft <= 60 };
     else if (isCodeSent) timerInfo = { text: '시간 만료 — 재발송해주세요', isWarning: true };

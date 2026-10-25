@@ -9,6 +9,7 @@ import { RefreshToolbarSkeleton } from '../layout/routeSkeletonParts';
 import { MY_WAITING_STATUSES, MY_WAITING_SORTS } from './waitingDirectoryFilters';
 import { radius } from '../../styles/tokens';
 import IconToolSkeleton from '../common/IconToolSkeleton';
+import ListingContent from '../common/ListingContent';
 
 export const MY_WAITING_HELP = '열려 있는 동안 대기 현황이 자동으로 갱신돼요. 입장·취소한 내역은 당일에 확인할 수 있어요.';
 
@@ -65,16 +66,17 @@ export function WaitingTabSkeleton({ view = 'list', intakeMode = 'BOTH', paused 
     return <LoadingStatus className="reserve-waiting-tab" aria-label="대기 명단을 불러오는 중" aria-busy="true">
         <WaitingFiltersSkeleton business />
         <RefreshToolbarSkeleton search autoRefreshDomain="WAITING" />
-        <div className="reserve-waiting-summary" aria-hidden="true">
-            <div><h3><SkeletonText>대기 명단</SkeletonText></h3><div style={{ height: 20, marginTop: 4, display: 'flex', alignItems: 'center' }}><Bone width={204} height={13} /></div></div>
-            <div className="reserve-waiting-actions">
-                <Button variant={paused ? 'primary' : 'outline'} size="sm" disabled><SkeletonText>{paused ? '접수 시작' : '접수 중지'}</SkeletonText></Button>
-                {['ONSITE', 'BOTH'].includes(intakeMode) && <Button variant="outline" size="sm" disabled><SkeletonText>현장 접수 QR</SkeletonText></Button>}
-                <Button variant="primary" size="sm" disabled><SkeletonText>대기 접수</SkeletonText></Button>
+        <ListingContent notice={<>
+            <div className="reserve-waiting-summary" aria-hidden="true">
+                <div><h3><SkeletonText>대기 명단</SkeletonText></h3><div style={{ height: 20, marginTop: 4, display: 'flex', alignItems: 'center' }}><Bone width={204} height={13} /></div></div>
+                <div className="reserve-waiting-actions">
+                    <Button variant={paused ? 'primary' : 'outline'} size="sm" disabled><SkeletonText>{paused ? '접수 시작' : '접수 중지'}</SkeletonText></Button>
+                    {['ONSITE', 'BOTH'].includes(intakeMode) && <Button variant="outline" size="sm" disabled><SkeletonText>현장 접수 QR</SkeletonText></Button>}
+                    <Button variant="primary" size="sm" disabled><SkeletonText>대기 접수</SkeletonText></Button>
+                </div>
             </div>
-        </div>
-        <div className="reserve-waiting-form-help" aria-hidden="true" style={{ minHeight: 20, display: 'flex', alignItems: 'center' }}><Bone width="min(360px, 90%)" height={13} /></div>
-        <WaitingListSkeleton view={view} />
+            <div className="reserve-waiting-form-help" aria-hidden="true" style={{ minHeight: 20, display: 'flex', alignItems: 'center' }}><Bone width="min(360px, 90%)" height={13} /></div>
+        </>}><WaitingListSkeleton view={view} /></ListingContent>
     </LoadingStatus>;
 }
 WaitingTabSkeleton.propTypes = { view: PropTypes.oneOf(['list', 'cards']), intakeMode: PropTypes.string, paused: PropTypes.bool };
@@ -86,8 +88,9 @@ export function MyWaitingSkeleton({ view = 'list', statusLabel = MY_WAITING_STAT
             { value: 'sort', options: [{ value: 'sort', label: sortLabel }], className: 'reserve-explore-sort-filter reserve-reservation-sort-filter' },
         ]} />
         <RefreshToolbarSkeleton search autoRefreshDomain="WAITING" />
-        <p className="reserve-waiting-form-help"><SkeletonText>{MY_WAITING_HELP}</SkeletonText></p>
-        <WaitingListSkeleton view={view} personal />
+        <ListingContent notice={<p className="reserve-waiting-form-help"><SkeletonText>{MY_WAITING_HELP}</SkeletonText></p>}>
+            <WaitingListSkeleton view={view} personal />
+        </ListingContent>
     </LoadingStatus>;
 }
 MyWaitingSkeleton.propTypes = { view: PropTypes.oneOf(['list', 'cards']), statusLabel: PropTypes.string, sortLabel: PropTypes.string };

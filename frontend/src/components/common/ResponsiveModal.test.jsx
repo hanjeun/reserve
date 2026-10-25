@@ -44,7 +44,7 @@ describe('ResponsiveModal focus and viewport boundary', () => {
         await user.tab();
         expect(screen.getByRole('button', { name: '완료' })).toHaveFocus();
         await user.tab();
-        // user-event blurs the last control to body without the browser's focusin notification.
+        // user-event의 body 포커스 이동은 브라우저 focusin을 발생시키지 않는다.
         fireEvent.focusIn(document.body);
         expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus();
         await user.tab({ shift: true });

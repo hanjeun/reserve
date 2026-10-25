@@ -22,8 +22,7 @@ const bash = process.platform === 'win32'
     ? `${process.env.ProgramFiles ?? 'C:/Program Files'}/Git/bin/bash.exe`
     : '/bin/bash';
 
-// No executable can be resolved from PATH. Every external command in the runbook is mocked.
-// This exercises command ordering and fail-closed guards, not a MySQL/S3 restoration.
+// 외부 명령을 모두 대체해 순서와 거부 조건만 검사하며 실제 MySQL·S3 복원은 수행하지 않는다.
 const mocks = String.raw`
 exec 3>&2
 PATH=/reserve-runbook-test-no-executables

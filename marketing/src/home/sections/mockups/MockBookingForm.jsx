@@ -18,7 +18,7 @@ export default function MockBookingForm() {
             border: `1px solid ${colors.border.light}`,
             boxSizing: 'border-box',
         }}>
-            {/* 예약 날짜 — 표시만 */}
+
             <div style={{ marginBottom: 16 }}>
                 <label style={mockFormLabel}>예약 날짜</label>
                 <div style={{ ...mockInputBase, justifyContent: 'space-between', cursor: 'not-allowed' }}>
@@ -27,7 +27,6 @@ export default function MockBookingForm() {
                 </div>
             </div>
 
-            {/* 예약 시간 — 표시만 */}
             <div style={{ marginBottom: 16 }}>
                 <label style={mockFormLabel}>예약 시간</label>
                 <div style={{ ...mockInputBase, justifyContent: 'space-between', cursor: 'not-allowed' }}>
@@ -36,7 +35,6 @@ export default function MockBookingForm() {
                 </div>
             </div>
 
-            {/* 인원 수 — 실제 동작 */}
             <div style={{ marginBottom: 16 }}>
                 <label style={mockFormLabel}>인원 수</label>
                 <div style={{ ...mockInputBase, justifyContent: 'space-between' }}>
@@ -69,7 +67,6 @@ export default function MockBookingForm() {
                 </div>
             </div>
 
-            {/* 요청 사항 — 실제 입력 가능 */}
             <div style={{ marginBottom: 20 }}>
                 <label style={mockFormLabel}>요청 사항</label>
                 <div
@@ -108,7 +105,6 @@ export default function MockBookingForm() {
                 </div>
             </div>
 
-            {/* 예약 신청하기 — 디자인 시스템 Button, active 시 scale */}
             <Button
                 variant="primary"
                 size="lg"

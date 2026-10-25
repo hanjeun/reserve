@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
-/** Waiting owns its relay; shared Redis infrastructure has no waiting dependency. */
+/** 웨이팅 모듈이 릴레이를 소유하며 공통 Redis 기반은 웨이팅에 의존하지 않는다. */
 @Configuration(proxyBeanMethods = false)
 @Profile({"local & !prod & !blue & !green", "!local & (prod | blue | green)"})
 @ConditionalOnProperty(prefix = "reserve.redis", name = "enabled", havingValue = "true")

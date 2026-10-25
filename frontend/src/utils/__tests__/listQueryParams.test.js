@@ -63,6 +63,14 @@ describe('list URL conventions', () => {
             .toEqual({ tab: 'waiting', view: 'list', waitingStatus: 'all', waitingSort: 'recent', waitingPage: '1' });
     });
 
+    it('preserves the reservation server page across view normalization without mixing the waiting page', () => {
+        const normalized = normalizeListQueryParams('/my-reservations', new URLSearchParams('page=3&waitingPage=2&view=cards&status=CONFIRMED'));
+        expect(normalized.get('page')).toBe('3');
+        expect(normalized.get('waitingPage')).toBe('2');
+        expect(normalized.get('status')).toBe('CONFIRMED');
+        expect(normalizeListQueryParams('/my-reservations', new URLSearchParams('page=0')).has('page')).toBe(false);
+    });
+
     it('leaves authentication, payment, message-target and workspace URLs to their own owners', () => {
         for (const path of ['/oauth2/callback', '/payment/result', '/messages', '/business', '/admin']) {
             const query = 'storeId=14&tab=ads&paymentId=local-proof&view=cards';

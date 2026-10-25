@@ -12,21 +12,12 @@ import { Button, FormTextArea } from '../common';
 import useMessage from '../../hooks/useMessage';
 import { colors } from '../../styles/tokens';
 
-/**
- * 사업자 예약 관리 탭(BusinessPanel)의 예약 한 줄.
- * 레이아웃(이미지/정보/상태/금액/모바일 액션바)은 ReservationRow 공용 컴포넌트를 쓰고,
- * 여기선 사업자 전용 액션(승인/거절/완료/노쇼/취소/삭제)과 사유 입력 모달만 담당한다.
- * 2026-07: 원래 손님 쪽(MyReservations.jsx)과 완전히 따로 구현돼 있던 걸 통합 —
- * 모바일 액션바(겹침 방지) 처리가 이 화면엔 없었던 게 통합의 계기였다.
+/*
+ * 공통 예약 행에 사업자 전용 실행 도구·사유 모달을 연결한다.
  */
 
-/**
- * 사유 입력 모달의 종류별 문구 (2026-08-11).
- *
- * <p>거절과 취소는 모달 구조가 같고 문구만 다르다. 모달을 두 벌 복사하지 않고 여기서 갈라 쓴다 —
- * 복사하면 나중에 한쪽에만 고친 게 반드시 생긴다(maskClosable 컨벤션이 실제로 그렇게 샜다).
- * 문구를 분리한 이유는 라벨이 다르기 때문이다. "거절"은 아직 승인 안 된 요청을 안 받는 것이고,
- * "취소"는 이미 확정된 약속을 가게가 깨는 것이라 이용자가 받는 의미가 전혀 다르다.
+/*
+ * 거절·취소는 입력 모달을 공유하되 사용자에게 전달할 상태 의미는 구분한다.
  */
 const REASON_MODALS = {
     reject: {
@@ -54,20 +45,15 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
     const { id, status } = reservation;
 
     const isActing = (key) => actionLoading === `${key}-${id}`;
-    // UNCONFIRMED = 승인됐는데 시간이 지나도록 처리가 안 된 건 (2026-08-11).
-    // CONFIRMED 와 똑같은 버튼을 준다 — 처리를 안 했다는 이유로 처리 수단을 막으면 영영 못 닫는다.
+    // 승인 뒤 처리가 지연된 예약은 미처리 상태로 구분한다.
+
     const isOpenConfirmed = status === 'CONFIRMED' || status === 'UNCONFIRMED';
     const hasAction = status === 'PENDING' || isOpenConfirmed;
 
     const closeReasonModal = () => { setReasonModal(null); setReason(''); };
 
-    /**
-     * 노쇼는 확인을 한 번 받는다 (2026-08-11).
-     *
-     * <p>거절·취소에는 사유 모달이 있어 손이 한 번 멈추는데, 노쇼만 <b>누르는 즉시 확정</b>이었다.
-     * 완료 버튼 바로 옆이라 오조작이 쉽고, 되돌리는 수단도 없다.
-     * 게다가 노쇼는 <b>손님에게 불이익이 남는 기록</b>이라 셋 중 가장 무거운데 가장 쉬웠다.
-     * 사유는 받지 않는다 — 노쇼는 "안 왔다"는 사실 하나뿐이라 적을 게 없다.
+    /*
+     * 손님에게 남는 노쇼 기록은 실행 전에 확인한다.
      */
     const handleNoShow = () => {
         confirm({
@@ -149,9 +135,9 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
                 onClose={() => setDetailOpen(false)}
             />
 
-            {/* ⚠️ open={reasonModal != null} 로 두고 문구만 갈아끼운다. Modal에 key를 주면 닫을 때
-                언마운트돼 닫힘 애니메이션이 죽는다(antd 6). reasonModal이
-                null이 되는 순간 REASON_MODALS 조회도 없어지므로 문구는 fallback으로 방어한다. */}
+            {/*
+             * 닫힘 모션을 유지하도록 모달 key를 바꾸지 않고 닫힘 중 문구는 대체값으로 유지한다.
+             */}
             <Modal
                 title={
                     <Flex align="center" gap={8}>
@@ -160,9 +146,9 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
                     </Flex>
                 }
                 open={reasonModal != null}
-                /* mask.closable=false: 사유를 작성하는 모달 — 바깥 클릭으로 내용 유실 방지.
-                   컨벤션 — 입력 폼/파괴적 확인 모달은 바깥 클릭으로 안 닫히고, 읽기 전용 모달
-                   (상세보기/QR/예약상세)은 AntD 기본값(true)대로 아무데나 눌러도 닫힌다. */
+                /*
+                 * 사유 입력이 바깥 클릭으로 유실되지 않게 한다.
+                 */
                 mask={{ closable: false }}
                 onOk={handleReasonConfirm}
                 onCancel={closeReasonModal}

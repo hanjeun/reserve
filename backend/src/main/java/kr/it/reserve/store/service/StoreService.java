@@ -61,7 +61,6 @@ import java.util.concurrent.Executor;
 public class StoreService {
     private static final String EDIT_FORBIDDEN_MESSAGE = "가게를 수정할 권한이 없어요.";
 
-
     private final StoreRepository storeRepository;
     private final StoreFulltextSearch storeFulltextSearch;
     private final FileStorageService fileStorageService;
@@ -78,15 +77,8 @@ public class StoreService {
     private StoreUpdates updates;
 
     /**
-     * MySQL ngram=2와 일치하는 인덱스가 확인되면 FULLTEXT 후보 검색을 사용한다.
-     * 원문 LIKE와 같은 결과 수가 보장되는 요청만 사용하며 H2·미설치·오류는 LIKE로 폴백한다.
-     * 명시적으로 false를 지정하면 탐지도 수행하지 않는다.
-     *
-     * <p>★ 이 필드는 <b>final이 아니어야 한다.</b> 이 클래스는 Lombok {@code @RequiredArgsConstructor}를
-     * 쓰는데, final 필드는 생성자 파라미터가 되고 그때 {@code @Value}는 (copyableAnnotations 설정 없이는)
-     * 생성자로 복사되지 않아 주입이 안 된다. non-final이면 필드 주입 경로를 탄다.
-     *
-     * <p>선행 조건: {@code docs/technical/manual-ddl.md}의 FULLTEXT 인덱스 DDL 적용.
+     * MySQL ngram=2와 일치하는 인덱스에서만 후보를 사용하고 원문 동등성이 맞지 않으면 LIKE로 복귀한다. false이면 탐지하지 않는다.
+     * {@code @Value}는 생성자 대신 필드에 주입하므로 final로 바꾸지 않는다.
      */
     @Value("${search.store.fulltext-enabled:true}")
     private boolean fulltextEnabled;
@@ -156,13 +148,10 @@ public class StoreService {
             store.setOpenTime(request.getOpenTime());
             store.setCloseTime(request.getCloseTime());
         }
-        // ★ 브레이크타임은 영업시간 if 블록 **밖**에 둔다.
-        //   예전엔 안에 있어서 영업시간 없이 브레이크타임만 보내면 조용히 버려졌고,
-        //   수정 경로(updateStore)는 블록 밖이라 **생성과 수정의 동작이 달랐다**.
+        // 브레이크타임은 영업시간 입력과 독립적으로 반영한다.
         store.setBreakStartTime(request.getBreakStartTime());
         store.setBreakEndTime(request.getBreakEndTime());
-        // ★ 저장 직전에 "최종 값"으로 검증한다 — 요청 본문이 아니라 엔티티를 본다.
-        //   요청만 보면 생성/수정 경로가 서로 다른 판정을 하게 된다(수정은 일부 필드만 올 수 있다).
+        // 부분 수정도 같은 규칙을 적용하도록 저장할 최종 값으로 검증한다.
         validateBusinessHours(store);
         normalizeDepositPaymentPolicy(store);
 
@@ -202,9 +191,6 @@ public class StoreService {
         return directory().getStore(id);
     }
 
-    /**
-     * 가게 수정
-     */
     @Transactional
     public StoreResponse updateStore(Long id, StoreUpdateRequest request, Member member) {
         log.info("Store update started: storeId={}", id);
@@ -260,9 +246,7 @@ public class StoreService {
             if (request.getCloseTime() != null) store.setCloseTime(request.getCloseTime());
             if (request.hasField("breakStartTime")) store.setBreakStartTime(request.getBreakStartTime());
             if (request.hasField("breakEndTime")) store.setBreakEndTime(request.getBreakEndTime());
-            // (2026-08-09) 여기 있던 setCloseTime 중복 호출을 제거했다 — 위에서 이미 같은 값을 넣는다.
-            // ★ 병합이 끝난 뒤 검증한다. 요청에 openTime 만 왔다면 기존 closeTime 과 비교돼야 한다 —
-            //   요청 본문끼리만 비교하면 "12시 오픈만 보냈는데 마감이 10시인 가게"를 통과시킨다.
+            // 부분 수정은 기존 값과 병합한 뒤 검사해 영업시간 모순을 놓치지 않는다.
             validateBusinessHours(store);
             normalizeDepositPaymentPolicy(store);
 
@@ -490,19 +474,7 @@ public class StoreService {
         return km;
     }
 
-    /**
-     * 운영 기간(openDate~closeDate)을 정규화해 저장한다 (2026-08-24 신설).
-     *
-     * <p><b>지난 날짜를 걸러내지 않는다</b> — {@code closedDates} 는 걸러내지만 여기는 다르다.
-     * 임시 휴무는 계속 쌓이기만 하는 목록이라 정리가 필요하지만, 운영 기간은 값 하나이고
-     * <b>이미 끝난 팝업스토어</b>도 정상적인 상태다. 걸러내면 종료된 가게가 갑자기 무기한 영업이 된다.
-     *
-     * <p>형식이 깨진 값은 {@code null}(제한 없음)로 흡수한다 — 저장을 통째로 실패시킬 사안이 아니고,
-     * 이 화면은 날짜 선택기를 쓰므로 정상 조작으로는 깨진 값이 나오지 않는다.
-     *
-     * <p>종료일이 시작일보다 앞이면 <b>거절한다.</b> 그 조합은 "예약을 받을 수 있는 날이 하루도 없는
-     * 가게"가 되는데, 영업시간 뒤집힘과 같은 종류의 조용한 고장이다.
-     */
+    /** 이미 종료된 운영 기간도 보존한다. 잘못된 날짜는 제한 없음으로 정규화하되 종료일이 시작일보다 이르면 거부한다. */
     private void applyOperatingPeriod(Store store, String rawOpen, String rawClose) {
         LocalDate open  = parseIsoDateOrNull(rawOpen);
         LocalDate close = parseIsoDateOrNull(rawClose);
@@ -525,19 +497,7 @@ public class StoreService {
         }
     }
 
-    /**
-     * 예약 방식과 회차 목록을 정규화해 저장한다 (2026-08-24 신설).
-     *
-     * <p><b>모르는 값은 거절하지 않고 {@code SLOT} 으로 흡수한다.</b> 이 값이 잘못 오면
-     * 가게가 예약을 못 받는 상태가 되는데, 그건 400 을 돌려주는 것보다 훨씬 나쁘다.
-     * 옛 클라이언트가 이 필드를 아예 안 보내는 경우도 같은 경로로 흘러간다.
-     *
-     * <p><b>SESSION 인데 회차가 하나도 없으면 거절한다.</b> 그 상태로 저장하면
-     * 예약 가능한 시각이 0개인 가게가 조용히 만들어진다 — 영업시간 뒤집힘과 같은 종류다.
-     *
-     * <p>회차 목록은 <b>방식과 무관하게 항상 덮어쓴다.</b> SLOT 으로 되돌릴 때 옛 회차가 남아 있으면,
-     * 나중에 다시 SESSION 으로 바꿨을 때 기억나지 않는 값이 되살아난다.
-     */
+    /** 알 수 없는 예약 방식은 SLOT으로 해석한다. SESSION은 회차가 필요하며, 다른 방식으로 바꿀 때도 기존 회차 목록을 덮어쓴다. */
     private void applyBookingType(Store store, String rawType, List<String> rawSessions) {
         Store.BookingType type = parseBookingType(rawType);
         List<LocalTime> sessions = normalizeSessionTimes(rawSessions);
@@ -592,29 +552,7 @@ public class StoreService {
         return out.stream().sorted().limit(MAX_SESSION_TIMES).toList();
     }
 
-    // ══ 영업시간 정합성 (2026-08-24 신설) ══════════════════════════════════
-    //
-    // ★ 왜 clamp 가 아니라 거절인가 — 다른 옵션들은 "이상한 값이 오면 안전한 값으로 수렴"시킨다.
-    //   숫자 하나는 무엇으로 고쳐야 할지가 자명하기 때문이다(음수 정원 → 무제한 등).
-    //   그런데 "오픈 12시, 마감 10시"는 무엇으로 고쳐야 할지가 자명하지 않다.
-    //   임의로 뒤집거나 버리면 사장님이 의도한 것과 다른 가게가 조용히 저장된다.
-    //
-    // ★ 그리고 이건 조용히 두면 안 되는 종류다. 지금까지는 검증이 없어서 저장은 성공하고
-    //   화면도 정상인데 **슬롯 생성 루프가 한 번도 안 돌아 손님 쪽 예약 가능 시간이 0개**가 됐다
-    //   (ReservationService: 남은 당일 시간이 예약 단위보다 짧으면 슬롯 생성 종료).
-    //   사장님은 예약이 안 들어오는 이유를 알 방법이 없다. 시끄러운 실패가 맞다.
-
-    /**
-     * 영업시간·브레이크타임의 정합성을 검사한다. 어긋나면 {@link StoreException} 으로 거절한다.
-     *
-     * <p><b>반드시 병합이 끝난 엔티티를 넘길 것.</b> 수정 경로는 일부 필드만 오므로
-     * 요청 본문끼리 비교하면 기존 값과의 모순을 놓친다.
-     *
-     * <p>브레이크타임이 <b>한쪽만</b> 온 경우는 거절하지 않고 <b>양쪽을 지운다</b> —
-     * 슬롯 계산이 {@code breakStart != null && breakEnd != null} 일 때만 브레이크로 취급하므로
-     * 한쪽만 남겨두면 "설정한 것 같은데 적용은 안 되는" 상태가 된다. 그건 데이터를 지우는 쪽이
-     * 오해가 적다(사장님 입력이 불완전했던 것이지 모순은 아니다).
-     */
+    /** 부분 수정은 병합이 끝난 엔티티로 영업시간을 검사한다. 브레이크 타임 한쪽만 있으면 양쪽을 비운다. */
     private void normalizeDepositPaymentPolicy(Store store) {
         // 결제액이 없는 가게는 나중 결제를 사용할 수 없다. 기존 예약의 금액·환불 스냅샷은 수정하지 않는다.
         if (store.getNoShowDeposit() == null || store.getNoShowDeposit() <= 0) store.setAllowLatePayment(false);
@@ -626,7 +564,7 @@ public class StoreService {
 
         if (open != null && close != null && !open.isBefore(close)) {
             // 같은 시각도 거절이다 — 길이가 0인 영업시간은 슬롯이 하나도 안 나온다.
-            // ⚠️ 자정을 넘는 영업시간(22:00~02:00)은 지금 구조가 지원하지 않는다.
+            // 주의: 자정을 넘는 영업시간(22:00~02:00)은 지금 구조가 지원하지 않는다.
             //    LocalTime 비교라 wrap-around 를 표현할 수 없고, 슬롯 루프도 마찬가지다.
             //    지원하려면 "다음날로 넘어가는 영업"을 모델에 넣어야 하므로 별도 작업이다.
             //    그때까지는 여기서 걸러서 "저장은 됐는데 예약이 안 되는" 상태를 막는다.
@@ -661,16 +599,16 @@ public class StoreService {
     /** 회차 상한. 이보다 많아지면 SLOT 방식이 맞다. */
     private static final int MAX_SESSION_TIMES = 50;
 
-    // ══ 가게 옵션 정규화 (2026-08-09 신설) ════════════════════════════════
+    // 가게 옵션 정규화
     //
-    // ★ 왜 컨트롤러의 @Valid 가 아니라 여기인가
+    // 왜 컨트롤러의 @Valid 가 아니라 여기인가
     //   이 두 엔드포인트는 @ModelAttribute(multipart) 라 검증 실패가 BindException 으로
     //   나가 기존 에러 응답 규격과 달라진다. 또 사장님 입력은 Select 라 범위를 벗어날 일이
     //   없고, 실제 위험은 **API 를 직접 두드리는 경우**다. 그럴 땐 거절보다 안전한 값으로
     //   수렴시키는 쪽이 서비스를 멈추지 않는다. 위 clampNearbyRadiusKm 이 이미 그 패턴이다.
     //   생성·수정 두 경로가 **반드시 여기를 지나가게** 해서 한 쪽만 고치는 사고를 막는다.
 
-    /** 예약 단위 시간(분). ★ 0 이면 ReservationService 의 슬롯 루프가 전진하지 않아 **무한루프 + OOM** 이 된다. */
+    /** 슬롯 생성이 전진하도록 예약 단위 시간은 양수여야 한다. */
     private static final int MIN_SLOT_MINUTES = 5;
     private static final int MAX_SLOT_MINUTES = 480;
     private static final int DEFAULT_SLOT_MINUTES = 30;
@@ -708,11 +646,7 @@ public class StoreService {
     /** 예약 마감(시간 전). null 또는 0 = 제한 없음. 음수는 0 으로 수렴. */
     private static final int MAX_BOOKING_DEADLINE_HOURS = 24 * 365;
 
-    /**
-     * 정기 휴무 요일 정규화 — ISO 범위(1~7) 밖 값과 중복을 버린다 (2026-08-11).
-     * 폼에서 오는 값이라 신뢰하지 않는다. 범위를 안 자르면 {@code isClosedOn} 이 영원히 못 맞추는
-     * 값(예: 0, 8)이 들어가 "휴무로 저장했는데 예약이 들어오는" 상태가 된다.
-     */
+    /** 휴무 요일은 ISO 범위 1~7 안의 중복 없는 값으로 정규화한다. */
     private List<Integer> normalizeClosedDays(List<Integer> days) {
         if (days == null) return List.of();
         return days.stream()
@@ -776,7 +710,7 @@ public class StoreService {
 
     /**
      * 부분 환불 기준일. <b>0 = 적용 안 함</b>(sentinel).
-     * ★ fullDays 이상이면 부분 환불 구간(partial <= d < full)이 비어 설정이 조용히 죽는다.
+     * fullDays 이상이면 부분 환불 구간(partial <= d < full)이 비어 설정이 조용히 죽는다.
      * 사장님은 설정했다고 믿고 있는데 아무 일도 안 일어나므로, 차라리 "적용 안 함"으로 정규화해
      * 화면에도 그대로 보이게 한다.
      */
@@ -825,10 +759,6 @@ public class StoreService {
             String keyword, String sort, Pageable pageable, Double lat, Double lng, String domain, String region) {
         return directory().search(keyword, sort, pageable, lat, lng, domain, region);
     }
-
-
-
-
 
     /** 내부 전체 조회도 공개 정책과 안정 정렬을 공유한다. */
     @Transactional(readOnly = true)

@@ -10,15 +10,8 @@ import useLiveUpdatesStatus from '../../hooks/useLiveUpdatesStatus';
 
 const { Text } = Typography;
 
-/**
- * 공통 목록 툴바 (rate limit 내장 — 3초 쿨다운)
- *
- * 예약·가게 목록에서 쓰는 입력 없는 FilterMenu를 관리자·사업자 목록에도 공유한다.
- * 검색이 있으면 필터 행 아래에 검색+새로고침 행을 두고, 검색이 없으면 한 줄에 끝낸다.
- *
- * [selects 없음]
- *   행1: [Search──────────────] → [새로고침]
- *        (search 없으면 새로고침만 오른쪽)
+/*
+ * 검색·선택·새로고침은 같은 목록 도구줄 배치를 공유한다.
  */
 const FilterToolbar = ({
     selects = [],
@@ -36,15 +29,15 @@ const FilterToolbar = ({
     const live = useLiveUpdatesStatus();
     const showRefresh = Boolean(onReload) && !live.domains.includes(autoRefreshDomain);
     if (initialLoading) return <FilterToolbarSkeleton selects={selects} count={count} search={search} extra={extra} extraSkeleton={extraSkeleton} spread={spread} style={style} showRefresh={showRefresh} />;
-    /* 쿨다운·스피너 정지는 RefreshButton 이 갖는다 — 예전엔 이 파일과 MailboxTab, ChatTab 이
-       같은 3초 쿨다운을 각자 구현하고 있었고(정리 안 되는 setTimeout 포함),
-       회전이 중간에서 끊겨 아이콘이 튀는 문제도 네 곳에 똑같이 있었다. */
+    /*
+     * 새로고침 대기·스피너 수명은 RefreshButton에서 관리한다.
+     */
     const reloadBtn = showRefresh ? <RefreshButton onReload={onReload} loading={loading} /> : null;
 
     if (selects.length > 0) {
-        // 건수가 있는 목록은 선택값·꺾쇠 바로 다음에 건수를 둔다. 고정 폭 버튼은 실제 글자보다
-        // 넓은 투명 클릭 영역을 만들어 "전체 상태    25건"처럼 보이므로, 내용 폭으로 줄인다.
-        // select.width는 긴 선택값이 화면을 밀지 않도록 하는 최대 폭으로만 계속 사용한다.
+        // 건수는 선택값·꺾쇠 바로 옆에 두고 선택 도구는 내용 너비로 맞춘다.
+
+        // 지정 너비는 긴 선택값을 제한하는 최대 폭으로만 사용한다.
         const keepCountAdjacent = count != null;
         const menuRow = (
             <div className="reserve-explore-filters reserve-filter-toolbar-primary" aria-label="목록 필터">
@@ -100,11 +93,12 @@ const FilterToolbar = ({
         );
     }
 
-    /* selects 없음 — 1줄 구조 (검색 + 새로고침 같은 행) */
+    /* 선택 메뉴가 없으면 검색·새로고침을 한 줄에 둔다. */
     return (
         <div className="reserve-filter-toolbar" style={style}>
-            {/* 목록 제어는 왼쪽에, 건수와 새로고침은 오른쪽 끝에 둔다. 검색창과 새로고침이
-                붙지 않도록 이 컴포넌트를 쓰는 모든 관리자·사업자 목록에서 한 번에 강제한다. */}
+            {/*
+             * 목록 검색과 건수·새로고침의 배치를 같은 관문에서 유지한다.
+             */}
             <div className={`reserve-filter-toolbar-secondary${spread ? ' reserve-filter-toolbar-secondary--spread' : ''}${!search && !extra ? ' reserve-filter-toolbar-secondary--refresh-only' : ''}`}>
                 {extra}
                 {search && (

@@ -38,8 +38,7 @@ function collectMarkdownFiles(directory, result = []) {
   return result;
 }
 
-// 여는 펜스 길이부터 3까지 한 글자씩 줄여 가며, bodyStart 이후 가장 가까운 닫는 펜스 줄의 끝을 찾는다.
-// 이전 정규식 /^(?: {0,3})(`{3,}|~{3,})[^\n]*\n[\s\S]*?^(?: {0,3})\1[ \t]*$/gm 의 백트래킹 순서를 그대로 따른다.
+// 펜스 길이를 줄이며 가장 가까운 닫는 줄을 찾아 마크다운 해석 순서를 유지한다.
 function findFencedBlockEnd(markdown, fenceRun, bodyStart) {
   for (let length = fenceRun.length; length >= 3; length -= 1) {
     const closingFence = new RegExp(String.raw`^ {0,3}${fenceRun.slice(0, length)}[ \t]*$`, 'gm');
@@ -78,7 +77,7 @@ function normalizeTarget(rawTarget) {
   let target = rawTarget.trim();
   if (target.startsWith('<') && target.endsWith('>')) target = target.slice(1, -1).trim();
 
-  // Markdown destinations may be followed by an optional quoted title.
+  // 링크 경로 뒤의 선택적 인용 제목은 경로에서 제외한다.
   const titleMatch = target.match(/^(\S+?)(?:\s+["'(].*)$/);
   if (titleMatch) target = titleMatch[1];
 
@@ -118,12 +117,9 @@ function localPathFor(source, rawTarget) {
 function extractTargets(markdown) {
   const targets = [];
   const patterns = [
-    // Inline links and images. The destination intentionally stops at whitespace
-    // or the first closing parenthesis; repository paths do not use parentheses.
+// 저장소 경로에는 괄호를 사용하지 않으므로 첫 공백이나 닫는 괄호에서 경로를 끝낸다.
     /!?\[[^[\]\n]*\]\((<[^>\n]+>|[^\s)]+)(?:\s+["'(][^\n]*)?\)/g,
-    // Reference definitions: [name]: path "optional title"
     /^ {0,3}\[[^\]\n]+\]:\s*(<[^>\n]+>|\S+)/gm,
-    // Simple HTML links and images used in README files.
     /\b(?:href|src)\s*=\s*["']([^"']+)["']/gi,
   ];
 

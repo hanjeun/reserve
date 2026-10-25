@@ -1,6 +1,4 @@
-/* Search-specific motion: pair the search field and content with shared header restoration.
-   열 때 올라오고, 취소·Esc·검색 실행으로 닫을 때 내려간다(짝).
-   닫힌 뒤의 원래 화면·결과 화면에는 옆으로 밀리는 페이지 전환을 걸지 않는다(routeEntryMotion, 2026-09-23). */
+/* 검색 입력과 본문은 열림·닫힘 모션을 공유한다. 복귀 화면에는 별도 옆 이동을 적용하지 않는다. */
 @media (prefers-reduced-motion: no-preference) {
     .reserve-search-page--entering .reserve-search-header {
         animation: reserve-search-controls-enter var(--reserve-search-motion-duration, 220ms) cubic-bezier(.22, 1, .36, 1) both;
@@ -8,11 +6,11 @@
     .reserve-search-page--leaving .reserve-search-header {
         animation: reserve-search-controls-leave var(--reserve-search-motion-duration, 220ms) cubic-bezier(.4, 0, 1, 1) both;
     }
-    .reserve-search-page--entering .reserve-search-content {
+    .reserve-search-page--entering :is(.reserve-search-content, .reserve-search-motion-content) {
         animation: reserve-search-content-enter var(--reserve-search-motion-duration, 220ms) cubic-bezier(0.22, 1, 0.36, 1) both;
     }
 
-    .reserve-search-page--leaving .reserve-search-content {
+    .reserve-search-page--leaving :is(.reserve-search-content, .reserve-search-motion-content) {
         animation: reserve-search-content-leave var(--reserve-search-motion-duration, 220ms) cubic-bezier(0.55, 0, 1, 0.45) both;
     }
 
@@ -30,12 +28,12 @@
 }
 
 @media (max-width: 767px) and (prefers-reduced-motion: no-preference) {
-    .reserve-search-page--entering .reserve-search-content {
+    .reserve-search-page--entering :is(.reserve-search-content, .reserve-search-motion-content) {
         animation-name: reserve-search-content-enter-mobile;
         animation-duration: var(--reserve-search-motion-duration, 220ms);
     }
 
-    .reserve-search-page--leaving .reserve-search-content {
+    .reserve-search-page--leaving :is(.reserve-search-content, .reserve-search-motion-content) {
         animation-name: reserve-search-content-leave-mobile;
         animation-duration: var(--reserve-search-motion-duration, 220ms);
     }

@@ -90,7 +90,6 @@ public class MemberApiController {
         return ApiResponse.success(updated, "위치가 등록됐어요.");
     }
 
-    // 회원 탈퇴
     @GetMapping("/withdrawal-readiness")
     public ApiResponse<MemberWithdrawalReadiness> getWithdrawalReadiness() {
         Member member = SecurityUtil.getCurrentMember("탈퇴 준비 상태를 확인할 권한이 없어요.");

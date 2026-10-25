@@ -7,6 +7,8 @@ import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useGoBack from '../../hooks/useGoBack';
 import { useWindowWidth } from '../../hooks';
 import useMessengerStore from '../../store/useMessengerStore';
+import useAuthStore from '../../store/useAuthStore';
+import { parseSearchMessageTarget } from '../../utils/searchResults';
 import { breakpoints } from '../../styles/tokens';
 
 const EXIT_FALLBACK_MS = 360;
@@ -18,6 +20,10 @@ const MessagesPage = () => {
     const width = useWindowWidth();
     const openPanel = useMessengerStore((state) => state.openPanel);
     const openStore = useMessengerStore((state) => state.openStore);
+    const openSupport = useMessengerStore((state) => state.openSupport);
+    const openOwnerRoom = useMessengerStore((state) => state.openOwnerRoom);
+    const userRole = useAuthStore(state => state.user?.role);
+    const initialSelection = parseSearchMessageTarget(params, userRole);
     const skeletonShown = useSkeletonShown();
     const [animateEntry] = useState(() => !skeletonShown);
     const [closing, setClosing] = useState(false);
@@ -32,11 +38,13 @@ const MessagesPage = () => {
     useEffect(() => {
         if (!handOffToDesktopPanel || completedRef.current) return;
         completedRef.current = true;
-        const storeId = Number(params.get('storeId'));
-        if (Number.isInteger(storeId) && storeId > 0) openStore(storeId);
+        const target = parseSearchMessageTarget(params, userRole);
+        if (target?.kind === 'store') openStore(target.storeId);
+        else if (target?.kind === 'owner') openOwnerRoom(target.roomId);
+        else if (target?.kind === 'support') openSupport();
         else openPanel();
         goBack();
-    }, [goBack, handOffToDesktopPanel, openPanel, openStore, params]);
+    }, [goBack, handOffToDesktopPanel, openPanel, openStore, openOwnerRoom, openSupport, params, userRole]);
 
     const finishClose = useCallback(() => {
         if (completedRef.current) return;
@@ -75,7 +83,7 @@ const MessagesPage = () => {
             }}
             aria-hidden={closing || undefined}
         >
-            <MessengerContent surface="page" initialStoreId={params.get('storeId')} onClose={requestClose} />
+            <MessengerContent surface="page" initialSelection={initialSelection} onClose={requestClose} />
         </div>
     );
 };

@@ -38,7 +38,15 @@ public class WaitingEventStream {
     private RedisWaitingRelay relay;
 
     public synchronized SseEmitter subscribe(Member member, LocalDateTime oauthAuthenticatedAt) {
-        var identity = UpdateStreamAccess.waitingIdentity(member, oauthAuthenticatedAt);
+        return subscribe(member, oauthAuthenticatedAt, null);
+    }
+
+    public synchronized SseEmitter subscribe(Member member, LocalDateTime oauthAuthenticatedAt, String loginMethod) {
+        return subscribe(member, oauthAuthenticatedAt, loginMethod, null);
+    }
+
+    public synchronized SseEmitter subscribe(Member member, LocalDateTime oauthAuthenticatedAt, String loginMethod, String sessionId) {
+        var identity = UpdateStreamAccess.waitingIdentity(member, oauthAuthenticatedAt, loginMethod, sessionId);
         if (identity == null || !access.current(identity)) {
             throw new WaitingException("로그인 상태를 확인해주세요.", HttpStatus.FORBIDDEN);
         }
@@ -95,7 +103,7 @@ public class WaitingEventStream {
 
     private void complete(SseEmitter emitter) {
         try { emitter.complete(); }
-        catch (IllegalStateException disconnected) { /* Already closed by the Servlet container. */ }
+        catch (IllegalStateException disconnected) { /* 서블릿 컨테이너가 이미 연결을 닫았다. */ }
     }
 
     private boolean send(SseEmitter emitter, String name, Object data) {

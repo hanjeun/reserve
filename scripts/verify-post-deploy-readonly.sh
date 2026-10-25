@@ -1,13 +1,7 @@
 #!/usr/bin/env bash
-#
-# RESERVE 배포 후 DB 구조와 운영 큐를 읽기 전용으로 점검한다.
-#
-#   sudo RESERVE_VERIFY_ENV=/etc/reserve-backup.env \
-#     /usr/local/bin/reserve-post-deploy-verify
-#   DDL 11/12/13 후보 적용 후에만 RESERVE_VERIFY_WAITING_SIGNUP_SCHEMA=1을 추가한다.
-#
-# 이 스크립트는 테이블·컬럼·인덱스와 현재 큐 상태만 조회한다. PortOne 재조회,
-# 웹훅 재처리, S3 객체 삭제, READY 결제 상태 변경은 의도적으로 하지 않는다.
+# 운영 큐와 스키마만 조회하며 실제 결제·재처리·삭제·보정은 수행하지 않는다.
+# 해당 DDL 준비 후 RESERVE_VERIFY_WAITING_SIGNUP_SCHEMA=1 또는 RESERVE_VERIFY_AUTH_ADMISSION_SCHEMA=1로 추가 검사한다.
+# 추가 SQL 검사는 실제 릴리스 JAR의 Hibernate validate를 대체하지 않는다.
 
 set -euo pipefail
 
@@ -33,6 +27,12 @@ warn() { echo "[attention] $*" >&2; ATTENTION=1; }
 WAITING_SIGNUP_SCHEMA="${RESERVE_VERIFY_WAITING_SIGNUP_SCHEMA:-0}"
 [[ "$WAITING_SIGNUP_SCHEMA" = "0" || "$WAITING_SIGNUP_SCHEMA" = "1" ]] \
     || die "RESERVE_VERIFY_WAITING_SIGNUP_SCHEMA must be 0 or 1"
+AUTH_ADMISSION_SCHEMA="${RESERVE_VERIFY_AUTH_ADMISSION_SCHEMA:-0}"
+[[ "$AUTH_ADMISSION_SCHEMA" = "0" || "$AUTH_ADMISSION_SCHEMA" = "1" ]] \
+    || die "RESERVE_VERIFY_AUTH_ADMISSION_SCHEMA must be 0 or 1"
+if [[ "$AUTH_ADMISSION_SCHEMA" = "1" ]]; then
+    [[ "$DB_USER" = "reserve_backup" ]] || die "auth/admission checks require the configured backup role"
+fi
 
 docker inspect "$MYSQL_CONTAINER" >/dev/null 2>&1 \
     || die "container '$MYSQL_CONTAINER' not found"
@@ -41,8 +41,11 @@ docker inspect "$MYSQL_CONTAINER" >/dev/null 2>&1 \
 
 mysql_query() {
     local query=$1
+    if [[ "$AUTH_ADMISSION_SCHEMA" = "1" ]]; then
+        query="START TRANSACTION READ ONLY; ${query} ROLLBACK;"
+    fi
     docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER" \
-        mysql --user="$DB_USER" --batch --skip-column-names "$DB_NAME" -e "$query"
+        mysql --connect-timeout=5 --user="$DB_USER" --batch --skip-column-names "$DB_NAME" -e "$query"
 }
 
 require_table() {
@@ -73,12 +76,13 @@ require_index() {
 
 require_column_contract() {
     local table="$1" column="$2" type="$3" nullable="$4" default="$5"
+    local expected_extra="${6:-}" escaped_type="${3//\'/\'\'}"
     local default_condition="COLUMN_DEFAULT IS NULL"
     if [[ "$default" != "<NULL>" ]]; then
         default_condition="BINARY COLUMN_DEFAULT = BINARY '${default//\'/\'\'}'"
     fi
     local count
-    count="$(mysql_query "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = '${table}' AND column_name = '${column}' AND LOWER(column_type) = '${type}' AND is_nullable = '${nullable}' AND ${default_condition} AND extra = '';")"
+    count="$(mysql_query "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = '${table}' AND column_name = '${column}' AND BINARY column_type = BINARY '${escaped_type}' AND is_nullable = '${nullable}' AND ${default_condition} AND extra = '${expected_extra}';")"
     [[ "$count" = "1" ]] || die "column contract differs: ${table}.${column} (type/null/default/extra)"
     note "column ${table}.${column}: contract matches"
 }
@@ -96,8 +100,7 @@ require_index_contract() {
 require_enum_check() {
     local table="$1" constraint="$2" column="$3"
     shift 3
-    # MySQL emits charset introducers and, on some servers, escaped literal quotes.
-    # Match only the declared IN list; additional expressions and NOT ENFORCED fail.
+    # MySQL의 문자셋 접두사·따옴표 이스케이프는 허용하되 추가 조건과 비활성 CHECK는 거부한다.
     local quote="[\\\\]?'" charset="(_utf8mb4|_utf8mb3|_utf8|_latin1|_ascii|_binary)?"
     local pattern="^[[:space:]]*[(]*[[:space:]]*\`?${column}\`?[[:space:]]+[iI][nN][[:space:]]*[(][[:space:]]*"
     local separator="" value
@@ -113,9 +116,23 @@ require_enum_check() {
     note "CHECK ${table}.${constraint}: enforced contract matches"
 }
 
+require_foreign_key_contract() {
+    local table="$1" constraint="$2" column="$3" referenced_table="$4" referenced_column="$5" deletion="$6"
+    local delete_condition="rc.delete_rule IN ('NO ACTION','RESTRICT')" matches
+    if [[ "$deletion" = "CASCADE" ]]; then delete_condition="rc.delete_rule = 'CASCADE'"; fi
+    matches="$(mysql_query "SELECT IF(COUNT(*) = 1 AND SUM(k.column_name = '${column}' AND k.ordinal_position = 1 AND k.referenced_table_schema = DATABASE() AND k.referenced_table_name = '${referenced_table}' AND k.referenced_column_name = '${referenced_column}' AND ${delete_condition} AND rc.update_rule IN ('NO ACTION','RESTRICT')) = 1, 1, 0) FROM information_schema.key_column_usage k JOIN information_schema.referential_constraints rc ON rc.constraint_schema = k.constraint_schema AND rc.table_name = k.table_name AND rc.constraint_name = k.constraint_name WHERE k.table_schema = DATABASE() AND k.table_name = '${table}' AND k.constraint_name = '${constraint}';")"
+    [[ "$matches" = "1" ]] || die "foreign key contract differs: ${table}.${constraint}"
+    note "foreign key ${table}.${constraint}: contract matches"
+}
+
 ATTENTION=0
 
 note "schema=${DB_NAME}, container=${MYSQL_CONTAINER}"
+
+if [[ "$AUTH_ADMISSION_SCHEMA" = "1" ]]; then
+    AUTHENTICATED_BACKUP_ROLE="$(mysql_query "SELECT IF(SUBSTRING_INDEX(CURRENT_USER(),'@',1) = 'reserve_backup', 1, 0);")"
+    [[ "$AUTHENTICATED_BACKUP_ROLE" = "1" ]] || die "authenticated backup role differs; refusing auth/admission checks"
+fi
 
 for table in payment_webhook_inbox payment_reconciliation_issue file_deletion_task oauth_unlink_task marketing_consent_history; do
     require_table "$table"
@@ -138,7 +155,7 @@ require_index oauth_unlink_task idx_oauth_unlink_retry
 require_index marketing_consent_history idx_marketing_consent_member_created
 require_index refresh_token idx_refresh_token_previous_hash
 
-# 기존 운영 점검은 그대로 유지한다. 승인된 프리뷰 후보가 배포된 뒤에만 추가 구조를 요구한다.
+# 해당 후보를 배포한 경우에만 추가 스키마를 요구한다.
 if [[ "${RESERVE_VERIFY_PREVIEW_SCHEMA:-0}" = "1" ]]; then
     for table in ad_payment_attempt chat_room chat_message chat_report chat_intro chat_intro_item; do
         require_table "$table"
@@ -154,7 +171,7 @@ if [[ "${RESERVE_VERIFY_PREVIEW_SCHEMA:-0}" = "1" ]]; then
     require_index chat_room idx_chat_room_store_type
     require_index chat_report uk_chat_report_key
     require_index chat_intro uk_chat_intro_scope
-    # 기존 MySQL ENUM에 OWNER가 없으면 health는 200이어도 사장님 첫 답장이 실패한다.
+    # health 응답만으로 드러나지 않는 사장님 발신자 ENUM 계약을 확인한다.
     CHAT_SENDER_TYPE="$(mysql_query "SELECT column_type FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'chat_message' AND column_name = 'sender_role';")"
     if [[ "$CHAT_SENDER_TYPE" == enum\(* ]]; then
         [[ "$CHAT_SENDER_TYPE" == *"'ADMIN'"* && "$CHAT_SENDER_TYPE" == *"'MEMBER'"* && "$CHAT_SENDER_TYPE" == *"'OWNER'"* ]] \
@@ -195,6 +212,64 @@ if [[ "$WAITING_SIGNUP_SCHEMA" = "1" ]]; then
     EMAIL_DUPLICATE_GROUPS="$(mysql_query "SELECT COUNT(*) FROM (SELECT email FROM email_verification GROUP BY email HAVING COUNT(*) > 1) duplicate_emails;")"
     [[ "$EMAIL_DUPLICATE_GROUPS" = "0" ]] || die "duplicate email verification groups require approved review"
     note "DDL 11/12/13 waiting/signup schema: contract matches"
+fi
+
+if [[ "$AUTH_ADMISSION_SCHEMA" = "1" ]]; then
+    AUTH_ADMISSION_INNODB="$(mysql_query "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN ('member','reservation','login_method_challenge','login_session','reservation_request') AND table_type = 'BASE TABLE' AND engine = 'InnoDB';")"
+    [[ "$AUTH_ADMISSION_INNODB" = "5" ]] || die "auth/admission tables must exist and use InnoDB"
+    require_column_contract member login_methods_managed 'tinyint(1)' NO 0
+
+    require_column_contract login_method_challenge id 'varchar(36)' NO '<NULL>'
+    require_column_contract login_method_challenge member_id bigint NO '<NULL>'
+    require_column_contract login_method_challenge auth_version int NO '<NULL>'
+    require_column_contract login_method_challenge purpose "enum('PASSWORD_SETUP','SOCIAL_LINK','SOCIAL_REAUTH')" NO '<NULL>'
+    require_column_contract login_method_challenge provider "enum('GOOGLE','KAKAO','LOCAL','NAVER')" YES '<NULL>'
+    require_column_contract login_method_challenge email 'varchar(255)' YES '<NULL>'
+    require_column_contract login_method_challenge code_hash 'varchar(100)' YES '<NULL>'
+    require_column_contract login_method_challenge created_at 'datetime(6)' NO '<NULL>'
+    require_column_contract login_method_challenge expires_at 'datetime(6)' NO '<NULL>'
+    require_column_contract login_method_challenge attempt_count int NO 0
+    require_column_contract login_method_challenge consumed 'tinyint(1)' NO 0
+    require_index_contract login_method_challenge PRIMARY 0 id
+    require_index_contract login_method_challenge uk_login_method_member_purpose 0 'member_id,purpose'
+    require_index_contract login_method_challenge idx_login_method_expiry 1 expires_at
+    require_foreign_key_contract login_method_challenge fk_login_method_member member_id member member_id RESTRICT
+
+    require_column_contract login_session id bigint NO '<NULL>' auto_increment
+    require_column_contract login_session member_id bigint NO '<NULL>'
+    require_column_contract login_session session_id 'varchar(36)' NO '<NULL>'
+    require_column_contract login_session refresh_token_hash 'varchar(64)' NO '<NULL>'
+    require_column_contract login_session previous_token_hash 'varchar(64)' YES '<NULL>'
+    require_column_contract login_session rotation_version bigint NO '<NULL>'
+    require_column_contract login_session refresh_jti 'varchar(36)' NO '<NULL>'
+    require_column_contract login_session signing_key_id 'varchar(48)' YES '<NULL>'
+    for column in created_at issued_at expires_at absolute_expires_at; do
+        require_column_contract login_session "$column" 'datetime(6)' NO '<NULL>'
+    done
+    for column in rotated_at oauth_authenticated_at; do
+        require_column_contract login_session "$column" 'datetime(6)' YES '<NULL>'
+    done
+    require_column_contract login_session auth_version int NO '<NULL>'
+    require_column_contract login_session login_method 'varchar(16)' NO '<NULL>'
+    require_index_contract login_session PRIMARY 0 id
+    require_index_contract login_session uk_login_session_sid 0 session_id
+    require_index_contract login_session uk_login_session_hash 0 refresh_token_hash
+    require_index_contract login_session idx_login_session_member 1 member_id
+    require_index_contract login_session idx_login_session_expiry 1 expires_at
+
+    require_column_contract reservation_request request_id bigint NO '<NULL>' auto_increment
+    require_column_contract reservation_request member_id bigint NO '<NULL>'
+    require_column_contract reservation_request request_key 'varchar(36)' NO '<NULL>'
+    require_column_contract reservation_request request_hash 'varchar(64)' NO '<NULL>'
+    require_column_contract reservation_request reservation_id bigint NO '<NULL>'
+    require_column_contract reservation_request created_at 'datetime(6)' NO '<NULL>'
+    REQUEST_ASCII_COLUMNS="$(mysql_query "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'reservation_request' AND column_name IN ('request_key','request_hash') AND character_set_name = 'ascii' AND collation_name = 'ascii_bin';")"
+    [[ "$REQUEST_ASCII_COLUMNS" = "2" ]] || die "reservation request keys/hashes require ascii_bin comparison"
+    require_index_contract reservation_request PRIMARY 0 request_id
+    require_index_contract reservation_request uk_reservation_request_member_key 0 'member_id,request_key'
+    require_foreign_key_contract reservation_request fk_reservation_request_member member_id member member_id CASCADE
+    require_foreign_key_contract reservation_request fk_reservation_request_reservation reservation_id reservation reservation_id CASCADE
+    note "auth/admission schema: contract matches; actual release JAR validation is still required"
 fi
 
 NON_INNODB="$(mysql_query "SELECT CONCAT(table_name, ':', engine) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN ('payment','reservation','payment_webhook_inbox','payment_reconciliation_issue','file_deletion_task','oauth_unlink_task','marketing_consent_history','refresh_token') AND engine <> 'InnoDB';")"

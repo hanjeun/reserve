@@ -1,12 +1,11 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import TextLink from '../common/TextLink';
 import {
     CalendarOutlined, ClockCircleOutlined, CreditCardOutlined, EnvironmentOutlined,
     FieldTimeOutlined, HourglassOutlined, RollbackOutlined, TeamOutlined, ThunderboltOutlined,
 } from '../common/icons';
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
-
-// ─── StoreInfoSection 행 빌더 헬퍼 (모듈 레벨 — 복잡도 분산) ───
 
 const hasPositiveNumber = value => Number.isFinite(Number(value)) && Number(value) > 0;
 
@@ -113,11 +112,9 @@ const RowValue = ({ row }) => {
     }
     if (row.link) {
         return (
-            <a href={row.link} target="_blank" rel="noopener noreferrer"
-                className="reserve-store-info-link"
-                style={{ color: colors.text.secondary, textDecoration: 'none', borderBottom: `1px solid ${colors.border.light}` }}>
+            <TextLink href={row.link} target="_blank" rel="noopener noreferrer" className="reserve-store-info-link">
                 {row.value}
-            </a>
+            </TextLink>
         );
     }
     return row.value;

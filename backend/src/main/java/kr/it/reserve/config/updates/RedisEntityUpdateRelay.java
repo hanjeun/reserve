@@ -36,7 +36,7 @@ import java.util.function.LongSupplier;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-/** Ephemeral cross-node invalidations; MySQL and authorized REST reads remain authoritative. */
+/** 노드 간에는 임시 갱신 신호만 전달한다. 정본은 MySQL과 권한을 검사하는 REST 조회다. */
 @Slf4j
 public class RedisEntityUpdateRelay implements MessageListener, SubscriptionListener {
     static final int MAX_BYTES = 65_536;
@@ -90,7 +90,7 @@ public class RedisEntityUpdateRelay implements MessageListener, SubscriptionList
 
     @PostConstruct
     void register() {
-        // The existing Redis lifecycle owns this bounded container and its reconnect loop.
+        // 유한한 릴레이 컨테이너와 재연결은 기존 Redis 생명주기에서 관리한다.
         container.addMessageListener(this, ChannelTopic.of(channel));
     }
 

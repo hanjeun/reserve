@@ -50,7 +50,7 @@ for (const count of [101, 201]) {
         await expect(filteredCount).toHaveText('1건');
         if (isMobile) await expect(filteredCount).toBeHidden();
         else await expect(filteredCount).toBeVisible();
-        // Mobile cards hide the member name; this identifier is visible on both layouts.
+        // 모바일에서도 보이는 식별자로 같은 행을 찾는다.
         await expect(page.getByText('REVIEW-1', { exact: true })).toBeVisible();
         expect(requests.at(-1)).toMatchObject({ page: '0', size: '15', search: '백번째밖예약자' });
     });

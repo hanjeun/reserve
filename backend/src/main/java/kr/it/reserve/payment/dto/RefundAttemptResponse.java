@@ -4,13 +4,7 @@ import kr.it.reserve.payment.entity.RefundAttempt;
 
 import java.time.LocalDateTime;
 
-/**
- * 환불 원장 관리자 조회 응답 — 2026-08-23 신설.
- *
- * <p>원장 엔티티는 결제를 ID 로만 들고 있다(교착 회피 — {@code RefundAttempt#paymentId} 주석).
- * 그래서 여기서도 ID 만 내보낸다. 결과적으로 구매자 이름·이메일·전화번호가
- * 관리자 화면 JSON 에 실릴 일이 없다 — 원장 화면에 필요한 건 "어느 결제인지"뿐이다.
- */
+/** 원장은 결제 ID로만 연결해 잠금 순환과 불필요한 개인정보 반환을 피한다. */
 public record RefundAttemptResponse(
         Long id,
         Long paymentId,

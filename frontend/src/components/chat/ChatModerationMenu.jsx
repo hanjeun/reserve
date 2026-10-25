@@ -95,7 +95,7 @@ const ChatModerationMenu = ({ thread, onChanged, onHidden, hidden = false, pendi
                     },
                 }}
             >
-                {/* 옆의 닫기(X)와 같은 44×44 아이콘 버튼 — 평소 투명, hover 에 회색 판 (2026-09-23) */}
+                {/* 닫기 도구와 같은 44px 클릭 영역을 사용한다. */}
                 <Tooltip title="대화 관리"><button type="button" className="reserve-chat-icon-button" aria-label="대화 관리">
                     <MoreOutlined />
                 </button></Tooltip>

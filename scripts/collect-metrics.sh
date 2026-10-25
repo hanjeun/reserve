@@ -1,12 +1,5 @@
 #!/usr/bin/env bash
-#
-# RESERVE host/container metrics collector. Runs every minute from cron.
-#
-# Deployed to the server at ~/collect-metrics.sh -- this file is the source of
-# truth. See docs/technical/monitoring.md for how to install it on a fresh box.
-#
-# One metric per line: Loki's unwrap keeps every other parsed field as a label,
-# so packing them together would make each sample its own time series.
+# Loki가 지표마다 별도 시계열을 유지하도록 한 줄에 지표 하나만 기록한다.
 set -uo pipefail
 
 LOG_DIR=/var/log/metrics
@@ -16,9 +9,9 @@ exec 2>>"$LOG_DIR/collector.err"
 
 emit_host() { printf 'kind=host metric=%s value=%s\n' "$1" "$2" >> "$LOG_FILE"; return; }
 
-# vmstat's FIRST sample is an average since boot and is useless; the second is real.
+# 첫 표본은 부팅 이후 평균이므로 두 번째 표본을 사용한다.
 read -r CPU_USER CPU_SYSTEM CPU_EXEC CPU_IDLE CPU_WAIT CPU_STEAL <<<"$(vmstat 1 2 | tail -1 | awk '{print $13, $14, $13+$14, $15, $16, $17}')"
-# 기존 cpu_pct 시계열의 의미(100-idle)는 바꾸지 않는다. 실제 실행·I/O 대기·호스트 회수는 새 지표다.
+# cpu_pct의 100-idle 의미를 유지하고 실행·I/O 대기·호스트 회수 비율은 별도로 기록한다.
 emit_host cpu_pct "$(awk -v i="${CPU_IDLE:-100}" 'BEGIN{printf "%.1f", 100-i}')"
 emit_host cpu_exec_pct   "${CPU_EXEC:-0}"
 emit_host cpu_user_pct   "${CPU_USER:-0}"
@@ -26,7 +19,7 @@ emit_host cpu_system_pct "${CPU_SYSTEM:-0}"
 emit_host cpu_iowait_pct "${CPU_WAIT:-0}"
 emit_host cpu_steal_pct  "${CPU_STEAL:-0}"
 
-# mem_used_pct from `available`, not `used` -- Linux counts page cache as used.
+# 페이지 캐시를 사용 중으로 계산하지 않도록 MemAvailable을 기준으로 한다.
 read -r MEM_USED MEM_AVAIL MEM_PCT <<<"$(free -m | awk '/^Mem:/{printf "%d %d %.1f", $3, $7, ($2-$7)/$2*100}')"
 emit_host mem_used_mb      "$MEM_USED"
 emit_host mem_available_mb "$MEM_AVAIL"

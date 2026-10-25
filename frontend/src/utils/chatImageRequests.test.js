@@ -36,7 +36,7 @@ it('bounds reads at two and pending work at 32, removing aborted queued work imm
     await expect(request(35)).rejects.toMatchObject({ status: 429 });
     controllers[2].abort();
     await expect(requests[2]).rejects.toMatchObject({ name: 'AbortError' });
-    request(36); // The cancelled queued item has already freed one slot.
+    request(36); // 취소된 대기 항목은 이미 동시 처리 자리를 반환했다.
     finishes[0](new Blob(['png'], { type: 'image/png' }));
     await flush();
     expect(getChatImageBlob).toHaveBeenCalledTimes(3);

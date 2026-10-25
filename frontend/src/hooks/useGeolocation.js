@@ -1,16 +1,5 @@
-/**
- * useGeolocation — 브라우저 Geolocation 요청 + 실패 시나리오별 폴백 안내
- *
- * 반환값:
- *   request(): Promise<{ latitude, longitude } | null>
- *     - 성공: 좌표 반환
- *     - 실패(거부/타임아웃/미지원): null 반환 + toast로 이유 안내
- *   requesting: boolean — 요청 진행 중 여부
- *
- * 실패 메시지는 전부 토스트 — 상황별로 다르게 안내:
- *   PERMISSION_DENIED → "위치 정보 허용이 필요해요"
- *   POSITION_UNAVAILABLE / TIMEOUT / 인앱 브라우저 미지원 →
- *     "위치를 가져올 수 없어요. 마이페이지에서 주소를 등록해보세요."
+/*
+ * 위치 요청은 Promise<{ latitude, longitude } | null>을 반환한다. 거부·시간 초과·미지원은 안내 후 null로 처리한다.
  */
 import { useState, useCallback } from 'react';
 import useMessage from './useMessage';

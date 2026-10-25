@@ -1,4 +1,4 @@
-// Coverage tooling stays outside the application's locked runtime dependencies.
+// 커버리지 도구를 앱의 잠금된 런타임 의존성과 분리한다.
 allprojects {
     apply plugin: 'jacoco'
     afterEvaluate {

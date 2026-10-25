@@ -1,4 +1,3 @@
-/* Shared modal decisions and background scroll containment. */
 html[data-reserve-modal-open="true"] { overscroll-behavior: none; }
 .ant-modal-wrap, .ant-modal-body { overscroll-behavior: contain; }
 .reserve-modal-actions {
@@ -48,8 +47,7 @@ html[data-reserve-modal-open="true"] { overscroll-behavior: none; }
     height: auto;
 }
 
-/* Scoped confirmation layout. AntD 6 uses ant-modal-container, not ant-modal-content.
-   Keep AntD portal/mask/focus/motion behavior; only bound the visible panel and body. */
+/* AntD의 포털·포커스·모션은 유지하고 ant-modal-container와 본문 크기만 제한한다. */
 .reserve-confirm-root {
     --reserve-confirm-available-height: calc(100svh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
 }
@@ -62,7 +60,7 @@ html[data-reserve-modal-open="true"] { overscroll-behavior: none; }
     padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px));
 }
 
-/* AntD's inline-block centering spacer is redundant in the flex wrapper. */
+/* flex 중앙 정렬에서는 AntD의 inline-block 정렬 여백을 제거한다. */
 .reserve-confirm-root .ant-modal-wrap.ant-modal-centered::before {
     display: none;
 }

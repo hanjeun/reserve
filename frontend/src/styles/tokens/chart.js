@@ -1,9 +1,5 @@
-/**
- * RESERVE Design System - Chart Tokens
- *
- * 관리자 대시보드 + 사업자 통계 탭이 공유하는 Recharts 스타일 프리셋.
- * 2026-07: 기본 AntD Card+Statistic, CartesianGrid strokeDasharray 격자선 노출 등
- * 각진 느낌을 벗어나 둥근 카드 + 컬러 아이콘 배지 + 부드러운 차트로 리디자인.
+/*
+ * 관리자·사업자 통계에서 공유하는 차트 스타일
  */
 import { colors } from './colors';
 
@@ -26,22 +22,13 @@ export const chartGridProps = {
 
 export const chartAxisTick = { fontSize: 11, fill: colors.text.tertiary };
 
-/**
- * 차트 바깥 여백 — 모든 Recharts 차트가 이 하나만 쓴다.
- *
- * 관문 규칙: margin.left 는 절대 음수로 만들지 않는다. Y축 라벨 폭은 아래
- * chartYAxisWidth 로만 조절한다. 음수 margin 은 Y축 전체를 카드 안쪽으로
- * 끌어당겨 라벨이 잘리고, 차트마다 값이 달라지면(-20 vs 0) 같은 화면에
- * 나란히 놓인 그래프들의 시작 위치가 서로 어긋나 제목과도 정렬이 안 맞는다.
+/*
+ * 차트 왼쪽 여백은 음수로 두지 않는다. 축 라벨 공간은 공통 Y축 너비로 조절한다.
  */
 export const chartMargin = { top: 8, right: 12, bottom: 4, left: 0 };
 
-/**
- * Y축이 차지하는 가로 폭. Recharts 기본값은 60px인데 "0~99" 같은 짧은 눈금엔
- * 지나치게 넓어서 그래프 본문이 오른쪽으로 밀려 보인다(왼쪽 여백 40px vs 오른쪽 8px).
- * 눈금 라벨 길이에 맞춰 고른다.
- *   count    — 건수/개수 등 짧은 정수 눈금
- *   currency — "120k" 같은 축약 금액 눈금
+/*
+ * 짧은 개수와 축약 금액에 맞춰 Y축 너비를 선택한다.
  */
 export const chartYAxisWidth = { count: 30, currency: 42 };
 

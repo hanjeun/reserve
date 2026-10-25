@@ -7,15 +7,7 @@ import kr.it.reserve.payment.entity.Payment;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * PG 환불 조회 결과를 로컬 원장에 반영해도 되는지 판정하는 단일 정책 관문.
- *
- * <p>결제의 {@code CANCELLED}/{@code PARTIAL_CANCELLED}/{@code PAID} 상태만으로는
- * 이번 환불 시도의 성공·실패를 알 수 없다. 과거 부분 환불 때문에 이미 같은 상태일 수 있고,
- * 별도의 취소가 아직 {@code REQUESTED} 일 수도 있기 때문이다. 따라서 누적 취소액,
- * 이번 취소 ID, 개별 취소 상태와 금액이 모두 맞을 때만 자동 확정한다.
- * 애매한 경우에는 결제와 원장을 그대로 두고 운영 대사 대상으로 남긴다.
- */
+/** 결제 상태만으로 현재 환불을 확정하지 않는다. 취소 ID·개별 상태·금액·누적 취소액이 모두 맞을 때만 원장에 반영하고 불명확하면 대사 대상으로 남긴다. */
 public final class RefundSettlementPolicy {
 
     private static final String CANCELLATION_SUCCEEDED = "SUCCEEDED";

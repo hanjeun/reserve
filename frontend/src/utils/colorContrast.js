@@ -8,14 +8,14 @@ const luminance = hex => {
 };
 const contrast = (first, second) => (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
 
-/** Pick readable text for opaque literal palette colors, before creating CSS variables. */
+/* CSS 변수를 만들기 전에 불투명한 팔레트 리터럴의 글자 대비를 정한다. */
 export const foregroundForSurface = background => {
     const surface = luminance(background);
     return contrast(surface, luminance(DARK_FOREGROUND)) >= contrast(surface, 1)
         ? DARK_FOREGROUND : LIGHT_FOREGROUND;
 };
 
-/** Keep white action text readable without changing the brand/link color. */
+/* 브랜드·링크 색을 유지하고 흰 실행 문구의 대비만 보정한다. */
 export const surfaceForWhiteText = background => {
     if (contrast(luminance(background), 1) >= 4.5) return background;
     const channels = [1, 3, 5].map(offset => parseInt(background.slice(offset, offset + 2), 16));

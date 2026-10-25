@@ -40,7 +40,8 @@ final class BrowserCsrfMatcher implements RequestMatcher {
         Cookie[] cookies = request.getCookies();
         // 쿠키가 없는 서버 간 호출은 주변 브라우저 자격 증명을 사용할 수 없다.
         return cookies != null && Arrays.stream(cookies).anyMatch(cookie ->
-                "access_token".equals(cookie.getName()) || "refresh_token".equals(cookie.getName()));
+                "access_token".equals(cookie.getName()) || "refresh_token".equals(cookie.getName())
+                        || "__Host-reserve-entry".equals(cookie.getName()) || "reserve_entry".equals(cookie.getName()));
     }
 
     private boolean hasAllowedReferer(String referer) {

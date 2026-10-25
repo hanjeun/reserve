@@ -1,17 +1,4 @@
-/**
- * RESERVE Design System - Button Component
- *
- * variants:
- *   primary   - 파란 배경 (폼 제출)
- *   secondary - 회색 배경 (보조)
- *   ghost     - 투명 + 테두리 없음 (텍스트형)
- *   ghost-sm  - 텍스트형 소형 (취소, 리뷰쓰기 등 인라인 액션)
- *   hero      - 홈 히어로 버튼
- *   danger    - 위험 액션
- *   link      - 링크형
- */
-
-import React from 'react';
+import React, { useId } from 'react';
 import PropTypes from 'prop-types';
 import { SpinIndicator } from './Loading';
 import Tooltip from './Tooltip';
@@ -74,9 +61,8 @@ const VARIANTS = {
     },
     outline: {
         background: 'transparent',
-        // 2026-07: 예전엔 text.tertiary(연회색)라 같은 "모달 취소 버튼"인데도 AntD 기본 버튼
-        // (진한 텍스트)과 색이 달라 보였다. 모달 취소는 "그냥 장식"이 아니라 사용자가 실제로
-        // 누를 수 있어야 하는 동등한 선택지이므로 본문과 같은 진한 색이 맞다.
+        // 테두리 버튼은 본문과 같은 진한 글자를 사용한다.
+
         color: colors.text.primary,
         border: `1px solid ${colors.border.default}`,
         borderRadius: radius.xl,
@@ -112,11 +98,7 @@ const SIZE_HEIGHT = {
     hero: heights.buttonHero,
 };
 
-/**
- * sm(36px) 채움·테두리 버튼의 좌우 여백은 모달과 같은 20px이다.
- * 예전엔 모달만 인라인으로 여백을 줬고, 모달 밖의 sm 버튼(메일 작성·광고 신청·QR·날짜 적용·자동 응답 저장 등)은
- * 브라우저 기본 6px 라 글자가 테두리에 붙어 보였다. 호출부 style 이 있으면 그쪽이 이긴다.
- */
+/* 소형 일반 버튼은 모달과 같은 좌우 여백을 사용한다. */
 const SM_PADDING_X = { primary: 20, danger: 20, outline: 20, secondary: 20 };
 
 const SIZE_FONT = {
@@ -126,7 +108,6 @@ const SIZE_FONT = {
     hero: '19px',
 };
 
-// 중첩 삼항 대신 if/else로 추출 (SonarCloud: no nested ternary)
 function resolveHeight(variant, size) {
     if (variant.startsWith('ghost-sm') || variant === 'link') return 'auto';
     if (variant === 'hero') return heights.buttonHero;
@@ -145,7 +126,6 @@ function resolvePadding(variant, size) {
     return undefined;
 }
 
-// 아이콘 자리 — 로딩 중이면 로딩 아이콘(없으면 스피너), 아니면 넘겨받은 아이콘.
 function renderLeadingIcon({ loading, loadingIcon, icon, children, iconOnly }) {
     if (loading) {
         return loadingIcon
@@ -163,6 +143,8 @@ const Button = ({
     block = false,
     loading = false,
     disabled = false,
+    unavailableReason = '',
+    onUnavailable,
     htmlType = 'button',
     icon,
     loadingIcon,
@@ -172,8 +154,11 @@ const Button = ({
     className,
     ...rest
 }) => {
+    const reasonId = useId();
     const isGhostSm = variant.startsWith('ghost-sm');
     const iconOnly = icon != null && React.Children.count(children) === 0;
+    const neutralText = !iconOnly && ['ghost', 'ghost-sm'].includes(variant)
+        && (style?.color == null || [colors.text.secondary, colors.text.tertiary].includes(style.color));
     const smallButtonRadius = iconOnly ? radius.md : radius.pill;
 
     const v = VARIANTS[variant] || VARIANTS.primary;
@@ -187,24 +172,30 @@ const Button = ({
         alignItems: 'center',
         justifyContent: 'center',
         gap: '5px',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        // 평상시 인라인 opacity를 넣으면 전역 hover/active 규칙을 이겨 피드백이 사라진다.
-        opacity: disabled ? 0.45 : undefined,
+        cursor: disabled || unavailableReason ? 'not-allowed' : 'pointer',
+        // 활성 상태의 opacity는 공통 CSS에서 처리한다.
+        opacity: disabled || unavailableReason ? 0.45 : undefined,
         fontWeight: isGhostSm ? fontWeight.medium : fontWeight.bold,
         fontSize: buttonFontSize,
         height: buttonHeight,
         width: block ? '100%' : undefined,
-        transition: `all ${transitions.fast} ${transitions.easing}`,
+        transition: neutralText ? undefined : `all ${transitions.fast} ${transitions.easing}`,
         userSelect: 'none',
         padding: buttonPadding,
         ...v,
         ...(size === 'sm' && !isGhostSm && variant !== 'link' ? { borderRadius: smallButtonRadius } : {}),
         ...(iconOnly ? { height: heights.buttonMd, width: heights.buttonMd, minWidth: heights.buttonMd, flexShrink: 0, padding: 0 } : {}),
         ...style,
+        ...(neutralText ? { color: undefined } : {}),
     };
 
     const handleClick = (e) => {
         if (disabled || loading) return;
+        if (unavailableReason) {
+            e.preventDefault();
+            onUnavailable?.(unavailableReason);
+            return;
+        }
         onClick?.(e);
     };
 
@@ -216,26 +207,21 @@ const Button = ({
             disabled={disabled || loading}
             aria-busy={loading || undefined}
             onClick={handleClick}
-            className={['reserve-btn', `reserve-btn--${variant}`, iconOnly && 'reserve-btn--icon-only', className].filter(Boolean).join(' ')}
+            className={['reserve-btn', `reserve-btn--${variant}`, iconOnly && 'reserve-btn--icon-only', neutralText && 'reserve-text-link', className].filter(Boolean).join(' ')}
             style={baseStyle}
             {...rest}
+            aria-disabled={unavailableReason ? true : rest['aria-disabled']}
+            aria-describedby={[rest['aria-describedby'], unavailableReason && reasonId].filter(Boolean).join(' ') || undefined}
             title={iconOnly ? undefined : rest.title}
         >
-            {/* ★ 로딩 중에도 children 을 그대로 둔다. 스피너는 **아이콘 자리**를 대신할 뿐이다.
-                예전에는 loading 이면 children 을 통째로 버렸는데, 그 결과 호출부가 정성껏 넘긴
-                "등록 중…" "수정 중…" "결제 중…" 같은 문구가 **화면에 한 번도 나온 적이 없었다**
-                (StoreFormActions 등 8곳). 버튼이 빈 채로 도는 것보다 무엇을 기다리는지 보이는 게 낫다.
-                관문이 여기 하나라 이 세 줄로 8곳이 같이 살아난다. */}
+            {/* 로딩 중에도 실행 내용을 표시한다. */}
             {leadingIcon}
             {children}
         </button>
     );
-    return iconOnly && rest['aria-label'] ? <Tooltip title={rest['aria-label']}>{button}</Tooltip> : button;
+    const content = iconOnly && rest['aria-label'] ? <Tooltip title={rest['aria-label']}>{button}</Tooltip> : button;
+    return unavailableReason ? <>{content}<span id={reasonId} className="reserve-sr-only">{unavailableReason}</span></> : content;
 };
-/* hover·active 등 상호작용 CSS 는 index.css 의 "Button 상호작용 상태" 블록에 있다.
-   예전에는 이 파일 안의 <style> 태그였는데, JSX 안의 style 은 **인스턴스마다 렌더**되어
-   버튼이 많은 화면에서 동일한 태그가 수십 개 쌓였다(실측: 마이페이지에서 3개).
-   전역 정책은 index.css 로 — docs/technical/design-system.md 참고. */
 
 Button.propTypes = {
     variant: PropTypes.oneOf([
@@ -246,6 +232,8 @@ Button.propTypes = {
     block: PropTypes.bool,
     loading: PropTypes.bool,
     disabled: PropTypes.bool,
+    unavailableReason: PropTypes.string,
+    onUnavailable: PropTypes.func,
     htmlType: PropTypes.oneOf(['button', 'submit', 'reset']),
     icon: PropTypes.node,
     loadingIcon: PropTypes.node,

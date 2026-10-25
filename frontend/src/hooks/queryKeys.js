@@ -1,7 +1,7 @@
 // TanStack Query 키 팩토리 — 계층 구조로 invalidation 범위 제어
 // 예: queryClient.invalidateQueries({ queryKey: reservationKeys.all() })
 //     → 'reservations'로 시작하는 모든 쿼리 무효화
-//
+
 // 쓰기 뒤 무엇을 무효화할지는 invalidateAfterWrite.js 에 모아 두었다. 새 mutation 은 거기서 고를 것.
 
 export const storeKeys = {
@@ -24,6 +24,7 @@ export const benefitKeys = {
 export const reservationKeys = {
     all:    () => ['reservations'],
     my:     () => ['reservations', 'my'],
+    myPage: (params) => ['reservations', 'my', params],
     manage: () => ['reservations', 'manage'],
     managePage: (params) => ['reservations', 'manage', params],
     qrToken: (id) => ['reservations', 'qrToken', id],

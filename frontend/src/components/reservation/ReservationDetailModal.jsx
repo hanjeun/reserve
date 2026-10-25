@@ -12,18 +12,12 @@ import { colors, fontSize } from '../../styles/tokens';
 
 const { Text } = Typography;
 
-/**
- * 예약 상세 모달 — 읽기 전용 정보 표시만 담당 (액션 버튼은 각 화면에서 별도 렌더링).
- * 사업자 패널(ReservationCard)과 내 예약(MyReservations) 양쪽에서 공용으로 사용해서
- * 두 화면의 예약 상세 정보 표시 방식(항목 구성, 아이콘, 스타일)을 하나로 통일한다.
+/*
+ * 손님·사업자가 같은 읽기 전용 예약 상세를 사용하며 실행 도구는 각 화면이 담당한다.
  */
 const ReservationDetailModal = ({ reservation, open, onClose }) => {
-    // 2026-07 버그 수정: reservation이 null이 되는 순간(부모가 닫을 때 detailReservation을 null로
-    // 설정하는 화면 — MyReservations.jsx) `if (!reservation) return null`이 Modal 자체를
-    // 렌더링에서 빼버려서, AntD가 닫힘 애니메이션을 재생할 DOM이 통째로 사라졌었다
-    // (useImagePreview의 예전 버그, SanctionModal의 예전 key-toggle 버그와 같은 부류). 마지막으로 받은
-    // 유효한 reservation을 캐시해두고 그걸로 렌더링해서, reservation이 null이 되어도 Modal은
-    // open=false로만 전환되고 내용은 애니메이션이 끝날 때까지 그대로 남아있게 한다.
+    // 닫힘 중에도 마지막 예약 내용을 유지해 모달이 일찍 사라지지 않게 한다.
+
     const [cached, setCached] = React.useState(reservation);
     if (reservation && reservation !== cached) setCached(reservation);
 
@@ -35,9 +29,8 @@ const ReservationDetailModal = ({ reservation, open, onClose }) => {
         guestCount, depositAmount, status, specialRequest, rejectionReason, cancelReason, checkedInAt,
     } = displayed;
 
-    // 거절과 취소는 서로 다른 필드를 다른 라벨로 보여준다 (2026-08-11).
-    // 하나로 합치면 취소된 예약에 "거절 사유"가 찍혀 이용자가 오해한다.
-    // cancelReason 은 가게가 취소했을 때만 채워지므로, 본인 취소 건에는 이 블록이 안 나온다.
+    // 거절·취소는 각각의 사유 필드와 라벨을 사용한다.
+
     let reasonBlock = null;
     if (status === 'REJECTED' && rejectionReason) reasonBlock = { label: '거절 사유', value: rejectionReason };
     else if (status === 'CANCELLED' && cancelReason) reasonBlock = { label: '취소 사유', value: cancelReason };

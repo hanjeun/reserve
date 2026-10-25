@@ -49,7 +49,7 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
     const closePickerOnEscape = event => {
         if (event.key === 'Escape') { setEmojiOpen(false); trigger.current?.focus(); }
     };
-    // Escape belongs to the focusable search and emoji buttons, not the region.
+    // Escape는 포커스 가능한 검색·이모지 버튼에서 처리한다.
     const picker = <section className="reserve-chat-emoji-picker" id={id} aria-label="이모지 선택">
         <input ref={searchInput} type="search" value={query} onChange={event => setQuery(event.target.value)}
             onKeyDown={closePickerOnEscape}

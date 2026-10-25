@@ -3,7 +3,7 @@
 .anticon.reserve-ui-icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; line-height: 0; vertical-align: -0.125em; color: inherit; }
 .anticon.reserve-ui-icon > svg { display: block; width: 1em; height: 1em; pointer-events: none; }
 
-/* Icon controls have a 44px hit area and a separate 32px visual surface. */
+/* 아이콘 도구는 44px 클릭 영역과 32px 표시 면을 분리한다. */
 :is(.reserve-icon-tool, .reserve-store-view-toggle, .reserve-explore-region-trigger,
     .reserve-header-back, .reserve-header-search, .reserve-header-workspace-menu,
     .reserve-search-icon, .reserve-search-clear, .reserve-messenger-mobile-back,
@@ -87,7 +87,7 @@
     transition: var(--reserve-icon-press-transition);
 }
 
-/* Only the visual contents compress; the target, positioning and selected color stay fixed. */
+/* 표시 내용만 눌리며 클릭 영역·위치·선택 색은 유지한다. */
 :is(.reserve-icon-tool, .reserve-store-view-toggle, .reserve-explore-region-trigger,
     .reserve-header-back, .reserve-header-search, .reserve-header-workspace-menu,
     .reserve-search-icon, .reserve-search-clear, .reserve-messenger-mobile-back,
@@ -100,7 +100,7 @@
     --reserve-icon-current-scale: var(--reserve-icon-active-scale);
     --reserve-icon-surface-opacity: 1;
 }
-/* Text-button press rules must not shrink the surrounding icon target. */
+/* 텍스트 버튼의 눌림 규칙으로 아이콘 클릭 영역을 축소하지 않는다. */
 :is(.reserve-btn--ghost.reserve-btn--icon-only, .reserve-btn--ghost-sm.reserve-btn--icon-only):active:not(:disabled) {
     transform: none;
     opacity: 1;
@@ -127,7 +127,7 @@
 .ant-modal-root .ant-modal-close:focus-visible:not(:disabled)::before,
 .reserve-workspace-drawer .ant-drawer-header > .ant-drawer-close:focus-visible:not(:disabled)::before { opacity: 1; }
 
-/* Send keeps its filled neutral surface inside the same 44px target. */
+/* 보내기의 채운 표면도 같은 44px 클릭 영역 안에 둔다. */
 .reserve-chat-send {
     --reserve-icon-persistent-surface-opacity: 1;
     --reserve-icon-surface-color: var(--c-gray-100, #f2f4f6);
@@ -137,7 +137,7 @@
 }
 .reserve-chat-send:focus-visible:not(:disabled) { --reserve-icon-surface-color: var(--c-gray-200, #e5e8eb); }
 
-/* Persistent photo overlays stay circular; their transparent hit area stays 44px. */
+/* 사진 위 도구는 원형을 유지하고 투명 클릭 영역은 44px로 둔다. */
 .reserve-favorite-button:not(.reserve-favorite-button--plain)::before {
     background: var(--c-bg-overlay, rgba(255, 255, 255, 0.92));
     opacity: 1;
@@ -147,7 +147,7 @@
 @media (hover: hover) and (pointer: fine) {
     .reserve-favorite-button:not(.reserve-favorite-button--plain):hover:not(:disabled)::before { box-shadow: 0 2px 12px rgba(0, 0, 0, 0.16); }
 }
-/* Navigation labels and section decoration keep their own typography. */
+/* 탐색 문구·섹션 장식은 각자의 글자 크기를 유지한다. */
 .reserve-workspace-menu-group :is(a, .reserve-workspace-menu-placeholder) > .anticon,
 .reserve-workspace-heading-label > .anticon { font-size: 22px; }
 .ant-pagination-rtl :is(.ant-pagination-prev, .ant-pagination-next, .ant-pagination-jump-prev, .ant-pagination-jump-next) .reserve-ui-icon > svg { transform: rotate(180deg); }

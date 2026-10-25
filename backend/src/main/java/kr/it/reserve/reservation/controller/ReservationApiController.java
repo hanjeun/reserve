@@ -19,6 +19,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -54,9 +55,31 @@ public class ReservationApiController {
                 .body(ApiResponse.success(reservation, "예약이 신청됐어요."));
     }
 
+    @PostMapping("/requests/result")
+    public ResponseEntity<ApiResponse<ReservationResponse>> recoverReservation(
+            @Valid @RequestBody ReservationCreateRequest request) {
+        Member member = SecurityUtil.getCurrentMember();
+        if (!rateLimiter.tryConsume("reservation-result:" + member.getId(), RateLimiter.Policy.PROFILE_READ))
+            throw new ReservationException("예약 결과를 잠시 후 다시 확인해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+        return ResponseEntity.ok(ApiResponse.success(reservationService.recoverReservation(request, member), "예약 요청 결과를 확인했어요."));
+    }
+
     @GetMapping({"/my", "/my-reservations"})
-    public ResponseEntity<ApiResponse<List<ReservationResponse>>> getMyReservations() {
-        List<ReservationResponse> reservations = reservationService.getMyReservations(SecurityUtil.getCurrentMember());
+    public ResponseEntity<ApiResponse<Void>> retiredMyReservations() {
+        SecurityUtil.getCurrentMember();
+        return ResponseEntity.status(HttpStatus.GONE).cacheControl(CacheControl.noStore())
+                .body(ApiResponse.error("예약 조회 방식이 변경됐어요. 화면을 새로고침한 뒤 다시 시도해주세요."));
+    }
+
+    @GetMapping({"/my/page", "/my-reservations/page"})
+    public ResponseEntity<ApiResponse<Page<ReservationResponse>>> getMyReservationPage(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "15") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Reservation.ReservationStatus status,
+            @RequestParam(defaultValue = "recent") String sort) {
+        Page<ReservationResponse> reservations = reservationService.getMyReservations(
+                SecurityUtil.getCurrentMember(), page, size, search, status, sort);
         return ResponseEntity.ok(ApiResponse.success(reservations, "내 예약 목록 조회 성공"));
     }
 
@@ -82,15 +105,7 @@ public class ReservationApiController {
         return ResponseEntity.ok(ApiResponse.success(slots, "시간대별 예약 가능 여부 조회 성공"));
     }
 
-    /**
-     * 달력용 월 단위 조회 (공개 API — 로그인 불필요).
-     *
-     * <p><b>{@code month} 를 {@code YearMonth} 로 바인딩하지 않는 이유</b> — 형식이 틀렸을 때
-     * 스프링이 {@code MethodArgumentTypeMismatchException} 을 던지고, 그건 이 프로젝트의
-     * {@code ApiResponse} 에러 규격을 타지 않는다. 프론트가 처리 못 하는 모양의 400 이 나가느니
-     * 직접 파싱해서 <b>다른 400 과 같은 모양</b>으로 돌려준다.
-     * ({@code StoreCreateRequest.openDate} 가 String 인 것과 같은 이유다.)
-     */
+    /** 잘못된 월 형식도 공통 ApiResponse 오류 형식으로 반환하기 위해 직접 파싱한다. */
     @GetMapping("/calendar")
     public ResponseEntity<ApiResponse<List<CalendarDayResponse>>> getMonthCalendar(
             @RequestParam Long storeId,
@@ -177,7 +192,7 @@ public class ReservationApiController {
     }
 
     /**
-     * 확정된 예약을 가게가 취소한다 (2026-08-11 신설). 전액 환불이 함께 실행된다.
+     * 확정된 예약을 가게가 취소한다. 전액 환불이 함께 실행된다.
      *
      * <p>{@code PATCH /{id}/cancel} 과 <b>경로가 다른 이유</b> — 그쪽은 예약자 본인 검증
      * ({@code validateOwnership})을 타서 가게 주인은 403 이다. 같은 엔드포인트에서 분기하면
@@ -227,12 +242,7 @@ public class ReservationApiController {
         return ResponseEntity.ok(ApiResponse.success(null, "노쇼 처리됐어요."));
     }
 
-    // QR 스캔을 통한 실제 방문 기록 — 승인 상태는 바꾸지 않고 checkedInAt만 기록
-    //
-    // ★ 2026-08-19 레이트리밋 추가. 이 엔드포인트는 실제 방문 시각을 기록하는 상태 변경 API 인데
-    //   호출 횟수 제한이 전혀 없었다. 토큰 자체는 서명돼 있어 위조는 불가능하지만, 유출된 토큰을
-    //   스크립트로 쏟아붓거나 응답 문구 차이로 예약 상태를 캐내는 건 막을 게 없었다.
-    //   한도 근거는 RateLimiter.Policy#QR_CHECKIN 주석 참고.
+    // QR 체크인은 승인 상태를 바꾸지 않고 방문 시각만 기록한다. 서명 검증과 별도로 호출량을 제한한다.
     @PostMapping("/qr-checkin")
     public ResponseEntity<ApiResponse<QrCheckinResponse>> checkInByQrToken(
             @RequestBody Map<String, String> body,

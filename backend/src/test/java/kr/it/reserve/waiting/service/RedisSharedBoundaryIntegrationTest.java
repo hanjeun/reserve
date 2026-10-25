@@ -38,7 +38,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-/** Explicit opt-in; owns one disposable Redis, never the application's existing Redis or its credentials. */
+/** 명시적으로 켠 경우에만 일회성 Redis를 사용하며 앱 Redis나 자격정보는 재사용하지 않는다. */
 @EnabledIfEnvironmentVariable(named = "RESERVE_REDIS_INTEGRATION", matches = "true")
 @Timeout(30)
 class RedisSharedBoundaryIntegrationTest {
@@ -53,7 +53,7 @@ class RedisSharedBoundaryIntegrationTest {
     @BeforeAll
     static void startDisposableRedis() throws Exception {
         assertThat(NAME).matches("reserve-redis-audit-[a-z0-9-]+");
-        // No persistent/anonymous volumes, public interface or password-bearing command-line arguments.
+        // 영속·익명 볼륨, 공개 연결 주소, 비밀번호가 포함된 명령행 인수를 사용하지 않는다.
         command(null, "run", "--pull=never", "-d", "--name", NAME,
                 "--user", "999:999", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges:true",
                 "--memory=128m", "--memory-swap=128m", "--cpus=0.5", "--pids-limit=64",
@@ -221,7 +221,7 @@ class RedisSharedBoundaryIntegrationTest {
         for (int attempt = 0; attempt < 40; attempt++) {
             try (var connection = factory.getConnection()) {
                 if ("PONG".equals(connection.ping())) return;
-            } catch (RuntimeException notReady) { /* Only this disposable Redis is starting. */ }
+            } catch (RuntimeException notReady) { /* 이 시험이 소유한 Redis만 기동을 기다린다. */ }
             Thread.sleep(50);
         }
         throw new IllegalStateException("Disposable Redis did not become ready");

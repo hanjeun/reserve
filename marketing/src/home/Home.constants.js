@@ -9,7 +9,7 @@ export { STORE_DATA, RESERVATION_DATA, FAQS } from './Home.data';
 
 export const SECTION_IDS = ['section-0', 'section-1', 'section-2', 'section-faq'];
 
-// JSX 대신 컴포넌트 참조 저장 → 렌더 시 동적 생성으로 useState 버그 해결
+// 목업 컴포넌트 참조를 보관하고 마크업을 만들 때 렌더링한다.
 export const SECTIONS = [
     {
         id: 'section-0', tag: '가게 탐색',

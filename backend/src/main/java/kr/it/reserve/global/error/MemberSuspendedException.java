@@ -13,7 +13,7 @@ import org.springframework.http.HttpStatus;
 @Getter
 public class MemberSuspendedException extends BusinessException {
 
-    private final String suspendStatus;   // "SUSPENDED" | "BANNED"
+    private final String suspendStatus;
     private final String suspendedUntil;  // ISO date 문자열, BANNED면 null
     private final String reason;          // 정지 사유, 없으면 null
 

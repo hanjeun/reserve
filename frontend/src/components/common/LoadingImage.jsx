@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import PropTypes from 'prop-types';
 
-/** The native image keeps its layout and request priority; only its loading background changes. */
+/* 이미지의 배치·요청 우선순위를 유지하며 로딩 배경만 제어한다. */
 export default function LoadingImage({ src, srcSet, className, onLoad, onError, ref, ...props }) {
     const sourceKey = `${src ?? ''}\u0000${srcSet ?? ''}`;
     const [settledSource, setSettledSource] = useState(null);
@@ -9,7 +9,7 @@ export default function LoadingImage({ src, srcSet, className, onLoad, onError, 
     const imageRef = useCallback(image => {
         const cleanup = typeof ref === 'function' ? ref(image) : undefined;
         if (ref && typeof ref !== 'function') ref.current = image;
-        // Cached successes and failures may finish before React attaches load/error handlers.
+        // 캐시된 성공·실패는 React 이벤트 연결 전에 끝날 수 있다.
         if (image?.complete) setSettledSource(sourceKey);
         return typeof cleanup === 'function' ? cleanup : undefined;
     }, [ref, sourceKey]);
@@ -20,8 +20,8 @@ export default function LoadingImage({ src, srcSet, className, onLoad, onError, 
         onError={event => {
             const failedSource = event.currentTarget.getAttribute('src');
             onError?.(event);
-            // Existing callers may replace the failed source with a fallback on this same node.
-            // If that fallback also fails without another replacement, end its skeleton as well.
+            // 같은 이미지 노드에서 대체 출처를 다시 시도할 수 있다.
+            // 대체 출처도 실패하면 골격 표시를 끝낸다.
             if (event.currentTarget.getAttribute('src') === failedSource) setSettledSource(sourceKey);
             else setSettledSource(null);
         }} />;

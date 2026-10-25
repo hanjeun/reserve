@@ -447,8 +447,14 @@ public class FeedService {
             URI uri = URI.create(candidate); String host = uri.getHost();
             if ("https".equalsIgnoreCase(uri.getScheme()) && uri.getUserInfo() == null && (uri.getPort() == -1 || uri.getPort() == 443)
                     && host != null && Set.of("lh3.googleusercontent.com", "lh4.googleusercontent.com", "lh5.googleusercontent.com", "lh6.googleusercontent.com", "k.kakaocdn.net", "phinf.pstatic.net").contains(host.toLowerCase(Locale.ROOT))) return candidate;
-        } catch (IllegalArgumentException ignored) { /* Invalid account avatar is omitted from the public profile. */ }
+        } catch (IllegalArgumentException ignored) { /* 잘못된 계정 사진은 공개 프로필에서 제외한다. */ }
         return null;
+    }
+
+    /** 사진 조회나 조회수 변경 없이 같은 공개 조회 조건을 재사용한다. */
+    public Specification<FeedPost> publicSearchSpecification() {
+        policy.requireEnabled();
+        return publicSpecification(null, null, null);
     }
 
     private Specification<FeedPost> publicSpecification(String region, Long author, Long favoriteMember) {

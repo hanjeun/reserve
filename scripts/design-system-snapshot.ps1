@@ -39,8 +39,7 @@ $sourceRoot = Join-Path $snapshotRoot 'source'
 
 if ($InstallGitGuard) {
     if ($Stage -ne 'Verify') { throw 'The Git byte guard is only available with Verify.' }
-    # A captured .gitattributes is itself immutable, but Git still applies its rules.
-    # info/attributes has higher precedence without editing any snapshot member.
+    # 원본 스냅샷을 수정하지 않고 info/attributes의 높은 우선순위로 Git 속성을 적용한다.
     $attributeRule = 'docs/design-system/snapshots/** -text -eol'
     $attributePath = (& git -C $repoRoot rev-parse --git-path info/attributes).Trim()
     if ($LASTEXITCODE -ne 0 -or -not $attributePath) { throw 'Cannot resolve repository Git attributes.' }
@@ -176,7 +175,7 @@ if ($Stage -eq 'Finalize') {
     Save-Source 'frontend/node_modules/pretendard/package.json' 'font-dependency-reference' 'licenses/Pretendard-package.json'
 
     $records = @(Get-Content -LiteralPath (Join-Path $snapshotRoot 'capture-records.json') -Raw | ConvertFrom-Json)
-    # Correct the early header-stage grouping without changing preserved source bytes.
+    # 보존 원문의 바이트를 유지하면서 헤더 단계만 분류한다.
     foreach ($record in $records) {
         if ($record.source_relative_path -eq 'frontend/src/index.css') { $record.category = 'core-style-entry' }
         elseif ($record.source_relative_path -match '^frontend/src/styles/' -and $record.category -eq 'reserve-shell-baseline') { $record.category = 'mixed-global-style' }

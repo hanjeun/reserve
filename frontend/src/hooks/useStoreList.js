@@ -12,6 +12,7 @@ import { hasDistanceCoordinates } from '../utils/distanceSort';
 import { STORE_LIST_PAGE_SIZE } from '../constants/storeListPageSize';
 import { normalizeListQueryParams } from '../utils/listQueryParams';
 import useDiscoveryRegion from './useDiscoveryRegion';
+import useDebounce from './useDebounce';
 import { queryErrorStatus } from './liveUpdateQueries';
 import { readQuerySelection, writeQuerySelection } from '../utils/querySelection';
 
@@ -32,6 +33,7 @@ const useStoreList = () => {
     const normalizedParams = normalizeListQueryParams('/stores', urlSearchParams);
 
     const keyword = normalizedParams.get('keyword') || '';
+    const searchKeyword = useDebounce(keyword, 300);
     const sort    = normalizedParams.get('sort')    || 'recommended';
     const lat     = normalizedParams.get('lat');
     const lng     = normalizedParams.get('lng');
@@ -51,6 +53,7 @@ const useStoreList = () => {
     } = useQuery({
         // 페이지·크기도 키에 포함한다. 늦게 도착한 이전 페이지 응답은 현재 목록을 덮지 않는다.
         queryKey: storeKeys.list({ keyword, sort, lat, lng, domain, region, page: page - 1, size: STORE_LIST_PAGE_SIZE }),
+        enabled: keyword === searchKeyword,
         queryFn: () =>
             storeService.getStores({
                 keyword, sort, page: page - 1, size: STORE_LIST_PAGE_SIZE,
@@ -72,7 +75,7 @@ const useStoreList = () => {
     const lastPage = Math.max(1, totalPages);
     const pageOutOfRange = isSuccess && !isPlaceholderData && !error && page > lastPage;
 
-    // 가게 목록을 받을 때마다 각 가게의 커버 이미지 "비율"만 따로 적어둔다 (2026-07 추가).
+    // 가게 목록을 받을 때마다 각 가게의 커버 이미지 "비율"만 따로 적어둔다.
     // 상세 페이지 스켈레톤이 커버 자리를 실제 비율로 그려야 이미지 도착 시 레이아웃이 안 튀는데,
     // 그동안은 TanStack Query의 목록 캐시에서만 비율을 찾았다. 그런데 그 캐시가 없는 경우가
     // 흔해서(상세 URL 직접 진입 / 상세에서 새로고침 / 홈·찜 목록에서 클릭 / gcTime 만료)
@@ -123,7 +126,7 @@ const useStoreList = () => {
         totalPages,
         page,
         pageSize: STORE_LIST_PAGE_SIZE,
-        loading: isLoading || pageOutOfRange || isPlaceholderData,
+        loading: isLoading || keyword !== searchKeyword || pageOutOfRange || isPlaceholderData,
         initialLoading: isLoading,
         refetching: isFetching && !isLoading,
         hasData,

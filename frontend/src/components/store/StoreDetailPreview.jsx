@@ -37,7 +37,7 @@ const syncPreviewStyles = (frameDocument, copies) => {
     frameDocument.body.setAttribute('style', 'margin:0;background:var(--c-bg-paper);color:var(--c-text-primary)');
 };
 
-/** The portal shares real layouts and CSS; registration edits stay outside the disabled reservation form. */
+/* 실제 상세 레이아웃·CSS를 공유하고 등록 입력은 비활성 예약 폼과 분리한다. */
 export default function StoreDetailPreview({ store, device = 'mobile', onDeviceChange, infoContent }) {
     const [form] = Form.useForm();
     const [frameDocument, setFrameDocument] = useState(null);
@@ -54,7 +54,7 @@ export default function StoreDetailPreview({ store, device = 'mobile', onDeviceC
     }, []);
     useLayoutEffect(() => {
         if (!frameDocument) return undefined;
-        // Keep unchanged stylesheets attached when another component inserts its styles.
+        // 다른 컴포넌트가 스타일을 삽입해도 같은 스타일시트 노드는 유지한다.
         const copies = new Map();
         const copyStyles = () => syncPreviewStyles(frameDocument, copies);
         copyStyles();

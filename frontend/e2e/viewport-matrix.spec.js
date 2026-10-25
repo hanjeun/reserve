@@ -44,7 +44,9 @@ async function mockApi(page) {
                 type: 'reservation', merchantUid: 'viewport-payment', status: 'PAID', amount: 1000,
             });
         }
-        if (url.pathname === '/api/reservations/my') return ok(route, []);
+        if (url.pathname === '/api/reservations/my/page') return ok(route, emptyPage);
+        if (url.pathname === '/api/reservations/my') return route.fulfill({ status: 410, json: { success: false,
+            message: '예약 조회 방식이 변경됐어요. 화면을 새로고침한 뒤 다시 시도해주세요.' } });
         if (url.pathname.endsWith('/waiting-count')
             || url.pathname === '/api/chat/my/unread'
             || url.pathname === '/api/chat/unread') return ok(route, 0);

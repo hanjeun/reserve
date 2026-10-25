@@ -15,6 +15,7 @@ const emptyPage = {
 };
 
 const ok = (route, data) => route.fulfill({ json: { success: true, data } });
+const editFixtureState = new WeakMap();
 
 const openRegistrationOperation = async page => {
     await page.goto('/store/register');
@@ -57,10 +58,11 @@ const selectEditSection = async (page, label, heading) => {
 };
 
 test.beforeEach(async ({ context, page }) => {
-    let editFetchCount = 0;
+    const server = { baseChanged: false };
+    editFixtureState.set(page, server);
     await context.clearCookies();
     await page.addInitScript(() => {
-        // A same-origin preview frame shares storage with the page under test.
+        // 같은 출처의 미리보기 프레임은 저장소를 공유한다.
         if (window !== window.top) return;
         window.localStorage.clear();
         window.sessionStorage.clear();
@@ -77,11 +79,10 @@ test.beforeEach(async ({ context, page }) => {
             return;
         }
         if (url.pathname === '/api/stores/99/edit') {
-            editFetchCount += 1;
             await ok(route, {
                 id: 99,
                 ownerId: business.id,
-                name: editFetchCount === 1 ? '서버 원본 가게' : '서버에서 갱신된 가게',
+                name: server.baseChanged ? '서버에서 갱신된 가게' : '서버 원본 가게',
                 category: '카페',
                 phone: '02-1234-5678',
                 address: '서울특별시 중구 세종대로 1',
@@ -146,6 +147,9 @@ test('store editing keeps a local draft and warns when the server base changed',
     await nameInput.fill('내 수정 초안 가게');
     await page.getByRole('button', { name: '임시저장' }).click();
     await expect(page.getByText(/임시저장됨/)).toBeVisible();
+    await expect(nameInput).toHaveValue('내 수정 초안 가게');
+    // 서버 변경 시점을 로컬 저장 뒤로 고정해 조회 재시도와 분리한다.
+    editFixtureState.get(page).baseChanged = true;
 
     await page.reload();
     const conflictDialog = page.getByRole('dialog').filter({ hasText: '가게 정보가 달라졌어요' });
@@ -307,7 +311,7 @@ test('store editing reserves its selection skeleton while the initial data is de
         });
     });
 
-    // Measure the held data request, not the first load of the form/authentication chunks.
+    // 인증·모듈 로딩을 제외하고 보류한 데이터 요청 시간을 측정한다.
     await page.goto('/store/register');
     await expect(page.getByRole('heading', { name: '어떤 가게를 운영하시나요?', exact: true })).toBeVisible();
     const skeleton = page.getByRole('status', { name: '가게 정보를 불러오는 중' });

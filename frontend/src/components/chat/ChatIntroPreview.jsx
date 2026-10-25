@@ -5,10 +5,8 @@ import ChatIntro from './ChatIntro';
 import MessengerAvatar from './MessengerAvatar';
 import { SUPPORT_DISPLAY_NAME } from '../../constants/chatIntro';
 
-/**
- * 채팅 관리 화면의 미리보기 — 손님이 보는 메신저 대화창 모양 그대로 그린다 (2026-09-23).
- * 헤더·본문·입력창은 메신저의 실제 클래스를 재사용한다. 가게·고객지원 모두 첫 대화에는 항상 안내가 보인다(09-24 통일).
- * 질문 버튼은 실제처럼 눌러 볼 수 있다. 입력창은 실제 입력 관문(ChatComposer)을 그대로 그리되 inert 로 막아 모양만 보인다.
+/*
+ * 실제 메신저 클래스로 미리보기를 구성하고 입력창은 inert로 실행을 막는다.
  */
 const noop = () => {};
 

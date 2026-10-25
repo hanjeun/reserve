@@ -18,7 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Read-only statistics; authorization and aggregation stay together under the facade transaction. */
+/** 권한 확인과 통계 집계는 같은 읽기 트랜잭션에서 수행한다. */
 final class StoreStatistics {
     private final StoreRepository storeRepository;
     private final ReservationRepository reservationRepository;

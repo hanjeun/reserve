@@ -31,13 +31,13 @@ public class AuditLog {
     private Long id;
 
     @Column(nullable = false, length = 30)
-    private String entityType;  // MAIL, STORE, MEMBER, RESERVATION, REVIEW
+    private String entityType;
 
     @Column(nullable = false)
     private Long entityId;
 
     @Column(nullable = false, length = 20)
-    private String action;  // SOFT_DELETE, RESTORE, HARD_DELETE
+    private String action;
 
     @Column(length = 255)
     private String actorEmail;  // 관리자 이메일

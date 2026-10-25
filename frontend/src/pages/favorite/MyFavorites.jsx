@@ -3,6 +3,7 @@ import { useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { DataState, FilterMenu, FilterToolbar, PageContainer, StoreCardSkeleton } from '../../components/common';
+import ListingContent from '../../components/common/ListingContent';
 import LikedContentList from '../../components/feed/LikedContentList';
 import { useFeedInteractions } from '../../hooks/feedInteractionQueries';
 import { StoreCard } from '../../components/store';
@@ -18,17 +19,7 @@ import { isBlockingListReadError, queryErrorStatus } from '../../hooks/liveUpdat
 import { favoriteKeys } from '../../hooks/queryKeys';
 import favoriteService from '../../services/favoriteService';
 
-
-
-// 2026-07 추가 — masonry(columns) 대신 고정 그리드로 전환.
-// 예전엔 columns:'4 240px'라 브라우저가 컨테이너 폭에 따라 3열/4열을 오가는 방식이었고
-// (최소폭 240px만 보장), PC에서는 거의 항상 4열이 가능한 폭인데도 3열로 나오는 경우가 있었다.
-// PC에서는 항상 4열로 고정되도록 repeat(4, 1fr) 그리드로 바꾸고, 모바일은 미디어 쿼리로
-// 2열/1열로 자연스럽게 줄어들게 했다.
-// 2026-07-30 — 3열 단계 추가(경계 근거는 StoreList.jsx의 GRID_STYLE 주석 참고).
-// CSS 는 index.css 로 이관했다(2026-08-05). JSX 안 <style> 은 인스턴스마다 렌더되고,
-// 전역 규칙이 컴포넌트에 숨으면 그 컴포넌트를 안 쓰는 화면에는 규칙이 없다.
-// 전역 정책은 index.css — docs/technical/design-system.md 참고.
+// 고정 그리드의 열 수는 공통 목록 규칙을 따른다.
 
 const MyFavorites = () => {
     useDocumentTitle('좋아요');
@@ -77,7 +68,6 @@ const MyFavorites = () => {
         reviewCount: fav.storeReviewCount ?? 0,
     });
 
-    // 헤더 안내 문구 — 로딩 → 실패(빈 목록) → 목록 있음 → 빈 목록 순으로 판정한다.
     const headerMessage = () => {
         if (loading) return '즐겨찾기를 불러오는 중이에요.';
         if (blockingError) return '즐겨찾기 목록을 확인하지 못했어요.';
@@ -85,9 +75,8 @@ const MyFavorites = () => {
         return '마음에 드는 가게를 즐겨찾기에 추가해보세요.';
     };
 
-    // 컨텐츠 — 고정 4열 그리드. 규칙은 index.css 의 "즐겨찾기 그리드" 블록에 있다.
-    // 개수를 모르는 첫 로딩만 8개다. 조회 실패 시 DataState가 재시도 진행 상태를 표시한다.
-    // 로딩 영역은 <output>(암묵 role=status)이다. display 는 .rsv-fav-grid 가 grid 로 정한다.
+    // 첫 조회만 고정 개수의 골격을 쓰고 오류 재시도는 DataState에서 표시한다.
+
     const renderContent = () => {
         if (loading) {
             return (
@@ -99,11 +88,11 @@ const MyFavorites = () => {
         if (blockingError) {
             return (
                 <DataState state="error" kind="favorite" subject="즐겨찾기 목록" error={error}
-                    onRetry={refetch} retrying={isFetching} style={{ marginTop: 100 }} />
+                    onRetry={refetch} retrying={isFetching} />
             );
         }
         if (favorites.length === 0) {
-            return <DataState state="empty" kind="favorite" title="아직 즐겨찾기한 가게가 없어요." style={{ marginTop: 100 }} />;
+            return <DataState state="empty" kind="favorite" title="아직 즐겨찾기한 가게가 없어요." />;
         }
         return (
             <>
@@ -123,7 +112,7 @@ const MyFavorites = () => {
     return (
         <PageContainer size="xl" paddingTop="40px" aria-busy={isFetching}>
             {/* 헤더 */}
-            <div style={styles.header}>
+            <div className="reserve-listing-heading">
                 <PageTitle loading={loading} style={styles.title}>좋아요</PageTitle>
                 <PageDescription loading={loading}>
                     {hasContentLikes ? '좋아요한 가게·게시물·소식·댓글을 한곳에서 볼 수 있어요.' : headerMessage()}
@@ -141,10 +130,10 @@ const MyFavorites = () => {
                 </div> : undefined} />
 
             {/* 컨텐츠 — 상태별 분기는 위 renderContent 주석 참고 */}
-            {showStores && <section ref={listRef} className="reserve-liked-section" aria-label="좋아요한 가게">{hasContentLikes && <h2>가게</h2>}
-                {error && !blockingError && <DataState state="error" kind="favorite" subject="즐겨찾기 목록" error={error}
+            {showStores && <section ref={listRef} className="reserve-liked-section reserve-liked-section--listing" aria-label="좋아요한 가게">{hasContentLikes && <h2>가게</h2>}
+                <ListingContent notice={error && !blockingError && <DataState state="error" kind="favorite" subject="즐겨찾기 목록" error={error}
                     title="최신 즐겨찾기를 확인하지 못해 이전 목록을 보여드리고 있어요."
-                    onRetry={refetch} retrying={isFetching} compact style={{ marginBottom: 16 }} />}{renderContent()}</section>}
+                    onRetry={refetch} retrying={isFetching} compact />}>{renderContent()}</ListingContent></section>}
             {hasContentLikes && kind !== 'stores' && <section className="reserve-liked-section" aria-label="좋아요한 게시물과 소식">
                 {kind === 'all' && <h2>게시물 · 가게 소식 · 댓글</h2>}<LikedContentList type={kind === 'posts' ? 'POST' : kind === 'news' ? 'NEWS' : kind === 'comments' ? 'COMMENT' : 'ALL'} />
             </section>}
@@ -153,8 +142,6 @@ const MyFavorites = () => {
 };
 
 const styles = {
-    // 아래 새로고침 툴바가 생겨 '내 예약' 화면과 같은 간격(32)으로 맞춘다.
-    header: { marginBottom: 32 },
     title:  { margin: '0 0 8px', },
 };
 

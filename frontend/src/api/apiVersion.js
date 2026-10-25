@@ -1,4 +1,4 @@
-/** The legacy API remains usable while a frontend and backend are rolled out separately. */
+/* 프론트와 서버를 따로 배포하는 동안 기존 API 주소를 유지한다. */
 export function versionedApiUrl(url, version = import.meta.env.VITE_API_VERSION) {
     if (version !== 'v1' || typeof url !== 'string' || !url.startsWith('/api/')
         || /^\/api\/v\d+(?:\/|$)/.test(url)) return url;

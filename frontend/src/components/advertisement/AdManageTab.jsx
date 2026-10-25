@@ -67,7 +67,7 @@ const STATUS_LABELS = {
     REVIEW_REQUIRED: { label: '결제 확인 필요', color: 'warning' },
 };
 
-// 결제 가능한 상태 — 아직 결제 전(대기)이거나 결제가 실패한 경우
+// 결제 전·결제 실패 상태만 결제를 허용한다.
 const PAYABLE_STATUSES = new Set(['PENDING_PAYMENT', 'PAYMENT_FAILED']);
 
 // 취소 요청 가능 여부다. 완료 여부는 서버 원장과 PG 대사가 결정한다.
@@ -76,16 +76,15 @@ const CANCELLABLE_STATUSES = new Set(['PENDING_PAYMENT', 'PAYMENT_FAILED', 'ACTI
 // 수정 가능한 상태 — 백엔드 updateAd와 동일한 규칙(CANCELLED/EXPIRED/SUSPENDED/REFUNDED는 수정 불가)
 const EDITABLE_STATUSES = new Set(['PENDING_PAYMENT', 'PAYMENT_FAILED', 'ACTIVE']);
 
-// 종료상태(만료/취소/환불/중단) — 목록에서 직접 숨길 수 있는 상태(소프트삭제) — 2026-07 추가,
-// 백엔드 AdvertisementService.removeAd와 동일한 규칙
-const REMOVABLE_STATUSES = new Set(['EXPIRED', 'CANCELLED', 'REFUNDED', 'SUSPENDED']);
+// 종료 광고는 목록에서 숨길 수 있는 상태로 분류한다.
 
+const REMOVABLE_STATUSES = new Set(['EXPIRED', 'CANCELLED', 'REFUNDED', 'SUSPENDED']);
 
 const DEFAULT_BANNER_COPY = getBannerCopyPreset(DEFAULT_BANNER_COPY_KEY);
 const isPastStartDate = (ad) => Boolean(ad?.startDate && ad.startDate < dayjs().format('YYYY-MM-DD'));
 
-// 스켈레톤이 실제 테이블과 1:1로 대응하도록 컬럼 정의와 같은 값을 유지 (2026-07 전수조사)
-// 예전엔 cols/headers를 아예 안 넘겨서 기본값 6칸 + 헤더까지 회색 막대로 그려졌다.
+// 골격과 실제 테이블은 같은 열 규격을 사용한다.
+
 const SKELETON_HEADERS = ['가게', '유형', '기간', '금액', '상태', '처리'];
 const SKELETON_COLS    = [220, 90, 190, 100, 100, 220];
 
@@ -97,7 +96,6 @@ const skeletonRowCount = (total, page, pageSize) => {
 };
 
 // 노출 일수(양 끝 포함) — 기간이 비어 있으면 0
-
 
 const revokeBlobUrl = (url) => {
     if (url.startsWith('blob:') && typeof URL.revokeObjectURL === 'function') {
@@ -121,16 +119,7 @@ const fetchMyAds = async (page, storeFilter, debouncedSearch) => {
     };
 };
 
-
-
-
-
-
-
-
-
 // 기존 이미지를 antd Upload가 인식하는 최소 형태로 바꾼다.
-
 
 const cancelConfirmOptions = (ad) => {
     const isPaid = ad.status === 'ACTIVE';
@@ -245,13 +234,8 @@ const createModalText = (createStep) => {
     };
 };
 
-/**
- * 사업자 광고 관리 탭 — 내 광고 목록 + 새 광고 신청(결제).
- * 가격: BADGE 1,000원/일, BANNER 5,000원/일 (예시값, 추후 조정 가능)
- *
- * 2026-07-09: TanStack Query로 전환 — 목록은 useQuery(adKeys.my()), 결제는 useAdPayment
- * 내부에서 useMutation으로 처리되며 성공 시 같은 쿼리 키를 무효화해서 자동 반영됨(수동 refetch 불필요).
- * 가게 목록도 useMyStores()를 재사용해서 "내 가게" 페이지와 캐시를 공유함.
+/*
+ * 내 광고 조회와 결제 후 무효화는 같은 광고 캐시를 사용하며 가게 선택은 내 가게 캐시를 공유한다.
  */
 const AdManageTab = () => {
     const { message, confirm } = useMessage();
@@ -263,7 +247,7 @@ const AdManageTab = () => {
     const { handlePreview, previewNode, suppressLinkNavigation } = useImagePreview();
     const [modalOpen, setModalOpen] = useState(false);
     const [createStep, setCreateStep] = useState('details');
-    // 미리보기 → 이전은 앞으로 갈 때(오른쪽에서)의 반대 방향으로 돌아온다(들어가기·나가기 짝, 2026-09-23).
+    // 미리보기에서 돌아올 때 기존 진입과 짝을 이루는 반대 방향 모션을 사용한다.
     const [createStepBack, setCreateStepBack] = useState(false);
     const goToCreateStep = (step) => {
         setCreateStepBack(step === 'details' && createStep === 'preview');
@@ -272,8 +256,8 @@ const AdManageTab = () => {
     const [{ advertisementSearch, advertisementStore, advertisementPage }, setAdListParams] = useQueryParamsState(AD_LIST_QUERY_DEFAULTS);
     const search = advertisementSearch;
     const debouncedSearch = useDebounce(search, 300);
-    // 2026-07 추가 — ReservationTab과 동일한 가게 필터 컨벤션(FilterToolbar selects,
-    // 가게 2개 이상일 때만 노출, "전체 가게" 옵션 포함)
+    // 가게 필터는 공통 FilterToolbar를 사용한다.
+
     const storeFilter = advertisementStore;
     const filterStoreOptions = [
         { value: 'ALL', label: '전체 가게' },
@@ -293,8 +277,8 @@ const AdManageTab = () => {
     const [imagePreviewUrl, setImagePreviewUrl] = useState('');
     const imagePreviewUrlRef = useRef('');
 
-    // 2026-07 추가 — 배너 광고 수정용 별도 모달 state. 새 신청 모달과 달리 가게/유형/기간이 없어서
-    // 그 모달을 그대로 재사용하기 애매해 별도로 둔다. editTarget이 null이면 닫힌 상태.
+    // 배너 수정은 새 광고 신청과 입력 항목이 달라 별도 모달 상태로 둔다.
+
     const [editTarget, setEditTarget] = useState(null);
 
     const { errors, validate, clearError, resetErrors } = useFormErrors();
@@ -339,8 +323,8 @@ const AdManageTab = () => {
         onSettled: () => invalidateAdData(queryClient),
     });
 
-    // 종료상태 광고 목록에서 숨기기(소프트삭제) — 2026-07 추가, 예약 쪽 "삭제"와 동일한 패턴
-    // 이미 끝난 광고를 내 목록에서만 감춘다 — 공개 노출·통계에는 영향이 없어 my() 만 무효화한다.
+    // 종료 광고는 소프트 삭제로 목록에서 숨긴다.
+
     const removeMutation = useMutation({
         mutationFn: (adId) => adService.removeAd(adId),
         onSuccess: () => {
@@ -350,8 +334,8 @@ const AdManageTab = () => {
         onError: (err) => message.error(errorMessageOr(err, '삭제에 실패했어요.')),
     });
 
-    // 2026-07 추가 — 배너 광고 수정 mutation. 새 이미지를 고르지 않으면 images를 보내지 않아
-    // 백엔드가 기존 이미지를 그대로 유지하게 한다(AdUpdateRequest 규칙).
+    // 새 사진을 선택하지 않으면 images를 보내지 않아 기존 사진을 유지한다.
+
     const updateMutation = useMutation({
         mutationFn: ({ adId, formData }) => adService.updateAd(adId, formData),
         onSuccess: () => {
@@ -446,11 +430,7 @@ const AdManageTab = () => {
     };
 
     const handleSubmit = async () => {
-        // 틀린 칸을 한 번에 모아 각 칸 아래에 붙인다.
-        // 예전엔 message.warning 을 세 번 이어 붙여서 ① 첫 오류만 알려주고(고치면 다음 게 또 뜬다)
-        // ② 토스트가 사라지면 어느 칸이 문제였는지 알 수 없었다.
-        // 배너 필수 조건은 원래 한 덩어리(이미지+제목)로 묶여 있었는데, 실제로 비어 있는 건
-        // 둘 중 하나일 수 있으므로 칸별로 갈라서 표시한다.
+
         if (!validateCreateForm()) {
             goToCreateStep('details');
             return;
@@ -469,9 +449,8 @@ const AdManageTab = () => {
 
     const handlePay = (ad) => payExisting(ad.id);
 
-    // 2026-07 추가 — 수정 모달 열기. 기존 title/description은 그대로 프리필하고, 기존 이미지는
-    // antd Upload가 인식하는 최소 형태({ uid, name, status: 'done', url })로 변환해서 보여준다
-    // (사용자가 지우지 않는 한 그 그대로 유지되고, 새로 고르면 전체 교체된다 — AdUpdateRequest 규칙과 일치).
+    // 수정 모달에는 기존 텍스트와 사진 미리보기를 채운다.
+
     const handleEdit = (ad) => {
         setEditTarget(ad);
         setEditBannerCopyKey(findBannerCopyKey(ad) || 'CUSTOM');
@@ -572,15 +551,17 @@ const AdManageTab = () => {
                 initialLoading={loading}
             />
 
-            {/* 가게 선택지는 목록과 별도 요청이다. 실패해도 전체 광고 목록은 그대로 두고,
-                필터 아래의 결과 영역에서 원인과 재시도를 제공한다. */}
+            {/*
+             * 가게 선택 조회가 실패해도 광고 목록은 유지하고 필터 아래에 재시도를 표시한다.
+             */}
             {storesError && (
                 <DataState state="error" kind="store" subject="가게 필터 목록" error={storesError}
                     onRetry={refetchStores} retrying={storesLoading} compact style={{ marginBottom: 16 }} />
             )}
 
-            {/* 로딩 조건 통일(2026-07 전수조사): 예전엔 ads.length === 0 조건 때문에 새로고침이나
-                광고 신청/취소 후 재조회 시엔 아무 로딩 신호도 없었다 — 관리자 탭들과 동일하게 통일. */}
+            {/*
+             * 최초·쿼리 전환에는 골격을 표시하고 수동 갱신 중에는 기존 목록을 유지한다.
+             */}
             {adsContent}
 
             <FormModal

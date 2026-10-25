@@ -12,7 +12,6 @@ import Tooltip from './Tooltip';
 
 const toggleSuccessMessage = (added) => (added ? '즐겨찾기에 추가됐어요.' : '즐겨찾기에서 삭제됐어요.');
 
-// 낙관적 업데이트 + 실패 시 되돌리기
 function useFavoriteToggle(storeId, queryClient, message) {
     return useMutation({
         mutationFn: () => favoriteService.toggle(storeId),
@@ -45,8 +44,8 @@ function getAccessibleLabel(statusUnknown, statusFailed, isFavorite) {
 const favoriteClassName = (plain, modifier = '') =>
     `reserve-favorite-button${modifier}${plain ? ' reserve-favorite-button--plain' : ''}`;
 
-// 광고 미리보기(preview): 실제 목록과 같은 자리·모양의 빈 하트만 그린다(2026-09-23).
-// 누를 수 없는 그림이라 button 이 아니고 조회도 하지 않는다 — 미리보기 안에는 링크·버튼이 없어야 한다.
+// 광고 미리보기는 같은 위치의 하트만 그리며 실제 상태 변경을 실행하지 않는다.
+// 미리보기 하트는 장식으로만 렌더링하며 조회·클릭을 수행하지 않는다.
 function FavoritePreview({ plain, btnSize, iconSize, inactiveColor, style }) {
     return (
         <span
@@ -101,10 +100,8 @@ function buildButtonStyle({ btnSize, blocked, statusUnknown, style }) {
     };
 }
 
-/**
- * 2026-07-09: TanStack Query로 전환 (favoriteKeys.status(storeId)) — initialStatus가 없을 때
- * 각 카드가 개별적으로 조회하던 걸 캐시로 묶어서, 같은 가게가 여러 곳(목록+상세 등)에 동시에
- * 떠 있어도 한 번만 조회하고 토글 시 전부 같이 갱신된다.
+/*
+ * 같은 가게의 즐겨찾기 상태 조회·변경을 같은 캐시로 공유한다.
  */
 const FavoriteButton = ({ storeId, initialStatus, appearance = 'overlay', style = {}, preview = false, inactiveColor = colors.text.secondary }) => {
     // 필요한 값만 구독한다 — 스토어 전체를 구독하면 목록의 하트 수십 개가 로그인 정보가 바뀔 때마다 다시 그려진다.
@@ -127,9 +124,9 @@ const FavoriteButton = ({ storeId, initialStatus, appearance = 'overlay', style 
         initialData: initialStatus,
     });
     const isFavorite = favoriteData ?? false;
-    // 서버의 찜 API 는 "지금 상태를 뒤집는" 토글이다. 상태를 모르는 채로 누르게 두면, 이미 찜한 가게인데
-    // 조회만 실패해 빈 하트로 보이는 상태에서 "찜하려고" 누른 사용자가 오히려 찜을 해제하게 된다(2026-09-21).
-    // 그래서 상태를 모르면(조회 실패·첫 조회 중) 토글을 막고, 실패했으면 누를 때 다시 조회한다.
+    // 찜 상태를 확인하기 전에는 토글을 허용하지 않는다.
+
+    // 상태를 모르면 토글하지 않으며 조회 실패 뒤 누르면 상태 조회를 재시도한다.
     const statusUnknown = favoriteData === undefined;
 
     const toggleMutation = useFavoriteToggle(storeId, queryClient, message);

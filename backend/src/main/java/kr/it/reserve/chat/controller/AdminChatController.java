@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/** 관리자용 채팅 API (2026-08-24 신설). */
+/** 관리자용 채팅 API. */
 @RestController
 @RequestMapping("/api/admin/chat")
 @RequiredArgsConstructor

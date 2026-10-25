@@ -120,8 +120,8 @@ export function useConversationLists({ showHidden, canOwnStores, canAdminSupport
         () => flattenPages(adminQuery.data).map(adminConversationRow),
         [adminQuery.data],
     );
-    // 모두 실패한 경우에는 같은 연결 문제를 세 번 반복하지 않고, 한 번의 상태와 재시도로 묶는다.
-    // 한 목록이라도 이전/현재 데이터를 갖고 있으면 각 섹션의 compact 상태를 유지한다.
+    // 모든 목록의 연결 오류는 한 번의 안내·재시도로 묶는다.
+    // 데이터가 있는 목록은 유지하고 각 섹션의 오류만 좁게 표시한다.
     const enabledConversationSources = [
         { enabled: true, query: memberQuery, rows: memberRows },
         { enabled: canOwnStores, query: ownerQuery, rows: ownerRows },
@@ -185,13 +185,13 @@ export const threadCopyOf = ({ selection, thread, selectedRow, supportName }) =>
     };
 };
 
-// 첫 안내(인사말 + 자동 문답) 노출 여부 — 고객지원은 관리자가, 가게 문의는 사장님이 설정한다(2026-09-23).
+// 첫 안내는 고객지원·가게의 관리 설정을 사용한다.
 export const introVisibilityOf = ({ selection, thread, messageCount, hasMoreHistory }) => {
     const canShowIntro = thread?.viewerRole === 'MEMBER' && thread?.canSend === true
         && messageCount === 0 && !hasMoreHistory;
     const showSupportIntro = selection.kind === 'support' && thread?.type === 'SUPPORT'
         && thread?.roomId > 0 && canShowIntro;
-    // 가게 문의도 고객지원처럼 첫 대화에는 항상 안내를 보인다 — 설정이 없으면 기본 안내(2026-09-24 통일).
+    // 첫 대화에는 설정된 안내나 공통 기본값을 표시한다.
     const showStoreIntro = selection.kind === 'store' && canShowIntro;
     return { showIntro: showSupportIntro || showStoreIntro, showStoreIntro };
 };

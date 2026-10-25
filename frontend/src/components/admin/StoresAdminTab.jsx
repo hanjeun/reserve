@@ -1,16 +1,5 @@
-/**
- * RESERVE - 관리자 가게 관리 탭
- * AdminPanel.jsx에서 분리 (Cognitive Complexity 17 → 15 목표)
- *
- * 2026-07-09: MembersTab과 동일하게 TanStack Query(adminKeys.stores()) + placeholderData:
- * keepPreviousData로 전환, 정지/영구폐업/해제는 useMutation, raw <Table> → 공용 DataTable.
- *
- * 2026-07 전수조사 — MembersTab과 동일한 3가지 수정:
- * 1) StoreSuspendModal/StoreBanModal 로컬 정의를 공용 SanctionModal로 통합 +
- *    key={open ? 'x-open' : 'x-closed'} 강제 remount 제거(닫힘 애니메이션이 죽던 원인).
- * 2) AdminTableSkeleton에 실제 headers/cols 배선.
- * 3) 본문 스켈레톤은 최초 로딩·쿼리 전환에만 표시하고, 수동 새로고침은 기존 행을 유지.
- * 4) 검색어/페이지를 URL 쿼리스트링에 동기화(useQueryParamState) — MembersTab과 동일한 이유.
+/*
+ * 제재 모달·테이블 골격을 공유하고 조회 조건을 URL·캐시 키에 유지한다.
  */
 import React, { useState } from 'react';
 import { Typography, Tag } from 'antd';
@@ -48,9 +37,6 @@ const SKELETON_COLS    = [60, 180, 100, 200, 140, 90, 230];
 const PAGE_SIZE = 20;
 const QUERY_DEFAULTS = { search: '', page: '1' };
 
-// MembersTab과 동일한 2026-07 전수조사 사유 — pagination을 DataTable에 제어시켜서 무효화/영구폐업
-// 뮤테이션 후 재마운트되면서 페이지가 1로 튀는 버그와, 스켈레톤에 pagination 미전달로 로딩 중 페이지
-// 버튼이 사라지던 문제를 동시에 해결.
 const skeletonRowCount = (total, pageIdx1, pageSize) => {
     if (!total) return Math.min(8, pageSize);
     const remaining = total - (pageIdx1 - 1) * pageSize;

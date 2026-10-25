@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types';
+import { Divider } from 'antd';
 import Bone from '../common/Bone';
 import SkeletonText from '../common/SkeletonText';
 import PageContainer from '../common/PageContainer';
@@ -16,11 +17,6 @@ const gapStyle = { display: 'flex', flexDirection: 'column', gap: 16 };
 
 function NameSkeleton() {
     return <><Bone height={54} borderRadius={12} style={{ marginBottom: 16 }} /><Bone height={56} borderRadius={16} /></>;
-}
-function PasswordSkeleton() {
-    return <><div style={{ marginBottom: 16, padding: '8px 12px', fontSize: 12 }}><SkeletonText>영문과 숫자를 포함해 8~64자로 입력해주세요</SkeletonText></div>
-        {['current', 'new', 'confirm'].map(key => <Bone key={key} height={54} borderRadius={12} style={{ marginBottom: 16 }} />)}
-        <Bone height={56} borderRadius={16} /></>;
 }
 function PhotoSkeleton() {
     return <div style={{ ...gapStyle, alignItems: 'center', gap: 8 }}><Bone width={80} height={80} borderRadius="50%" />
@@ -41,21 +37,28 @@ function BusinessSkeleton({ user }) {
         <Bone height={100} borderRadius={12} /><Bone height={46} borderRadius={16} /></div>;
 }
 BusinessSkeleton.propTypes = { user: PropTypes.object };
-const TAB_SKELETONS = { name: NameSkeleton, password: PasswordSkeleton, photo: PhotoSkeleton,
+const TAB_SKELETONS = { name: NameSkeleton, photo: PhotoSkeleton,
     'public-profile': PublicProfileSkeleton, location: LocationSkeleton, business: BusinessSkeleton };
 
 // 이미 복원한 계정의 역할·로그인 방식으로 실제 마이페이지에 있는 탭과 설정 자리만 표시한다.
 export default function MyPageSkeleton({ search = '' }) {
     const isPC = useWindowWidth() >= breakpoints.tablet;
     const user = useAuthStore(state => state.user);
-    const socialUser = user?.provider && user.provider !== 'LOCAL';
     const tabWidths = [
-        ['name', 46], ...(!socialUser ? [['password', 72]] : []), ['photo', 46], ['public-profile', 92], ['location', 46],
+        ['name', 46], ['photo', 46], ['public-profile', 92], ['location', 46],
         ...(!hasAdminAccess(user?.role) ? [['business', 59]] : []),
     ];
     const requested = new URLSearchParams(search).get('tab');
     const activeTab = tabWidths.some(([key]) => key === requested) ? requested : 'name';
     const TabSkeleton = TAB_SKELETONS[activeTab];
+    const securitySection = <div className="reserve-my-page-skeleton-card" style={{ ...cardStyle, marginTop: isPC ? 24 : 0 }}>
+        <SkeletonText style={{ marginBottom: 16 }}>로그인 및 보안</SkeletonText>
+        {[0, 1, 2, 3].map(row => <Bone key={row} height={44} style={{ marginBottom: 12 }} />)}
+        <Divider />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <Bone width="50%" height={32} /><Bone width={72} height={36} borderRadius={12} />
+        </div>
+    </div>;
     return <PageContainer size={isPC ? 'lg' : 'sm'} paddingTop="48px">
         <div className="reserve-my-page-skeleton-grid" style={{ display: 'flex', flexDirection: isPC ? 'row' : 'column', gap: 32, alignItems: 'flex-start' }}>
             <div style={{ flex: isPC ? '1 1 420px' : undefined, width: '100%', minWidth: 0 }}>
@@ -74,6 +77,7 @@ export default function MyPageSkeleton({ search = '' }) {
                     </div>
                     <TabSkeleton user={user} />
                 </div>
+                {isPC && securitySection}
             </div>
             <div style={{ ...gapStyle, gap: 32, flex: isPC ? '1 1 300px' : undefined, width: '100%', minWidth: isPC ? 280 : 0, maxWidth: isPC ? 420 : undefined }}>
                 <div className="reserve-my-page-skeleton-card" style={{ ...cardStyle, ...gapStyle }}>
@@ -96,9 +100,7 @@ export default function MyPageSkeleton({ search = '' }) {
                     </div>
                     <Bone height={36} />
                 </div>}
-                <div className="reserve-my-page-skeleton-card" style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: 16 }}>
-                    <Bone width="50%" height={32} /><Bone width={72} height={36} borderRadius={12} />
-                </div>
+                {!isPC && securitySection}
             </div>
         </div>
     </PageContainer>;

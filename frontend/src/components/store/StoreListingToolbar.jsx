@@ -1,20 +1,18 @@
 import PropTypes from 'prop-types';
-import { Typography } from 'antd';
 import { EnvironmentOutlined } from '../common/icons';
 import FilterMenu from '../common/FilterMenu';
 import Tooltip from '../common/Tooltip';
 import ListingControlsSkeleton from '../common/ListingControlsSkeleton';
+import ListingCount from '../common/ListingCount';
 import StoreListViewToggle from './StoreListViewToggle';
 import { SERVICE_DOMAIN_FILTER_OPTIONS } from '../../constants';
 import { formatRegionLabel } from '../../constants/regions';
-
-const { Text } = Typography;
 
 /** 공개 탐색과 내 가게 관리가 공유하는 목록 조작 화면. 데이터와 정렬 규칙은 각 화면이 소유한다. */
 export default function StoreListingToolbar({
     view, onViewChange, region, regionOpen, onRegionOpen,
     domain, onDomainChange, sort, onSortChange, sortOptions,
-    count, disabled = false, initialLoading = false, sortDisabled = false, sortLoading = false,
+    count, countUnavailable = false, disabled = false, initialLoading = false, sortDisabled = false, sortLoading = false,
     label = '가게 목록 필터', className = '', onAnimationEnd,
 }) {
     const regionLabel = region ? formatRegionLabel(region) : '전체 지역';
@@ -31,7 +29,9 @@ export default function StoreListingToolbar({
             onAnimationEnd={onAnimationEnd}
         >
             <StoreListViewToggle view={view} onChange={onViewChange} disabled={disabled} />
-            {count != null && <Text className="reserve-explore-count" type="secondary">{count.toLocaleString('ko-KR')}개 가게</Text>}
+            {(count != null || countUnavailable) && <ListingCount>
+                {countUnavailable ? '목록 확인 필요' : `${count.toLocaleString('ko-KR')}개 가게`}
+            </ListingCount>}
             <div className="reserve-explore-filter-controls">
                 {onRegionOpen && <Tooltip title={`지역 필터, ${regionLabel}`} disabled={regionOpen}><button
                     type="button"
@@ -81,6 +81,7 @@ StoreListingToolbar.propTypes = {
     onSortChange: PropTypes.func.isRequired,
     sortOptions: PropTypes.arrayOf(PropTypes.shape({ value: PropTypes.string.isRequired, label: PropTypes.node.isRequired })).isRequired,
     count: PropTypes.number,
+    countUnavailable: PropTypes.bool,
     disabled: PropTypes.bool,
     initialLoading: PropTypes.bool,
     sortDisabled: PropTypes.bool,

@@ -22,7 +22,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 
-/** Store photo ordering/upload/cleanup runs inside the facade's existing transaction. */
+/** 사진 순서·업로드·정리는 호출 서비스의 트랜잭션 안에서 처리한다. */
 @Slf4j(topic = "kr.it.reserve.store.service.StoreService")
 final class StoreImages {
     private final FileStorageService fileStorageService;
@@ -97,14 +97,7 @@ final class StoreImages {
     // 상세 이미지 하나 업로드 결과(key + URL + 원본 크기) — key는 바깥 트랜잭션의 rollback cleanup 등록용
     private record UploadedDetailImage(String key, String url, ImageDimension dim) {}
 
-    /**
-     * 상세 이미지 여러 장을 병렬로 S3 업로드(2026-07 추가 — "이미지 업로드 비동기 병렬 처리" 블로그 글 참고).
-     * 기존엔 파일 개수만큼 순차 블로킹 업로드라 이미지가 많을수록 응답이 선형으로 느려졌음 —
-     * CompletableFuture.supplyAsync로 동시에 여러 장을 올림. join은 입력 리스트 순서 그대로
-     * 수행하므로(완료 순서가 아니라), detailImages와 detailImagesMeta의 1:1 순서 대응이 그대로 유지됨.
-     * 트랜잭션 내부에서 동기적으로 join하므로(응답을 먼저 반환하는 방식이 아님) Store 등록/수정
-     * 트랜잭션의 원자성은 그대로 유지되고, 이미지 하나라도 업로드 실패하면 예외가 전파되어 롤백된다.
-     */
+    /** 입력 순서로 병렬 업로드 결과를 모아 이미지와 메타데이터 순서를 맞춘다. 실패 예외는 호출 트랜잭션으로 전파한다. */
     private List<UploadedDetailImage> uploadDetailImagesParallel(List<MultipartFile> files, Long memberId, Long storeId) {
         List<CompletableFuture<UploadedDetailImage>> futures = files.stream()
                 .filter(f -> f != null && !f.isEmpty())
@@ -131,9 +124,6 @@ final class StoreImages {
         }
     }
 
-    /**
-     * 이미지 업데이트 보조 메서드 (가독성을 위해 분리)
-     */
     void updateStoreImages(Store store, StoreUpdateRequest request) {
         Long memberId = store.getOwner().getId();
         Long storeId = store.getId();
@@ -228,14 +218,7 @@ final class StoreImages {
         }
     }
 
-    /**
-     * 기존 이미지 URL은 이 가게에 지금 저장된 같은 역할의 값과 정확히 같을 때만 받는다.
-     *
-     * <p>URL은 공개값이라 요청자가 다른 가게 URL을 보낼 수 있지만, 저장값과 달라 여기서 막힌다.
-     * 소유자·가게 ID 경로 검사는 받을 때가 아니라 지울 때({@link #enqueueManagedFileDeletion}) 한다 —
-     * 2026-04-26 이전 옛 경로(stores/…)로 저장된 가게도 사진을 유지한 채 수정할 수 있어야 하고,
-     * 이미 심어진 남의 URL이 있어도 경계 밖이라 교체·폐업 때 지워지지 않는다.
-     */
+    /** 기존 URL은 이 가게의 같은 역할에 저장된 값만 유지한다. 삭제할 때는 관리 경로의 소유권을 별도로 확인해 다른 자원의 파일을 지우지 않는다. */
     private void validateExistingStoreImageReferences(Store store, StoreUpdateRequest request) {
         String requestedMain = request.getExistingMainImageUrl();
         if (requestedMain != null

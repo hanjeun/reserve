@@ -44,7 +44,7 @@ public class SiteUrls {
         return java.util.List.copyOf(origins);
     }
     public String frontendFor(HttpServletRequest request) {
-        // Only the fixed legacy host can finish an in-flight OAuth on its own host-only cookie.
+        // 고정된 기존 호스트만 해당 호스트 쿠키로 진행 중인 OAuth를 완료할 수 있다.
         if (legacyFrontend != null && !legacyFrontend.isBlank()) {
             String legacy = origin(legacyFrontend, false);
             if (URI.create(legacy).getHost().equalsIgnoreCase(request.getServerName())) return legacy;

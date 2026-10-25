@@ -15,13 +15,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 @Entity
-/*
- * 인덱스는 ReservationRepository의 실제 쿼리에서 역산했다(추측으로 넣지 않았다).
- * ddl-auto: update 라 재시작 시 자동 생성된다. 단 **삭제·변경은 자동 반영되지 않으므로**
- * 여기서 이름을 바꾸면 옛 인덱스가 DB에 그대로 남는다 — 수동 DROP이 필요하다.
- *
- * 복합 인덱스는 왼쪽부터 쓰이므로 (등호 조건 → 정렬) 순서로 놓는다.
- */
+/* 복합 인덱스는 조회 조건·정렬 순서를 기준으로 구성한다. 운영의 구조 변경은 별도 승인된 수동 DDL로 적용한다. */
 @Table(name = "reservation", indexes = {
     // findByMemberOrderByCreatedAtDesc — 내 예약 목록. 로그인 사용자가 가장 자주 여는 화면.
     @Index(name = "idx_reservation_member", columnList = "member_id, deleted_at, created_at"),
@@ -45,8 +39,7 @@ public class Reservation {
     @Column(name = "reservation_id")
     private Long id;
 
-    // 표시용 예약번호 (R-YYYYMMDD-XXXX) — auto-increment id 노출 대신 사람이 읽고 대조하는 용도.
-    // ddl-auto: update 환경이라 기존 행 백필을 위해 nullable로 둔다(ReservationCodeBackfillRunner가 1회 채움).
+    // 표시·대조용 예약 코드이며, 코드가 없는 기존 예약을 보완할 수 있도록 null을 허용한다.
     @Column(name = "reservation_code", length = 20, unique = true)
     private String reservationCode;
 
@@ -60,19 +53,15 @@ public class Reservation {
     @JoinColumn(name = "store_id", nullable = false)
     private Store store;
 
-    // 예약 날짜
     @Column(name = "reservation_date", nullable = false)
     private LocalDate reservationDate;
 
-    // 예약 시간
     @Column(name = "reservation_time", nullable = false)
     private LocalTime reservationTime;
 
-    // 예약 인원
     @Column(name = "guest_count", nullable = false)
     private Integer guestCount;
 
-    // 예약 상태
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
@@ -86,13 +75,7 @@ public class Reservation {
     @Column(name = "rejection_reason", length = 500)
     private String rejectionReason;
 
-    /**
-     * 가게가 취소한 사유 (2026-08-11 추가).
-     *
-     * <p>{@code rejectionReason} 을 재사용하지 않은 이유 — 화면이 그 값을 <b>"거절 사유"</b> 라는
-     * 라벨로 보여준다. 취소된 예약에 "거절 사유"가 뜨면 이용자가 무슨 일이 있었는지 오해한다.
-     * {@code ddl-auto: update} 라 컬럼 추가는 재시작 시 자동 반영된다(삭제·타입변경만 수동 DDL).
-     */
+    /** 가게 취소 사유는 거절 사유와 분리해 저장한다. */
     @Column(name = "cancel_reason", length = 500)
     private String cancelReason;
 
@@ -110,10 +93,7 @@ public class Reservation {
     @Builder.Default
     private Integer depositAmount = 0;
 
-    /**
-     * 실제 방문 QR 체크인 시각(KST 벽시계). 예약 승인 상태와 분리해 출석 사실만 기록한다.
-     * nullable 컬럼 추가라 {@code ddl-auto: update} 환경에서 기존 행은 자연스럽게 미체크인으로 남는다.
-     */
+    /** 실제 방문 QR 체크인 시각(KST 벽시계). 승인 상태와 분리해 출석 사실만 기록하며 값이 없으면 미체크인이다. */
     @Column(name = "checked_in_at")
     private LocalDateTime checkedInAt;
 
@@ -153,23 +133,10 @@ public class Reservation {
         CANCELLED,  // 취소됨 (사용자 또는 사업자가 취소)
         NO_SHOW,    // 노쇼 (고객이 방문하지 않음)
 
-        /**
-         * 미확인 — 승인된 예약인데 <b>예약 시각이 지나도록 사장님이 완료·노쇼 처리를 안 한 상태</b>
-         * (2026-08-11 신설, {@code ReservationElapsedScheduler} 가 전환).
-         *
-         * <p>그 전까지 이런 예약은 CONFIRMED 로 <b>영원히 남았다.</b> 사장님 화면에서는
-         * 며칠 전 예약이 계속 "승인됨"으로 떠 있어 오늘 처리할 건과 섞였고, 이용자 화면에서도
-         * 방문이 끝났는지 아닌지 알 수 없었다.
-         *
-         * <p><b>돈에는 손대지 않는다.</b> 방문했는지 안 했는지는 서버가 알 수 없다 —
-         * 자동으로 COMPLETED 로 넘기면 안 온 손님까지 이용완료가 되어 노쇼 통계가 무너지고,
-         * NO_SHOW 로 넘기면 온 손님을 벌하게 된다. 사실만 기록하고 판단은 사장님에게 남긴다.
-         * 이 상태에서도 완료·노쇼 처리는 그대로 가능하다.
-         */
+        /** 승인 뒤 예약 시각만 지난 상태다. 금전이나 방문 여부는 자동 판단하지 않고 사업자의 완료·노쇼 처리를 기다린다. */
         UNCONFIRMED
     }
 
-    // 결제 완료 처리
     public void markDepositPaid(Integer amount) {
         this.depositPaid = true;
         this.depositAmount = amount;

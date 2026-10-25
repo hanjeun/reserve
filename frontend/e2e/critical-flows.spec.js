@@ -84,8 +84,13 @@ async function mockApi(page, authenticatedUser = null) {
             return;
         }
 
+        if (url.pathname === '/api/reservations/my/page') {
+            await ok(route, { content: [], page: { number: 0, size: 15, totalElements: 0, totalPages: 0 } });
+            return;
+        }
         if (url.pathname === '/api/reservations/my') {
-            await ok(route, []);
+            await route.fulfill({ status: 410, json: { success: false,
+                message: '예약 조회 방식이 변경됐어요. 화면을 새로고침한 뒤 다시 시도해주세요.' } });
             return;
         }
 
@@ -327,7 +332,7 @@ test('accessibility: guest header has keyboard focus and inquiry loads on demand
     expect(await heroHeading.textContent()).toBe(reducedMotionText);
 
     const logo = page.getByRole('link', { name: 'RESERVE 홈', exact: true });
-    const search = page.getByRole('link', { name: '가게·지역·서비스 검색' });
+    const search = page.getByRole('link', { name: '통합 검색' });
     const login = page.getByRole('button', { name: '로그인', exact: true });
     await logo.focus();
     await page.keyboard.press('Tab');

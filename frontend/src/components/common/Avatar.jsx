@@ -1,10 +1,5 @@
-/**
- * RESERVE - 공통 Avatar 컴포넌트
- *
- * - 기본 fallback은 하늘색 배경 + 파란 아이콘
- * - fallback 노드를 지정하면 사진이 없거나 실패했을 때만 표시
- * - src 변경 시 imgError 자동 초기화
- * - 레이어 방식: 아이콘이 항상 뒤에, 이미지가 위에 덮음
+/*
+ * 출처가 바뀌면 오류를 초기화하고 사진이 없거나 실패할 때만 지정한 대체 노드를 표시한다.
  */
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
@@ -42,13 +37,13 @@ const Avatar = ({ src, size = 36, style, draggable, referrerPolicy, fallback, re
             position: 'relative',
             ...style,
         }}>
-            {/* 기본 아이콘은 이미지 뒤에 유지하고, 별도 fallback은 실패한 뒤에만 렌더 */}
+            {/* 기본 아이콘은 사진 뒤에 두고 지정한 대체 노드는 실패 뒤에 표시한다. */}
             {fallback === undefined ? <UserOutlined style={{
                 fontSize: size * 0.44,
                 color: colors.primary.main,
                 position: 'absolute',
             }} /> : !showImg && fallback}
-            {/* 이미지 — 로드 성공 시 아이콘 위에 덮음, 실패 시 아이콘 노출 */}
+            {}
             {showImg && (
                 <LoadingImage
                     src={imgUrl}

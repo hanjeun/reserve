@@ -2,9 +2,9 @@ package kr.it.reserve.config.jwt;
 
 import kr.it.reserve.global.error.AuthException;
 import kr.it.reserve.config.util.SecurityUtil;
+import kr.it.reserve.config.util.CookieUtil;
 import kr.it.reserve.member.entity.Member;
 import jakarta.servlet.*;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,7 +13,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collections;
 
 @Slf4j
@@ -32,8 +31,9 @@ public class JwtAuthenticationFilter implements Filter {
         try {
             String token = resolveToken(httpRequest);
 
-            if (token != null && tokenProvider.validToken(token)) {
-                Member member = tokenProvider.getActiveMemberFromToken(token);
+            if (token != null) {
+                TokenProvider.VerifiedAuthentication verified = tokenProvider.verifyAuthentication(token);
+                Member member = verified.member();
                 String role = "ROLE_" + member.getRole().name();
 
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
@@ -42,7 +42,7 @@ public class JwtAuthenticationFilter implements Filter {
                         Collections.singletonList(new SimpleGrantedAuthority(role))
                 );
                 authentication.setDetails(new SecurityUtil.OAuthAuthenticationDetails(
-                        tokenProvider.getOAuthAuthenticationAt(token)));
+                        verified.oauthAuthenticatedAt(), verified.loginMethod(), verified.sessionId()));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
         } catch (AuthException e) {
@@ -62,14 +62,6 @@ public class JwtAuthenticationFilter implements Filter {
         }
 
         // 2. Cookie 확인
-        Cookie[] cookies = request.getCookies();
-        if (cookies != null) {
-            return Arrays.stream(cookies)
-                    .filter(c -> COOKIE_NAME.equals(c.getName()))
-                    .findFirst()
-                    .map(Cookie::getValue)
-                    .orElse(null);
-        }
-        return null;
+        return CookieUtil.getCookie(request, COOKIE_NAME);
     }
 }

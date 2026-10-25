@@ -74,7 +74,7 @@ public class LocalFeedImageStore {
         } catch (IOException exception) {
             // 실패한 새 파일만 보상 삭제한다. 기존 객체를 덮어쓰거나 폴더를 재귀 삭제하지 않는다.
             try { if (created && !Files.isSymbolicLink(target)) Files.deleteIfExists(target); }
-            catch (IOException ignored) { /* The failed upload remains isolated under its generated UUID. */ }
+            catch (IOException ignored) { /* 업로드 실패 파일은 생성된 UUID 경로에 격리한다. */ }
             throw FileException.uploadFailed();
         }
     }

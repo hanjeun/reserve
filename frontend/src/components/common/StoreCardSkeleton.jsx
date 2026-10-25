@@ -3,7 +3,7 @@ import { colors } from '../../styles/tokens/colors';
 import { shadows } from '../../styles/tokens/spacing';
 import Bone from './Bone';
 
-// The route fallback imports this directly so admin-only skeleton dependencies stay lazy.
+// 라우트 골격에서 직접 가져와 관리자 전용 의존성은 지연 로드한다.
 export default function StoreCardSkeleton({ count = 6, withActions = false, metadata, extraTools, showFavorite = true }) {
     return <>
         {Array.from({ length: count }, (_, index) => `store-${index}`).map(key => (

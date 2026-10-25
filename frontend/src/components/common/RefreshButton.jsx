@@ -1,7 +1,5 @@
-/**
- * 공용 새로고침 버튼. 요청 중 표시와 3초 연타 방지 쿨다운을 분리한다.
- * 회전은 loading만 따르며, 완료된 요청을 시각 효과 때문에 지연하지 않는다.
- * 타이머는 언마운트 시 정리한다. 선택 이유: docs/technical/ui-decisions.md.
+/*
+ * 요청 중 회전과 연타 방지 시간을 분리하며 언마운트 때 타이머를 해제한다.
  */
 import React from 'react';
 import PropTypes from 'prop-types';

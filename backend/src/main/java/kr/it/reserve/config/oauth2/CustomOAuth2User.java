@@ -26,6 +26,7 @@ public class CustomOAuth2User implements OAuth2User {
     private final String nameAttributeKey;
     private final boolean newUser;
     private final OAuthAuthentication oauthAuthentication;
+    private final boolean loginMethodAction;
 
     /** loadUser가 인증한 문맥이다. 이후 현재 Member 조회나 다른 로그인으로 시각을 덮지 않는다. */
     public record OAuthAuthentication(Long memberId, AuthProvider provider, String providerId,
@@ -41,10 +42,16 @@ public class CustomOAuth2User implements OAuth2User {
 
     public CustomOAuth2User(Member member, Map<String, Object> attributes, String nameAttributeKey, boolean newUser,
             Instant tokenExpiresAt) {
+        this(member, attributes, nameAttributeKey, newUser, tokenExpiresAt, false);
+    }
+
+    public CustomOAuth2User(Member member, Map<String, Object> attributes, String nameAttributeKey, boolean newUser,
+            Instant tokenExpiresAt, boolean loginMethodAction) {
         this.member = member;
         this.attributes = attributes;
         this.nameAttributeKey = nameAttributeKey;
         this.newUser = newUser;
+        this.loginMethodAction = loginMethodAction;
         this.oauthAuthentication = member.getProvider() == null || member.getProvider() == AuthProvider.LOCAL ? null
                 : new OAuthAuthentication(member.getId(), member.getProvider(), member.getProviderId(),
                         member.getOauthAuthenticatedAt(), tokenExpiresAt, member.getAuthVersion());

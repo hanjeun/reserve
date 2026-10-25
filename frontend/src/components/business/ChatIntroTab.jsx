@@ -12,10 +12,8 @@ import { chatService } from '../../services';
 
 const CHAT_INTRO_QUERY_DEFAULTS = Object.freeze({ chatIntroStore: '' });
 
-/**
- * 사업자 패널 › 채팅 관리 — 가게별 채팅 첫 화면(공지사항·인사말·자주 묻는 질문) 설정 (2026-09-24).
- * 관리자 패널 › 채팅 관리와 같은 편집기·스켈레톤을 쓴다. 가게는 표시 이름·사진을 가게 정보에서 가져온다(읽기 전용).
- * 다른 사업자 탭처럼 공통 FilterToolbar 로 시작하고, 선택한 가게는 URL(chatIntroStore)에 남는다.
+/*
+ * 가게 채팅은 표시 이름·사진을 읽기 전용 가게 정보에서 가져오고 선택 가게를 URL에 유지한다.
  */
 export default function ChatIntroTab() {
     const { stores, loading: storesLoading, error: storesError, refetch: refetchStores } = useMyStores();

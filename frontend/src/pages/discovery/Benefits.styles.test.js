@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 const stylesheet = postcss.parse(readFileSync(resolve('src/styles/global/feature-surfaces.css'), 'utf8'));
 
-// These are stylesheet source contracts, not browser pixel or hover measurements.
+// CSS 소스 계약만 확인하며 실제 픽셀·호버 측정과 구분한다.
 const styleAtWidth = (selector, width, { reducedMotion = false, hover = false } = {}) => {
     const style = {};
     stylesheet.walkRules(rule => {

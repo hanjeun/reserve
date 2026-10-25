@@ -29,7 +29,7 @@ async function expectContentEntry(page, destination, direction, { cached = false
         await expect(destination).toHaveCSS('animation-name', 'none');
         expect(await entries()).toEqual([]);
     } else {
-        // App clears the direction after 180ms; verify its actual CSS/class when the motion starts.
+        // 180ms 뒤 방향이 해제되므로 모션 시작 시점의 CSS와 클래스를 확인한다.
         await expect.poll(entries).toContainEqual(expect.objectContaining({
             animationName: `reserve-discovery-page-${direction}`,
             destinationAnimation: `reserve-discovery-page-${direction}`,
@@ -64,7 +64,7 @@ test.beforeEach(async ({ page }) => {
         status: 401,
         json: { success: false, message: '세션이 없습니다.' },
     }));
-    // Successful public data makes a return to Home use its real query cache.
+    // 홈 복귀 시 실제 공개 목록 캐시를 사용한다.
     await page.route(/\/api\/stores\?/, route => route.fulfill({
         json: { success: true, data: { content: [], page: { totalElements: 0, totalPages: 0 } } },
     }));
@@ -111,7 +111,7 @@ test('top tabs move only their content in the selected direction, including brow
     await expectContentEntry(page, waitingDestination, 'from-left', { cached: true });
     await expect(waitingDestination).toHaveCSS('transform', 'none');
 
-    // Waiting and Feed now load different modules; verify the cached rightward entry after warming Feed.
+    // 피드 모듈을 먼저 불러온 뒤 캐시된 오른쪽 진입을 확인한다.
     await page.evaluate(() => { window.__reservePageEntries = []; });
     await feedTab.click();
     await expect(feedTab).toHaveAttribute('aria-current', 'page');

@@ -3,15 +3,8 @@ import { WifiOutlined } from '../common/icons';
 import useOnlineStatus from '../../hooks/useOnlineStatus';
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
 
-/**
- * 오프라인 상태 안내 배너.
- *
- * 네트워크가 끊기면 화면 상단에 고정되어 "인터넷 연결이 끊겼습니다"를 알린다.
- * axios 인터셉터가 개별 요청 실패를 각 화면에서 toast로 띄우긴 하지만, 그건 "요청을 시도했을 때"만
- * 반응하는 사후 안내다. 이 배너는 요청 전에도 상시로 오프라인임을 알려줘서, 사용자가 왜 화면이
- * 안 넘어가는지 헷갈리지 않게 한다.
- *
- * 온라인으로 복귀하면 잠깐 "연결됨"을 초록으로 보여준 뒤 사라진다.
+/*
+ * 요청 시도와 무관하게 연결 상태를 표시하고 온라인 복귀 안내 뒤 닫는다.
  */
 const OfflineBanner = () => {
     const online = useOnlineStatus();

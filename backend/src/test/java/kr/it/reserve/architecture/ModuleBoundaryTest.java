@@ -18,17 +18,8 @@ import java.util.TreeSet;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 모듈 경계 래칫 — 모듈러 모놀리스 전환 0단계 (docs/technical/modularization-plan.md, 2026-09-24).
- *
- * <p>{@code kr.it.reserve} 바로 아래 패키지(member·store·payment…)를 모듈로 보고, <b>서로를 의존하는 모듈 쌍</b>(A⇄B)을 센다.
- * 지금 있는 쌍은 {@link #KNOWN_BIDIRECTIONAL} 기준선에 두고,
- * <ul>
- *   <li>새 쌍이 생기면 실패 — 한쪽 방향을 이벤트나 인터페이스로 끊어야 한다.</li>
- *   <li>기준선의 쌍이 없어졌는데 목록에 남아 있어도 실패 — 목록에서 지워 다시 생기지 못하게 한다(한 방향으로만 좋아진다).</li>
- * </ul>
- * <p>양방향 쌍만으로는 A→B→C→A를 놓친다. 순환에 참여하는 모든 의존 방향도 고정한다.
- * 각 방향 A→B에 대해 B에서 A로 돌아오는 경로를 확인하므로 순환 길이·개수 제한이 없다.
- * 기존 방향이 사라지면 기준선에서도 제거해 다시 추가할 수 없게 한다.
+ * 모듈의 양방향 의존과 순환에 포함된 모든 의존 방향을 기준선으로 고정한다.
+ * 새 의존은 거부하고 사라진 의존은 기준선에서도 제거해 다시 추가하지 못하게 한다.
  */
 class ModuleBoundaryTest {
 
@@ -37,7 +28,7 @@ class ModuleBoundaryTest {
 
     /** 기준선 — 줄이기만 한다. 1단계(탈퇴·폐업 조율 서비스)가 끝나면 여기서 지운다. */
     private static final Set<String> KNOWN_BIDIRECTIONAL = Set.of(
-            // 2026-09-24 실측 19쌍. 회원 탈퇴(member⇄*)·가게 폐업(store⇄*)·감사 로그 정리(audit⇄*)가 대부분이다.
+            // 기존 양방향 의존의 기준선이며 새 쌍은 허용하지 않는다.
             "advertisement⇄audit",
             "advertisement⇄payment",
             "advertisement⇄store",
@@ -59,7 +50,7 @@ class ModuleBoundaryTest {
             "reservation⇄store"
     );
 
-    /** 2026-10-04 바이트코드 실측 65개 순환 방향(2개 모듈 순환 포함). 줄이기만 한다. */
+    /** 순환에 포함되는 의존 방향은 줄어든 기준선으로만 갱신한다. */
     private static final Set<String> KNOWN_CYCLIC_DIRECTIONS = Set.of(
             "advertisement->audit",
             "advertisement->config",
@@ -143,6 +134,16 @@ class ModuleBoundaryTest {
             }
         }
         moduleDependencies = edges;
+    }
+
+    @Test
+    void unifiedSearchUsesDomainOwnedReadersForPrivateData() {
+        var sources = new ClassFileImporter().importClass(kr.it.reserve.search.SearchQueries.class);
+        assertThat(sources.getDirectDependenciesFromSelf()).allSatisfy(dependency -> {
+            String target = dependency.getTargetClass().getName();
+            if (target.startsWith(ROOT + "reservation.") || target.startsWith(ROOT + "waiting.") || target.startsWith(ROOT + "chat."))
+                assertThat(target).matches("kr\\.it\\.reserve\\.(reservation|waiting|chat)\\.search\\.[A-Za-z]+SearchReader(?:\\$Hit)?");
+        });
     }
 
     @Test

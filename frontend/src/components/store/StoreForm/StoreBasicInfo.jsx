@@ -51,19 +51,8 @@ const toggleStyles = {
     desc:  { fontSize: fontSize.xs, color: colors.text.tertiary, flex: 1 },
 };
 
-/**
- * 긴 입력·시간 범위는 모바일에서 세로로 쌓는다. 짧은 정책 Select만 compact 2열을 쓴다.
- *
- * ★ 예전에는 폭과 무관하게 항상 가로였다. 이 컴포넌트를 쓰는 7곳이 전부 같은 문제를 겪었고,
- *   그중 최악은 영업시간이었다 — 360px 화면에서 칸 하나가 약 160px 인데 그 안에
- *   `[시작] → [종료]` 와 시계 아이콘이 다 들어가야 했다. 환불 정책은 3열이라 칸당 100px 미만.
- *   숫자 입력은 그럭저럭 보여도 RangePicker·Select 는 글자가 잘렸다.
- *
- * 시간 범위·긴 힌트는 여전히 한 칸의 폭을 보장한다. 짧은 환불·마감 기준만
- * compact로 표시하며 모바일 밀도는 작업 폼 전용 CSS 관문에서 정한다.
- *
- * 폭 판정을 호출부에서 prop 으로 받지 않고 여기서 하는 이유: 이 파일의 SettingsSection 은
- * isMobile 을 안 받는다. 관문 한 곳에서 정해야 7곳이 어긋나지 않는다(docs/technical/design-system.md).
+/*
+ * 모바일의 긴 입력·시간 범위는 한 열로 두고 짧은 정책 선택만 두 열로 묶는다.
  */
 const FieldRow = ({ children, style, compact = false, className = '' }) => {
     const isMobile = useWindowWidth() < 768;
@@ -140,9 +129,9 @@ const BasicSection = ({ isMobile = true, form, zipCode = '', addressDetail = '' 
                 <FormInput placeholder="예: 필라테스, 네일샵, 한식 등" maxLength={30} />
             </Form.Item>
 
-            {/* 예약 단위·브레이크 타임은 시간대(SLOT) 방식에서만 예약을 바꾼다(ReservationService.bookableSlotTimes).
-                회차·날짜 방식에서는 칸을 숨기되 hidden 으로 등록은 유지해 값을 그대로 저장한다 —
-                SLOT 으로 되돌렸을 때 예전 설정이 살아 있어야 하고, 숨긴 칸의 required 가 제출을 막지 않게 규칙도 끈다. */}
+            {/*
+             * 시간대 전용 설정은 다른 방식에서 숨기되 값을 보존하고 필수 검증은 끈다.
+             */}
             <FieldRow compact={isSlot} style={isMobile ? {} : { marginBottom: 12 }}>
                 <Form.Item
                     label="예약 단위" name="reservationSlotMinutes"
@@ -253,9 +242,9 @@ const SettingsSection = ({ bookingType = 'SLOT' }) => (
                 rules={VALIDATION_RULES.noShowDeposit}
                 extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>0원이면 예약금 없음</Text>}
             >
-                {/* step 1000 · 천단위 콤마 — 기본 step 은 1 이라 스피너로 10,000원을 만들려면
-                    1만 번을 눌러야 했다. 예약금은 천 원 단위로 정하는 값이다.
-                    parser 는 콤마를 걷어내 숫자로 되돌린다(없으면 두 번째 입력부터 NaN 이 된다). */}
+                {/*
+                 * 예약금은 천 원 단위로 조절하며 표시용 쉼표를 숫자로 복원한다.
+                 */}
                 <FormInput
                     type="number" placeholder="0" suffix="원"
                     min={0} max={100000} precision={0} step={1000}
@@ -294,9 +283,9 @@ const SettingsSection = ({ bookingType = 'SLOT' }) => (
 
         <Divider />
         <SectionLabel>휴무 · 예약 범위</SectionLabel>
-        {/* 2026-08-11 신설. 그 전까지 영업시간이 요일 구분 없이 하나뿐이라
-            **월요일 휴무인 가게도 월요일 예약을 받았다.** 기능이 없는 게 아니라
-            잘못된 예약을 받는 상태였고, 사장님이 하나씩 거절해야 했다. */}
+        {/*
+         * 요일별 영업시간·휴무를 예약 가능 날짜에 반영한다.
+         */}
         <Form.Item
             label="정기 휴무" name="closedDays"
             extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
@@ -314,10 +303,9 @@ const SettingsSection = ({ bookingType = 'SLOT' }) => (
             ]} />
         </Form.Item>
 
-        {/* 운영 기간 (2026-08-24 신설).
-            휴무일과 성격이 다르다 — 휴무는 "여는 가게가 그날만 쉰다"이고,
-            이건 "그 기간 밖에는 가게가 아예 없다"이다. 팝업스토어·기간 한정 클래스용.
-            비워두면 지금까지와 똑같이 무기한 영업이라 기존 가게는 영향이 없다. */}
+        {/*
+         * 운영 기간 밖은 예약을 받지 않으며 빈 기간은 무기한 운영으로 처리한다.
+         */}
         <Form.Item
             label="운영 기간" name="operatingPeriod"
             extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>

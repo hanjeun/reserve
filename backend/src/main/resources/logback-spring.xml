@@ -11,7 +11,7 @@
         </encoder>
     </appender>
 
-    <!-- 파일 출력 + 30일 rotation (운영 환경) -->
+    <!-- 운영 로그 파일은 30일 보관한다. -->
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>/var/log/reserve/app.log</file>
         <encoder>

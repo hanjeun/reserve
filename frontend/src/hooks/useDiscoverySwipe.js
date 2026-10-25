@@ -25,7 +25,7 @@ function hasOpenOverlay() {
 function isProtectedTarget(target, content) {
     const element = target instanceof Element ? target : target?.parentElement;
     if (!element || element.closest(PROTECTED_TARGETS)) return true;
-    // A sideways list/carousel keeps the gesture even at its first or last item.
+    // 가로 목록·캐러셀은 첫 항목·마지막 항목에서도 제스처를 유지한다.
     for (let ancestor = element; ancestor && ancestor !== content; ancestor = ancestor.parentElement) {
         if (ancestor.scrollWidth <= ancestor.clientWidth + 2) continue;
         const style = getComputedStyle(ancestor);
@@ -34,7 +34,7 @@ function isProtectedTarget(target, content) {
     return false;
 }
 
-/** One large, passive touch gesture moves one discovery tab; native scrolling and edge back gestures stay available. */
+/* 큰 가로 터치 한 번으로 한 탐색 탭만 이동하고 스크롤·가장자리 뒤로가기를 보존한다. */
 export default function useDiscoverySwipe(contentRef) {
     const location = useLocation();
     const navigate = useNavigate();

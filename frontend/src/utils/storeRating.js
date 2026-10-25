@@ -1,7 +1,7 @@
 const isNumericValue = value => typeof value === 'number'
     || (typeof value === 'string' && value.trim() !== '');
 
-/** Store summaries use the same zero-review score and safe API-number handling. */
+/* 리뷰가 없을 때의 점수와 API 숫자 검증을 가게 요약에서 공유한다. */
 export function normalizeStoreRating(ratingValue, reviewCountValue) {
     const count = isNumericValue(reviewCountValue) ? Number(reviewCountValue) : Number.NaN;
     const reviewCount = Number.isSafeInteger(count) && count > 0 ? count : 0;

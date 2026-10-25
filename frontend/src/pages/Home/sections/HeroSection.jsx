@@ -39,10 +39,10 @@ export default function HeroSection({ isMobile, prefersReducedMotion }) {
             padding: isMobile ? '0 20px' : '0 24px',
         }}>
 
-            {/* ── 상단 spacer: 콘텐츠를 세로 중앙으로 밀어올림 ── */}
+            {/* 상단 spacer: 콘텐츠를 세로 중앙으로 밀어올림 ── */}
             <div style={{ flex: 1 }} />
 
-            {/* ── 메인 콘텐츠 ── */}
+            {/* 메인 콘텐츠 ── */}
             <div style={{
                 width: '100%',
                 maxWidth: 1000,
@@ -84,10 +84,10 @@ export default function HeroSection({ isMobile, prefersReducedMotion }) {
                 </div>
             </div>
 
-            {/* ── 하단 spacer: 콘텐츠를 세로 중앙으로 밀어내림 ── */}
+            {/* 하단 spacer: 콘텐츠를 세로 중앙으로 밀어내림 ── */}
             <div style={{ flex: 1 }} />
 
-            {/* ── BounceArrow ──
+            {/* BounceArrow ──
               * 모바일: flex 마지막 자식 → spacer 아래, 컨테이너 하단에 자연스럽게 붙음
               * PC:     absolute bottom:0 유지 (콘텐츠 흐름 밖)
               */}

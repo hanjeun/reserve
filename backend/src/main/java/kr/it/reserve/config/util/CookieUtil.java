@@ -3,76 +3,55 @@ package kr.it.reserve.config.util;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import kr.it.reserve.global.error.AuthException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
+import java.util.List;
 
 @Component
 public class CookieUtil {
-
+    private static final String REFRESH = "refresh_token";
+    /** 인증 경로가 겹치지 않아 요청에는 리프레시 쿠키 하나만 포함된다. */
+    private static final List<String> REFRESH_PATHS = List.of("/api/auth", "/api/v1/auth");
     private final boolean secureCookie;
 
-    public CookieUtil(@Value("${server.env:prod}") String env) {
-        this.secureCookie = !"local".equals(env);
-    }
+    public CookieUtil(@Value("${server.env:prod}") String env) { this.secureCookie = !"local".equals(env); }
 
+    /** Cookie 헤더에는 Path가 없어 값이 다른 동명 쿠키는 구분할 수 없다. */
     public static String getCookie(HttpServletRequest request, String name) {
-        Cookie[] cookies = request.getCookies();
-        
-        if (cookies != null) {
-            return Arrays.stream(cookies)
-                    .filter(cookie -> name.equals(cookie.getName()))
-                    .findFirst()
-                    .map(Cookie::getValue)
-                    .orElse(null);
+        List<String> values = getCookieValues(request, name);
+        if (values.size() > 1 && ("access_token".equals(name) || REFRESH.equals(name))) {
+            throw new AuthException("로그인 정보를 확인할 수 없어요. 다시 로그인해주세요.");
         }
-        
-        return null;
+        return values.isEmpty() ? null : values.getFirst();
     }
 
-    // Jakarta Cookie API는 SameSite를 직접 지원하지 않아 Set-Cookie 헤더를 직접 만든다.
-    //
-    // 2026-07-29: 운영에서만 SameSite=None을 쓰던 것을 전 환경 Lax로 바꿨다.
-    // None은 cross-site 요청에도 쿠키를 붙이는데, JwtAuthenticationFilter가 쿠키로 인증하고
-    // SecurityConfig는 csrf.disable() 상태라 CSRF가 실제로 성립했다.
-    // @ModelAttribute로 multipart를 받는 POST 3개(가게 등록·광고 신청·사업자 인증)는
-    // CORS preflight가 뜨지 않아 CORS로도 막히지 않는다. (CodeQL java/spring-disabled-csrf-protection)
-    //
-    // Lax로 되돌려도 되는 근거:
-    //  - 프론트와 API가 같은 출처다(nginx가 /api/를 같은 도메인에서 프록시, 번들에도 다른 API 도메인 없음)
-    //    → refresh(POST /api/auth/refresh)는 same-site라 Lax에서도 쿠키가 간다
-    //  - 로컬 환경은 원래부터 Lax였고 문제없이 동작해왔다
-    //  - 결제사 복귀(/api/payment/mobile-redirect)와 OAuth 콜백은 top-level GET이라 Lax에서도 쿠키가 간다
-    //    (Strict였다면 이 둘이 깨진다 — Strict로 올리지 말 것)
-    private static final String SAME_SITE = "Lax";
+    public static List<String> getCookieValues(HttpServletRequest request, String name) {
+        Cookie[] cookies = request.getCookies();
+        return cookies == null ? List.of() : Arrays.stream(cookies)
+                .filter(cookie -> name.equals(cookie.getName())).map(Cookie::getValue)
+                .filter(value -> value != null && !value.isBlank()).distinct().toList();
+    }
 
     public void addCookie(HttpServletResponse response, String name, String value, int maxAge) {
-        String sameSite = SAME_SITE;
-
-        StringBuilder sb = new StringBuilder();
-        sb.append(name).append("=").append(value).append("; ");
-        sb.append("Path=/; ");
-        sb.append("Max-Age=").append(maxAge).append("; ");
-        sb.append("HttpOnly; ");
-        if (secureCookie) sb.append("Secure; ");
-        sb.append("SameSite=").append(sameSite);
-
-        response.addHeader("Set-Cookie", sb.toString());
+        if (REFRESH.equals(name)) {
+            // 넓은 경로의 기존 쿠키를 지운 뒤 인증 경로별 쿠키를 설정한다. 다른 경로에는 원문 토큰을 두지 않는다.
+            write(response, name, "", 0, "/");
+            for (String path : REFRESH_PATHS) write(response, name, value, maxAge, path);
+        } else {
+            write(response, name, value, maxAge, "/");
+        }
     }
 
     public void deleteCookie(HttpServletResponse response, String name) {
-        // addCookie와 동일한 SameSite/Secure 속성으로 삭제해야 브라우저가 매칭해서 삭제함
-        String sameSite = SAME_SITE;
+        if (REFRESH.equals(name)) for (String path : REFRESH_PATHS) write(response, name, "", 0, path);
+        write(response, name, "", 0, "/");
+    }
 
-        StringBuilder sb = new StringBuilder();
-        sb.append(name).append("=; ");
-        sb.append("Path=/; ");
-        sb.append("Max-Age=0; ");
-        sb.append("HttpOnly; ");
-        if (secureCookie) sb.append("Secure; ");
-        sb.append("SameSite=").append(sameSite);
-
-        response.addHeader("Set-Cookie", sb.toString());
+    private void write(HttpServletResponse response, String name, String value, int maxAge, String path) {
+        response.addHeader("Set-Cookie", name + "=" + value + "; Path=" + path + "; Max-Age=" + maxAge
+                + "; HttpOnly; " + (secureCookie ? "Secure; " : "") + "SameSite=Lax");
     }
 }

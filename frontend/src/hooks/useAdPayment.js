@@ -5,28 +5,8 @@ import adService from '../services/adService';
 import useMessage from './useMessage';
 import { invalidateAdData } from './invalidateAfterWrite';
 
-/**
- * 광고 결제 훅 — usePayment(예약금 결제)와 동일한 패턴, 완전히 독립된 흐름.
- * 흐름: createAd(FormData) → prepare 응답 받음 → PortOne.requestPayment → verifyPayment → 완료
- *
- * 2026-07-09: useMutation 기반으로 전환 — payingId를 별도 useState로 추적하던 걸
- * payExistingMutation.variables(마지막으로 mutate에 넘긴 adId)로 대체, 성공 시
- * adKeys.my() 쿼리를 무효화해서 AdManageTab이 별도 refetch() 호출 없이 최신 목록을 받음.
- * (내부적으로 mutationFn은 여전히 절대 throw하지 않고 {success,...} 형태로 resolve함 —
- * 결제 취소/실패는 정상적인 흐름이라 각 케이스별 메시지를 그대로 유지하기 위함)
- *
- * 2026-07 추가 — 모바일 결제 지원. 백엔드 /api/advertisements/mobile-redirect가 결제 검증까지
- * 끝낸 뒤 /payment/result?type=ad로 리다이렉트하므로, 모바일은 데스크톱과 달리 반환값이 오지 않는다
- * (페이지가 리다이렉트로 넘어가버림).
- *
- * ─── 2026-08-10 PortOne V1 → V2 전환 ────────────────────────────────────────
- * 자세한 배경은 usePayment.js 상단 주석 참고. 요약하면 V1 SDK + V2 채널키 혼용 때문에 결제가
- * V1 원장에 쌓여 **환불(취소)이 404 로 실패**하고 있었다. 광고 결제도 같은 경로라 함께 전환한다.
- * - `m_redirect_url` → `redirectUrl`, `merchant_uid` → `paymentId`, `name` → `orderName`,
- *   `amount` → `totalAmount`, `buyer_*` → `customer.*`
- * - 실패·취소는 콜백의 `rsp.success` 가 아니라 **반환값의 `code` 존재 여부**로 판별한다
- * - 리다이렉트가 일어나면 반환값이 `undefined` 다 → `payment == null` 을 먼저 거른다
- * - PC 결제창이 팝업에서 IFRAME 으로 바뀌어 `paymentWindowGuard`(focus 기반 강제취소)를 걷어냈다
+/*
+ * 광고 결제 결과는 PC 검증 또는 모바일 리다이렉트의 서버 검증으로 확정한다. 실패·취소도 결과 객체이므로 mutation 완료만으로 결제 성공을 판단하지 않는다.
  */
 const useAdPayment = () => {
     const { message } = useMessage();
@@ -97,10 +77,8 @@ const useAdPayment = () => {
                 const prepared = await adService.createAd(formData);
                 return await runPayment(prepared);
             } catch (err) {
-                // 2026-07 버그 수정: axios 인터셉터는 항상 진짜 Error 객체를 throw하는데(err instanceof Error),
-                // 여기서는 typeof err === 'string'으로 검사해서 항상 false가 되고 있었다 — 그 결과 백엔드가
-                // 보낸 구체적인 오류 문구(예: 이미 결제 대기 중인 신청이 있음, 노출 기간 오류 등)가 한 번도 사용자에게
-                // 보이지 않고 늘 같은 뭉뚝한 fallback 문구만 떠 있었다. BusinessVerificationTab 등과 동일한 컨벤션으로 통일.
+                // 인터셉터가 던진 Error의 message를 사용자 오류 안내에 사용한다.
+
                 message.error(err instanceof Error ? err.message : '광고 신청에 실패했어요.');
                 return { success: false };
             }
@@ -108,14 +86,14 @@ const useAdPayment = () => {
         onSuccess: invalidateMyAds,
     });
 
-    // 결제 대기(PENDING_PAYMENT)/실패(PAYMENT_FAILED) 상태인 기존 광고에 대해 결제창을 다시 여는 mutation — "결제" 버튼용
+    // 결제 대기·실패 상태의 기존 광고는 결제창을 다시 열 수 있다.
     const payExistingMutation = useMutation({
         mutationFn: async (adId) => {
             try {
                 const prepared = await adService.preparePayment(adId);
                 return await runPayment(prepared);
             } catch (err) {
-                // 위 createMutation과 동일한 이유로 err.message를 읽도록 수정(2026-07)
+
                 message.error(err instanceof Error ? err.message : '결제 준비에 실패했어요.');
                 return { success: false };
             }

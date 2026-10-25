@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
-/** Entity updates own relay registration and its publisher shutdown. */
+/** 릴레이 등록과 발행자 종료를 같은 생명주기로 묶는다. */
 @Configuration(proxyBeanMethods = false)
 @Profile({"local & !prod & !blue & !green", "!local & (prod | blue | green)"})
 @ConditionalOnProperty(prefix = "reserve.redis", name = "enabled", havingValue = "true")

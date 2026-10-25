@@ -4,7 +4,7 @@ import StoreDetailSkeleton from '../common/StoreDetailSkeleton';
 import useStoreImageHint from '../../hooks/useStoreImageHint';
 import { useWindowWidth } from '../../hooks/useWindowWidth';
 
-/** The same lightweight frame is available before authentication, route code and store data. */
+/* 인증·라우트·가게 데이터 로딩에서 같은 경량 프레임을 사용한다. */
 export default function StoreDetailLoading({ storeId, pathname, isPC: suppliedIsPC }) {
     const id = storeId ?? /^\/store\/([0-9]+)\/?$/.exec(pathname || '')?.[1];
     const imageHint = useStoreImageHint(id);

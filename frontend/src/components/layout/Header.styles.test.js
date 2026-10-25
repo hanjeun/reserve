@@ -28,41 +28,17 @@ describe('result query header source contracts', () => {
         expect(styleAtWidth('.reserve-header-is-guest.reserve-header-has-back .reserve-header-logo-wordmark', 390)['font-size']).toBeUndefined();
     });
 
-    it.each([320, 390, 767, 768, 960, 1248])('hides the brand only on mobile keyword results and keeps the PC wordmark (%ipx)', width => {
+    it.each([320, 390, 767, 768, 960, 1248])('목록 검색어와 무관하게 워드마크를 유지한다 (%ipx)', width => {
         expect(styleAtWidth('.reserve-header-logo-wordmark', width).display).toBe('block');
-        expect(styleAtWidth('.reserve-header-has-query .reserve-header-logo', width).display).toBe(width < 768 ? 'none' : undefined);
-        expect(styleAtWidth('.reserve-header-has-query .reserve-header-logo-compact', width).display).toBeUndefined();
-    });
-
-    it.each([768, 960, 1248])('centers the PC keyword field at the search screen position (%ipx)', width => {
-        const inner = styleAtWidth('.reserve-header-has-query .reserve-header-inner', width);
-        expect(inner.display).toBe('grid');
-        expect(inner['grid-template-columns']).toBe('1fr minmax(0, 560px) 1fr');
-        expect(styleAtWidth('.reserve-header-query', width)['margin-left']).toBeUndefined();
-    });
-
-    it('keeps the mobile keyword field in the flexible row', () => {
-        expect(styleAtWidth('.reserve-header-has-query .reserve-header-inner', 390).display).toBeUndefined();
-    });
-
-    it('uses bounded flex width and ellipsis rather than overlapping the account or brand', () => {
-        const query = styleAtWidth('.reserve-header-query', 390);
-        expect(query.flex).toBe('1 1 0');
-        expect(query['min-width']).toBe('0');
-        expect(query['--reserve-header-query-height']).toBe('44px');
-        expect(query['--reserve-header-query-radius']).toBe('100px');
-        expect(query['--reserve-header-query-max-width']).toBe('560px');
-        expect(query['font-size']).toBe('16px');
-        expect(query.background).toBe('var(--c-gray-50, #f9fafb)');
-        expect(styleAtWidth('.reserve-header-query-text', 390)['text-overflow']).toBe('ellipsis');
-        expect(styleAtWidth('.reserve-header-query-text', 390)['white-space']).toBe('nowrap');
+        expect(styleAtWidth('.reserve-header-has-query .reserve-header-logo', width).display).toBeUndefined();
+        expect(styleAtWidth('.reserve-header-has-query .reserve-header-inner', width).display).toBeUndefined();
+        expect(styleAtWidth('.reserve-header-query', width)).toEqual({});
     });
 
     it('keeps a 44px clickable search icon and neutral keyboard focus indicators', () => {
         expect(styleAtWidth('.reserve-search-page', 390)['--reserve-search-action-size']).toBe('44px');
         expect(styleAtWidth('.reserve-search-icon', 390).cursor).toBe('pointer');
         expect(styleAtWidth('.reserve-search-icon:focus-visible', 390).outline).toBe('var(--reserve-focus-ring)');
-        expect(styleAtWidth('.reserve-header-query:focus-visible', 390).outline).toBe('var(--reserve-focus-ring)');
     });
 
     it('keeps the search link neutral and closes only the mobile search-to-login gutter', () => {

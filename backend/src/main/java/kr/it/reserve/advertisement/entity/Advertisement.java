@@ -11,15 +11,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-/**
- * 가게 광고.
- *
- * 현재 노출 상태와 현재 merchantUid를 갖는다. 금융 판단의 정본은 AdPaymentAttempt이며,
- * 기존 결제 시도는 새 UID가 생겨도 보존한다. 예약 결제 원장과는 별개다.
- *
- * 노출 방식: 결제 완료 즉시 ACTIVE(사전 관리자 승인 없음) — 문제가 생기면
- * 관리자가 사후에 SUSPENDED로 내린다(Store의 정지 패턴과 동일한 철학).
- */
+/** 노출 상태는 광고에, 결제·환불 판단과 이전 결제 시도는 AdPaymentAttempt 원장에 보존한다. */
 @Entity
 /*
  * 인덱스는 AdvertisementRepository의 실제 쿼리에서 역산했다. (근거는 Reservation 엔티티 주석 참고)
@@ -88,19 +80,8 @@ public class Advertisement {
     private String merchantUid;
 
     /**
-     * 광고 상태.
-     *
-     * columnDefinition = "varchar(20)"인 이유 (2026-07 버그 수정):
-     * Hibernate는 MySQL에서 @Enumerated(STRING) 필드를 네이티브 ENUM 컬럼으로 만든다.
-     * 그런데 ddl-auto: update는 "없는 컬럼 추가"만 해주고 "기존 컬럼의 타입 변경"은 하지 않는다.
-     * 그래서 나중에 AdStatus에 CANCELLED/REFUNDED를 추가했을 때 DB의 enum 정의는
-     * enum('ACTIVE','EXPIRED','PAYMENT_FAILED','PENDING_PAYMENT','SUSPENDED') 5개인 채로 굳어버렸고,
-     * 결제 전 광고를 취소하면 UPDATE ... SET status='CANCELLED'가 MySQL에서 거부되어 500이 났다.
-     *
-     * varchar로 두면 앞으로 AdStatus에 값을 추가해도 DB가 다시 깨지지 않는다.
-     * (Store.status가 이미 varchar(20)이라 같은 문제를 겪지 않았다 — 그 선례를 따른다)
-     * 기존 DB에는 ddl-auto가 타입을 안 바꾸므로 수동 ALTER가 필요하다:
-     *   ALTER TABLE advertisement MODIFY COLUMN status VARCHAR(20) NOT NULL;
+     * 광고 상태는 상태값 추가가 MySQL 네이티브 ENUM 정의에 종속되지 않도록 VARCHAR로 매핑한다.
+     * 기존 스키마의 타입 변경은 자동 생성에 맡기지 않고 manual-ddl 런북의 검증·승인 절차를 따른다.
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, columnDefinition = "varchar(20)")
@@ -110,7 +91,7 @@ public class Advertisement {
     @Column(name = "suspend_reason")
     private String suspendReason;
 
-    // 광고 성과 지표(2026-07 추가) — Promotion.viewCount/likeCount와 동일한 단순 카운터 방식.
+    // 광고 성과 지표 — Promotion.viewCount/likeCount와 동일한 단순 카운터 방식.
     // 별도 이벤트 로그 테이블 없이 지금 규모에 맞게 간단하게 시작 — 하루 단위 추이가 필요해지면
     // 별도 로그 테이블로 증분해야 함(현재 구조로는 일별 추이 불가, 누적 지표만 제공).
     @Column(name = "impression_count", nullable = false)
@@ -132,9 +113,7 @@ public class Advertisement {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    // 2026-07 추가 — 종료상태(EXPIRED/CANCELLED/REFUNDED/SUSPENDED) 광고를 사업자가 목록에서 직접
-    // 숨길 수 있게 — 예약(Reservation.deletedAt)과 동일한 소프트삭제 패턴(휴지통 30일 보관 후 자동 영구삭제).
-    // 결제/노출 이력은 지우지 않고 그대로 보존하는 게 목적이라 하드삭제가 아니라 소프트삭제.
+    // 목록에서 숨겨도 결제·노출 이력은 보존한다.
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 

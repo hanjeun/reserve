@@ -38,15 +38,7 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
     @Query("SELECT r FROM ChatRoom r WHERE r.id = :id")
     Optional<ChatRoom> findByIdForUpdate(@Param("id") Long id);
 
-    /**
-     * 관리자 목록 — <b>안 읽은 방이 먼저, 그다음 최근 순.</b>
-     *
-     * <p>단순히 최근 순으로 두면 답을 기다리는 방이 활발한 방에 밀려 아래로 내려간다.
-     * 관리자 화면에서 제일 중요한 건 "아직 답 안 한 방"이라 그걸 위로 올린다.
-     *
-     * <p>{@code JOIN FETCH member} — 목록이 손님 이름·이메일을 보여주므로 없으면 방 개수만큼
-     * 추가 쿼리가 나간다(N+1).
-     */
+    /** 응답 대기 방을 먼저 표시하고, 목록의 회원 정보를 한 번에 조회한다. */
     @Query(value = """
             SELECT r FROM ChatRoom r
              JOIN FETCH r.member

@@ -1,4 +1,4 @@
-// Keep syntax policies executable; rationale and exceptions live in docs/rules/code-conventions.md.
+// 구문 정책은 이 규칙에서 강제하고 근거와 예외는 코드 규칙 문서에 둔다.
 export const rules = {
     'user-copy-tone': {
         meta: {

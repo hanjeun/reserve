@@ -1,24 +1,24 @@
 import { cloneElement, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
-// This component owns the application tooltip interaction policy.
+
 import { Tooltip as AntTooltip } from 'antd'; // eslint-disable-line no-restricted-imports
 import useInputModality from '../../hooks/useInputModality';
 import { getInputModality } from '../../hooks/inputModality';
 import { TooltipScopeContext } from './tooltipScope';
 
-// Event handlers are forwarded without reading their refs during rendering.
+// 렌더 중 ref를 읽지 않고 이벤트 처리기를 전달한다.
 function TooltipSurface({ children, handlers, ...props }) {
     return <AntTooltip {...props}>{cloneElement(children, handlers)}</AntTooltip>;
 }
 TooltipSurface.propTypes = { children: PropTypes.element.isRequired, handlers: PropTypes.object.isRequired };
 
-/** Explain controls on hover or keyboard focus without retaining a touch popup. */
+/* 호버·키보드 포커스에서 안내하고 터치 팝업은 남기지 않는다. */
 export default function Tooltip({ title, children, disabled = false, ...props }) {
     const modality = useInputModality();
     const scope = useContext(TooltipScopeContext);
     const dismissed = useRef(false);
     const [state, setState] = useState({ modality, scope, open: false });
-    // An old hover must not reappear after touch input switches back to a mouse.
+    // 터치 뒤 마우스로 전환할 때 이전 호버가 다시 나타나지 않게 한다.
     if (state.modality !== modality || state.scope !== scope) setState({ modality, scope, open: false });
     const open = state.modality === modality && state.scope === scope && state.open && modality !== 'touch' && !disabled;
     const close = () => { dismissed.current = true; setState({ modality: getInputModality(), scope, open: false }); };

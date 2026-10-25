@@ -6,7 +6,7 @@ import { TooltipScopeContext } from './tooltipScope';
 import useInputModality from '../../hooks/useInputModality';
 import useReducedMotion from '../../hooks/useReducedMotion';
 
-/** State details can be pinned with a click or tap without changing action tooltips. */
+/* 상태 설명을 눌러 고정할 수 있으며 실행 도구의 툴팁과 구분한다. */
 export default function InfoHint({ label, children, onOpenChange }) {
     const descriptionId = useId();
     const scope = useContext(TooltipScopeContext);

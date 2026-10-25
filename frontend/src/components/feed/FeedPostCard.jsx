@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { Avatar } from '../common';
+import TextLink from '../common/TextLink';
 import InterfaceIcon from '../common/InterfaceIcon';
 import FeedMediaStrip from './FeedMediaStrip';
 import FeedItemMenu from './FeedItemMenu';
@@ -13,7 +14,7 @@ export default function FeedPostCard({ post, detail = false, preview = false, li
     const author = post.author || {};
     const state = feedStateLabel(post.state);
     const removed = post.state === 'DELETED';
-    const storeLink = (to, label, icon) => preview ? <span>{icon}{label}</span> : <Link to={to}>{icon}{label}</Link>;
+    const storeLink = (to, label, icon) => preview ? <span className="reserve-text-link">{icon}{label}</span> : <TextLink to={to}>{icon}{label}</TextLink>;
     const text = <>
         {preview && post.news && <div className="reserve-feed-news-heading"><h2>{post.news.title}</h2><StoreNewsMetadata item={post.news} />
             {post.news.conditions && <p className="reserve-feed-note">적용 조건: {post.news.conditions}</p>}</div>}

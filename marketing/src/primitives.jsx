@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 
-// Build-time markup for the original screen. The shipped page needs no UI runtime or inline styles.
+// 빌드할 때 마크업과 외부 CSS를 생성해 브라우저의 UI 런타임 의존성을 없앤다.
 export const Typography = {
     Title: ({ level = 1, children, ...props }) => createElement(`h${level}`, props, children),
     Text: ({ children, ...props }) => <span {...props}>{children}</span>,

@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Only invalidation signals cross the stream; the existing APIs authorize every data read. */
+/** 스트림은 갱신 신호만 보내며 실제 데이터 조회 권한은 기존 API가 검사한다. */
 @Component @RequiredArgsConstructor
 public class StoreNewsEvents {
     private final ApplicationEventPublisher events;

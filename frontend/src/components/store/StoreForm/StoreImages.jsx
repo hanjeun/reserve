@@ -11,16 +11,8 @@ import SortableImageUpload from '../../common/SortableImageUpload';
 import LoadingUpload from '../../common/LoadingUpload';
 import ImageUploadButton from '../../common/ImageUploadButton';
 
-/**
- * Upload 의 onChange 이벤트에서 폼 값으로 쓸 배열만 꺼낸다.
- *
- * ★ 이게 없으면 `required` 검사가 통째로 무력해진다.
- * Upload 는 `{ file, fileList }` 객체를 onChange 로 넘기는데, 그 객체가 그대로 폼 값이 되면
- * fileList 가 비어 있어도 **객체 자체는 truthy** 라 required 를 통과한다.
- * 즉 "이미지를 올렸다가 지우고 제출" 하면 대표 이미지 없이 등록이 됐다.
- *
- * 배열로 바꿔주면 `[]` 가 되어 async-validator 가 빈 값으로 판정한다.
- * (실제 파일은 폼이 아니라 useStoreForm 의 state 로 전송되므로, 이 값은 검증 전용이다.)
+/*
+ * Upload의 fileList만 검증 값으로 전달해 빈 배열의 필수 검증을 유지한다. 실제 파일 전송은 폼 상태에서 관리한다.
  */
 const normFileList = (e) => (Array.isArray(e) ? e : e?.fileList ?? []);
 

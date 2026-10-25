@@ -56,7 +56,7 @@ function supplementalNotices(identity, directory) {
     return supplemental;
 }
 
-// Build evidence comes from the emitted chunks, not the full development dependency tree.
+// 배포 청크에 포함된 의존성만 고지 대상으로 수집한다.
 export function bundleNotices() {
     return {
         name: 'reserve-bundle-notices',

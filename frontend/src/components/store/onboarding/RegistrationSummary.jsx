@@ -56,7 +56,7 @@ export function RegistrationSummary({ values, goTo, imageCounts = { main: 0, det
         ].map(row => ({...row, step: onboardingPreviewDestination(row.label, values, mode)}));
     };
     return <section className="reserve-onboarding-summary" aria-label="가게 설정">
-        {/* Reuse customer detail values, with break time in its own editable row. */}
+        {/* 고객 상세 값을 공유하고 휴게 시간은 별도 수정 행에 둔다. */}
         <StoreInfoSection store={{ ...store, breakStartTime: null, breakEndTime: null }} transformRows={rows}
             renderAction={row => <Button variant="ghost-sm" size="sm" htmlType="button" disabled={disabled}
                 onClick={() => goTo(row.step)} aria-label={`${row.label} 수정`}>수정</Button>} />

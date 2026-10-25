@@ -3,7 +3,7 @@ import { Tag } from 'antd';
 import Tooltip from './Tooltip';
 import useInputModality from '../../hooks/useInputModality';
 
-/** Keep essential status reasons readable without requiring a touch tooltip. */
+/* 필수 상태 사유는 터치 툴팁 없이도 읽을 수 있게 한다. */
 export default function StatusHint({ label, color, description }) {
     const modality = useInputModality();
     return <span className="reserve-status-hint">

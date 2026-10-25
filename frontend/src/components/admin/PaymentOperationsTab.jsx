@@ -38,7 +38,7 @@ const OUTCOME_LABELS = {
 };
 
 const pageContent = (data) => data?.content ?? [];
-// 주문번호(13px, 약 189px) + 복사 아이콘(약 20) + 칸 좌우 여백(16) 이 한 줄에 들어가는 폭 (2026-09-21 실측).
+// 주문번호·복사 도구·좌우 여백이 한 줄에 들어갈 너비를 둔다.
 const ORDER_NO_COLUMN_WIDTH = 232;
 const pageTotal = (data) => data?.page?.totalElements ?? data?.totalElements ?? pageContent(data).length;
 const shortDateTime = (value) => value ? value.replace('T', ' ').substring(0, 16) : '-';

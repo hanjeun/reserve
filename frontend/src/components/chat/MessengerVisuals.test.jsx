@@ -427,7 +427,7 @@ describe('institutional admin sender groups and literal message text', () => {
 
 describe('messenger footer hover source contract', () => {
     it('keeps navigation hover neutral while reserving primary for the active tab', () => {
-        // CSS contract only: jsdom is not a browser hover or pixel measurement.
+        // CSS 계약만 확인하며 실제 호버·픽셀 측정은 브라우저 검증과 구분한다.
         const css = postcss.parse(readFileSync(resolve(cwd(), 'src/styles/global/feature-surfaces.css'), 'utf8'));
         const declarations = selector => {
             const result = {};

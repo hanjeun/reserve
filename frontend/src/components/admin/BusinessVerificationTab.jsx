@@ -1,28 +1,5 @@
-/**
- * RESERVE - 관리자 사업자 인증 탭 (대기 중 / 전체 목록)
- *
- * 2026-07 전수조사로 AdminPanel.jsx에서 분리.
- * 다른 9개 탭(MembersTab, StoresAdminTab, ReservationsAllTab, TrashTab, AuditLogTab,
- * DashboardTab, MailboxTab, AdminAdsTab)은 이미 components/admin/ 아래로 분리돼 있었는데
- * 사업자 인증 탭만 데이터 로딩 + 컬럼 정의 + 상세 모달 + 거절 모달이 전부 AdminPanel에
- * 남아 있어서, AdminPanel이 "탭 셸"이 아니라 "탭 셸 + 한 탭의 전체 구현"이 되어 있었음.
- *
- * mode: 'pending'(대기 중) | 'all'(전체 목록)
- *   두 탭은 같은 queryKey(adminKeys.businessVerifications())를 공유하므로 TanStack Query
- *   캐시 덕에 네트워크 요청은 한 번만 나간다 — 컴포넌트를 두 번 마운트해도 중복 호출 없음.
- *   URL 쿼리스트링(search/page)도 mode별로 별개인 탭 키(tab=pending / tab=all)에서만 쓰이므로
- *   두 인스턴스가 서로의 필터를 덮어쓸 걱정은 없다(AdminPanel의 탭 전환이 항상 ?tab=만 남기고
- *   나머지 파라미터를 지우기 때문).
- *
- * 함께 고친 것 —
- * 1) raw <Table> → 공용 DataTable (size/scroll/pagination 기본값 통일. DataTable을 만든 이유가
- *    바로 이런 불일치 방지인데 정작 AdminPanel이 이걸 안 쓰고 tableProps를 직접 지정하고 있었음)
- * 2) AdminTableSkeleton에 실제 headers/cols 배선 (헤더는 고정 텍스트라 진짜 글자로 노출)
- * 3) RejectModal의 key={rejectOpen ? 'reject-open' : 'reject-closed'} 강제 remount 제거 —
- *    닫는 순간 key가 바뀌며 언마운트돼서 닫힘 애니메이션이 죽던 원인. antd 6의 destroyOnHidden은
- *    "닫힘 애니메이션이 끝난 뒤에" children을 파괴하므로 입력값 초기화 + 애니메이션을 둘 다 얻는다.
- * 4) 본문 스켈레톤은 최초 로딩·쿼리 전환에만 표시하고 수동 새로고침에는 기존 행을 유지
- * 5) 검색어/페이지를 URL 쿼리스트링에 동기화(useQueryParamState) — MembersTab 등과 동일한 이유.
+/*
+ * 인증 목록은 mode·페이지·검색어별 캐시를 분리하고 상태 변경 뒤 관련 조회를 무효화한다.
  */
 import React, { useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
@@ -68,9 +45,6 @@ const SKELETON_COLS    = [...BUSINESS_VERIFICATION_SKELETON_COLS];
 const PAGE_SIZE = 15;
 const QUERY_DEFAULTS = { search: '', page: '1' };
 
-// 다른 관리자 탭들과 동일한 2026-07 전수조사 사유 — pagination을 DataTable에 제어시켜서 승인/거절/
-// 자격취소 뮤테이션 후 페이지 리셋 버그와, 스켈레톤 로딩 중 페이지 버튼 소멸 문제를 동시에 해결
-// (mode='pending'/'all' 각각 독립적인 컴포넌트 인스턴스라 page state도 서로 영향을 주지 않는다).
 const skeletonRowCount = (total, pageIdx1, pageSize) => {
     if (!total) return Math.min(BUSINESS_VERIFICATION_SKELETON_ROWS, pageSize);
     const remaining = total - (pageIdx1 - 1) * pageSize;
@@ -151,9 +125,9 @@ const RejectModal = ({ open, target, onCancel, onOk, loading }) => {
             open={open}
             onCancel={() => requestClose(handleCancel, { discard: false })}
             onOk={handleOk}
-            /* mask.closable=false: 사업자 인증 거절 사유를 작성하는 모달 — 바깥 클릭으로 내용 유실 방지.
-               컨벤션 — 입력 폼/파괴적 확인 모달은 바깥 클릭으로 안 닫히고, 읽기 전용 모달
-               (상세보기/QR/예약상세)은 AntD 기본값(true)대로 아무데나 눌러도 닫힌다. */
+            /*
+             * 거절 사유 입력이 바깥 클릭으로 유실되지 않게 한다.
+             */
             mask={{ closable: false }}
             okText="거절 처리"
             cancelText="취소"
@@ -287,8 +261,8 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
             });
     }, []);
 
-    // 모달을 먼저 열어 기다리는 상태를 즉시 보여 주고, 실패해도 닫지 않는다. 그래야 왜 실패했는지
-    // 확인하고 같은 대상만 다시 조회할 수 있다.
+    // 조회 중에도 모달을 열어 두고 오류·재시도를 표시한다.
+
     const openDetail = (record) => {
         setDetailItem(null);
         setDetailRequestId(record.id);
@@ -477,8 +451,9 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
                                 </Button>
                             </>
                         ) : (
-                            /* 모달의 닫기/취소는 테두리 있는 outline으로 통일 (FormModal.jsx의 컨벤션 주석 참고).
-                               예전엔 ghost-sm(텍스트형)이라 이 모달만 닫기 버튼이 그냥 글자처럼 보였다. */
+                            /*
+                             * 닫기·취소는 공통 모달의 outline 버튼을 사용한다.
+                             */
                             <Button variant="outline" size="sm" onClick={() => setDetailOpen(false)}
                                 style={{ paddingLeft: 20, paddingRight: 20 }}>
                                 닫기

@@ -5,6 +5,7 @@ import { advanceSession, currentSession, isCurrentSession } from '../api/session
 import useLocationStore from './useLocationStore';
 
 const STARTUP_AUTH_RETRY_DELAYS_MS = [400, 1200];
+let authRestoreRuns = 0;
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const isTransientAuthError = (error) => {
     if (error?.isSessionExpired || error?.isStaleSession) return false;
@@ -26,12 +27,13 @@ const useAuthStore = create(
             sessionRevision: currentSession().epoch,
             isLoggedIn: false,
             isLoggingOut: false,
+            authRestoring: false,
 
             setLoggingOut: (val) => set({ isLoggingOut: val }),
 
-            expireSession: () => applyUser(set, get, null),
+            expireSession: () => { set({ authRestoring: false }); applyUser(set, get, null); },
 
-            login: (userData) => applyUser(set, get, userData, true),
+            login: (userData) => { set({ authRestoring: false }); applyUser(set, get, userData, true); },
 
             // 프로필 표시 갱신은 새 로그인과 다르다. 다른 계정의 늦은 콜백은 반영하지 않는다.
             updateUser: (userData) => {
@@ -39,6 +41,7 @@ const useAuthStore = create(
             },
 
             logout: () => {
+                set({ authRestoring: false });
                 applyUser(set, get, null, true);
                 set({ isLoggingOut: true });
                 localStorage.removeItem('auth-storage');
@@ -78,17 +81,24 @@ const useAuthStore = create(
              * 앱 초기화 시 인증 상태 복구
              */
             initializeAuth: async () => {
-                for (let attempt = 0; attempt <= STARTUP_AUTH_RETRY_DELAYS_MS.length; attempt += 1) {
-                    if (attempt > 0) await wait(STARTUP_AUTH_RETRY_DELAYS_MS[attempt - 1]);
-                    try {
-                        return await get().checkAuth(true, { rethrowTransient: true, timeout: 8000 });
-                    } catch (error) {
-                        if (!isTransientAuthError(error) || attempt === STARTUP_AUTH_RETRY_DELAYS_MS.length) {
-                            return null;
+                authRestoreRuns += 1;
+                set({ authRestoring: true });
+                try {
+                    for (let attempt = 0; attempt <= STARTUP_AUTH_RETRY_DELAYS_MS.length; attempt += 1) {
+                        if (attempt > 0) await wait(STARTUP_AUTH_RETRY_DELAYS_MS[attempt - 1]);
+                        try {
+                            return await get().checkAuth(true, { rethrowTransient: true, timeout: 8000 });
+                        } catch (error) {
+                            if (!isTransientAuthError(error) || attempt === STARTUP_AUTH_RETRY_DELAYS_MS.length) {
+                                return null;
+                            }
                         }
                     }
+                    return null;
+                } finally {
+                    authRestoreRuns -= 1;
+                    if (authRestoreRuns === 0) set({ authRestoring: false });
                 }
-                return null;
             },
         }),
         {

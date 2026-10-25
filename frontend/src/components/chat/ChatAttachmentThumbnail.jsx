@@ -4,7 +4,6 @@ import useImagePreview from '../../hooks/useImagePreview';
 import LoadingImage from '../common/LoadingImage';
 import { colors, radius } from '../../styles/tokens';
 
-/** Chat and feed composers share the same attachment size and image preview. */
 export default function ChatAttachmentThumbnail({ file, uid, url, gallery, onReady }) {
     const { previewOpen, handlePreview, handleCancel, previewNode } = useImagePreview();
     const imageRef = useCallback(image => {

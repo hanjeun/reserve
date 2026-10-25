@@ -1,9 +1,10 @@
 import PropTypes from 'prop-types';
-import { EyeInvisibleOutlined, EyeOutlined, SyncOutlined } from '../common/icons';
+import { EyeInvisibleOutlined, EyeOutlined, SearchOutlined, SyncOutlined } from '../common/icons';
+import IconTool from '../common/IconTool';
 import useRefreshCooldown from '../../hooks/useRefreshCooldown';
 import Tooltip from '../common/Tooltip';
 
-export default function MessengerListHeading({ headingLevel = 2, onRefresh, refreshing = false, showHidden = false, onToggleHidden }) {
+export default function MessengerListHeading({ headingLevel = 2, onRefresh, refreshing = false, showHidden = false, onToggleHidden, onFindStore }) {
     const Heading = `h${headingLevel}`;
     const { reload, blocked } = useRefreshCooldown(onRefresh, refreshing);
     const hiddenLabel = showHidden ? '일반 대화 보기' : '숨긴 대화 보기';
@@ -11,6 +12,7 @@ export default function MessengerListHeading({ headingLevel = 2, onRefresh, refr
         <header className="reserve-messenger-list-heading">
             <Heading>{showHidden ? '숨긴 대화' : '대화'}</Heading>
             <div className="reserve-messenger-list-actions">
+                {onFindStore && <IconTool label="가게 찾기" kind="navigation" icon={<SearchOutlined aria-hidden="true" />} onClick={onFindStore} />}
                 {onToggleHidden && (
                     <Tooltip title={hiddenLabel}><button
                         type="button"
@@ -43,4 +45,5 @@ MessengerListHeading.propTypes = {
     refreshing: PropTypes.bool,
     showHidden: PropTypes.bool,
     onToggleHidden: PropTypes.func,
+    onFindStore: PropTypes.func,
 };

@@ -7,7 +7,7 @@ const waitingTimestamp = value => value ? new Intl.DateTimeFormat('ko-KR', {
     timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
 }).format(new Date(value)) : null;
 
-/** Only server-confirmed information is displayed. QR payloads and contact details never appear. */
+/* 서버가 확인한 결과만 표시하며 QR 원문과 연락처는 노출하지 않는다. */
 export default function QrScanResult({ result }) {
     if (!result) return null;
     const waiting = result.kind === 'waiting';

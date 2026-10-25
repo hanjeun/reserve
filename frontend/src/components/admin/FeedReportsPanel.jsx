@@ -99,7 +99,7 @@ export default function FeedReportsPanel() {
             const values = await form.validateFields(['visibilityReason']);
             assertCurrentSession(target.session);
             await visibility.mutateAsync({ ...target, values: { hidden, reason: values.visibilityReason.trim(), revision: target.revision } });
-        } catch { /* The reason stays visible under its field. */ }
+        } catch { /* 필드 아래에 거절 사유를 유지한다. */ }
         finally { submitLock.current = false; setValidating(false); }
     };
     const saveReview = async () => {

@@ -1,33 +1,5 @@
-/**
- * RESERVE - 관리자 회원 관리 탭
- * AdminPanel.jsx에서 분리 (Cognitive Complexity 17 → 15 목표)
- *
- * 2026-07-09: TanStack Query로 전환 (adminKeys.members()) + placeholderData: keepPreviousData.
- * 정지/영구정지/해제도 useMutation으로 전환, 성공 시 같은 쿼리를 무효화.
- * raw <Table>을 공용 DataTable로 교체.
- *
- * 2026-07 전수조사 —
- * 1) SuspendModal/BanModal을 여기서 직접 정의하던 걸 공용 SanctionModal로 통합
- *    (StoresAdminTab의 거의 동일한 모달 2개까지 총 4벌 중복이었음).
- *    동시에 key={open ? 'x-open' : 'x-closed'} 강제 remount 패턴을 제거 —
- *    이게 닫힘 애니메이션이 재생되지 않던 원인이었다(닫는 순간 key가 바뀌어 언마운트).
- *    SanctionModal이 destroyOnHidden으로 입력값 초기화를 대신 처리한다.
- * 2) AdminTableSkeleton에 실제 컬럼 제목(headers)과 실제 컬럼 너비(cols)를 넘김 —
- *    헤더는 고정 텍스트라 가릴 이유가 없고, cols가 없으면 기본 6칸이라 실제 7칸과 안 맞아
- *    로딩 종료 시 열이 재배치되며 화면이 튀었다.
- * 3) 본문 스켈레톤은 최초 로딩·쿼리 전환에만 표시하고 수동 새로고침에는 기존 행을 유지.
- * 2026-08-09: ★ 페이지네이션·검색을 서버로 올렸다.
- *    예전에는 size: 100 을 하드코딩해 한 번에 받아온 뒤 그 배열을 filter 했다.
- *    그래서 **101번째 회원부터는 검색은커녕 목록에 뜨지도 않았다**.
- *    AdminAdsTab 이 먼저 거친 길과 똑같은 문제·똑같은 해법이다.
- *    ★ queryKey 에 page 와 debouncedSearch 가 반드시 들어가야 한다 — 빠뜨리면
- *      검색어가 바뀌어도 같은 캐시를 재사용해 화면이 그대로 멈춰 있는다.
- *
- * 4) 검색어/페이지를 URL 쿼리스트링에 동기화(useQueryParamsState) — 새로고침해도 필터가
- *    유지되고 링크 공유도 가능해짐. ★ 검색어 변경 시 페이지를 1로 되돌리는 것까지 한 번의
- *    setQuery 호출로 같이 처리한다 — 따로 호출하면(useQueryParamState 단일 키 버전이었을 때)
- *    뒤에 실행된 페이지 갱신이 검색어 갱신을 덮어써 버리는 버그가 실제로 있었다(브라우저
- *    실측으로 확인). 반드시 하나의 setQuery({ search, page }) 호출로 묶어야 한다.
+/*
+ * 서버 검색·페이지별 캐시를 분리하고 검색·페이지 초기화를 함께 반영한다.
  */
 import React, { useState } from 'react';
 import { Typography, Tag } from 'antd';
@@ -52,7 +24,6 @@ const MEMBER_STATUS_CONFIG = {
     BANNED:    { color: 'red',    label: '영구정지' },
 };
 
-// SonarCloud: 중첩 삼항 + 중첩 템플릿 리터럴 해소 — 헬퍼 함수로 추출
 const getSuspendTooltip = (r) => {
     if (!r.suspendReason) return '';
     const until = r.suspendedUntil ? ` (~${r.suspendedUntil})` : '';
@@ -71,21 +42,14 @@ const SKELETON_COLS    = [60, 100, 220, 90, 90, 90, 230];
 const PAGE_SIZE = 20;
 const QUERY_DEFAULTS = { search: '', page: '1' };
 
-// 2026-07 전수조사: AuditLogTab/AdminAdsTab은 pagination을 DataTable에 제어시켜서(current 보관)
-// 로딩 중에도 AdminTableSkeleton에 같은 값을 넘겨 페이지 버튼이 사라지지 않는데, 이 탭은 그동안
-// pageSize만 넘기고 current는 AntD Table 내부 상태(uncontrolled)에 맡기고 있었다. 그 결과 두 가지
-// 문제가 있었다 — ① 스켈레톤엔 pagination을 아예 안 넘겨서 로딩 중엔 페이지 버튼이 통째로 사라짐
-// ② 정지/영구정지 등 뮤테이션 성공 후 목록을 무효화하면 (isLoading||isFetching)이 잠깐 true가 되며
-// <DataTable>이 언마운트→재마운트되는데, 그 순간 AntD Table의 내부 페이지 상태도 초기화되어
-// 3페이지를 보고 있다가 뮤테이션 한 번에 1페이지로 튕겨나갔다. page를 이 컴포넌트로 끌어올려서 둘 다 해결.
 const skeletonRowCount = (total, pageIdx1, pageSize) => {
     if (!total) return Math.min(8, pageSize);
     const remaining = total - (pageIdx1 - 1) * pageSize;
     return Math.max(1, Math.min(pageSize, remaining));
 };
 
-// data?.members 가 매 렌더 새 배열 레퍼런스를 만들면 dataSource 가 매번 바뀐 것으로 보여
-// Table 이 불필요하게 다시 그려진다. AdminAdsTab 과 같은 이유로 상수 빈 배열을 둔다.
+// 빈 목록은 안정된 배열 참조를 사용해 불필요한 테이블 갱신을 줄인다.
+
 const EMPTY_MEMBERS = [];
 
 const MembersTab = () => {
@@ -102,8 +66,8 @@ const MembersTab = () => {
     const {
         data, isLoading: memberLoading, isFetching, isPlaceholderData, error: membersError, refetch,
     } = useQuery({
-        // ★ page·검색어가 쿼리키에 들어가야 한다. 서버가 페이지네이션·검색을 하므로
-        //   이 둘이 바뀌면 결과가 달라진다 — 키에 없으면 이전 응답을 그대로 재사용해버린다.
+        // 검색어와 페이지를 조회 키에 포함해 서버 결과를 분리한다.
+
         queryKey: [...adminKeys.members(), page, debouncedMemberSearch],
         queryFn: async () => {
             // 서버는 0-based, 이 화면은 1-based(AntD Table) — 여기서 한 번만 변환한다.
@@ -116,7 +80,7 @@ const MembersTab = () => {
             });
             return {
                 members: result?.content ?? [],
-                // Spring Boot 3.5부터 페이지 메타가 page:{} 하위로 이동했다 — 신버전을 먼저 읽고 구버전도 폴백.
+                // page 안의 페이지 메타를 우선 읽고 루트 형식도 허용한다.
                 totalElements: result?.page?.totalElements ?? result?.totalElements ?? 0,
             };
         },
@@ -125,12 +89,10 @@ const MembersTab = () => {
     const members = data?.members ?? EMPTY_MEMBERS;
     const totalElements = data?.totalElements ?? 0;
 
-    // 클라이언트 filter 는 제거했다 — 서버가 검색까지 처리하므로 받은 결과가 곧 정답이다.
-    // useDebounce 는 그대로 둔다. 이젠 "리렌더 억제"가 아니라 **타이핑 한 글자마다 서버를
-    // 때리지 않기 위한 것**이라 오히려 더 중요해졌다(300ms).
+    // 입력 안정화 뒤 서버 검색을 요청한다.
 
     // 검색어가 바뀌어 결과가 줄어들면 이전 페이지 번호가 존재하지 않는 페이지를 가리킬 수 있어 1로 복귀.
-    // 반드시 한 번의 setQuery 호출로 묶는다(위 파일 상단 주석 참고).
+    // 검색어와 첫 페이지는 한 번의 URL 갱신으로 반영한다.
     const handleSearchChange = (e) => setQuery({ search: e.target.value, page: '1' });
     const setPage = (p) => setQuery({ page: String(p) });
 
@@ -254,8 +216,9 @@ const MembersTab = () => {
             />
             {tableBody}
 
-            {/* key 토글 제거 — SanctionModal이 destroyOnHidden으로 입력값을 초기화하므로
-                강제 remount가 필요 없고, 그 덕에 닫힘 애니메이션이 정상 재생된다 */}
+            {/*
+             * 입력 초기화는 destroyOnHidden에 맡겨 닫힘 전환 중 모달을 재마운트하지 않는다.
+             */}
             <SanctionModal
                 presetKey="MEMBER_SUSPEND"
                 open={suspendOpen}

@@ -2,17 +2,6 @@ package kr.it.reserve.config.oauth2;
 
 import java.util.Map;
 
-/**
- * Google OAuth2 사용자 정보
- * 
- * Google에서 제공하는 사용자 정보 구조:
- * {
- *   "sub": "고유ID",
- *   "name": "이름",
- *   "email": "이메일",
- *   "picture": "프로필이미지URL"
- * }
- */
 public class GoogleOAuth2UserInfo implements OAuth2UserInfo {
 
     private final Map<String, Object> attributes;

@@ -20,8 +20,8 @@ public class StoreStatisticsResponse {
 
     private List<DailyValue> reservationTrend;   // 일별 예약 건수 추이
     private Map<String, Long> statusBreakdown;   // 상태별 건수 (PENDING/CONFIRMED/COMPLETED/...)
-    private Double averageRating;                // Store.rating (denormalized)
-    private Integer reviewCount;                 // Store.reviewCount (denormalized)
+    private Double averageRating;                // 가게에 집계해 둔 평점
+    private Integer reviewCount;                 // 가게에 집계해 둔 리뷰 수
     private List<DailyValue> revenueTrend;       // 결제 완료일별 예약금 순결제액 추이(확정 환불 차감)
     private Long totalDepositRevenue;            // 기간 내 예약금 순결제액 합계(호환을 위해 필드명 유지)
     private AdSummary adSummary;                 // 현재 활성 광고 요약 (없으면 null)
@@ -44,7 +44,7 @@ public class StoreStatisticsResponse {
         private String status;         // ACTIVE
         private Integer daysRemaining; // 오늘 기준 종료일까지 남은 일수
 
-        // 광고 성과 지표(2026-07 추가) — 누적 카운터(일별 추이 아님, 현 구조 한계).
+        // 광고 성과 지표 — 누적 카운터(일별 추이 아님, 현 구조 한계).
         // ctr/conversionRate은 분모가 0이면 null("집계 불가"와 "0%"를 구분하기 위해 엔티티가 직접 계산).
         private Integer impressionCount;
         private Integer clickCount;

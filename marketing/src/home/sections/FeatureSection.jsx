@@ -34,7 +34,7 @@ export default function FeatureSection({ sec, index, isMobile }) {
                 style={{
                     ...styles.sectionMobile,
                     background: bgColor,
-                    // shorthand로 통일: sectionMobile의 padding을 덮어쓰되, 해당 인덱스만 상하 안줷을 탈되게 확보
+                    // 해당 모바일 섹션은 기본 패딩을 덮어써 상하 여백을 확보한다.
                     ...((index === 1 || index === 2) && {
                         padding: '80px 20px',
                     })

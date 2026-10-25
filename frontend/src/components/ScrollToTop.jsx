@@ -9,7 +9,7 @@ const isMessagesPath = pathname => /^\/messages\/?$/.test(pathname);
 const currentPosition = () => ({ left: window.scrollX, top: window.scrollY });
 const scrollInstantly = position => window.scrollTo({ ...position, behavior: 'instant' });
 
-/** Discovery tabs and the exact history entry beneath messages keep their last position. */
+/* 탐색 탭과 메시지 아래의 같은 히스토리 항목은 스크롤 위치를 보존한다. */
 function ScrollToTop() {
     const location = useLocation();
     const current = useRef(null);
@@ -56,7 +56,7 @@ function ScrollToTop() {
         }
         rememberDiscoveryLocation(location);
 
-        // Existing filter/query updates own their scroll behavior and do not count as entering another page.
+        // 필터·쿼리 변경은 기존 화면의 스크롤 처리를 따른다.
         if (previous?.pathname === location.pathname) {
             position.current = currentPosition();
             restoring.current = false;
@@ -112,7 +112,7 @@ function ScrollToTop() {
             const height = Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight ?? 0);
             if (readyFrames >= 2 && height - window.innerHeight >= saved.top - 1) { finish(); return; }
             if (Date.now() >= deadline) {
-                // A still-loading short skeleton must not clamp and overwrite the saved destination.
+                // 로딩 중인 짧은 골격의 높이로 저장한 복귀 위치를 덮지 않는다.
                 if (!loading) finish();
                 else stop();
                 return;

@@ -16,7 +16,7 @@ describe('shared profile photo selection boundary', () => {
     let send;
     let fetch;
     beforeEach(() => {
-        // Prevent real requests even if the underlying uploader accidentally starts one.
+        // 업로더가 실행돼도 실제 요청은 차단한다.
         send = vi.spyOn(XMLHttpRequest.prototype, 'send').mockImplementation(() => {});
         fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true });
     });

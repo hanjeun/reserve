@@ -18,7 +18,7 @@ async function mockUiApi(page, { signedIn = false } = {}) {
         contentType: 'image/svg+xml',
         body: `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450"><rect width="800" height="450" fill="${route.request().url().includes('first') ? '#3182f6' : '#e5a73b'}"/></svg>`,
     }));
-    // Every API request is intercepted. Withdrawal tests never reach a real account or backend.
+    // 모든 API를 가로채 실제 계정의 탈퇴를 실행하지 않는다.
     await page.route('**/api/**', route => {
         const url = new URL(route.request().url());
         const path = url.pathname;
@@ -172,7 +172,7 @@ test('mobile messages fill changing viewport heights without bottom dead space o
     const footer = surface.locator('.reserve-messenger-footer');
     await expect(footer).toBeVisible();
     await expect(page.locator('.reserve-header')).toHaveCount(0);
-    // A visible lazy skeleton suppresses the second entry animation; the page stays untransformed.
+    // 골격 화면이 진입 모션을 소유하면 콘텐츠에서 재실행하지 않는다.
     await expect(page.locator('.reserve-messages-route')).toHaveCSS('transform', 'none');
     for (const size of [{ width: 390, height: 844 }, { width: 390, height: 674 }, { width: 667, height: 400 }, { width: 767, height: 674 }, { width: 390, height: 844 }]) {
         await page.setViewportSize(size);

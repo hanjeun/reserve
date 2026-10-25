@@ -30,16 +30,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
-/**
- * 감사 로그(AuditLog) + 휴지통(Trash) 서비스.
- *
- * 설계 메모: 휴지통(소프트 삭제 + 복구)은 "실수로 지워도 되돌릴 수 있어야 하는" 콘텐츠 —
- * 예약(RESERVATION), 리뷰(REVIEW), 메일(MAIL/SENT_MAIL), 광고(ADVERTISEMENT, 2026-07 추가)
- * — 에만 적용한다. 회원(MEMBER)/가게(STORE)는 운영 정책 위반에 대한 제재이므로 정지/영구정지로 처리하며
- * (AdminManagementController 참고) 더 이상 이 서비스에서 소프트 삭제하지 않는다.
- * logMemberSanction/logStoreSanction은 제재 행위를 감사 로그로만 남기고
- * 실제 soft-delete 엔트리(휴지통 표시 대상)를 만들지 않는다.
- */
+/** 콘텐츠의 숨김·복구와 감사 기록을 관리한다. 회원·가게 제재는 휴지통 항목을 만들지 않는다. */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -60,7 +51,7 @@ public class AuditLogService {
     @Autowired(required = false)
     private ReviewUpdates reviewUpdates;
 
-    // ── 소프트 삭제 + 스냅샷 저장 (예약/리뷰/메일만 해당) ──────────────
+    // 소프트 삭제 + 스냅샷 저장 (예약/리뷰/메일만 해당)
 
     @Transactional
     public void softDeleteSentMail(Long mailId) {
@@ -115,11 +106,7 @@ public class AuditLogService {
         log.info("Review soft-deleted: id={}", reviewId);
     }
 
-    /**
-     * 광고 종료상태 행 숨기기(소프트삭제) — 2026-07 추가.
-     * 호출측(AdvertisementService.removeAd)에서 이미 종료상태(EXPIRED/CANCELLED/REFUNDED/SUSPENDED)만
-     * 허용하는지 검증한 뒤 호출함.
-     */
+    /** 호출부에서 본인 광고의 종료 상태를 확인한 뒤 숨긴다. */
     @Transactional
     public void softDeleteAdvertisement(Long adId) {
         Advertisement ad = advertisementRepository.findById(adId)
@@ -134,7 +121,7 @@ public class AuditLogService {
         log.info("Advertisement soft-deleted: id={}", adId);
     }
 
-    // ── 복구 (예약/리뷰/메일만 해당) ──────────────────────────────
+    // 복구 (예약/리뷰/메일만 해당)
 
     @Transactional
     public void restore(String entityType, Long entityId) {
@@ -156,7 +143,7 @@ public class AuditLogService {
         log.info("Entity restored: type={}, id={}", entityType, entityId);
     }
 
-    // ── 제재 / 인증 로그 (회원/가게 — 휴지통 미사용, 감사 로그만 기록) ──────
+    // 제재 / 인증 로그 (회원/가게 — 휴지통 미사용, 감사 로그만 기록)
 
     /**
      * 회원 제재 로그 (정지/영구정지/해제)
@@ -194,7 +181,7 @@ public class AuditLogService {
         log.info("Business verification logged: memberId={}, action={}", memberId, action);
     }
 
-    // ── 스케줄러 전용 자동 정리 ────────────────────────────────
+    // 스케줄러 전용 자동 정리
 
     /**
      * 만료된 소프트 삭제 항목 자동 영구 삭제 + AuditLog 기록
@@ -226,7 +213,7 @@ public class AuditLogService {
                 success, expired.size(), auditDeleted);
     }
 
-    // ── 목록 조회 ──────────────────────────────────────────────
+    // 목록 조회
 
     @Transactional(readOnly = true)
     public Page<AuditLog> getTrashItems(String entityType, Pageable pageable) {
@@ -245,7 +232,7 @@ public class AuditLogService {
         return auditLogRepository.findByEntityTypeOrderByCreatedAtDesc(entityType.toUpperCase(), pageable);
     }
 
-    // ── 내부 유틸 ──────────────────────────────────────────────
+    // 내부 유틸
 
     private void saveAuditLogWithActor(String entityType, Long entityId, String action,
                                        Map<String, String> snapshotData, String actorEmail) {

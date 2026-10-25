@@ -63,7 +63,7 @@ public class ChatRetentionScheduler {
                 log.warn("Chat access audit retention failed: auditId={}, errorType={}", audit.getId(), failure.getClass().getSimpleName());
             }
         }
-        // Candidates can be retained by the service's recheck; this is not a purge count.
+        // 서비스가 후보를 다시 검사하므로 후보 수와 실제 파기 수는 다르다.
         log.info("Chat retention sweep completed: runAtUtc={}, reportCandidates={}, reportFailures={}, messageCandidates={}, messageFailures={}, auditCandidates={}, auditFailures={}",
                 now.atOffset(ZoneOffset.UTC), reportCandidates.size(), reportFailures,
                 messageCandidates.size(), messageFailures, auditCandidates.size(), auditFailures);

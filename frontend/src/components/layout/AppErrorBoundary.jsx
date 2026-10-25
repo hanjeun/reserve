@@ -8,20 +8,8 @@ import Button from '../common/Button';
 import PageStatus from '../common/PageStatus';
 import { isChunkLoadError } from '../../utils/chunkReload';
 
-/**
- * 렌더 오류 경계 두 겹.
- *
- * 예전엔 경계가 없어서 한 페이지의 렌더 오류가 앱 전체를 흰 화면으로 만들었다.
- *   - RouteErrorBoundary: 라우트 콘텐츠만 감싼다(Layout 안). 헤더·푸터는 살아 있어서 다른 곳으로 갈 수 있다.
- *   - AppErrorBoundary: AntApp 바깥, 앱 셸(헤더·메신저·레이아웃) 자체가 실패했을 때의 마지막 그물.
- * 둘 다 Sentry.ErrorBoundary 라서 잡은 오류는 Sentry 로 보고된다(main.jsx 의 Sentry.init).
- *
- * 청크 로딩 실패는 "다시 시도"로 복구되지 않는다 — React.lazy 가 실패한 import 를 기억하기 때문이다.
- * 그 경우에는 새로고침을 첫 버튼으로 내세운다(자동 1회 새로고침은 utils/chunkReload.js).
- *
- * 이 파일은 첫 번들(index 청크)에 들어간다 — 번들 예산(scripts/check-bundle-budget.mjs)이 빠듯해서
- * 폴백은 컴포넌트 하나로 가볍게 두고, 파일 안에서만 쓰는 폴백에는 propTypes 를 달지 않는다
- * (Sentry.ErrorBoundary 가 항상 같은 모양의 props 를 넘긴다).
+/*
+ * 라우트 오류는 콘텐츠에 한정해 셸을 유지하고 앱 셸 오류는 바깥 경계에서 처리한다. React.lazy의 청크 오류는 새로고침으로 복구한다.
  */
 function ErrorFallback({ error, resetError, goHome, fullPage = false }) {
     const chunkError = isChunkLoadError(error);

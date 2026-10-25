@@ -122,12 +122,21 @@ for (const [path, placeholder, endpoint] of [
     ['/stores', '가게 검색', '/api/stores'],
     ['/waiting', '웨이팅 가게 검색', '/api/waiting/stores'],
 ]) {
-    test(`the ${path} header edits its own list while global search starts empty`, async ({ page }) => {
+    test(`the ${path} list keeps its tabs and filters while global search starts empty`, async ({ page }) => {
         const requests = await setup(page);
         await page.goto(path + '?keyword=' + encodeURIComponent('공방') + '&view=list&sort=reviewCount&page=1');
         const field = page.getByPlaceholder(placeholder, { exact: true });
         await expect(field).toBeVisible();
-        await page.getByRole('button', { name: '목록 검색어 수정: 공방' }).click();
+        const header = page.locator('.reserve-header');
+        const tabs = page.getByRole('navigation', { name: '서비스 탐색' });
+        const selected = path === '/stores' ? '탐색' : '웨이팅';
+        await expect(tabs).toBeVisible();
+        for (const name of ['홈', '탐색', '혜택', '웨이팅', '피드']) await expect(tabs.getByRole('link', { name, exact: true })).toBeVisible();
+        await expect(header.getByRole('button', { name: /목록 검색어 수정/ })).toHaveCount(0);
+        await expect(header.getByRole('searchbox')).toHaveCount(0);
+        await expect(header.getByRole('button', { name: '이전 화면으로 돌아가기' })).toHaveCount(0);
+        await expect(header.getByRole('link', { name: '통합 검색', exact: true })).toHaveAttribute('href', '/search');
+        await field.click();
         await expect(field).toBeFocused();
         await expect(page).toHaveURL(url => url.pathname === path && url.searchParams.get('keyword') === '공방');
         await field.fill('공방 검색');
@@ -136,7 +145,18 @@ for (const [path, placeholder, endpoint] of [
             && url.searchParams.get('view') === 'list' && url.searchParams.get('sort') === 'reviewCount' && url.searchParams.get('page') === '1');
         await expect.poll(() => requests.some(request => request.path === endpoint && request.keyword === '공방 검색')).toBe(true);
         expect(requests.some(request => request.path === '/api/search' || request.path === '/api/search/me')).toBe(false);
+        await expect(tabs).toBeVisible();
+        await expect(tabs.getByRole('link', { name: selected, exact: true })).toHaveAttribute('aria-current', 'page');
         const returnUrl = page.url();
+        const otherPath = path === '/stores' ? '/waiting' : '/stores';
+        const otherPlaceholder = path === '/stores' ? '웨이팅 가게 검색' : '가게 검색';
+        await tabs.getByRole('link', { name: selected === '탐색' ? '웨이팅' : '탐색', exact: true }).click();
+        await expect(page).toHaveURL(url => url.pathname === otherPath);
+        await expect(page.getByPlaceholder(otherPlaceholder, { exact: true })).toBeVisible();
+        await tabs.getByRole('link', { name: selected, exact: true }).click();
+        await expect(page).toHaveURL(returnUrl);
+        await expect(field).toHaveValue('공방 검색');
+        await expect(tabs).toBeVisible();
         await page.getByRole('link', { name: '통합 검색', exact: true }).click();
         await expect(page).toHaveURL('/search');
         await expect(page.getByRole('searchbox')).toHaveValue('');

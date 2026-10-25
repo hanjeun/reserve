@@ -44,7 +44,7 @@ test('cached search entry and cancel pair the header controls and content withou
     await expect(page).toHaveURL(url => url.pathname === '/' && url.searchParams.get('region') === 'all');
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await recordSearchEntrances(page);
-    await page.getByRole('link', { name: '가게·지역·서비스 검색' }).click();
+    await page.getByRole('link', { name: '통합 검색' }).click();
     await expect(page).toHaveURL(/\/search$/);
     const content = page.locator('.reserve-search-content');
     const header = page.locator('.reserve-search-header');
@@ -80,7 +80,7 @@ test('an uncached search enters with its skeleton once and does not re-enter wit
     await expect(page.locator('.reserve-discovery-home')).toBeVisible();
     await recordSearchEntrances(page);
     try {
-        await page.getByRole('link', { name: '가게·지역·서비스 검색' }).click();
+        await page.getByRole('link', { name: '통합 검색' }).click();
         const skeleton = page.locator('.reserve-route-skeleton--search');
         await expect(skeleton).toBeVisible();
         await expect(skeleton.locator('.reserve-search-header')).toHaveCSS('animation-name', 'reserve-search-controls-enter');
@@ -105,7 +105,7 @@ test('an uncached search enters with its skeleton once and does not re-enter wit
 test('submitting a search shows results without a page slide', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.goto('/');
-    await page.getByRole('link', { name: '가게·지역·서비스 검색' }).click();
+    await page.getByRole('link', { name: '통합 검색' }).click();
     await expect(page).toHaveURL(/\/search$/);
     const field = page.locator('.reserve-search-field input');
     await field.fill('카페');
@@ -119,7 +119,7 @@ test('submitting a search shows results without a page slide', async ({ page }) 
 test('reduced-motion search navigation is immediate', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
-    await page.getByRole('link', { name: '가게·지역·서비스 검색' }).click();
+    await page.getByRole('link', { name: '통합 검색' }).click();
     await expect(page).toHaveURL(/\/search$/);
     await expect(page.locator('.reserve-search-content')).toHaveCSS('animation-name', 'none');
     await expect(page.locator('.reserve-search-header')).toHaveCSS('animation-name', 'none');

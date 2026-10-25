@@ -16,9 +16,13 @@ import kr.it.reserve.promotion.StoreNewsPolicy;
 import kr.it.reserve.promotion.entity.Promotion;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.repository.StoreSearchSpecification;
+import kr.it.reserve.store.search.StoreFulltextSearch;
 import kr.it.reserve.waiting.entity.WaitingStatus;
 import kr.it.reserve.waiting.repository.WaitingEntryRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataAccessException;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,17 +36,36 @@ import java.util.List;
 @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW)
 public class SearchQueries {
     private final FeedService feeds;
+    private final StoreFulltextSearch storeFulltextSearch;
+    @Value("${search.store.fulltext-enabled:true}") private boolean fulltextEnabled;
+    @Value("${search.store.unified-fulltext-enabled:false}") private boolean unifiedFulltextEnabled;
     @PersistenceContext private EntityManager entityManager;
 
     public List<SearchResponse.Item> stores(SearchQuery input) {
+        var visible = StoreSearchSpecification.publicSearch(input.keyword(), "recent", null, null,
+                new StoreSearchSpecification.DistanceCandidates(null, null, 0), ServiceTime.today());
+        Specification<Store> literal = (root, query, cb) -> cb.and(visible.toPredicate(root, query, cb),
+                activeMember(root.join("owner"), cb));
+        if (fulltextEnabled && unifiedFulltextEnabled) {
+            String candidate = storeFulltextSearch.candidateQuery(input.keyword());
+            if (!candidate.isEmpty()) {
+                try {
+                    return storeFulltextSearch.preview(literal, candidate, input.limit() + 1).stream()
+                            .map(row -> item(row.id(), "STORE", row.name(),
+                                    SearchQuery.text(row.category(), 50) + " · " + SearchQuery.text(row.address(), 100),
+                                    "/store/" + row.id())).toList();
+                } catch (DataAccessException failure) {
+                    // The failed MATCH transaction has ended before this source's literal read starts.
+                    storeFulltextSearch.disable();
+                }
+            }
+        }
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<Tuple> query = cb.createTupleQuery();
         var root = query.from(Store.class);
-        var visible = StoreSearchSpecification.publicSearch(input.keyword(), "recent", null, null,
-                new StoreSearchSpecification.DistanceCandidates(null, null, 0), ServiceTime.today());
         query.multiselect(root.get("id").alias("id"), root.get("name").alias("title"),
                 root.get("category").alias("category"), root.get("address").alias("address"));
-        query.where(cb.and(visible.toPredicate(root, query, cb), activeMember(root.join("owner"), cb)));
+        query.where(literal.toPredicate(root, query, cb));
         return entityManager.createQuery(query).setMaxResults(input.limit() + 1).getResultList().stream()
                 .map(row -> item(row.get("id", Long.class), "STORE", row.get("title", String.class),
                         SearchQuery.text(row.get("category", String.class), 50) + " · " + SearchQuery.text(row.get("address", String.class), 100),

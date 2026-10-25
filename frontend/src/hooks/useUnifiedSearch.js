@@ -32,7 +32,7 @@ export default function useUnifiedSearch({ keyword, submittedKeyword = '', confi
     const valid = normalized.length > 0 && normalized.length <= SEARCH_KEYWORD_MAX_LENGTH;
     const ready = valid && !composing;
     const isConfirmed = ready && confirmed && normalized === submitted;
-    const catalog = ready ? searchCatalog(normalized, auth) : [];
+    const catalog = valid ? searchCatalog(normalized, auth) : [];
     const localOnly = isConfirmed && isLocalNavigationSearch(submitted, auth);
     const remoteConfirmed = isConfirmed && !localOnly;
     const personalAllowed = canSearchPersonal(auth);

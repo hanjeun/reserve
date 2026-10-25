@@ -65,7 +65,7 @@ test.beforeEach(async ({ page, context }) => {
 test('guest header separates neutral navigation hover from primary press and keyboard focus', async ({ page, isMobile }) => {
     await mockApi(page);
     await page.goto('/');
-    const search = page.getByRole('link', { name: '가게·지역·서비스 검색' });
+    const search = page.getByRole('link', { name: '통합 검색' });
     const login = page.getByRole('button', { name: '로그인', exact: true });
     const start = page.getByRole('button', { name: '시작하기' });
     await expect(search).toBeVisible();

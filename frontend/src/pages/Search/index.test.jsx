@@ -64,7 +64,6 @@ describe('dedicated search submission and result editing', () => {
         window.scrollTo = vi.fn();
     });
 
-
     it('loads the search term and submits it with Enter', async () => {
         const user = userEvent.setup();
         renderSearch(['/search?keyword=' + encodeURIComponent('공방')]);
@@ -112,30 +111,26 @@ describe('dedicated search submission and result editing', () => {
         expect(screen.queryByLabelText('통합 검색 결과')).toBeNull();
     });
 
-    it('returns to the same result filters, view and page when editing is cancelled', async () => {
+    it('returns to the same list filters, view and page when an independent global search is cancelled', async () => {
         const user = userEvent.setup();
         const original = '/stores?keyword=' + encodeURIComponent('공방') + '&domain=OTHER&sort=reviewCount&view=list&page=2';
         renderSearch([original]);
-        await user.click(screen.getByRole('link', { name: '검색어 수정: 공방' }));
-        expect(field().value).toBe('공방');
-        await user.clear(field());
+        await user.click(screen.getByRole('link', { name: '통합 검색' }));
+        expect(path()).toBe('/search'); expect(field()).toHaveValue('');
         await user.type(field(), '다른 가게');
         await user.click(screen.getByRole('button', { name: '취소' }));
         expect(path()).toBe(original);
-        expect(screen.getByRole('link', { name: '검색어 수정: 공방' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: '목록 검색어 수정: 공방' })).toBeInTheDocument();
     });
 
-    it('lets the result search field open the existing search screen and run a new search', async () => {
+    it('opens global search without inheriting a list term and explicitly confirms its own new query', async () => {
         const user = userEvent.setup();
         renderSearch(['/stores?keyword=' + encodeURIComponent('공방') + '&page=2']);
-        await user.click(screen.getByRole('link', { name: '검색어 수정: 공방' }));
-        expect(path()).toBe('/search?keyword=' + encodeURIComponent('공방'));
-        expect(field().value).toBe('공방');
-        await user.clear(field());
+        await user.click(screen.getByRole('link', { name: '통합 검색' }));
+        expect(path()).toBe('/search'); expect(field()).toHaveValue('');
         await user.type(field(), '카페');
         await user.click(screen.getByRole('button', { name: '검색', exact: true }));
-        expect(path()).toBe('/search?keyword=' + encodeURIComponent('카페'));
-        expect(field()).toHaveValue('카페');
+        expect(path()).toBe('/search?keyword=' + encodeURIComponent('카페')); expect(field()).toHaveValue('카페');
     });
 
     it('ignores composition-confirmation Enter and keyCode 229', () => {

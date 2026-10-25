@@ -69,6 +69,8 @@ RUN for REQUIRED_CLASS in \
     BOOT-INF/classes/kr/it/reserve/search/SearchResponse\$Item.class \
     BOOT-INF/classes/kr/it/reserve/search/SearchResponse\$Group.class \
     BOOT-INF/classes/kr/it/reserve/search/SearchResponse\$GroupError.class \
+    BOOT-INF/classes/kr/it/reserve/store/search/StoreFulltextSearch.class \
+    BOOT-INF/classes/kr/it/reserve/store/search/StoreFulltextSearch\$Preview.class \
     BOOT-INF/classes/kr/it/reserve/member/controller/LoginMethodController.class \
     BOOT-INF/classes/kr/it/reserve/member/service/LoginMethodService.class \
     BOOT-INF/classes/kr/it/reserve/member/entity/LoginMethodChallenge.class \

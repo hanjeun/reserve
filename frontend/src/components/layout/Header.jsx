@@ -17,6 +17,7 @@ import { useSkeletonShown } from './loadingPresentation';
 import { colors, heights, fontWeight, radius } from '../../styles/tokens';
 import { WorkspaceMenuContext } from './workspaceMenu';
 import { SEARCH_MOTION_DURATION_MS } from './searchTransition';
+import { focusActiveListSearch } from '../../utils/listSearchFocus';
 
 const HeaderAccountMenu = lazy(() => import('./HeaderAccountMenu'));
 const HEADER_ACTION_MOTION_MS = 180;
@@ -71,8 +72,8 @@ const Header = () => {
     // 버튼이 계속 필요한 경로 사이에서는 같은 DOM을 유지하고, 실제로 없어질 때만 접는다.
     const backLeaving = renderBack && !showBack;
     const workspaceLeaving = renderWorkspaceMenu && !showWorkspaceMenu;
-    const keyword = currentPath === '/stores' ? new URLSearchParams(location.search).get('keyword')?.trim() : '';
-    const searchTarget = keyword ? '/search?keyword=' + encodeURIComponent(keyword) : '/search';
+    const keyword = ['/stores', '/waiting'].includes(currentPath) ? new URLSearchParams(location.search).get('keyword')?.trim() : '';
+    const searchTarget = '/search';
     const searchLeaving = navigationIntent?.intent === 'search'
         && navigationIntent.pathname === location.pathname && navigationIntent.hash === location.hash;
 
@@ -171,17 +172,17 @@ const Header = () => {
                     </a>
                 </div>
                 {keyword && (
-                    <Link to={searchTarget} state={{ searchEntry: true }} onClick={handleSearchEntry} className="reserve-header-query" aria-label={'검색어 수정: ' + keyword} title={keyword}>
+                    <button type="button" onClick={() => focusActiveListSearch(reducedMotion)} className="reserve-header-query"
+                        aria-label={'목록 검색어 수정: ' + keyword} title={'현재 목록 검색어 수정: ' + keyword}
+                        style={{ fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer' }}>
                         <SearchOutlined aria-hidden="true" />
                         <span className="reserve-header-query-text">{keyword}</span>
-                    </Link>
+                    </button>
                 )}
                 <div className="reserve-header-actions" style={styles.actions}>
-                    {!keyword && (
-                        <Tooltip title="가게·지역·서비스 검색" disabled={searchLeaving}><Link to={searchTarget} state={{ searchEntry: true }} onClick={handleSearchEntry} className="reserve-header-search" aria-label="가게·지역·서비스 검색">
-                            <SearchOutlined aria-hidden="true" />
-                        </Link></Tooltip>
-                    )}
+                    <Tooltip title="통합 검색" disabled={searchLeaving}><Link to={searchTarget} state={{ searchEntry: true }} onClick={handleSearchEntry} className="reserve-header-search" aria-label="통합 검색">
+                        <SearchOutlined aria-hidden="true" />
+                    </Link></Tooltip>
                     {isLoggedIn ? (
                         <Suspense fallback={<span className="reserve-header-account-loading" aria-hidden="true" style={styles.avatarFallback} />}>
                             <HeaderAccountMenu />

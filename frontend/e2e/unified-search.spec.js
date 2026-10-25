@@ -39,6 +39,7 @@ async function setup(page, signedIn = false) {
         if (path.endsWith('/read')) return ok(null);
         if (path.includes('/config')) return ok({ enabled: false, imageEnabled: false });
         if (path === '/api/waiting/my' || path.includes('/conversations') || path.includes('/inbox')) return ok(pageOf([]));
+        if (path === '/api/stores' || path === '/api/waiting/stores') return ok(pageOf([]));
         if (path === '/api/stores/3') return ok({ id: 3, name: '검색 가게', ownerId: 8, category: '카페', address: '서울', reservationEnabled: false });
         return ok([]);
     });
@@ -115,3 +116,32 @@ test('clearing a confirmed search restores only the original landing and old-wor
     await expect(page.getByRole('heading', { name: '어떤 서비스를 찾으세요?' })).toHaveCount(0);
     await expect(page.getByRole('link', { name: /검색 가게/ })).toHaveCount(0);
 });
+
+for (const [path, placeholder, endpoint] of [
+    ['/stores', '가게 검색', '/api/stores'],
+    ['/waiting', '웨이팅 가게 검색', '/api/waiting/stores'],
+]) {
+    test(`the ${path} header edits its own list while global search starts empty`, async ({ page }) => {
+        const requests = await setup(page);
+        await page.goto(path + '?keyword=' + encodeURIComponent('공방') + '&view=list&sort=reviewCount&page=1');
+        const field = page.getByPlaceholder(placeholder, { exact: true });
+        await expect(field).toBeVisible();
+        await page.getByRole('button', { name: '목록 검색어 수정: 공방' }).click();
+        await expect(field).toBeFocused();
+        await expect(page).toHaveURL(url => url.pathname === path && url.searchParams.get('keyword') === '공방');
+        await field.fill('공방 검색');
+        await field.press('Enter');
+        await expect(page).toHaveURL(url => url.pathname === path && url.searchParams.get('keyword') === '공방 검색'
+            && url.searchParams.get('view') === 'list' && url.searchParams.get('sort') === 'reviewCount' && url.searchParams.get('page') === '1');
+        await expect.poll(() => requests.some(request => request.path === endpoint && request.keyword === '공방 검색')).toBe(true);
+        expect(requests.some(request => request.path === '/api/search' || request.path === '/api/search/me')).toBe(false);
+        const returnUrl = page.url();
+        await page.getByRole('link', { name: '통합 검색', exact: true }).click();
+        await expect(page).toHaveURL('/search');
+        await expect(page.getByRole('searchbox')).toHaveValue('');
+        expect(requests.some(request => request.path === '/api/search' || request.path === '/api/search/me')).toBe(false);
+        await page.getByRole('button', { name: '취소', exact: true }).click();
+        await expect(page).toHaveURL(returnUrl);
+        await expect(page.getByPlaceholder(placeholder, { exact: true })).toHaveValue('공방 검색');
+    });
+}

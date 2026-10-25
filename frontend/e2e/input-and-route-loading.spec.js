@@ -112,7 +112,7 @@ for (const destination of ['search', 'my-page']) {
         try {
             // dispatch navigates through the rendered UI, without waiting for the deliberately blocked import.
             if (destination === 'search') {
-                await page.getByRole('link', { name: '가게·지역·서비스 검색' }).evaluate(link => link.click());
+                await page.getByRole('link', { name: '통합 검색' }).evaluate(link => link.click());
             } else {
                 await page.getByRole('button', { name: '내 계정 메뉴 열기' }).click();
                 await page.getByRole('menuitem', { name: /테스트 고객님/ }).evaluate(item => item.click());

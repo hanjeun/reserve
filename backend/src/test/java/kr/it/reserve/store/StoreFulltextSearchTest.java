@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.ArgumentMatchers;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -22,6 +23,7 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
 
@@ -67,6 +69,34 @@ class StoreFulltextSearchTest {
         verify(dataSource, times(1)).getConnection();
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "CREATE TABLE store (FULLTEXT KEY ft_store_search (store_name, description, address, category, keywords))",
+            "CREATE TABLE store (FULLTEXT KEY ft_store_search (store_name, description, address, category) WITH PARSER ngram)",
+            "CREATE TABLE store (FULLTEXT KEY ft_store_search (store_name, description, address, category, keywords, zip_code) WITH PARSER ngram)"
+    })
+    void aDifferentParserOrColumnSetNeverEnablesCandidates(String definition) throws Exception {
+        prepareMysql(definition);
+        assertThat(search.candidateQuery("사진")).isEmpty();
+        verifyNoInteractions(repository);
+    }
+
+    @Test void aDifferentNgramSizeDoesNotReadTheTableOrEnableCandidates() throws Exception {
+        prepareMysql("", 1);
+        assertThat(search.candidateQuery("사진")).isEmpty();
+        assertThat(search.candidateQuery("공방")).isEmpty();
+        verify(dataSource, times(1)).getConnection();
+        verifyNoInteractions(repository);
+    }
+
+    @Test void aFailedCapabilityProbeIsCachedWithoutLeakingOrRepeatingTheFailure() throws Exception {
+        when(dataSource.getConnection()).thenThrow(new SQLException("synthetic private JDBC detail", "08006"));
+        assertThat(search.candidateQuery("사진")).isEmpty();
+        assertThat(search.candidateQuery("공방")).isEmpty();
+        verify(dataSource, times(1)).getConnection();
+        verifyNoInteractions(repository);
+    }
+
     @Test void equivalentCandidatePagePreservesOrderingTotalAndPageMetadata() {
         Specification<Store> literal = (root, query, builder) -> builder.conjunction();
         PageRequest page = PageRequest.of(1, 2);
@@ -103,6 +133,10 @@ class StoreFulltextSearchTest {
     }
 
     private void prepareMysql(String definition) throws Exception {
+        prepareMysql(definition, 2);
+    }
+
+    private void prepareMysql(String definition, int tokenSize) throws Exception {
         Connection connection = mock(Connection.class);
         DatabaseMetaData metadata = mock(DatabaseMetaData.class);
         Statement statement = mock(Statement.class);
@@ -114,9 +148,11 @@ class StoreFulltextSearchTest {
         when(connection.createStatement()).thenReturn(statement);
         when(statement.executeQuery("SELECT @@ngram_token_size")).thenReturn(tokens);
         when(tokens.next()).thenReturn(true);
-        when(tokens.getInt(1)).thenReturn(2);
-        when(statement.executeQuery("SHOW CREATE TABLE store")).thenReturn(table);
-        when(table.next()).thenReturn(true);
-        when(table.getString(2)).thenReturn(definition);
+        when(tokens.getInt(1)).thenReturn(tokenSize);
+        if (tokenSize == 2) {
+            when(statement.executeQuery("SHOW CREATE TABLE store")).thenReturn(table);
+            when(table.next()).thenReturn(true);
+            when(table.getString(2)).thenReturn(definition);
+        }
     }
 }

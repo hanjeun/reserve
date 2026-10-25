@@ -151,4 +151,20 @@ describe('explicit unified search scope and cancellation', () => {
         view.unmount();
         await waitFor(() => expect(view.client.getQueriesData({ queryKey: ['unified-search', 'personal', 7, 31] })).toEqual([]));
     });
+    it('keeps identical local store-menu suggestions during Hangul composition and retyping without remote reads', async () => {
+        login();
+        const view = setup({ keyword: '가게', composing: true });
+        const paths = () => view.result.current.catalog.map(item => item.path);
+        const initial = paths();
+        expect(initial).toContain('/stores');
+        view.rerender({ keyword: '가', composing: true });
+        view.rerender({ keyword: '가게', composing: true });
+        expect(paths()).toEqual(initial);
+        view.rerender({ keyword: '가게', composing: false });
+        expect(paths()).toEqual(initial);
+        await act(async () => { await Promise.resolve(); });
+        expect(searchService.public).not.toHaveBeenCalled(); expect(searchService.personal).not.toHaveBeenCalled();
+        expect(view.result.current.remoteConfirmed).toBe(false);
+    });
+
 });

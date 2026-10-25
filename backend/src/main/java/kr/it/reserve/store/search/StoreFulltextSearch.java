@@ -1,5 +1,7 @@
 package kr.it.reserve.store.search;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import kr.it.reserve.store.dto.StoreResponse;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.repository.StoreRepository;
@@ -20,6 +22,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -37,7 +40,10 @@ public class StoreFulltextSearch {
 
     private final DataSource dataSource;
     private final StoreRepository storeRepository;
+    @PersistenceContext private EntityManager entityManager;
     private volatile Boolean available;
+
+    public record Preview(Long id, String name, String category, String address) {}
 
     /** 짧은 문자·기호는 LIKE로, 색인 가능한 두 글자는 연산자 없는 후보로만 사용한다. */
     public String candidateQuery(String keyword) {
@@ -60,6 +66,22 @@ public class StoreFulltextSearch {
                 ? matched : storeRepository.findAll(literalSearch, pageable);
         // 소유자 등 lazy 필드도 독립 트랜잭션이 끝나기 전에 응답 DTO로 변환한다.
         return result.map(StoreResponse::fromEntity);
+    }
+
+    /** 통합검색은 원문과 후보의 전체 개수가 같을 때만 후보로 좁히고, 공개 텍스트만 최대 여섯 건 조회한다. */
+    @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW, isolation = Isolation.REPEATABLE_READ)
+    public List<Preview> preview(Specification<Store> literalSearch, String candidate, int resultLimit) {
+        if (resultLimit < 1 || resultLimit > 6) throw new IllegalArgumentException("Invalid store preview limit");
+        long literalTotal = storeRepository.count(literalSearch);
+        Specification<Store> narrowed = StoreSearchSpecification.withFulltextCandidate(literalSearch, candidate);
+        Specification<Store> selected = storeRepository.count(narrowed) == literalTotal ? narrowed : literalSearch;
+        var builder = entityManager.getCriteriaBuilder();
+        var query = builder.createQuery(Preview.class);
+        var root = query.from(Store.class);
+        query.select(builder.construct(Preview.class, root.get("id"), root.get("name"),
+                root.get("category"), root.get("address")));
+        query.where(selected.toPredicate(root, query, builder));
+        return entityManager.createQuery(query).setMaxResults(resultLimit).getResultList();
     }
 
     /** 인덱스 제거·조회 실패 후에는 재시작/설정 변경 전까지 MATCH 오류를 반복하지 않는다. */

@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import Header from './Header';
+import DiscoveryNav from './DiscoveryNav';
 import FilterToolbar from '../common/FilterToolbar';
 
 const { goBack, authState, reducedMotionState } = vi.hoisted(() => ({
@@ -90,8 +91,9 @@ describe('shared wordmark and result search header', () => {
 
     it.each(['/stores', '/waiting'])('edits only the current list and leaves the separate global entry blank at %s', async path => {
         const original = path + '?keyword=' + encodeURIComponent('카페 안산') + '&view=list&sort=reviewCount&page=2';
-        render(<MemoryRouter initialEntries={[original]}><Header /><CurrentListSearch /><CurrentRoute /></MemoryRouter>);
+        render(<MemoryRouter initialEntries={[original]}><Header /><DiscoveryNav /><CurrentListSearch /><CurrentRoute /></MemoryRouter>);
         expect(screen.queryByRole('button', { name: /목록 검색어 수정/ })).toBeNull();
+        expect(screen.queryByRole('button', { name: '이전 화면으로 돌아가기' })).toBeNull();
         const input = screen.getByPlaceholderText('현재 목록 검색');
         expect(screen.getByRole('banner')).not.toHaveClass('reserve-header-has-query');
         expect(screen.getByRole('link', { name: 'RESERVE 홈' })).toBeVisible();
@@ -102,6 +104,13 @@ describe('shared wordmark and result search header', () => {
         const current = new URL(screen.getByLabelText('현재 경로').textContent, 'http://localhost');
         expect(current.pathname).toBe(path); expect(current.searchParams.get('keyword')).toBe('공방');
         expect(current.searchParams.get('view')).toBe('list'); expect(current.searchParams.get('sort')).toBe('reviewCount'); expect(current.searchParams.get('page')).toBe('1');
+        const tabs = screen.getByRole('navigation', { name: '서비스 탐색' });
+        const selected = path === '/stores' ? '탐색' : '웨이팅';
+        fireEvent.click(within(tabs).getByRole('link', { name: selected === '탐색' ? '웨이팅' : '탐색', exact: true }));
+        fireEvent.click(within(tabs).getByRole('link', { name: selected, exact: true }));
+        expect(screen.getByLabelText('현재 경로').textContent).toBe(current.pathname + current.search);
+        expect(screen.getByPlaceholderText('현재 목록 검색')).toHaveValue('공방');
+        expect(within(tabs).getByRole('link', { name: selected, exact: true })).toHaveAttribute('aria-current', 'page');
         fireEvent.click(screen.getByRole('link', { name: '통합 검색' }));
         await waitFor(() => expect(screen.getByLabelText('현재 경로').textContent).toBe('/search:searchEntry'));
     });
@@ -158,7 +167,7 @@ describe('shared wordmark and result search header', () => {
         } finally { vi.useRealTimers(); }
     });
 
-    it('marks only a nonempty store keyword result so mobile hides the brand there', () => {
+    it('keeps the wordmark for list filters and unrelated query parameters', () => {
         const { unmount } = renderHeader('/stores?keyword=%20%20&domain=FOOD');
         expect(screen.getByRole('banner')).not.toHaveClass('reserve-header-has-query');
         expect(screen.getByRole('link', { name: '통합 검색' })).toBeTruthy();

@@ -6,7 +6,7 @@ import { Skeleton } from 'antd';
 import ResponsiveModal from '../common/ResponsiveModal';
 import { EnvironmentOutlined } from '../common/icons';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import TextLink from '../common/TextLink';
 import Button from '../common/Button';
 import { ModalActionGroup } from '../common/ModalActions';
 import DataState from '../common/DataState';
@@ -160,7 +160,7 @@ export default function RegionPickerSheet({ open, value = '', onClose, onApply, 
         () => [...new Set(popularAreas.map(area => area.group))],
         [popularAreas],
     );
-    // 사진 조회가 실패하거나 키가 아직 반영되지 않아도 지역 선택은 그대로 작동한다.
+    // 지역 사진 조회 오류와 지역 선택 동작을 분리한다.
     const { data: dynamicPhotos = [] } = useQuery({
         queryKey: tourismKeys.regionPhotos(photoRegions),
         queryFn: () => tourismService.getRegionPhotos(photoRegions),
@@ -173,7 +173,7 @@ export default function RegionPickerSheet({ open, value = '', onClose, onApply, 
         [dynamicPhotos],
     );
     // 지역 사진은 서버가 공공누리 제1유형을 확인한 관광정보 API 카탈로그만 쓴다.
-    // 사진이 없거나 이미지 프록시가 실패하면 기존 핀 아이콘이 그대로 남는다.
+    // 사진이 없거나 프록시 조회가 실패하면 핀 아이콘을 유지한다.
     const popularAreasWithPhoto = useMemo(
         () => popularAreas.map(area => ({ ...area, photo: dynamicPhotoByRegion.get(area.group) ?? null })),
         [dynamicPhotoByRegion, popularAreas],
@@ -227,9 +227,9 @@ export default function RegionPickerSheet({ open, value = '', onClose, onApply, 
                             : <PopularAreaList isLoading={isLoading} hasAreas={popularAreas.length > 0}
                                 areas={popularAreasWithPhoto} draft={draft} emptyPopular={copy.emptyPopular} onPick={pickArea} />}
                         {!regionError && hasPhotoAttribution && (
-                            <Link className="reserve-region-sheet-attribution-link" to="/content-sources#region-photos">
+                            <TextLink className="reserve-region-sheet-attribution-link" to="/content-sources#region-photos">
                                 사진·콘텐츠 출처 및 이용조건
-                            </Link>
+                            </TextLink>
                         )}
                     </section>
                     <div className="reserve-region-sheet-regions" aria-label="지역 목록">

@@ -8,7 +8,7 @@ import { canWithdrawMember } from '../utils/lifecycleReadiness';
 import { handleApiError } from '../utils/errorHandler';
 import { colors } from '../styles/tokens';
 
-/** Account/role epoch and pending-work checks belong to the withdrawal action. */
+/* 탈퇴 실행 시 계정·역할 세션과 미결 작업을 확인한다. */
 export default function useMemberWithdrawal() {
     const navigate = useNavigate();
     const { user, logout, sessionRevision } = useAuthStore();

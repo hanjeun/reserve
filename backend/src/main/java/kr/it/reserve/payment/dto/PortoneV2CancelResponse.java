@@ -4,22 +4,10 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Getter;
 
 /**
- * 포트원 V2 결제 취소(환불) 응답 — 2026-08-23 신설.
- * {@code POST https://api.portone.io/payments/{paymentId}/cancel}
- *
- * <h2>★ 왜 이 DTO 가 생겼나</h2>
- * 예전에는 취소 호출의 응답 타입이 {@code Void} 라 <b>본문을 통째로 버렸다.</b>
- * 그래서 HTTP 200 만 오면 무조건 "환불 완료"로 기록했는데, PortOne V2 의 취소는
- * <b>비동기로 끝날 수 있다</b> — 200 을 주면서 {@code status: "REQUESTED"} 를 돌려주는 경우다.
- * 그 상태는 "취소 요청을 접수했다"는 뜻이지 <b>돈이 돌아갔다는 뜻이 아니다.</b>
- * 접수 뒤 PG 쪽에서 실패하면, 우리 DB 에는 REFUNDED 로 남고 손님 돈은 안 돌아간
- * <b>가장 나쁜 어긋남</b>이 생긴다.
- *
- * <p>응답 형태는 {@code { "cancellation": { "status": ..., ... } }} 이고
- * {@code status} 는 {@code SUCCEEDED} · {@code REQUESTED} · {@code FAILED} 셋 중 하나다
- * (PortOne V2 REST 문서의 {@code CancelPaymentResponse} / {@code PaymentCancellation}).
- *
- * <p>모르는 필드는 무시한다 — PG 응답에 필드가 늘어난다고 환불이 깨지면 안 된다.
+ * {@code POST https://api.portone.io/payments/{paymentId}/cancel}의 cancellation 응답이다.
+ * HTTP 성공과 실제 환불 완료를 구분해 SUCCEEDED·REQUESTED·FAILED 상태를 읽는다.
+ * 본문·상태가 없거나 알 수 없으면 UNKNOWN으로 남기며 환불 완료로 추정하지 않는다.
+ * 취소 ID와 금액은 원장 대사에 사용하고 추가 응답 필드는 허용한다.
  */
 @Getter
 @JsonIgnoreProperties(ignoreUnknown = true)

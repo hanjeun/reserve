@@ -2,17 +2,8 @@
  * RESERVE - 폼 유틸리티
  */
 
-/**
- * `<Form scrollToFirstError={SCROLL_TO_FIRST_ERROR}>` 로 쓴다.
- *
- * 긴 폼(가게 등록은 화면 3~4개 높이다)에서 제출 버튼은 맨 아래에 있는데, 검증에 걸린 칸은
- * 위쪽일 때가 많다. 그러면 화면상으로는 **아무 일도 안 일어난 것처럼 보인다** — 버튼을 눌렀는데
- * 그대로다. 실제로는 저 위에서 빨간 글씨가 떠 있을 뿐이다.
- *
- * ⚠️ `inline: 'nearest'` 를 반드시 유지할 것. 기본값은 가로 위치까지 맞추려 드는데,
- *    iOS WebKit 에서 그게 **viewport 전체를 수평으로 밀어버린다**(AdminPanel.jsx:77 에
- *    같은 원인으로 scrollIntoView 를 걷어낸 이력이 있다).
- *    `scrollMode: 'if-needed'` 는 이미 보이는 칸이면 아예 스크롤하지 않게 한다.
+/*
+ * 첫 오류 필드를 필요한 경우에만 세로로 이동한다. inline: nearest를 유지해 가로 뷰포트 이동을 막는다.
  */
 export const SCROLL_TO_FIRST_ERROR = {
     behavior: 'smooth',
@@ -95,11 +86,9 @@ export const buildStoreFormData = (values) => {
     // 누락 = 유지, 명시적인 0/빈 값 = 제한 없음.
     if (Object.hasOwn(values, 'bookingDeadlineHours')) fd.append('bookingDeadlineHours', optionalString(values.bookingDeadlineHours));
 
-    // ── 휴무 (2026-08-11) ────────────────────────────────────────────────────
-    // ⚠️ multipart 에서 배열은 **같은 키를 여러 번 append** 해야 스프링이 List 로 바인딩한다.
-    //    JSON.stringify 로 보내면 List<Integer> 에 못 꽂히고 400 이 난다.
-    //
-    // 누락은 기존 값 유지, 빈 문자열은 명시적 해제다.
+    // multipart 배열은 같은 키를 반복해 추가해야 서버의 List로 바인딩된다.
+
+    // 값 누락은 기존 값 유지, 빈 문자열은 명시적 해제를 뜻한다.
     if (Object.hasOwn(values, 'closedDays')) appendList(fd, 'closedDays', (values.closedDays ?? []).map(String));
 
     const closedDates = (values.closedDates ?? [])
@@ -107,12 +96,12 @@ export const buildStoreFormData = (values) => {
         .filter(Boolean);
     if (Object.hasOwn(values, 'closedDates')) appendList(fd, 'closedDates', closedDates);
 
-    // 예약 방식 (2026-08-24). 값이 없으면 서버가 SLOT 으로 흡수하지만,
-    // 명시적으로 보내는 편이 "무엇을 의도했는지"가 드러난다.
+    // 예약 방식이 없을 때 SLOT 기본값으로 정규화한다.
+
     if (Object.hasOwn(values, 'bookingType')) fd.append('bookingType', values.bookingType || 'SLOT');
 
     // 회차 목록 — 명시적으로 비운 경우에만 빈 문자열을 보낸다.
-    // ★ SESSION 이 아닐 때도 보낸다. 서버가 방식에 따라 버릴지 말지 정한다 —
+    // SESSION 이 아닐 때도 보낸다. 서버가 방식에 따라 버릴지 말지 정한다 —
     //   프론트가 미리 거르면 두 곳이 같은 규칙을 알고 있어야 해서 언젠가 어긋난다.
     const sessionTimes = (values.sessionTimes ?? [])
         .map(t => formatValue(t, 'HH:mm'))

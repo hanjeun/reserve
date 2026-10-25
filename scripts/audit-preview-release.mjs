@@ -4,7 +4,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { resolveBin } from './resolve-bin.mjs';
 
-// Read-only inventory: never stage, reset, fetch, or change either checkout.
+// 조회만 수행하며 두 작업트리의 파일·Git 상태·원격 참조를 변경하지 않는다.
 const gitBinary = resolveBin('git');
 const git = (...args) => execFileSync(gitBinary, args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, windowsHide: true });
 const base = process.argv[2] || 'origin/dev';
@@ -36,8 +36,8 @@ for (let index = 0; index < rows.length; index += 1) {
     const oldPath = /[RC]/.test(status) ? rows[++index] : undefined;
     const absolute = resolve(root, path);
     const bytes = existsSync(absolute) ? readFileSync(absolute) : null;
-    // Git's native object ID is metadata, not a security checksum. The manifest uses SHA-256.
-    // --no-filters retains raw byte identity; without -w this command writes no Git object.
+    // Git 객체 ID는 메타데이터이며 보안용 무결성 검사는 SHA-256으로 수행한다.
+    // --no-filters로 원본 바이트를 비교하며 -w 없이 Git 객체를 쓰지 않는다.
     const blob = bytes && execFileSync(gitBinary, ['hash-object', '--stdin', '--no-filters'],
         { input: bytes, encoding: 'utf8', windowsHide: true }).trim();
     records.push({ path, status, ...(oldPath ? { oldPath } : {}), group: groupOf(path),

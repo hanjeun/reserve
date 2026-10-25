@@ -1,6 +1,4 @@
-/**
- * RESERVE - Hooks Index
- */
+
 
 export { default as useMessage } from './useMessage';
 export { default as useDocumentTitle } from './useDocumentTitle';

@@ -34,7 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.Mockito.doAnswer;
 
-/** Real MySQL transactions in a disposable synthetic fixture; no admission/session schema is required. */
+/** 격리된 합성 MySQL에서 실제 트랜잭션·정원 경계를 확인한다. */
 @SpringBootTest
 @Timeout(45)
 @EnabledIfEnvironmentVariable(named = "RESERVE_CAPACITY_MYSQL_TEST", matches = "1")
@@ -79,7 +79,7 @@ class ReservationCapacityMySqlReleaseTest {
         var initialLookup = new CountDownLatch(1);
         var competingBookingCommitted = new CountDownLatch(1);
         doAnswer(invocation -> {
-            // The payer lookup opens the old RR snapshot before reservation/store locking reads.
+            // 결제자 조회로 예약·가게 잠금 전에 이전 읽기 스냅샷을 만든다.
             Long payer = jdbc.queryForObject("SELECT member_id FROM reservation WHERE reservation_id = ?", Long.class, existing.getId());
             initialLookup.countDown();
             assertThat(competingBookingCommitted.await(10, TimeUnit.SECONDS)).isTrue();

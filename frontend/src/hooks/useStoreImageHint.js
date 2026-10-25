@@ -3,7 +3,7 @@ import { QueryClientContext } from '@tanstack/react-query';
 import { extractImageHint, rememberImageHints, getImageHint, forgetImageHint } from '../utils/imageHintCache';
 import { httpStatusOf } from '../utils/listErrorMessage';
 
-/** Read public geometry without starting a query; the authentication boot shell has no QueryClient. */
+/* 인증 골격에는 QueryClient가 없어 공개 사진 크기 힌트만 읽는다. */
 const useStoreImageHint = storeId => {
     const client = useContext(QueryClientContext);
     const queries = client?.getQueryCache().findAll({ predicate: query => {

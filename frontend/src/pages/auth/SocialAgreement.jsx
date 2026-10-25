@@ -40,8 +40,8 @@ const SocialAgreement = () => {
             // 로컬 스토어도 동기화 (termsAgreed + marketingAgreed 반영)
             updateUser({ ...user, termsAgreed: true, marketingAgreed: agreements.marketing });
             message.success('환영해요! RESERVE를 시작해보세요.');
-            // 2026-07: 신규 소셜 가입자도 약관 동의까지 마치면 원래 가려던 페이지로 보낸다.
-            // (OAuthCallback은 신규 가입자의 복귀 경로를 일부러 소비하지 않고 남겨둔다)
+            // 약관 동의 완료 후 저장된 복귀 경로로 이동한다.
+
             const target = consumeRedirect();
             // 가려던 곳이 있으면 이어서(오른쪽에서), 없으면 홈으로(왼쪽에서).
             navigate(target || '/', { replace: true, state: { reserveRouteMotion: target ? 'from-right' : 'from-left' } });
@@ -82,7 +82,7 @@ const SocialAgreement = () => {
                                 <Checkbox checked={agreements.terms} onChange={e => setAgreements(p => ({ ...p, terms: e.target.checked }))} />
                                 <Text style={A.itemText}><span style={A.requiredTag}>필수</span> 서비스 이용약관</Text>
                             </button>
-                            <button type="button" style={A.viewLink} onClick={() => window.open('/terms', '_blank')}>보기</button>
+                            <button type="button" className="reserve-text-link" style={A.viewLink} onClick={() => window.open('/terms', '_blank')}>보기</button>
                         </div>
                         <div style={A.itemRow}>
                             <button type="button" style={{ ...A.itemLeft, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}
@@ -90,7 +90,7 @@ const SocialAgreement = () => {
                                 <Checkbox checked={agreements.privacy} onChange={e => setAgreements(p => ({ ...p, privacy: e.target.checked }))} />
                                 <Text style={A.itemText}><span style={A.requiredTag}>필수</span> 개인정보 처리방침</Text>
                             </button>
-                            <button type="button" style={A.viewLink} onClick={() => window.open('/privacy', '_blank')}>보기</button>
+                            <button type="button" className="reserve-text-link" style={A.viewLink} onClick={() => window.open('/privacy', '_blank')}>보기</button>
                         </div>
                         <div style={A.itemRow}>
                             <button type="button" style={{ ...A.itemLeft, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}

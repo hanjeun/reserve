@@ -31,8 +31,10 @@ export default function StoreNewsSkeleton({ contentOnly = false, showRefresh = t
             <div className="reserve-explore-filters reserve-store-news-manage-toolbar" aria-hidden="true"><StoreNewsActionSkeleton /><span className="reserve-explore-count"><Bone width={52} height={16} /></span>
                 <div className="reserve-explore-filter-controls"><FilterMenuSkeleton select={{ value: 'ALL', options: [{ value: 'ALL', label: '전체 가게' }] }} />
                     <FilterMenuSkeleton select={{ value: 'ALL', options: STORE_NEWS_STATES }} />{showRefresh && <IconToolSkeleton />}</div></div></>}
-        {[0, 1, 2].map(item => <div className="reserve-store-news-manage-row" key={item}><Bone width="70%" height={22} />
-            <Bone width="90%" height={16} style={{ marginTop: 14 }} /><Bone width={160} height={38} style={{ marginTop: 16 }} /></div>)}
+        <div className="reserve-store-news-manage-list" aria-hidden="true">
+            {[0, 1, 2].map(item => <div className="reserve-store-news-manage-row" key={item}><Bone width="70%" height={22} />
+                <Bone width="90%" height={16} style={{ marginTop: 14 }} /><Bone width={160} height={38} style={{ marginTop: 16 }} /></div>)}
+        </div>
     </section>;
 }
 StoreNewsSkeleton.propTypes = { contentOnly: PropTypes.bool, showRefresh: PropTypes.bool };

@@ -26,6 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class EntityUpdateAuthorizationTest {
     @Autowired private MockMvc mvc;
     @MockitoBean private TokenProvider tokens;
+    @MockitoBean private kr.it.reserve.member.service.LoginMethodService loginMethods;
     @MockitoBean private CustomOAuth2UserService users;
     @MockitoBean private OAuth2AuthenticationSuccessHandler success;
     @MockitoBean private OAuth2AuthenticationFailureHandler failure;

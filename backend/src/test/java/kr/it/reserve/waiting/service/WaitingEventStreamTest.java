@@ -46,7 +46,7 @@ class WaitingEventStreamTest {
     @Test
     void delayedCutoffEndsTheOldConnectionBeforeDeliveryWhilePreservingTheNewConnection() throws Exception {
         MemberRepository members = mock(MemberRepository.class);
-        UpdateStreamAccess access = new UpdateStreamAccess(members, mock(TokenProvider.class, CALLS_REAL_METHODS));
+        UpdateStreamAccess access = new UpdateStreamAccess(members, activeDeviceTokens());
         Member member = member(1);
         member.setProvider(AuthProvider.NAVER);
         member.setTermsAgreed(false); // 이 스트림은 기존부터 약관 동의를 가입 조건으로 추가하지 않았다.
@@ -59,8 +59,8 @@ class WaitingEventStreamTest {
         SseEmitter newConnection = mock(SseEmitter.class);
         var emitters = List.of(oldConnection, newConnection).iterator();
         WaitingEventStream stream = new WaitingEventStream(access, emitters::next);
-        stream.subscribe(member, oldAuthentication);
-        stream.subscribe(member, newAuthentication);
+        stream.subscribe(member, oldAuthentication, "OAUTH", "old-device");
+        stream.subscribe(member, newAuthentication, "OAUTH", "new-device");
         clearInvocations(oldConnection, newConnection);
 
         member.recordOAuthSecurityRevocation(cutoff);
@@ -80,26 +80,42 @@ class WaitingEventStreamTest {
     }
 
     @Test
-    void heartbeatClosesARevokedLegacyContextAndSubscribeRejectsItAfterTheCutoff() throws Exception {
+    void aPasswordConnectionSurvivesTheOAuthCutoffButEndsWhenItsCredentialIsRemoved() throws Exception {
         MemberRepository members = mock(MemberRepository.class);
-        UpdateStreamAccess access = new UpdateStreamAccess(members, mock(TokenProvider.class, CALLS_REAL_METHODS));
+        UpdateStreamAccess access = new UpdateStreamAccess(members, activeDeviceTokens());
         Member member = member(1);
         member.setProvider(AuthProvider.NAVER);
-        when(members.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(member));
-        SseEmitter emitter = mock(SseEmitter.class);
-        WaitingEventStream stream = new WaitingEventStream(access, () -> emitter);
-        stream.subscribe(member, null);
-        clearInvocations(emitter);
-
+        member.setPassword("enabled-password-hash");
+        member.setTermsAgreed(false);
         member.recordOAuthSecurityRevocation(LocalDateTime.of(2026, 10, 16, 8, 0));
-        stream.heartbeat();
+        when(members.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(member));
+        SseEmitter connection = mock(SseEmitter.class);
+        WaitingEventStream stream = new WaitingEventStream(access, () -> connection);
+        stream.subscribe(member, null, "PASSWORD", "password-device");
+        clearInvocations(connection);
 
+        stream.remoteChanged(new RedisWaitingRelay.RemoteChanged(11L, Set.of(1L)));
+        verify(connection).send(any(SseEmitter.SseEventBuilder.class));
+        verify(connection, never()).complete();
+        clearInvocations(connection);
+
+        member.setPassword(null);
+        stream.heartbeat();
         var signal = org.mockito.ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
-        verify(emitter).send(signal.capture());
+        verify(connection).send(signal.capture());
         assertThat(signal.getValue().build().stream().map(SseEmitter.DataWithMediaType::getData).toList().toString())
                 .contains("session-ended").doesNotContain("heartbeat");
-        verify(emitter).complete();
-        assertThatThrownBy(() -> stream.subscribe(member, null)).isInstanceOf(WaitingException.class);
+        verify(connection).complete();
+    }
+
+    @Test
+    void sidlessLegacyContextCannotSubscribeEvenBeforeAProviderCutoff() {
+        MemberRepository members = mock(MemberRepository.class);
+        UpdateStreamAccess access = new UpdateStreamAccess(members, activeDeviceTokens());
+        SseEmitter emitter = mock(SseEmitter.class);
+        WaitingEventStream stream = new WaitingEventStream(access, () -> emitter);
+        assertThatThrownBy(() -> stream.subscribe(member(1), null)).isInstanceOf(WaitingException.class);
+        verifyNoInteractions(emitter);
     }
 
     @Test
@@ -138,5 +154,37 @@ class WaitingEventStreamTest {
 
     private Member member(long id) {
         return Member.builder().id(id).role(Role.USER).termsAgreed(true).build();
+    }
+
+    @Test
+    void logoutOfOneDeviceEndsOnlyItsWaitingConnectionAtTheNextHeartbeat() throws Exception {
+        Member member = member(1);
+        member.setProvider(AuthProvider.LOCAL);
+        member.setPassword("synthetic-hash");
+        var fixture = new kr.it.reserve.config.JwtSessionFixture(member);
+        var first = fixture.issue(null);
+        var second = fixture.issue(null);
+        var guarded = new UpdateStreamAccess(fixture.members, fixture.tokens);
+        SseEmitter one = mock(SseEmitter.class), two = mock(SseEmitter.class);
+        var emitters = List.of(one, two).iterator();
+        var live = new WaitingEventStream(guarded, emitters::next);
+        live.subscribe(member, null, "PASSWORD", fixture.tokens.getSessionId(first.accessToken()));
+        live.subscribe(member, null, "PASSWORD", fixture.tokens.getSessionId(second.accessToken()));
+        clearInvocations(one, two);
+        fixture.service.revoke(first.refreshToken());
+        live.heartbeat();
+        var ended = org.mockito.ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
+        verify(one).send(ended.capture());
+        assertThat(ended.getValue().build().stream().map(SseEmitter.DataWithMediaType::getData).toList().toString())
+                .contains("session-ended").doesNotContain("heartbeat");
+        verify(one).complete();
+        verify(two).send(any(SseEmitter.SseEventBuilder.class));
+        verify(two, never()).complete();
+    }
+
+    private static TokenProvider activeDeviceTokens() {
+        TokenProvider tokens = mock(TokenProvider.class, CALLS_REAL_METHODS);
+        doReturn(true).when(tokens).isDeviceSessionCurrent(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyLong());
+        return tokens;
     }
 }

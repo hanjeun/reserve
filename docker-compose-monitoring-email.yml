@@ -1,9 +1,8 @@
-# Optional, version-specific alert-email appearance override. Apply with the
-# existing production base + SMTP override only after Grafana-only approval.
-# Keep ng_alert_notification.txt and all account/security emails unchanged.
+# 기존 모니터링·SMTP 구성에 알림 HTML만 덮어쓰며 Grafana 단독 변경 승인이 필요하다.
+# 텍스트 알림과 계정·보안 메일은 유지한다.
 services:
   grafana:
-    # Public URL correction was separately approved; SMTP and routing stay as-is.
+    # 알림 링크의 공개 주소를 지정하며 SMTP와 경로 설정은 유지한다.
     environment:
       GF_SERVER_ROOT_URL: https://grafana.reserve.it.kr/
     volumes:

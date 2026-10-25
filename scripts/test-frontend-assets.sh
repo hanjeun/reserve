@@ -15,7 +15,7 @@ cmp "$OLD/assets/old-11111111.js" "$NEW/assets/old-11111111.js"
 ! grep -q 'old-11111111' "$NEW/reserve-assets.sha256"
 grep -q 'new-22222222' "$NEW/reserve-assets.sha256"
 
-# A later stage inherits this release's original files, not its inherited history.
+# 다음 릴리스에는 이 릴리스의 원본 자산만 이어받는다.
 SECOND="$ROOT/2222222222222222222222222222222222222222"
 mv "$NEW" "$SECOND"
 THIRD="$ROOT/.incoming-3333333333333333333333333333333333333333"
@@ -25,7 +25,7 @@ bash "$SCRIPT_ROOT/preserve-frontend-assets.sh" "$THIRD" "$ROOT" "$SECOND"
 cmp "$SECOND/assets/new-22222222.js" "$THIRD/assets/new-22222222.js"
 ! grep -q 'old-11111111\|new-22222222' "$THIRD/reserve-assets.sha256"
 
-# An equal filename with unequal bytes must fail without changing either file.
+# 같은 파일명의 내용이 다르면 양쪽 원본을 유지한 채 거부한다.
 COLLISION="$ROOT/.incoming-4444444444444444444444444444444444444444"
 mkdir -p "$COLLISION/assets"
 printf 'different bytes\n' > "$COLLISION/assets/new-22222222.js"
@@ -34,7 +34,7 @@ if bash "$SCRIPT_ROOT/preserve-frontend-assets.sh" "$COLLISION" "$ROOT" "$SECOND
 fi
 [[ "$(cat "$COLLISION/assets/new-22222222.js")" = 'different bytes' ]]
 
-# Traversal in a retained manifest is refused before its source is read or copied.
+# 소유 목록의 경로 이탈은 원본을 읽거나 복사하기 전에 거부한다.
 printf '%064d  ../outside.js\n' 0 > "$OLD/reserve-assets.sha256"
 INVALID="$ROOT/.incoming-5555555555555555555555555555555555555555"
 mkdir -p "$INVALID/assets"

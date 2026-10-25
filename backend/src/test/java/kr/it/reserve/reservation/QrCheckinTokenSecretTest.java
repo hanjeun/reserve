@@ -16,17 +16,7 @@ import java.util.Date;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * QR 체크인 토큰의 <b>서명 키가 로그인 JWT 키와 분리돼 있는지</b>를 검증한다 (2026-08-24 신설).
- *
- * <p>2026-08-24 이전에는 두 토큰이 같은 키로 서명돼, <b>서로의 서명 검증을 통과했다.</b>
- * 어느 한쪽 경로에서 {@code purpose} 확인을 빠뜨리면 곧바로 교차 사용이 가능해지는 구조였고,
- * 실제로 역방향은 {@code Role.valueOf(null)} NPE 로 <b>우연히</b> 막히고 있었다.
- *
- * <p>이 테스트가 지키는 것은 그 우연을 <b>구조</b>로 바꿨다는 사실이다.
- * 키 유도 로직이나 {@code DERIVATION_INFO} 를 건드리면 여기가 먼저 빨개진다.
- * Spring 컨텍스트를 띄우지 않는다 — 이 클래스는 순수 계산이라 굳이 필요 없다.
- */
+/** QR과 로그인 JWT의 서명 키를 분리해 서로의 토큰이 검증을 통과하지 못하는지 확인한다. */
 class QrCheckinTokenSecretTest {
 
     /** 운영과 같은 제약(64자 이상)을 만족하는 더미. 테스트 리소스의 값과 같은 모양이다. */

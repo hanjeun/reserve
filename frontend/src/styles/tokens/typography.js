@@ -1,6 +1,4 @@
-/**
- * RESERVE Design System - Typography
- */
+
 
 export const fontFamily = {
   base: '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',

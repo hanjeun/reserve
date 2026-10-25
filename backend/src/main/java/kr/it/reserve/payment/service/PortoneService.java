@@ -36,14 +36,7 @@ public class PortoneService {
 
     private static final String V2_API_URL = "https://api.portone.io";
 
-    /**
-     * 기동 시 PortOne 설정을 한 번 점검한다.
-     *
-     * <p>예전에는 storeId 가 취소 요청에서만 쓰여서, 값이 잘못돼 있어도 결제·조회는 멀쩡히 돌아가고
-     * <b>환불을 실제로 시도하는 순간에야</b> 404 로 드러났다(2026-08-09에 그렇게 터졌다).
-     * V2 전환 이후로는 storeId 가 <b>결제창을 여는 데에도</b> 필요하므로 비어 있으면 결제 자체가 시작되지 않는다.
-     * 그래서 경고가 아니라 에러로 남긴다.
-     */
+    /** 결제·취소에 필요한 PortOne 설정은 기동 시 확인한다. */
     @PostConstruct
     void checkPortoneConfig() {
         if (v2Secret == null || v2Secret.isBlank()) {
@@ -94,17 +87,8 @@ public class PortoneService {
     }
 
     /**
-     * V2 결제 취소 (환불).
-     * {@code POST /payments/{paymentId}/cancel}
-     *
-     * <p>★ 2026-08-23 — <b>반환 타입이 {@code void} 에서 바뀌었다.</b> 예전에는 응답 본문을
-     * {@code Void.class} 로 받아 통째로 버렸고, 그래서 HTTP 200 만 오면 호출측이 무조건
-     * "환불 완료"로 기록했다. 그런데 PortOne V2 의 취소는 <b>200 을 주면서
-     * {@code status: "REQUESTED"}(접수만 됨)를 돌려줄 수 있다.</b> 그 뒤 PG 에서 실패하면
-     * 우리 DB 는 REFUNDED 인데 손님 돈은 그대로인 상태가 된다.
-     * 이제 결과를 그대로 돌려주고, <b>무엇으로 기록할지는 호출측이 정한다.</b>
-     *
-     * @return 취소 결과. 예외를 던지지 않았다면 최소한 PG 가 요청을 받긴 한 것이다.
+     * HTTP 성공은 환불 완료를 뜻하지 않는다. PG 취소 상태와 금액은 호출부가 확인한다.
+     * @return PG의 취소 접수·처리 결과
      */
     public PortoneV2CancelResponse cancelPayment(String merchantUid, Integer amount, String reason) {
         return cancelPayment(merchantUid, amount, reason, null);
@@ -127,12 +111,7 @@ public class PortoneService {
         String url = V2_API_URL + "/payments/" + merchantUid + "/cancel";
 
         Map<String, Object> body = new HashMap<>();
-        // ★ storeId 는 값이 있을 때만 싣는다 (2026-08-09 운영 장애).
-        //   PortOne V2 는 본문에 storeId 가 오면 "그 상점 범위에서" 결제를 찾는다.
-        //   값이 비었거나 결제가 속한 상점과 다르면 결제가 존재해도 404 PAYMENT_NOT_FOUND 다.
-        //   조회(getPaymentInfo)는 storeId 를 아예 안 보내 시크릿의 기본 상점으로 해석되는데
-        //   취소만 보내고 있어서 "같은 결제인데 조회는 200 PAID, 취소만 404" 가 났다.
-        //   PORTONE_STORE_ID 가 비면 조회와 같은 해석 경로를 타도록 키 자체를 넣지 않는다.
+        // storeId가 비어 있으면 생략해 조회와 같은 기본 상점 범위를 사용한다.
         if (storeId != null && !storeId.isBlank()) {
             body.put("storeId", storeId);
         }

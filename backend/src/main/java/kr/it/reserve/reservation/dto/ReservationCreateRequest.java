@@ -35,4 +35,11 @@ public class ReservationCreateRequest {
 
     // 나중 결제 허용 여부 체크용 (true = 예약금 있어도 나중에 결제하겠다는 의사)
     private Boolean skipPayment;
+
+    private String requestId;
+    private String admissionTicket;
+
+    public ReservationCreateRequest(Long storeId, LocalDate date, LocalTime time, Integer guests, String specialRequest, Boolean skipPayment) {
+        this(storeId, date, time, guests, specialRequest, skipPayment, null, null);
+    }
 }

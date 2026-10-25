@@ -5,12 +5,8 @@ import { Card } from '../common';
 import ReservationStatusBadge from './ReservationStatusBadge';
 import { formatCurrency, formatTime, getThumbnailUrl } from '../../utils';
 
-/**
- * 예약 카드형 보기의 공용 표현 컴포넌트.
- *
- * 목록형의 촘촘한 ReservationRow를 카드에 그대로 넣지 않고, 내 가게 카드와 같은
- * 이미지 → 본문 → 균등 액션 바 구조를 사용한다. 액션의 종류와 상태 변경은 각 화면이
- * 계속 소유하고 이 컴포넌트는 표시와 배치만 맡는다.
+/*
+ * 표시·배치만 공유하며 실행 종류·상태 변경은 호출 화면에서 관리한다.
  */
 export default function ReservationSummaryCard({
     reservation,

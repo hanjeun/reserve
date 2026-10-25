@@ -7,16 +7,6 @@ import { RightOutlined } from './icons';
 
 const { Text } = Typography;
 
-/**
- * RESERVE Design System - ChartCard
- *
- * 차트를 감싸는 둥근 카드 — StatCard와 동일한 radius/shadow 톤으로 통일.
- * 관리자 DashboardTab, 사업자 통계 탭이 공유해서 쓰는 걸 목적으로 함.
- *
- * <ChartCard title="예약 상태 분포">
- *   <ResponsiveContainer width="100%" height="100%"><PieChart>...</PieChart></ResponsiveContainer>
- * </ChartCard>
- */
 const ChartCard = ({
     title,
     extra,

@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Copy only the original hashed assets of the live and one retained release into staging.
-# Old documents can then finish lazy imports through the unchanged /assets/ URL.
+# 열린 화면의 지연 로딩을 위해 현재·보존 릴리스의 원본 해시 자산만 이어받는다.
 set -Eeuo pipefail
 
 [[ $# -eq 3 ]] || { echo 'Usage: preserve-frontend-assets.sh incoming release-root current-path' >&2; exit 1; }
@@ -17,7 +16,7 @@ owned_records() {
   if [[ -f "$directory/$MANIFEST" && ! -L "$directory/$MANIFEST" ]]; then
     cat "$directory/$MANIFEST"
   else
-    # First upgrade from the pre-manifest deployment: all its assets are original.
+    # 소유 목록이 없는 릴리스는 모든 자산을 원본으로 취급한다.
     (cd "$directory" && find assets -mindepth 1 -maxdepth 1 -type f -print0 | sort -z | xargs -0 -r sha256sum --binary)
   fi
 }
@@ -29,7 +28,7 @@ validate_record() {
   }
 }
 
-# Save ownership before inheritance. Future deployments must not inherit inherited assets forever.
+# 자산이 무한히 재상속되지 않도록 상속 전에 원본 소유 목록을 고정한다.
 [[ ! -e "$STAGE/$MANIFEST" ]] || { echo 'Staging ownership manifest already exists' >&2; exit 1; }
 OWN_RECORDS=$(owned_records "$STAGE")
 [[ -n "$OWN_RECORDS" ]] || { echo 'Staged assets are empty' >&2; exit 1; }

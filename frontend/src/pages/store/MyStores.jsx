@@ -5,6 +5,7 @@ import { Typography, Modal, Flex } from 'antd';
 import { EditOutlined, DeleteOutlined, ExclamationCircleFilled, PlusOutlined } from '../../components/common/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageContainer, Button, Card, DataState, StoreCardSkeleton, ModalLoading, Tooltip } from '../../components/common';
+import ListingContent from '../../components/common/ListingContent';
 import { useMyStores } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useViewModeParam from '../../hooks/useViewModeParam';
@@ -37,7 +38,7 @@ const managedActions = (store, onEdit, onDelete, inRow = false) => [
     </button></Tooltip>,
 ];
 
-// ─── 영업 종료 확인 모달 ──────────────────────────────────────────────────────
+// 영업 종료 확인 모달
 export const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => {
     const [loadingReadiness, setLoadingReadiness] = useState(Boolean(open && storeId));
     const [readiness, setReadiness] = useState(null);
@@ -88,7 +89,6 @@ export const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel
     const readinessUnavailable = readinessError || (readiness && typeof readiness.canClose !== 'boolean');
     const canDelete = !loadingReadiness && !readinessUnavailable && canClose;
 
-    // 영업 종료 준비 상태 영역 — 확인 중 / 확인 실패 / 결과 중 하나.
     let readinessContent = null;
     if (loadingReadiness) {
         readinessContent = (
@@ -142,9 +142,9 @@ export const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel
             open={open}
             onOk={handleOk}
             onCancel={onCancel}
-            /* mask.closable=false: 가게 영업 종료 — 명시적으로 버튼을 눌러야 닫히게 한다.
-               컨벤션 — 입력 폼/파괴적 확인 모달은 바깥 클릭으로 안 닫히고, 읽기 전용 모달
-               (상세보기/QR/예약상세)은 AntD 기본값(true)대로 아무데나 눌러도 닫힌다. */
+            /*
+             * 영업 종료 확인은 명시적 버튼으로만 닫는다.
+             */
             mask={{ closable: false }}
             okText="영업 종료"
             cancelText="취소"
@@ -237,7 +237,7 @@ const OwnedStoresBody = ({ stores, visibleStores, view, onEdit, onDelete, onRegi
         );
     }
     return (
-        <DataState state="empty" kind="store" style={{ marginTop: '100px' }}
+        <DataState state="empty" kind="store"
             title={stores.length > 0 ? '조건에 맞는 내 가게가 없어요.' : '등록된 가게가 없어요.'}
             action={stores.length > 0
                 ? <Button variant="secondary" size="sm" onClick={onResetFilters}>필터 초기화</Button>
@@ -245,7 +245,7 @@ const OwnedStoresBody = ({ stores, visibleStores, view, onEdit, onDelete, onRegi
     );
 };
 
-// ─── MyStores 메인 ──────────────────────────────────────────────────────────
+// MyStores 메인
 const MyStores = () => {
     const navigate = useNavigate();
     const [urlSearchParams, setUrlSearchParams] = useSearchParams();
@@ -269,7 +269,7 @@ const MyStores = () => {
     const setToolbarParam = (key, value) => setUrlSearchParams(current => withToolbarParam(current, key, value));
     const resetOwnedFilters = () => setUrlSearchParams(current => {
         const next = new URLSearchParams(current);
-        next.delete('region'); // 예전 지역 필터 링크로 들어온 경우 URL의 낡은 값도 함께 없앤다.
+        next.delete('region'); // 지역 필터가 포함된 진입 URL은 초기화할 때 함께 정리한다.
         next.delete('domain');
         next.delete('sort');
         return next;
@@ -306,7 +306,6 @@ const MyStores = () => {
 
     const handleEdit = store => navigate(`/store/${store.id}/edit`);
 
-    // 카드 영역 — 로딩 / 첫 조회 실패 / 목록 중 하나.
     let storesContent;
     if (loading) {
         storesContent = <OwnedStoresSkeleton view={view} />;
@@ -314,29 +313,21 @@ const MyStores = () => {
         storesContent = (
             // 처음부터 못 불러오면 목록 자리에 띄운다 — 제목·툴바 옆이 아니라 결과가 나올 자리.
             <DataState state="error" kind="store" subject="가게 목록" error={error}
-                onRetry={handleRetry} retrying={retrying || refetching} style={{ marginTop: 100 }} />
+                onRetry={handleRetry} retrying={retrying || refetching} />
         );
     } else {
         storesContent = (
-            <>
-                {/* 다시 불러오기만 실패했으면 이전 목록은 그대로 두고, 그 위에 작은 띠로만 알린다. */}
-                {error && (
-                    <DataState state="error" kind="store" subject="가게 목록" error={error}
-                        title="최신 가게 정보를 확인하지 못해 이전 목록을 보여드리고 있어요."
-                        onRetry={handleRetry} retrying={retrying || refetching} compact style={{ marginBottom: 16 }} />
-                )}
-                <OwnedStoresBody stores={stores} visibleStores={visibleStores} view={view}
-                    listRef={listRef}
-                    onEdit={handleEdit} onDelete={handleDeleteClick}
-                    onRegister={() => navigate('/store/register')} onResetFilters={resetOwnedFilters} />
-            </>
+            <OwnedStoresBody stores={stores} visibleStores={visibleStores} view={view}
+                listRef={listRef}
+                onEdit={handleEdit} onDelete={handleDeleteClick}
+                onRegister={() => navigate('/store/register')} onResetFilters={resetOwnedFilters} />
         );
     }
 
     return (
         <PageContainer size="xl" paddingTop="40px" className="reserve-mystore-page" aria-busy={loading || refetching || retrying}>
             {/* 헤더 */}
-            <div style={{ marginBottom: '40px' }}>
+            <div className="reserve-listing-heading">
                 <PageTitle loading={loading} style={{ margin: '0 0 8px 0' }}>
                     내 가게 관리
                 </PageTitle>
@@ -360,9 +351,12 @@ const MyStores = () => {
                 label="내 가게 목록 필터"
             />
 
-            {/* 카드 영역 — 2026-07 수정: 고정 4열 그리드(rsv-mystore-grid)로 통일(위 GRID_STYLE 참고).
-                Card.Add도 같은 시점에 borderRadius를 0(각짐)으로 맞춰서 실제 가게 카드와 모서리가 일치한다. */}
-            {storesContent}
+            {}
+            <ListingContent notice={!loading && error && !blockingError && (
+                <DataState state="error" kind="store" subject="가게 목록" error={error}
+                    title="최신 가게 정보를 확인하지 못해 이전 목록을 보여드리고 있어요."
+                    onRetry={handleRetry} retrying={retrying || refetching} compact />
+            )}>{storesContent}</ListingContent>
 
             {/* 삭제 모달 */}
             {!accessDenied && <DeleteStoreModal
@@ -386,8 +380,8 @@ const styles = {
         width: '100%',
         padding: '4px 0',
         cursor: 'pointer',
-        // <div>에서 네이티브 <button>으로 바꾸면서(키보드·스크린리더 지원)
-        // 버튼 기본 외형을 지워 예전 모양을 그대로 유지한다.
+
+        // 버튼 기본 외형을 지워 기존 카드 액션 모양을 유지한다.
         background: 'none',
         border: 'none',
         color: 'inherit',

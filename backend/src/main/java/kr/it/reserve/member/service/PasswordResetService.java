@@ -69,18 +69,7 @@ public class PasswordResetService {
         return true;
     }
 
-    /**
-     * 코드 검증.
-     *
-     * <h3>{@code noRollbackFor} 가 왜 필요한가 — 빼면 이 방어가 통째로 죽는다</h3>
-     * {@code BusinessException} 은 {@code RuntimeException} 이라 스프링의 기본 규칙상
-     * <b>트랜잭션이 롤백된다.</b> 실패 횟수를 올린 뒤 예외를 던지면 그 증가분까지 같이 사라져서
-     * {@code attemptCount} 가 <b>영원히 0</b>에 머무른다 — 카운터가 있는 것처럼 보이지만
-     * 실제로는 무제한 시도가 된다. 실패를 <b>기록해야</b> 하는 경로라 롤백 대상에서 뺀다.
-     *
-     * <p>이 메서드가 쓰는 것은 조회와 카운터·verified 플래그뿐이라, 롤백을 끄더라도
-     * 어중간하게 남는 상태가 없다.
-     */
+    /** 실패 횟수 증가가 예외로 롤백되지 않도록 noRollbackFor를 유지한다. */
     @Transactional(noRollbackFor = BusinessException.class)
     public void verifyCode(String email, String code) {
         PasswordResetToken token = findLatestTokenForUpdate(email)
@@ -114,20 +103,7 @@ public class PasswordResetService {
         }
     }
 
-    /**
-     * 비밀번호 재설정.
-     *
-     * <h3>여기에도 같은 카운터를 건다 — 빼면 우회로가 생긴다</h3>
-     * 이 메서드는 {@code verified} 를 확인하기 <b>전에</b> 코드를 대조한다. 그래서
-     * {@code verify-code} 를 건너뛰고 여기만 두드려도 코드를 맞힐 수 있었고, 더 나쁘게는
-     * 응답 문구가 "잘못된 접근입니다"(코드 불일치) ↔ "코드 인증을 먼저 완료해주세요"(코드 일치)로
-     * 갈려서 <b>맞았는지 여부를 알려주는 오라클</b>이 됐다.
-     * 검증 경로가 둘이면 방어도 둘 다 걸어야 한다 — 하나만 막으면 막지 않은 쪽이 정문이 된다.
-     *
-     * <p>{@code noRollbackFor} 이유는 {@link #verifyCode} 주석 참고.
-     * 여기서는 실패 경로에서만 롤백을 끄는 셈인데, 성공 경로는 예외를 던지지 않으므로
-     * 비밀번호 변경·토큰 삭제는 평소대로 하나의 트랜잭션으로 커밋된다.
-     */
+    /** 코드 검증을 건너뛰는 우회를 막기 위해 재설정 경로에도 대조 횟수 제한을 적용한다. 실패 횟수는 롤백하지 않는다. */
     @Transactional(noRollbackFor = BusinessException.class)
     public void resetPassword(String email, String code, String newPassword) {
         // 재발송과 같은 member → token 순서를 지켜 잠금 순환과 중복 소비를 막는다.

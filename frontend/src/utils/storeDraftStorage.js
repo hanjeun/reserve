@@ -258,7 +258,7 @@ export const deleteStoreDraft = async key => {
 
 export const STORE_DRAFT_TTL_DAYS = DRAFT_TTL_MS / (24 * 60 * 60 * 1000);
 
-/** Export/import uses the same account-scoped store and keeps the original expiry. */
+/* 같은 계정 범위의 저장소를 사용하며 내보내기·가져오기에서 최초 만료 시각을 유지한다. */
 export const listStoreDrafts = async userId => {
     if (userId == null) return [];
     return runTransaction('readonly', store => new Promise((resolve, reject) => {

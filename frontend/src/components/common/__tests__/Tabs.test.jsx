@@ -18,7 +18,7 @@ describe('mobile tabs overflow patch', () => {
         }));
         const { container } = render(<Tabs items={items} />);
 
-        // render flushes the Tabs effect that changes mobile from false to true.
+        // 렌더가 모바일 탭 판별 효과까지 반영한다.
         expect(isMobile()).toBe(true);
         expect(container.querySelector('.ant-tabs-nav-more')).toHaveAttribute('type', 'button');
         expect(container.querySelector('.ant-tabs-nav-more')).toHaveAttribute('aria-haspopup', 'listbox');

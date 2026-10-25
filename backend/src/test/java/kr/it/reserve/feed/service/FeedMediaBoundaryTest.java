@@ -147,7 +147,7 @@ class FeedMediaBoundaryTest {
     void phoneJpegOrientationBecomesPixelsAndExifIsNotRetained() throws Exception {
         ByteArrayOutputStream jpeg = new ByteArrayOutputStream();
         ImageIO.write(new BufferedImage(2, 3, BufferedImage.TYPE_INT_RGB), "jpeg", jpeg);
-        // EXIF IFD0 Orientation=6 (90° clockwise), without other metadata.
+        // 다른 메타데이터 없이 EXIF IFD0 Orientation=6(시계 방향 90도)만 포함한다.
         byte[] exif = HexFormat.of().parseHex("ffe1002245786966000049492a0008000000010012010300010000000600000000000000");
         ByteArrayOutputStream original = new ByteArrayOutputStream();
         original.write(jpeg.toByteArray(), 0, 2); original.write(exif);

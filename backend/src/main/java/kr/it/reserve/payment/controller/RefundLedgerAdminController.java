@@ -13,19 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * 환불 원장 조회 (관리자) — 2026-08-23 신설.
- *
- * <p>원장을 만들어놓고 <b>볼 방법이 없으면 만들지 않은 것과 같다.</b> 이 컨트롤러의 목적은
- * "미결 건이 지금 몇 개인가"에 언제든 답할 수 있게 하는 것이다.
- *
- * <p>경로가 {@code /api/admin/**} 이라 {@code SecurityConfig} 에서 ADMIN 롤이 강제된다.
- * <b>읽기 전용이다</b> — 원장을 손으로 고칠 수 있게 만들면 그 순간 장부가 아니게 된다.
- * 잘못 적힌 건은 PortOne 콘솔에서 확인하고 결제 상태를 바로잡는 경로로 처리한다.
- *
- * <p>페이지 파라미터를 반드시 서버로 넘긴다 — 관리자 탭 세 곳이 전부 "프론트에서 전량 받아
- * 필터링"으로 시작했다가 같은 문제를 겪었다.
- */
+/** 관리자 전용 읽기 경로이며 원장을 직접 수정하지 않는다. */
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/admin/refunds")

@@ -5,12 +5,7 @@ import { colors, fontSize, fontWeight } from '../../frontend/src/styles/tokens/i
 
 const { Text } = Typography;
 
-/* ─────────────────────────────────────────────────────────────
-   CSS media query — isMobile JS 훅 없이 순수 CSS로 반응형 처리
-   - PC  : copyright(left) | 대표자(right, text-align:right)
-   - 모바일: 대표자(위, text-align:left) → copyright(아래)
-             CSS order 속성으로 DOM 순서 변경 없이 시각 순서만 교체
-───────────────────────────────────────────────────────────────*/
+/* 모바일에서는 CSS 순서로 대표자 정보를 저작권 문구보다 먼저 표시한다. */
 export const FOOTER_STYLES = `
 .footer-copyright {
     display: flex;
@@ -70,8 +65,8 @@ const FooterLink = ({ label, href }) => (
     <a
         href={href}
         style={{
-            display: 'block',          // 블록화하여 링크들과 정렬 기준 통일
-            textDecoration: 'none', textAlign: 'left',         // 브라우저 기본 가운데 정렬 버그 방지
+            display: 'block',
+            textDecoration: 'none', textAlign: 'left',
             fontSize: fontSize.sm,
             color: colors.text.tertiary,
             cursor: 'pointer',
@@ -89,8 +84,8 @@ const FooterLink = ({ label, href }) => (
 const ExternalLink = ({ href, label }) => (
     <a href={href} target="_blank" rel="noopener noreferrer"
         style={{
-            display: 'block',          // 블록화하여 버튼들과 정렬 기준 통일
-            textAlign: 'left',         // 왼쪽 밀착 강제
+            display: 'block',
+            textAlign: 'left',
             fontSize: fontSize.sm,
             color: colors.text.tertiary,
             textDecoration: 'none',
@@ -109,10 +104,8 @@ const AppFooter = () => {
             <footer style={{ backgroundColor: colors.background.surface, borderTop: `1px solid ${colors.border.light}`, padding: '0 24px 36px' }}>
                 <div style={{ maxWidth: 1100, margin: '0 auto', paddingTop: 48 }}>
 
-                    {/* 상단 */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 40, flexWrap: 'wrap', marginBottom: 28 }}>
 
-                        {/* 브랜드 */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 280 }}>
                             <div style={{ fontSize: 20, fontWeight: 800, color: colors.primary.main, letterSpacing: '-0.5px' }}>RESERVE</div>
                             <Text style={{ fontSize: fontSize.sm, color: colors.text.tertiary, lineHeight: 1.7 }}>
@@ -125,23 +118,20 @@ const AppFooter = () => {
                             </div>
                         </div>
 
-                        {/* 링크 */}
                         <div style={{ display: 'flex', gap: 48, flexWrap: 'wrap' }}>
-                            {/* 서비스 */}
+
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-start' }}>
                                 <Text style={{ fontSize: 11, fontWeight: fontWeight.semibold, color: colors.text.secondary, letterSpacing: '0.08em', textTransform: 'uppercase' }}>서비스</Text>
                                 <FooterLink label="가게 탐색" href={appUrl('/stores')} />
                                 <FooterLink label="예약 확인" href={appUrl('/my-reservations')} />
                             </div>
 
-                            {/* 법적 고지 */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-start' }}>
                                 <Text style={{ fontSize: 11, fontWeight: fontWeight.semibold, color: colors.text.secondary, letterSpacing: '0.08em', textTransform: 'uppercase' }}>법적 고지</Text>
                                 <FooterLink label="서비스 이용약관" href={appUrl('/terms')} />
                                 <FooterLink label="개인정보 처리방침" href={appUrl('/privacy')} />
                             </div>
 
-                            {/* 개발자 */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-start' }}>
                                 <Text style={{ fontSize: 11, fontWeight: fontWeight.semibold, color: colors.text.secondary, letterSpacing: '0.08em', textTransform: 'uppercase' }}>개발자</Text>
                                 <ExternalLink href="https://velog.io/@hanjeun/series/RESERVE" label="개발 블로그 →" />

@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import MyPage from './MyPage';
 import useAuthStore from '../../store/useAuthStore';
 import { businessService, memberService } from '../../services';
+vi.mock('../../components/member/LoginSecuritySection', () => ({ default: () => null }));
 
 const feedback = vi.hoisted(() => ({
     message: { error: vi.fn(), warning: vi.fn(), success: vi.fn() },
@@ -229,7 +230,7 @@ describe('MyPage business edit prefill', () => {
         fireEvent.click(screen.getByRole('button', { name: '신청 취소' }));
         let cancelPromise;
         act(() => { cancelPromise = feedback.confirm.mock.calls[0][0].onOk(); });
-        // Cancelling invalidates the failed prefill and removes its retry action.
+        // 취소하면 실패한 초기 입력 조회와 재시도 도구를 폐기한다.
         expect(screen.queryByRole('button', { name: '다시 불러오기' })).toBeNull();
         expect(screen.getByRole('button', { name: '수정하기' })).toBeDisabled();
         startEdit();

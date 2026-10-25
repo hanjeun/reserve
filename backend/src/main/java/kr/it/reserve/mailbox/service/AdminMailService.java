@@ -48,7 +48,7 @@ public class AdminMailService {
     @Value("${mail.from-name:RESERVE}")
     private String fromName;
 
-    /* ── 새 메일 작성 발송 + DB 저장 ───────────────────── */
+    /* 새 메일 작성 발송 + DB 저장 ───────────────────── */
     @Transactional
     public void compose(ComposeMailRequest request) {
         if (request.isMarketing()) {
@@ -67,19 +67,11 @@ public class AdminMailService {
     }
 
     /**
-     * 광고성 메일의 수신 동의 확인 (2026-08-11 신설).
-     *
-     * <p><b>왜 필요했나</b> — 가입·마이페이지에서 마케팅 수신 동의를 받아 DB 에 저장하고 있었지만,
-     * 그 값을 <b>읽는 코드가 한 줄도 없었다.</b> 동의를 관리하는 척만 하고 실제로는 아무것도
-     * 강제하지 않는 상태였다. 정보통신망법상 광고성 정보는 사전 동의가 필요하고,
-     * 수신 거부자에게 보내면 과태료 대상이다.
-     *
-     * <p>이 메일함은 임의의 주소로 보낼 수 있어 <b>회원이 아닌 주소</b>도 대상이 된다.
-     * 그 경우엔 동의를 확인할 방법 자체가 없으므로 광고 발송을 거부한다 —
-     * "확인할 수 없으면 보내지 않는다"가 안전한 기본값이다.
+     * 정보통신망법상 광고성 정보는 사전 동의가 필요하다.
+     * 회원이 아니거나 동의를 확인할 수 없는 주소에는 광고 메일을 보내지 않는다.
      */
     private void requireMarketingConsent(String toEmail) {
-        // ★ 탈퇴 회원을 제외하는 조회를 쓴다. findByEmail 은 소프트 삭제된 회원도 잡는데,
+        // 탈퇴 회원을 제외하는 조회를 쓴다. findByEmail 은 소프트 삭제된 회원도 잡는데,
         //   탈퇴한 사람에게 광고를 보내는 건 동의 없이 보내는 것보다 나쁘다.
         Member member = memberRepository.findByEmailAndDeletedAtIsNull(toEmail).orElse(null);
 
@@ -95,16 +87,10 @@ public class AdminMailService {
         }
     }
 
-    /* ── 보낸 메일 목록 ─────────────────────────────────── */
+    /* 보낸 메일 목록 ─────────────────────────────────── */
     /** 한 번에 내려줄 수 있는 최대 건수. 호출측이 큰 size 를 보내 전량을 끌어가지 못하게 막는다. */
     private static final int MAX_PAGE_SIZE = 100;
 
-    /**
-     * 보낸 메일 목록 — 페이지 단위. {@code search} 가 있으면 받는사람·제목으로 서버에서 걸러낸다.
-     *
-     * <p>예전에는 페이지 개념 없이 전량을 내려주고 프론트가 {@code Array.filter} 했다.
-     * 보낸 메일은 계속 쌓이기만 하는 데이터라 시간이 지날수록 응답이 커진다.
-     */
     public Page<AdminSentMailResponse> getSentMailList(int page, int size, String search) {
         int safeSize = Math.clamp(size, 1, MAX_PAGE_SIZE);
         int safePage = Math.max(page, 0);
@@ -118,21 +104,9 @@ public class AdminMailService {
         return mails.map(AdminSentMailResponse::from);
     }
 
-    /* ── 휴지통으로 이동 ────────────────────────────────── */
+    /* 휴지통으로 이동 ────────────────────────────────── */
 
-    /**
-     * 보낸 메일을 휴지통으로 옮긴다(소프트 삭제).
-     *
-     * <p><b>★ 여기까지 오는 배관은 원래 다 있었고, 부르는 사람만 없었다.</b>
-     * {@code AdminSentMail.deletedAt} · {@code softDelete()} · 목록 쿼리의 {@code deletedAt IS NULL} ·
-     * {@code AuditLogService.softDeleteSentMail} · 휴지통 복구({@code restoreById}) ·
-     * 30일 뒤 자동 영구삭제까지 전부 구현돼 있었는데, <b>deletedAt 을 세팅하는 진입점이 없어서</b>
-     * SENT_MAIL 은 휴지통에 한 번도 나타날 수 없었다. 이 메서드가 그 빠진 한 칸이다.
-     *
-     * <p>실제 삭제가 아니라 소프트 삭제인 이유 — 보낸 메일은 "무엇을 보냈는가"의 기록이다.
-     * 실수로 지웠을 때 되돌릴 수 없으면 그 기록의 가치가 사라진다. 휴지통에서 30일 뒤
-     * {@code TrashCleanupScheduler} 가 영구 삭제한다.
-     */
+    /** 휴지통에서 복구할 수 있도록 목록에서만 숨기며 보존 기간 뒤 정리한다. */
     @Transactional
     public void moveToTrash(Long mailId) {
         // 엔티티 로드·softDelete·감사 로그 기록이 한 곳에 묶여 있다.
@@ -140,7 +114,7 @@ public class AdminMailService {
         auditLogService.softDeleteSentMail(mailId);
     }
 
-    /* ── 이메일 발송 내부 메서드 ────────────────────────── */
+    /* 이메일 발송 내부 메서드 ────────────────────────── */
     private void sendReplyEmail(String toEmail, String subject, String body) {
         try {
             MimeMessage message = mailSender.createMimeMessage();

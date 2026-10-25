@@ -21,11 +21,8 @@ const viewQueryParams = (pathname, params, view) => {
     return next;
 };
 
-/**
- * 카드와 목록 모두 현재 보기를 URL에 표시하고, 같은 탭에서 마지막 보기를 복원한다.
- *
- * 보기 전환은 같은 조회 결과의 표현만 바꾸므로 지원하는 필터·유입 파라미터를 보존한다.
- * URL에 값이 있으면 공유·새로고침 계약을 우선하고, 값이 없을 때만 경로별 sessionStorage를 쓴다.
+/*
+ * URL의 보기 값을 우선하고 없을 때만 경로별 세션 저장값을 복원한다. 보기 전환은 기존 필터와 유입 파라미터를 보존한다.
  */
 export default function useViewModeParam(searchParams, defaultView) {
     const { pathname, hash, state } = useLocation();

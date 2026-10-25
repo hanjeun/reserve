@@ -24,7 +24,7 @@ import java.time.Duration;
 import java.util.Set;
 import java.util.concurrent.ThreadPoolExecutor;
 
-/** Retains the existing local configuration entry point; production Redis requires explicit opt-in. */
+/** Redis 연결은 명시적인 활성 설정에서만 준비한다. */
 @Configuration(proxyBeanMethods = false)
 @Profile({"local & !prod & !blue & !green", "!local & (prod | blue | green)"})
 @ConditionalOnProperty(prefix = "reserve.redis", name = "enabled", havingValue = "true")

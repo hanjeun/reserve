@@ -6,10 +6,10 @@ import { stateIllustrationSize, stateIllustrationDesktopSize } from '../../style
 import Bone from './Bone';
 import LoadingImage from './LoadingImage';
 
-// Vite emits content-hashed files. URL metadata does not fetch the other pictures.
+// Vite가 해시 파일을 생성하며 URL 메타데이터만으로 다른 그림을 요청하지 않는다.
 const files = import.meta.glob('../../assets/state-illustrations/*.webp', { eager: true, query: '?url&no-inline', import: 'default' });
 const sources = Object.fromEntries(Object.entries(files).map(([path, url]) => [path.split('/').pop(), url]));
-// Static outcomes may replay wherever they appear. QR and pending payment remain process indicators.
+// 완료 상태는 다시 재생할 수 있지만 QR·결제 대기는 진행 표시를 유지한다.
 const STATIC_STATES = new Set(['not-found', 'access-restricted', 'network-offline', 'rate-limited',
     'retry', 'server-unavailable', 'unknown-error', 'preparing', 'payment-success', 'payment-failure', 'waiting-called']);
 const slotStyle = size => ({
@@ -37,10 +37,10 @@ function IllustrationImage({ name, size, fallback, interactive }) {
     const { pictureRef, replay } = useIllustrationMotion(interactive && !failed ? src : null);
     const updateReplayable = host => {
         if (!host) return;
-        // An illustration inside a real action must not become a nested button.
+        // 실행 도구 안의 그림을 중첩 버튼으로 만들지 않는다.
         const action = host.parentElement?.closest('a, button, input, label, [role="button"], [role="link"], [aria-hidden="true"], [inert]');
         setReplayable(interactive && !action && !reduced && !failed && Boolean(src) && typeof host.querySelector('img')?.animate === 'function');
-    }; // A fresh callback ref rechecks ancestors after every commit, including role and inert changes.
+    }; // 커밋마다 부모의 role·inert 변경도 다시 확인한다.
     return <span ref={updateReplayable} className="reserve-state-illustration"
         style={slotStyle(size)} aria-hidden={replayable ? undefined : true}
         role={replayable ? 'button' : undefined} tabIndex={replayable ? 0 : undefined}

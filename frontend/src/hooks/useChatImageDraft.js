@@ -5,7 +5,7 @@ import chatService from '../services/chatService';
 
 const EMPTY_FILES = [];
 
-/** 파일은 영속 초안에 넣지 않는다. 방/로그인 세대가 바뀌면 즉시 숨기고 실패 복원도 격리한다. */
+/* 파일은 영속 초안에서 제외하고 방·세션 변경 시 숨긴다. 실패 복원도 같은 범위에 한정한다. */
 export default function useChatImageDraft(threadKey) {
     const sessionRevision = useAuthStore(state => state.sessionRevision);
     const isLoggedIn = useAuthStore(state => state.isLoggedIn);

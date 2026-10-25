@@ -299,7 +299,7 @@ it('offers an explicit retry when the shared partner store lookup fails', () => 
     const { rerender } = render(<MemoryRouter><BusinessPanel /></MemoryRouter>);
     expect(screen.getByRole('alert')).toHaveTextContent('가게별 필터');
     expect(screen.getByRole('button', { name: '가게 필터' })).toBeDisabled();
-    // 가게 목록은 필터용일 뿐이다. 그게 실패해도 예약 영역(여기서는 빈 상태)은 그대로 그려져야 한다.
+    // 필터용 가게 조회 오류로 예약 목록을 숨기지 않는다.
     expect(screen.getByText('예약 내역이 없어요.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
     expect(refetchStores).toHaveBeenCalledOnce();

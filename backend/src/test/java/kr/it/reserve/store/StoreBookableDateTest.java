@@ -10,17 +10,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * {@link Store#isBookableOn} — 그 날짜에 예약을 받을 수 있는가.
- *
- * <p><b>왜 이 테스트가 있나</b> — 이 판정은 <b>세 곳이 같은 답을 내야 한다</b>:
- * 예약 생성 검증, 가능시간 조회, 그리고 손님 화면의 달력.
- * 판정이 흩어지면 "달력엔 눌리는데 예약하면 거절당하는" 상태가 되고, 그건 사용자가
- * 원인을 짐작할 수 없는 종류의 고장이다. 그래서 메서드를 하나로 모았고,
- * 여기서 그 메서드의 계약을 고정한다.
- *
- * <p>Spring 컨텍스트를 띄우지 않는다 — 순수 날짜 계산이다.
- */
+/** 예약 생성·가용 시각·달력이 공통으로 사용하는 {@link Store#isBookableOn}의 날짜 계약을 확인한다. */
 class StoreBookableDateTest {
 
     private static final LocalDate D_09_10 = LocalDate.of(2026, 9, 10); // 목요일
@@ -48,8 +38,7 @@ class StoreBookableDateTest {
         @Test
         @DisplayName("★ 두 값이 모두 null 이면 언제든 예약 가능 — ddl-auto 로 컬럼만 추가된 기존 행이 이 상태다")
         void 무기한_영업() {
-            // ddl-auto: update 는 컬럼을 추가할 뿐 기존 행을 채우지 않는다.
-            // 기존 가게 전부가 여기 해당하므로, 이 케이스가 깨지면 서비스 전체가 예약 불가가 된다.
+            // 기존 null 값은 무기한 영업으로 해석해 예약 가능 여부를 유지한다.
             assertThat(store().isBookableOn(D_09_10)).isTrue();
         }
 

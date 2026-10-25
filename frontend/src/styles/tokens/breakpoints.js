@@ -1,16 +1,5 @@
-/**
- * RESERVE Design System - Breakpoints
- *
- * 2026-07-30 신설. 이전에는 480 / 575 / 576 / 767 / 768 / 900 여섯 값이 파일마다 흩어져 있었고,
- * 어떤 값이 "같은 의도"였는지 알 수 없었다(575와 576, 767과 768이 왜 다른지 근거가 없음).
- *
- * ★ 이 파일을 만들면서 값을 바꾸지 않았다. 기존에 쓰던 숫자를 그대로 옮기기만 한 것이라
- *   화면 동작은 1px도 달라지지 않는다. 값 변경은 별도 단계에서 근거와 함께 한다.
- *
- * 사용 규칙
- *  - JS 분기: useWindowWidth()와 비교. `useWindowWidth() >= bp.card`
- *  - CSS 미디어쿼리: max-width는 "미만"을 뜻하므로 bp에서 1을 뺀 값을 쓴다.
- *    (그래서 575/576, 767/768 쌍이 생겼던 것 — mq() 헬퍼로 실수를 막는다)
+/*
+ * 화면 경계는 공통 토큰으로 비교한다. 최대 폭 미디어쿼리는 경계보다 1px 작은 값을 사용한다.
  */
 
 export const breakpoints = {
@@ -24,10 +13,8 @@ export const breakpoints = {
     gridNarrow: 480,
 };
 
-/**
- * max-width 미디어쿼리 문자열. `@media ${mq.below(breakpoints.tablet)}`
- * below(768)은 "768 미만" = `(max-width: 767px)`이다.
- * 이 -1을 손으로 쓰다가 767/768, 575/576이 섞였다.
+/*
+ * below는 주어진 경계 미만의 max-width 미디어쿼리를 반환한다.
  */
 export const mq = {
     below: (bp) => `(max-width: ${bp - 1}px)`,

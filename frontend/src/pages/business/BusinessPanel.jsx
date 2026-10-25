@@ -3,6 +3,7 @@ import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import Pagination from '../../components/common/Pagination';
 import { ReservationCardSkeleton, ReservationSummaryCardSkeleton, DataState, FilterToolbar } from '../../components/common';
+import ListingContent from '../../components/common/ListingContent';
 import WorkspaceLayout from '../../components/layout/WorkspaceLayout';
 import WorkspacePanels from '../../components/layout/WorkspacePanels';
 import useWorkspaceNavigate from '../../hooks/useWorkspaceNavigate';
@@ -75,7 +76,7 @@ const ReservationListBody = ({ loading, view, reservations, statusFilter, deboun
     }
     if (reservations.length === 0) {
         return (
-            <DataState state="empty" kind="reservation" style={{ marginTop: 80 }}
+            <DataState state="empty" kind="reservation"
                 title={statusFilter === 'ALL' && !debouncedKeyword.trim()
                     ? '예약 내역이 없어요.'
                     : '조건에 맞는 예약이 없어요.'} />
@@ -97,32 +98,31 @@ const ReservationListBody = ({ loading, view, reservations, statusFilter, deboun
     );
 };
 
-// 가게 목록·예약 목록이 둘 다 실패하면 하나의 오류로, 예약만 실패하면 예약 오류만 보여 준다.
+// 가게·예약 조회가 함께 실패하면 하나로 안내하고 개별 오류는 해당 목록에만 표시한다.
 const renderMainContent = ({ error, blockingError, myStoresError, myStoresLoading, busy, retryAll, refetch, retryStores, listBody }) => {
+    let content = listBody;
     if (blockingError && myStoresError) {
-        return (
+        content = (
             <DataState state="error" kind="reservation" subject="예약 관리 데이터"
                 title="예약 관리 데이터를 불러오지 못했어요." error={error}
                 onRetry={retryAll} retrying={busy} />
         );
-    }
-    if (blockingError) {
-        return (
+    } else if (blockingError) {
+        content = (
             <DataState state="error" kind="reservation" subject="예약 목록" error={error}
                 onRetry={refetch} retrying={busy} />
         );
     }
     return (
-        <>
+        <ListingContent notice={!blockingError && <>
             {error && <DataState state="error" kind="reservation" subject="예약 목록" error={error}
                 title="최신 예약을 확인하지 못해 이전 목록을 보여드리고 있어요."
-                onRetry={refetch} retrying={busy} compact style={{ marginBottom: 16 }} />}
+                onRetry={refetch} retrying={busy} compact />}
             {myStoresError && (
                 <DataState state="error" kind="store" subject="가게별 필터용 가게 목록" error={myStoresError}
-                    onRetry={retryStores} retrying={myStoresLoading} compact style={{ marginBottom: 16 }} />
+                    onRetry={retryStores} retrying={myStoresLoading} compact />
             )}
-            {listBody}
-        </>
+        </>}>{content}</ListingContent>
     );
 };
 
@@ -229,12 +229,12 @@ const ReservationTab = () => {
                 initialLoading={loading}
             />
 
-            {/* 가게 필터 목록과 예약 목록은 서로 독립 요청이다. 예약은 가게 목록 없이도 '전체 가게'로
-                조회된다. 그래서 가게 목록만 실패했을 때 예약까지 가리면 멀쩡히 받아 온 예약을 버리는 셈이다.
-                그때는 목록 위에 좁은 오류만 얹고, 둘 다 실패했을 때만 하나의 오류로 합친다. */}
+            {/*
+             * 가게 필터와 예약은 독립 조회다. 가게 목록 오류만으로 조회된 예약을 가리지 않는다.
+             */}
             {mainContent}
             {hasData && !blockingError && total > 0 && (
-                <nav aria-label="예약 목록 페이지" style={{ marginTop: 16 }}>
+                <nav aria-label="예약 목록 페이지" className="reserve-listing-pagination">
                     <Pagination
                         current={page}
                         pageSize={DEFAULT_PAGE_SIZE}
@@ -291,7 +291,7 @@ const BusinessPanel = () => {
 };
 
 const styles = {
-    list: { display: 'flex', flexDirection: 'column', paddingBottom: 40 },
+    list: { display: 'flex', flexDirection: 'column' },
     divider: { height: 1, background: colors.border.light },
 };
 

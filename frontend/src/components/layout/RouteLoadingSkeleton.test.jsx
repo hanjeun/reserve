@@ -41,6 +41,16 @@ describe('route chunk loading patterns', () => {
     });
     afterEach(() => { setWidth(originalWidth); clients.splice(0).forEach(client => client.clear()); });
 
+    it.each(['/stores', '/waiting'])('includes the same search and refresh skeleton row on %s', pathname => {
+        const { container } = render(<RouteSkeletonPreview pathname={pathname} />);
+        const row = container.querySelector('.reserve-filter-toolbar-secondary');
+        expect(row).not.toBeNull();
+        expect(row.children).toHaveLength(2);
+        expect(row.lastElementChild).toHaveClass('reserve-filter-toolbar-refresh');
+        expect(row.parentElement).toHaveAttribute('aria-hidden', 'true');
+        expect(container.querySelector('input,button')).toBeNull();
+    });
+
     it('keeps the first search skeleton entrance and does not replay it on boot replacement', () => {
         const presentation = createLoadingPresentation('search-entry');
         const view = () => <LoadingPresentationContext.Provider value={presentation}>
@@ -70,11 +80,21 @@ describe('route chunk loading patterns', () => {
         expect(container.querySelector('button,input,select,a')).toBeNull();
     });
 
-    it('mirrors my page profile, account editing and three app settings cards', () => {
+    it('mirrors profile, account editing, login security and app settings cards', () => {
         const { container } = render(<RouteSkeletonPreview pathname="/my-page" />);
         expect(container.querySelector('.reserve-page-container')).toHaveStyle({ maxWidth: '1000px', padding: '48px 24px 80px' });
         expect(container.querySelectorAll('.reserve-my-page-skeleton-card')).toHaveLength(5);
+        expect(screen.getByText('로그인 및 보안')).toBeInTheDocument();
         expect(container.querySelector('.reserve-my-page-skeleton-grid')).toHaveStyle({ flexDirection: 'row' });
+        expect(container.querySelector('input,button,a')).toBeNull();
+    });
+    it('places the mobile security skeleton after all settings without adding a duplicate card', () => {
+        setWidth(390);
+        const { container } = render(<RouteSkeletonPreview pathname="/my-page" />);
+        const cards = container.querySelectorAll('.reserve-my-page-skeleton-card');
+        expect(cards).toHaveLength(5);
+        expect(cards[cards.length - 1]).toContainElement(screen.getByText('로그인 및 보안'));
+        expect(container.querySelector('.reserve-my-page-skeleton-grid')).toHaveStyle({ flexDirection: 'column' });
         expect(container.querySelector('input,button,a')).toBeNull();
     });
     it.each(Object.entries(routes))('covers %s without mounting interactive controls', (path, kind) => {
@@ -124,7 +144,7 @@ describe('route chunk loading patterns', () => {
         const row = container.querySelector('.reserve-filter-toolbar-secondary');
         expect(row.firstElementChild).toHaveStyle({ flexShrink: '1', minWidth: '0px', maxWidth: '480px' });
         expect(row.querySelector('.reserve-filter-toolbar-refresh > .reserve-icon-tool .reserve-skeleton-block')).toHaveStyle({ width: '32px', height: '32px', borderRadius: '10px' });
-        // The shared toolbar is sized by its actual 44px view slot, including while it is a bone.
+        // 골격에서도 실제 보기 도구의 44px 자리를 유지한다.
         expect(container.querySelector('.reserve-explore-filters').firstElementChild).toHaveClass('reserve-icon-tool');
     });
 

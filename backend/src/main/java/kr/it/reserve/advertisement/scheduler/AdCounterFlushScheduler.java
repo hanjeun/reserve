@@ -7,7 +7,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * 광고 노출/클릭/전환 카운터를 주기적으로 DB에 flush (2026-07 추가).
+ * 광고 노출/클릭/전환 카운터를 주기적으로 DB에 flush.
  *
  * AdCounterBuffer에 인메모리로 쌓인 값을 30초마다 걷어서 반영한다 — RateLimiter처럼
  * 인스턴스별 독립이라 Blue/Green 전환 순간의 미반영분은 유실될 수 있지만, 결제/정산과

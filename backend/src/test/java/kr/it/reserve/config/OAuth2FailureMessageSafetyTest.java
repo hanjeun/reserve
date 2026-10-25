@@ -43,4 +43,22 @@ class OAuth2FailureMessageSafetyTest {
                 .isEqualTo("이미 가입된 이메일이에요. 기존 가입 방식으로 로그인해주세요.")
                 .doesNotContain("private-user@example.com", "GOOGLE account");
     }
+
+    @Test
+    void linkingEmailMismatchExplainsTheRequiredAccountWithoutExposingProviderData() {
+        var exception = new OAuth2AuthenticationException(new OAuth2Error("login_method_email_mismatch"),
+                "private-user@example.com access_token=secret-value");
+        String message = ReflectionTestUtils.invokeMethod(handler, "resolveMessage", exception);
+        assertThat(message).isEqualTo("현재 RESERVE 계정과 같은 이메일의 인증된 소셜 계정을 사용해주세요.")
+                .doesNotContain("private-user@example.com", "secret-value");
+    }
+
+    @Test
+    void reauthenticationMismatchPointsToTheOriginallyLinkedIdentity() {
+        var exception = new OAuth2AuthenticationException(new OAuth2Error("login_method_identity_mismatch"),
+                "private-subject private-user@example.com");
+        String message = ReflectionTestUtils.invokeMethod(handler, "resolveMessage", exception);
+        assertThat(message).isEqualTo("처음 연결한 소셜 계정으로 본인 확인해주세요.")
+                .doesNotContain("private-subject", "private-user@example.com");
+    }
 }

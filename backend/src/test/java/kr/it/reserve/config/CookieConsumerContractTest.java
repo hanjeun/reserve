@@ -87,7 +87,7 @@ class CookieConsumerContractTest {
                 new UsernamePasswordAuthenticationToken(principal, null, List.of()));
         assertThat(request.getSession(false)).isNull();
         assertThat(response.getRedirectedUrl()).isEqualTo("https://reserve.it.kr/oauth2/callback?newUser=true");
-        assertThat(response.getHeaders(HttpHeaders.SET_COOKIE)).hasSize(3)
+        assertThat(response.getHeaders(HttpHeaders.SET_COOKIE)).hasSize(5)
                 .anySatisfy(cookie -> assertThat(cookie).startsWith("access_token=test-access;")
                         .contains("Max-Age=1800", "Secure", "HttpOnly", "SameSite=Lax"))
                 .anySatisfy(cookie -> assertThat(cookie).startsWith("refresh_token=test-refresh;")
@@ -121,7 +121,7 @@ class CookieConsumerContractTest {
     }
 
     private void assertClearedCookies(MockHttpServletResponse response) {
-        assertThat(response.getHeaders(HttpHeaders.SET_COOKIE)).hasSize(2)
+        assertThat(response.getHeaders(HttpHeaders.SET_COOKIE)).hasSize(4)
                 .anySatisfy(cookie -> assertThat(cookie).startsWith("access_token=;")
                         .contains("Max-Age=0", "Path=/", "Secure", "HttpOnly", "SameSite=Lax"))
                 .anySatisfy(cookie -> assertThat(cookie).startsWith("refresh_token=;")

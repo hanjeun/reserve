@@ -6,17 +6,8 @@ import RouteLoadingSkeleton from '../../components/layout/RouteLoadingSkeleton';
 import { consumeRedirect } from '../../utils/redirect';
 import { rememberLoginFeedback } from '../../utils/loginFeedback';
 
-/**
- * 소셜 로그인 콜백.
- *
- * 2026-07: 로그인 후 원래 보던 페이지로 복귀 추가.
- * 예전엔 기존 유저를 무조건 '/'로 보냈다 — 가게 상세(/store/12)에서 예약하려고
- * 소셜 로그인을 하면 로그인은 됐는데 홈으로 튀겨서 다시 그 가게를 찾아가야 했다.
- * 복귀 경로는 PrivateRoute / Login이 sessionStorage에 저장해둔 것을 꺼낸다
- * (소셜 로그인은 전체 페이지 리다이렉트라 React Router의 location.state가 살아남지 못한다).
- *
- * 신규 소셜 가입자는 약관 동의(/signup/social)가 우선이므로 여기서 소비하지 않고
- * 그대로 남겨둔다 — SocialAgreement가 동의 완료 후에 소비해서 복귀시킨다.
+/*
+ * 전체 페이지 리다이렉트 후 저장된 복귀 경로를 사용한다. 신규 가입자는 약관 동의를 마친 뒤 경로를 소비한다.
  */
 const OAuthCallback = () => {
     const { message } = App.useApp();
@@ -31,7 +22,7 @@ const OAuthCallback = () => {
         if (hasCalled.current) return cleanup;
         hasCalled.current = true;
 
-        // OAuth2 실패 콜백 체크 (FailureHandler가 ?error=oauth2&message=... 형식으로 보냄)
+        // OAuth 실패 콜백의 error·message 쿼리를 확인한다.
         const params = new URLSearchParams(window.location.search);
         const oauthError = params.get('error');
         const oauthMessage = params.get('message');

@@ -1,8 +1,8 @@
 import useAuthStore from '../store/useAuthStore';
 import { currentSession, isCurrentSession } from '../api/sessionScope';
 
-// Keep one composer in this tab's memory while its author visits account settings.
-// Files stay in memory; the comment component owns and revokes its preview URLs.
+// 계정 설정 방문 중 작성기 하나를 현재 탭 메모리에 보존한다.
+// 파일은 메모리에 두고 미리보기 URL은 댓글 컴포넌트에서 해제한다.
 let draft = null;
 
 export const rememberFeedCommentForProfile = ({ postId, content, images, target, nonce }) => {

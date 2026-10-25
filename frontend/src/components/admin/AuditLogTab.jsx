@@ -29,7 +29,7 @@ const makeLogMessage = (action, entityType, entityId, snapshot) => {
     try {
         const obj = JSON.parse(snapshot || '{}');
         detail = obj['사유'] || obj['상호명'] || '';
-    } catch { /* ignore */ }
+    } catch { /* 스냅샷을 읽지 못하면 공통 감사 문구만 표시한다. */ }
     switch (action) {
         case 'SOFT_DELETE': return `${entity} #${entityId} 소프트 삭제 처리됨`;
         case 'RESTORE':     return `${entity} #${entityId} 복구 완료`;
@@ -57,11 +57,8 @@ const SKELETON_HEADERS = ['일시', '행위', '대상', '로그 내용', '처리
 // 그래야 스켈레톤도 실제 테이블처럼 "고정 컬럼은 지정 폭, 로그 내용이 남는 공간 흡수"가 된다.
 const SKELETON_COLS    = [155, 115, 120, null, 200];
 
-/**
- * 스켈레톤 행 개수를 "실제로 채워질 행 수"로 계산한다 (2026-07 추가).
- * keepPreviousData 덕에 페이지를 넘기는 순간엔 이미 totalElements를 알고 있으므로,
- * 마지막 페이지가 3건이면 스켈레톤도 3줄만 그릴 수 있다 — 10줄 그렸다가 3줄로
- * 줄어들면서 화면이 튀는 걸 막는다. 최초 로딩(total을 모름)엔 pageSize로 폴백.
+/*
+ * 전체 건수를 알면 마지막 페이지의 실제 행 수만큼 골격을 표시하고 최초 조회는 pageSize를 사용한다.
  */
 const skeletonRowCount = (total, pageIdx, pageSize) => {
     if (!total) return pageSize;
@@ -69,26 +66,8 @@ const skeletonRowCount = (total, pageIdx, pageSize) => {
     return Math.max(1, Math.min(pageSize, remaining));
 };
 
-/**
- * 2026-07-09: TanStack Query로 전환 — 서버 사이드 페이지네이션(type + page)이라
- * 쿼리 키에 둘 다 포함. placeholderData: keepPreviousData로 페이지 이동/필터 변경 시
- * 이전 페이지의 진짜 데이터가 유지되다가 교체되어, Table을 언마운트하지 않아도
- * 깜빡임 없이 자연스럽게 넘어감(예전의 hasLoadedOnceRef 수동 관리가 필요 없어짐).
- *
- * 2026-07 버그 수정(1차): 위 설명대로 깜빡임(스켈레톤 재노출)은 없지만, 그 대신 페이지 이동이나
- * 필터 변경 시 새 데이터가 올 때까지 아무 신호 없이 "조용히 있다가 휙 바뀌는" 문제가 있었음.
- *
- * 2026-07 전수조사(2차 — 1차 수정을 되돌림): 1차에서 AntD Table의 loading prop을 썼는데, 이건
- * AntD 기본 <Spin>("점 4개" 스피너)을 그려서 우리 디자인 시스템(셰이머 스켈레톤 / 링 스피너)과
- * 전혀 다른, 눈에 띄게 이질적인 로딩 UI가 노출됐음 — 이 프로젝트의 목록 화면 로딩 관례는
- * 일관되게 "스켈레톤"이므로(StoreList/MyReservations/BusinessPanel 전부 동일), 최초 로딩뿐
- * 아니라 페이지 이동·필터 변경 시에도 동일한 AdminTableSkeleton을 보여주도록 통일.
- * 2026-07 전수조사(3차): 스켈레톤이 <DataTable>을 통째로 대체해서 페이지네이션까지 같이 사라졌던
- * 트레이드오프를 해소 — AdminTableSkeleton에 pagination을 넘겨서 로딩 중에도 페이지 버튼을
- * (disabled 상태로) 그대로 유지한다. 페이지 버튼은 total/current만 알면 그릴 수 있고
- * keepPreviousData 덕에 그 값은 이미 손안에 있다. 행 개수도 total로부터 정확히 계산한다.
- * 2026-07 전수조사(4차): 필터/페이지를 URL 쿼리스트링에 동기화(useQueryParamState) —
- * 새로고침해도 유지되고 링크 공유도 가능해짐(MembersTab 등과 동일한 이유).
+/*
+ * 조회 조건은 URL·쿼리 키에 포함하고 갱신 중 기존 행과 페이지 영역을 유지한다.
  */
 const AuditLogTab = () => {
     const [{ type: typeFilter, page: pageStr }, setQuery] = useQueryParamsState(QUERY_DEFAULTS);

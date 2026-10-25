@@ -70,7 +70,7 @@ esac`,
                     TASK_DETECTION_SCRIPT: bashPath(fileURLToPath(new URL('../detect-active-upstream.sh', import.meta.url))),
                     GITHUB_OUTPUT: bashPath(output), TASK_SSH_CALLED: bashPath(called),
                     RESERVE_SERVER_IP: 'reserve.test', EC2_SSH_KEY: 'fixture-key', RESERVE_SSH_FINGERPRINT: 'SHA256:fixture',
-                    MOCK_BLUE: '200', MOCK_GREEN: '000', MOCK_SCHEMA: 'v270-refund-v1', MOCK_FEATURE: 'waiting-signup-hidden-feed-oauth-v7',
+                    MOCK_BLUE: '200', MOCK_GREEN: '000', MOCK_SCHEMA: 'v270-refund-v1', MOCK_FEATURE: 'waiting-signup-hidden-feed-oauth-login-session-admission-v10',
                     MOCK_REMOTE_FAILURE: '0', MOCK_AMBIGUOUS: 'false', ...overrides },
             });
         assert.ifError(result.error);
@@ -81,6 +81,65 @@ esac`,
         fs.rmSync(fixture, { recursive: true, force: true });
     }
 };
+
+test('service admission deployment forwards opt-in settings and refuses an unusable Redis or epoch', () => {
+    const start = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
+    const settings = { ENABLED: 'false', AUTOMATIC_ENABLED: 'false', CAPACITY: '20', SESSION_SECONDS: '900', MAX_SESSION_SECONDS: '7200',
+        HEARTBEAT_TIMEOUT_SECONDS: '90', MAX_WAITING: '1000' };
+    for (const [suffix, fallback] of Object.entries(settings)) {
+        const key = `RESERVE_SERVICE_ADMISSION_${suffix}`;
+        assert.equal(start.env[key], `\${{ vars.${key} || '${fallback}' }}`);
+        assert.ok(start.with.envs.split(',').includes(key));
+    }
+    assert.equal(start.env.RESERVE_SERVICE_ADMISSION_EPOCH, '${{ vars.RESERVE_SERVICE_ADMISSION_EPOCH }}');
+    assert.ok(start.with.envs.split(',').includes('RESERVE_SERVICE_ADMISSION_EPOCH'));
+    const validation = start.with.script.slice(start.with.script.indexOf('case "$RESERVE_SERVICE_ADMISSION_ENABLED"'),
+        start.with.script.indexOf('case "$FEED_ENABLED"'));
+    assert.ok(validation.includes('Invalid service admission epoch'));
+    for (const [enabled, redis, epoch, passes] of [
+        ['false', 'false', '', true], ['true', 'true', 'release-entry-generation-01', true],
+        ['true', 'false', 'release-entry-generation-01', false], ['maybe', 'true', '', false],
+        ['true', 'true', '', false], ['true', 'true', 'short', false],
+        ['true', 'true', 'a'.repeat(65), false], ['true', 'true', 'invalid generation value', false],
+    ]) {
+        const result = spawnSync(process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash',
+            ['-c', `set -e\n${validation}`], { encoding: 'utf8', timeout: 5000, env: { ...process.env,
+                RESERVE_SERVICE_ADMISSION_ENABLED: enabled, RESERVE_REDIS_ENABLED: redis,
+                RESERVE_SERVICE_ADMISSION_AUTOMATIC_ENABLED: 'false',
+                RESERVE_SERVICE_ADMISSION_EPOCH: epoch } });
+        assert.ifError(result.error);
+        assert.equal(result.status === 0, passes, result.stderr + result.stdout);
+    }
+});
+
+test('automatic service admission deployment is opt-in and cannot bypass the base admission switch', () => {
+    const start = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
+    const validation = start.with.script.slice(start.with.script.indexOf('case "$RESERVE_SERVICE_ADMISSION_AUTOMATIC_ENABLED"'),
+        start.with.script.indexOf('case "$FEED_ENABLED"'));
+    for (const [enabled, automatic, passes] of [
+        ['false', 'false', true], ['true', 'true', true], ['false', 'true', false], ['true', 'invalid', false],
+    ]) {
+        const result = spawnSync(process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash',
+            ['-c', `set -e\n${validation}`], { encoding: 'utf8', timeout: 5000, env: { ...process.env,
+                RESERVE_SERVICE_ADMISSION_ENABLED: enabled, RESERVE_SERVICE_ADMISSION_AUTOMATIC_ENABLED: automatic } });
+        assert.ifError(result.error);
+        assert.equal(result.status === 0, passes, result.stderr + result.stdout);
+    }
+});
+
+test('deployment memory preflight ships with compose and must succeed immediately before target startup', () => {
+    const transfer = deployment.steps.find(entry => entry.name === 'Deploy docker-compose files to EC2');
+    assert.ok(transfer.with.source.split(',').includes('scripts/check-deployment-memory.sh'));
+    const start = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
+    const script = start.with.script;
+    const guard = 'sudo bash /home/ubuntu/scripts/check-deployment-memory.sh "${{ env.CURRENT_UPSTREAM }}" "${{ env.TARGET_UPSTREAM }}"';
+    assert.ok(script.trimStart().startsWith('set -e'));
+    assert.ok(script.indexOf(guard) > script.indexOf('sudo docker pull'));
+    const afterGuard = script.slice(script.indexOf(guard) + guard.length).trimStart();
+    assert.ok(afterGuard.startsWith('sudo -E docker compose'));
+    assert.doesNotMatch(script, /check-deployment-memory\.sh[^\n]*(?:\|\|\s*true|;)/);
+    assert.equal(start['continue-on-error'], undefined);
+});
 
 test('upstream detection publishes a single GitHub output only after the real shell guards succeed', () => {
     const result = runDetection({});
@@ -101,6 +160,8 @@ for (const [description, overrides] of [
     ['recovery without feed and store-news retention', { MOCK_FEATURE: 'waiting-signup-hidden-v2' }],
     ['recovery without benefit approval isolation', { MOCK_FEATURE: 'waiting-signup-hidden-feed-v3' }],
     ['recovery without provider-token and security-event support', { MOCK_FEATURE: 'waiting-signup-hidden-feed-v6' }],
+    ['recovery without managed login methods', { MOCK_FEATURE: 'waiting-signup-hidden-feed-oauth-v7' }],
+    ['recovery without automatic service admission', { MOCK_FEATURE: 'waiting-signup-hidden-feed-oauth-login-session-admission-v9' }],
     ['unsupported refund schema', { MOCK_SCHEMA: 'old' }],
     ['unhealthy live upstream', { MOCK_BLUE: '503' }],
     ['ambiguous upstream marker', { MOCK_AMBIGUOUS: 'true' }],
@@ -204,7 +265,15 @@ test('backend tests are explicit, required, and run before packaging', () => {
     const tests = step(backendTests, 'backend_tests');
     const packaging = step(backend, 'backend_package');
     assert.ok(tests && packaging);
-    assert.match(tests.run, /\.\/gradlew test --console=plain/);
+    assert.equal(tests.run, 'bash scripts/test-backend-isolated.sh');
+    const runner = read('scripts/test-backend-isolated.sh');
+    assert.match(runner, /gradlew test --rerun --no-daemon --console=plain/);
+    for (const gate of ['RESERVE_MYSQL_LOGIN_TEST_ISOLATED', 'RESERVE_ADMISSION_MYSQL_TEST',
+        'RESERVE_CAPACITY_MYSQL_TEST', 'RESERVE_MYSQL_OAUTH_TEST_ISOLATED', 'RESERVE_ADMISSION_REDIS_TEST',
+        'RESERVE_SERVICE_ADMISSION_HELPER_REDIS_TEST']) {
+        assert.match(runner, new RegExp('(?:export )?' + gate + '=1'));
+    }
+    assert.doesNotMatch(runner, /--exclude-task|(?:^|\s)-x\s+test/);
     assert.match(packaging.run, /\.\/gradlew bootJar --console=plain/);
     assert.equal(step(backend, 'backend_tests'), undefined);
     assert.equal(tests['continue-on-error'], undefined);
@@ -259,7 +328,7 @@ test('image publication and frontend staging remain main-push-only', () => {
             || /docker (build|push)\b/.test(entry.run ?? ''));
         assert.ok(writes.length > 0);
         for (const entry of writes) {
-            // GitHub requires the job condition as well as any step condition.
+            // GitHub는 단계 조건과 별개로 작업 조건도 요구한다.
             if (job.if !== mainPush) assert.equal(entry.if, mainPush, entry.name);
         }
     }
@@ -374,8 +443,7 @@ test('latency logs contain coarse routes and durations, never request identifier
 });
 
 test('public pages ship an indexable robots meta in the raw HTML', () => {
-    // nginx map 은 빈 값에 정규식을 평가하지 않는다. "~^$" 로 색인 대상(빈 X-Robots-Tag)을 잡으면
-    // 항상 default(noindex)로 떨어져 공개 페이지 원본 HTML 전체가 noindex 가 된다(2026-09-28 운영 사고).
+// nginx map은 빈 값에 정규식을 평가하지 않으므로 색인 허용 값은 빈 리터럴로 명시한다.
     const config = read('nginx/default.conf');
     const robotsMeta = config.match(/map \$reserve_robots_tag \$reserve_robots_meta \{[\s\S]*?\}/)?.[0];
     assert.ok(robotsMeta);
@@ -394,12 +462,12 @@ test('the live backend must be schema and refund compatible before deployment', 
     assert.match(detectionScript, /"\$SCHEMA_COMPAT" != 'v270-refund-v1'/);
 });
 
-test('automatic cutover requires recovery support for waiting, signup, private deletion, feed retention, benefit approval and interactions', () => {
+test('automatic cutover requires recovery support for waiting, signup, private deletion, feed retention, benefit approval, interactions and managed login methods', () => {
     const build = backend.steps.find(entry => entry.name === 'Build Docker image');
     const detect = step(deployment, 'detect');
     const cutover = deployment.steps.find(entry => entry.name === 'Cut over frontend and backend');
-    assert.match(build.run, /--label reserve\.feature-compat=waiting-signup-hidden-feed-oauth-v7/);
-    assert.match(detectionScript, /"\$FEATURE_COMPAT" != 'waiting-signup-hidden-feed-oauth-v7'/);
+    assert.match(build.run, /--label reserve\.feature-compat=waiting-signup-hidden-feed-oauth-login-session-admission-v10/);
+    assert.match(detectionScript, /"\$FEATURE_COMPAT" != 'waiting-signup-hidden-feed-oauth-login-session-admission-v10'/);
     assert.ok(detectionScript.indexOf('"$FEATURE_COMPAT" !=') < detectionScript.indexOf('DETECTED_UPSTREAM='));
     assert.equal(cutover.env.CURRENT_UPSTREAM, '${{ env.CURRENT_UPSTREAM }}');
     assert.ok(cutover.with.envs.split(',').includes('CURRENT_UPSTREAM'));
@@ -407,14 +475,14 @@ test('automatic cutover requires recovery support for waiting, signup, private d
     assert.match(cutover.with.script, /for COMPATIBLE_UPSTREAM in "\$CURRENT_UPSTREAM" "\$TARGET_UPSTREAM"/);
     const compatibilityGuard = cutover.with.script.indexOf('"$FEATURE_COMPAT" !=');
     assert.ok(compatibilityGuard > 0);
-    assert.match(cutover.with.script, /"\$FEATURE_COMPAT" != 'waiting-signup-hidden-feed-oauth-v7'/);
+    assert.match(cutover.with.script, /"\$FEATURE_COMPAT" != 'waiting-signup-hidden-feed-oauth-login-session-admission-v10'/);
     assert.ok(compatibilityGuard < cutover.with.script.indexOf('trap rollback_cutover'));
     assert.ok(compatibilityGuard < cutover.with.script.indexOf('sudo touch "$ROLLBACK_DIR/cutover-started"'));
     assert.ok(deployment.steps.indexOf(detect) < deployment.steps.indexOf(cutover));
     for (const entry of [detect, cutover]) assert.equal(entry['continue-on-error'], undefined);
 });
 
-test('backend image compatibility requires private deletion and feed retention classes in the actual jar', () => {
+test('backend image compatibility requires private deletion, feed retention and managed login-method classes in the actual jar', () => {
     const dockerfile = read('backend/Dockerfile');
     const guard = dockerfile.indexOf('RUN for REQUIRED_CLASS');
     assert.ok(guard > dockerfile.indexOf('COPY ${JAR_FILE} app.jar'));
@@ -442,7 +510,22 @@ test('backend image compatibility requires private deletion and feed retention c
     assert.ok(dockerfile.includes('BOOT-INF/classes/kr/it/reserve/config/updates/RedisEntityUpdateRelay.class'));
     assert.ok(dockerfile.includes('BOOT-INF/classes/kr/it/reserve/config/util/SecurityUtil\\$OAuthAuthenticationDetails.class'));
     assert.ok(dockerfile.includes('BOOT-INF/classes/kr/it/reserve/member/service/MemberWithdrawalService.class'));
+    for (const entry of ['controller/LoginMethodController', 'service/LoginMethodService', 'entity/LoginMethodChallenge']) {
+        assert.ok(dockerfile.includes('BOOT-INF/classes/kr/it/reserve/member/' + entry + '.class'));
+    }
     assert.ok(dockerfile.includes('META-INF/orm.xml'));
+    for (const entry of ['ReservationCreationGuard', 'ReservationRequest', 'AdmissionService']) {
+        assert.ok(dockerfile.includes('BOOT-INF/classes/kr/it/reserve/reservation/admission/' + entry + '.class'));
+    }
+    for (const entry of ['ServiceAdmissionService', 'ServiceAdmissionAutomaticPolicy', 'ServiceAdmissionLoadSampler']) {
+        assert.ok(dockerfile.includes('BOOT-INF/classes/kr/it/reserve/global/admission/' + entry + '.class'));
+    }
+    assert.ok(dockerfile.includes('BOOT-INF/classes/kr/it/reserve/config/ServiceAdmissionHttpFilter.class'));
+    assert.ok(dockerfile.includes('BOOT-INF/classes/redis/service-admission.lua'));
+    for (const entry of ['redis/reservation-admission.lua', 'db/manual/jwt-session.sql', 'db/manual/reservation-admission.sql']) {
+        assert.ok(dockerfile.includes('BOOT-INF/classes/' + entry));
+    }
+    assert.ok(dockerfile.includes('BOOT-INF/classes/kr/it/reserve/config/jwt/TokenProvider\\$VerifiedAuthentication.class'));
     assert.match(dockerfile, /jar tf app\.jar \| grep -F -x "\$REQUIRED_CLASS" > \/dev\/null \|\| exit 1/);
 });
 

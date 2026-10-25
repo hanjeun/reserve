@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CI/local drill for staged frontend + backend routing cutover and rollback.
+# 격리된 파일로 프론트·백엔드 경로의 동시 전환과 복구를 검사한다.
 
 set -euo pipefail
 
@@ -25,15 +25,14 @@ printf '%s\n' "$NEW_RELEASE" > "$RELEASE_ROOT/$NEW_RELEASE/release-id.txt"
 ln -sfn "releases/$OLD_RELEASE" "$DRILL_ROOT/current"
 [[ "$(cat "$DRILL_ROOT/current/version.txt")" = "old" ]]
 
-# Staging the new release and template must not change live frontend or backend routing.
+# 준비 단계는 현재 프론트·백엔드 경로를 바꾸지 않아야 한다.
 printf 'root %s/current;\n' "$DRILL_ROOT" > "$NGINX_CONFIG"
 printf 'set $service_url blue;\n' > "$SERVICE_ENV"
 cp "$NGINX_CONFIG" "$NGINX_TEMPLATE"
 [[ "$(readlink "$DRILL_ROOT/current")" = "releases/$OLD_RELEASE" ]]
 grep -Fqx "set \$service_url blue;" "$SERVICE_ENV"
 
-# Both containers can be healthy when best-effort cleanup previously failed. The nginx
-# routing include, not health-check ordering, remains the authoritative live target.
+# 양쪽 앱이 정상이더라도 실제 연결 대상은 nginx의 경로 설정으로 판단한다.
 BLUE_HEALTH=200
 GREEN_HEALTH=200
 SERVICE_ENV_LINE=$(tr -d '\r\n' < "$SERVICE_ENV")
@@ -47,13 +46,13 @@ esac
 TARGET_UPSTREAM=green
 [[ "$TARGET_UPSTREAM" != "$CURRENT_UPSTREAM" ]]
 
-# Preserve all three live routing inputs before cutover.
+# 전환 전에 설정 두 파일과 프론트 포인터를 함께 보존한다.
 mkdir -p "$ROLLBACK_DIR"
 readlink "$DRILL_ROOT/current" > "$ROLLBACK_DIR/previous-release"
 cp "$NGINX_CONFIG" "$ROLLBACK_DIR/default.conf"
 cp "$SERVICE_ENV" "$ROLLBACK_DIR/service-env.inc"
 
-# A stale bundle for the same SHA but another workflow attempt must never be consumed.
+# 같은 SHA라도 다른 실행 시도의 복구 묶음을 사용하지 않는다.
 mkdir -p "$STALE_ROLLBACK_DIR"
 printf 'releases/9999999999999999999999999999999999999999\n' \
   > "$STALE_ROLLBACK_DIR/previous-release"
@@ -65,8 +64,7 @@ restore_routing() {
   mv -Tf "$DRILL_ROOT/current.next" "$DRILL_ROOT/current"
 }
 
-# Inject a failure after all three routing inputs changed. The same ERR trap used by
-# production must restore the current attempt's bundle automatically.
+# 세 경로가 모두 바뀐 뒤 실패시켜 현재 실행의 복구 묶음이 ERR trap으로 적용되는지 확인한다.
 set +e
 (
   set -Eeuo pipefail
@@ -89,7 +87,7 @@ CUTOVER_STATUS=$?
 set -e
 [[ "$CUTOVER_STATUS" = 91 ]]
 
-# The failed cutover restored frontend root, backend include, and compatibility pointer.
+# 실패 시 프론트 경로·백엔드 설정·호환 포인터가 함께 복구됐는지 확인한다.
 [[ "$(readlink "$DRILL_ROOT/current")" = "releases/$OLD_RELEASE" ]]
 [[ "$(cat "$DRILL_ROOT/current/version.txt")" = "old" ]]
 grep -Fqx "root $DRILL_ROOT/current;" "$NGINX_CONFIG"

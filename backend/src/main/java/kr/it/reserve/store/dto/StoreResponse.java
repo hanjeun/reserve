@@ -56,17 +56,13 @@ public class StoreResponse {
     private Double rating;
     private Integer reviewCount;
 
-    // (2026-08-09) 여기 있던 @Min 을 제거했다 — 이건 **응답** DTO 라 Bean Validation 이
-    // 아예 동작하지 않는다(응답 객체는 검증 대상이 아니다). "검증이 있다"는 착각만 줌.
-    // 실제 방어는 StoreService 의 clampDeposit() 이 맡는다.
+    // 예약금 검증은 저장 경계의 StoreService에서 수행한다.
     private Integer noShowDeposit;  // 노쇼 방지금
     
-    // ========== 환불 정책 ==========
     private Integer fullRefundDays;     // 전액 환불 가능 일수
     private Integer partialRefundDays;  // 부분 환불 가능 일수
     private Integer partialRefundRate;  // 부분 환불 비율 (%)
 
-    // 예약 슬롯 정책
     private Integer maxCapacityPerSlot;
     private Boolean autoApprovalEnabled;
     private Integer bookingDeadlineHours;
@@ -100,8 +96,7 @@ public class StoreResponse {
     private Long waitingTeams;
     private Boolean reservationEnabled;
 
-    // 휴무·예약범위 (2026-08-11). 달력이 어떤 날짜를 막을지 결정하는 데 쓰인다 —
-    // 서버 검증(Store.isClosedOn)과 같은 값을 내려야 화면과 실제 동작이 어긋나지 않는다.
+    // 달력 표시에도 서버의 휴무·예약 범위 설정을 사용한다.
     private List<Integer> closedDays;
     private List<String> closedDates;
     private Integer maxAdvanceBookingDays;

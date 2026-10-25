@@ -1,16 +1,5 @@
-/**
- * 로그인 후 원래 보던 페이지로 돌아가기 (redirect-back)
- *
- * 2026-07 전수조사로 추가. 예전 동작:
- *   - 이메일 로그인: PrivateRoute가 state.from을 넘겨주고 Login.jsx가 그걸로 navigate하는
- *     코드가 이미 있었지만, 같은 파일에서 '로그인이 필요한 페이지입니다' 경고를 띄우면서
- *     navigate('/login', { state: {} })로 state를 통째로 비워버려 from이 유실됐다 → 항상 '/'로 감.
- *   - 소셜(OAuth) 로그인: window.location.href로 백엔드에 전체 페이지 리다이렉트를 하므로
- *     React Router의 location.state가 아예 살아남지 못한다 → 복귀 수단이 없었다.
- *
- * 그래서 두 경로가 공유할 수 있는 sessionStorage 기반 저장소로 통일한다.
- * sessionStorage인 이유: OAuth는 외부 사이트를 거쳐 돌아오는 왕복이지만 "같은 탭"이므로
- * sessionStorage가 유지된다. 반대로 탭을 닫으면 사라지므로 오래된 복귀 경로가 남지 않는다.
+/*
+ * 이메일·소셜 로그인에서 같은 탭의 복귀 경로를 공유한다. 전체 페이지 리다이렉트에도 유지되며 탭 종료 시 폐기된다.
  */
 
 const KEY = 'reserve:redirectAfterLogin';
@@ -89,7 +78,7 @@ export const clearRedirect = () => {
     try {
         sessionStorage.removeItem(KEY);
     } catch {
-        /* noop */
+        // 저장소 접근이 차단돼도 화면 흐름을 중단하지 않는다.
     }
 };
 

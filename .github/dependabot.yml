@@ -6,15 +6,15 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
     labels: ["chore", "dependencies"]
-    # 그룹이 없으면 업데이트 하나당 PR 하나가 열린다(실제로 13개까지 쌓였다).
+    # 호환 의존성은 함께 갱신한다.
     groups:
-      # eslint 코어와 플러그인은 버전이 물려 있어 따로 머지하면 그 사이 커밋에서 CI 가 깨진다.
+      # ESLint 코어와 플러그인의 호환 버전을 함께 유지한다.
       eslint:
         patterns: ["eslint", "@eslint/*", "eslint-plugin-*", "eslint-config-*"]
       # 오류 수집기와 Replay는 같은 버전으로 갱신한다.
       sentry:
         patterns: ["@sentry/*"]
-      # 나머지 minor/patch 는 한 덩어리로. 메이저는 여기 안 잡히고 따로 올라온다 — 그게 맞다.
+      # 주 버전 변경은 묶지 않는다.
       frontend-minor:
         update-types: ["minor", "patch"]
 
@@ -24,7 +24,7 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
     labels: ["chore", "dependencies"]
-    # Spring Boot 3.5의 Gradle 7/8 지원 범위다. Boot 업그레이드 때 이 제한도 재검토한다.
+    # Spring Boot 지원 범위에 맞추며 업그레이드 시 함께 검토한다.
     ignore:
       - dependency-name: "gradle-wrapper"
         update-types: ["version-update:semver-major"]

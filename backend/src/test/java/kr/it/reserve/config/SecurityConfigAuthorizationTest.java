@@ -10,17 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * SecurityConfig의 인가(authorization) 규칙이 실제 컨트롤러의 의도와 어긋나지 않는지 검증.
- *
- * 배경: GET /api/reservations/availability는 컨트롤러 주석에 "공개 API — 로그인 불필요"라고
- * 명시돼 있었는데도 SecurityConfig의 블랭킷 규칙("/api/reservations/**".authenticated())에
- * 걸려 실제로는 401을 반환하던 버그가 있었음(2026-07 hotfix로 수정).
- *
- * 이런 종류의 "컨트롤러 의도 vs SecurityConfig 규칙 불일치"는 코드 리뷰만으로는 놓치기 쉬워서,
- * 인증 없이 호출했을 때 기대 결과(공개 API는 401이 아니어야 함 / 보호된 API는 401이어야 함)를
- * 명시적으로 고정해두는 테스트. 새 엔드포인트를 추가할 때 이 클래스에 한 줄 추가하는 걸 습관화할 것.
- */
+/** 공개 경로와 보호 경로의 무인증 응답을 실제 SecurityConfig에 고정한다. */
 @SpringBootTest
 @AutoConfigureMockMvc
 class SecurityConfigAuthorizationTest {
@@ -51,7 +41,7 @@ class SecurityConfigAuthorizationTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    // ── 공개 API — 비로그인 상태에서도 401이 아니어야 함 (200/404 등은 데이터 유무에 따라 달라질 수 있어 허용) ──
+    // 공개 API — 비로그인 상태에서도 401이 아니어야 함 (200/404 등은 데이터 유무에 따라 달라질 수 있어 허용) ──
 
     @Test
     void feedInteractionReadsStayPublicButPersonalWritesAndModerationStayAuthenticated() throws Exception {
@@ -141,7 +131,7 @@ class SecurityConfigAuthorizationTest {
                 .andExpect(result -> assertNotEquals(401, result.getResponse().getStatus()));
     }
 
-    // ── 2026-09-21: 통째 공개(/api/stores/**·/api/reviews/**·/api/notices/**)를 공개 화면이 쓰는 GET 만으로 좁혔다 ──
+    // 필요한 공개 GET만 허용하고 나머지 개인 경로는 보호한다.
 
     @Test
     void narrowedPublicGetEndpointsStayOpen() throws Exception {
@@ -228,7 +218,7 @@ class SecurityConfigAuthorizationTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    // ── 보호된 API — 비로그인 상태에서는 반드시 401이어야 함 ──
+    // 보호된 API — 비로그인 상태에서는 반드시 401이어야 함 ──
 
     @Test
     void myReservationsRequiresAuth() throws Exception {

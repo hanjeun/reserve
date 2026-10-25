@@ -2,21 +2,6 @@ package kr.it.reserve.config.oauth2;
 
 import java.util.Map;
 
-/**
- * Naver OAuth2 사용자 정보
- * 
- * Naver에서 제공하는 사용자 정보 구조:
- * {
- *   "resultcode": "00",
- *   "message": "success",
- *   "response": {
- *     "id": "고유ID",
- *     "email": "이메일",
- *     "name": "이름",
- *     "profile_image": "프로필이미지URL"
- *   }
- * }
- */
 public class NaverOAuth2UserInfo implements OAuth2UserInfo {
 
     private final Map<String, Object> attributes;

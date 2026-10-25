@@ -17,8 +17,8 @@ export default function FilterMenu({ value, options, onChange, appearance = 'pla
     const popupRef = useRef(null);
     const selected = options.find(option => option.value === value);
 
-    // 열 때 목록을 선택한 항목 기준으로 맞춘다. 첫 항목이 선택돼 있으면 맨 위에서 시작한다 —
-    // 항목이 목록 높이를 조금 넘으면 브라우저가 스크롤을 남겨 첫 항목 윗부분이 잘려 보였다(2026-09-29).
+    // 열 때 선택 항목으로 스크롤을 맞추고 첫 항목이면 맨 위에서 시작한다.
+
     useEffect(() => {
         if (!open) return undefined;
         const frame = requestAnimationFrame(() => {

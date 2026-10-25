@@ -116,15 +116,26 @@ public class CustomerWaitingService {
                 ? entries.findPersonal(actor.getId(), WaitingStatus.ACTIVE, dayStart, pageable)
                 : entries.findPersonalFiltered(actor.getId(), ACTIVE_NAMES, dayStart, filterStatus,
                         term.isEmpty() ? "" : "%" + escaped + "%", filterSort, pageable);
-        return personal
-                .map(entry -> {
-                    Store store = stores.findById(entry.getStoreId()).orElse(null);
-                    long ahead = entry.getStatus() == WaitingStatus.WAITING
-                            ? entries.teamsAhead(entry.getStoreId(), WaitingStatus.ACTIVE, entry.getBusinessDate(), entry.getEntryNumber()) : 0;
-                    return new MyWaitingResponse(WaitingEntryResponse.from(entry), store == null ? "가게" : store.getName(),
-                            store == null ? null : store.getMainImageUrl(), store == null ? null : store.getMainImageWidth(),
-                            store == null ? null : store.getMainImageHeight(), ahead);
-                });
+        return personal.map(this::personalResponse);
+    }
+
+    public MyWaitingResponse personalEntry(Member actor, Long entryId) {
+        validateMember(actor);
+        if (entryId == null || entryId < 1) throw new WaitingException("접수를 찾을 수 없어요.", HttpStatus.NOT_FOUND);
+        var dayStart = WaitingService.dayStartUtc(clock.instant().atZone(ServiceTime.ZONE).toLocalDate());
+        WaitingEntry entry = entries.findPersonalEntry(entryId, actor.getId(), WaitingStatus.ACTIVE, dayStart,
+                        LocalDateTime.now(java.time.Clock.systemDefaultZone()))
+                .orElseThrow(() -> new WaitingException("접수를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
+        return personalResponse(entry);
+    }
+
+    private MyWaitingResponse personalResponse(WaitingEntry entry) {
+        Store store = stores.findById(entry.getStoreId()).orElse(null);
+        long ahead = entry.getStatus() == WaitingStatus.WAITING
+                ? entries.teamsAhead(entry.getStoreId(), WaitingStatus.ACTIVE, entry.getBusinessDate(), entry.getEntryNumber()) : 0;
+        return new MyWaitingResponse(WaitingEntryResponse.from(entry), store == null ? "가게" : store.getName(),
+                store == null ? null : store.getMainImageUrl(), store == null ? null : store.getMainImageWidth(),
+                store == null ? null : store.getMainImageHeight(), ahead);
     }
 
     @Transactional

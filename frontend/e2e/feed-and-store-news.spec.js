@@ -118,7 +118,7 @@ test('benefits write icon opens the approval writer directly and keeps a photo a
         newsType: 'NEWS',
     });
     expect(state.news[0].benefitState).toBe('PENDING');
-    // The public-list fixture returns the application only after a simulated review approves it.
+    // 공개 목록에는 합성 검수에서 승인한 신청만 포함한다.
     state.news[0].benefitState = 'APPROVED';
     await page.reload();
     const approved = page.getByRole('link', { name: '내 가게 · 새로운 가게 소식 소식 보기' });

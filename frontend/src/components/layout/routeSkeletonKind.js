@@ -1,9 +1,9 @@
 import { peekRedirect } from '../../utils/redirect';
 
-// 라우트 구분은 RESERVE 패턴이다. 정적 페이지에 API 대기를 만들지 않는다.
-// 2026-09-29: 로그인류·문서·준비 중·결제 결과·관리자·파트너·메시지를 각 실제 페이지 모양의 뼈대로 나눴다.
-// 예전 공용 form/workspace/document 뼈대는 제목 위치·폭·높이가 실제와 달라 로딩이 끝날 때 화면이 튀었다.
-// App.jsx 에 라우트를 추가하면 여기도 함께 고친다 — 빠뜨리면 로딩 중에 404 골격이 보인다.
+// 정적 라우트는 API 대기를 만들지 않는다.
+// 실제 페이지 배치에 맞는 라우트별 골격을 선택한다.
+
+// 라우트를 추가할 때 골격 매핑도 함께 갱신한다.
 export const normalizeRouteSkeletonPath = pathname => {
     let end = pathname.length;
     while (end > 0 && pathname[end - 1] === '/') end -= 1;

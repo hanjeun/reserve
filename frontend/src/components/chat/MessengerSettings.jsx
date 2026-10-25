@@ -13,8 +13,8 @@ export default function MessengerSettings({ user, notificationControl, headingLe
     const name = typeof user?.name === 'string' ? user.name.trim() : '';
     const email = typeof user?.email === 'string' ? user.email.trim() : '';
     const imageSource = getMessengerImageUrl(user?.profileImageUrl) || getMessengerImageUrl(user?.profileImage);
-    // URL 검증은 유지하되, 사진의 크롭·중앙 정렬·실패 처리는 마이페이지 Avatar가 소유한다.
-    // /icons 같은 프론트 자산을 업로드 API 경로로 다시 변환하지 않도록 절대 주소로 전달한다.
+    // URL만 검증하고 크롭·정렬·오류 표시는 공통 Avatar에 맡긴다.
+    // 프론트 자산 경로는 업로드 API 경로로 변환하지 않도록 절대 주소로 전달한다.
     const profileSource = imageSource ? new URL(imageSource, window.location.origin).href : null;
     const profileKey = JSON.stringify([user?.id ?? email, user?.role ?? null, imageSource]);
 

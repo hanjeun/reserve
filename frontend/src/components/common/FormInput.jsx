@@ -1,13 +1,4 @@
-/**
- * RESERVE Design System - FormInput Component
- * 
- * 사용법:
- * <FormInput placeholder="이메일 주소" />
- * <FormInput type="password" placeholder="비밀번호" />
- * <FormInput type="number" suffix="원" />
- * <FormInput disabled />
- * <FormInput maxLength={40} showCount />
- */
+
 
 import React from 'react';
 import PropTypes from 'prop-types';
@@ -15,7 +6,7 @@ import { Input, InputNumber } from 'antd';
 import { SpinIndicator } from './Loading';
 import { colors, radius, heights, fontSize } from '../../styles/tokens';
 
-const FormInput = ({ 
+const FormInput = ({
     type = 'text',
     placeholder,
     disabled = false,
@@ -25,7 +16,7 @@ const FormInput = ({
     showCount = false,
     id,
     style,
-    ...rest 
+    ...rest
 }) => {
     const baseStyle = {
         borderRadius: radius.lg,
@@ -92,18 +83,7 @@ const FormInput = ({
     );
 };
 
-/**
- * 버튼과 결합된 Input (이메일 인증 등)
- * 
- * 사용법:
- * <FormInput.WithButton 
- *     placeholder="이메일" 
- *     buttonText="코드발송" 
- *     onButtonClick={handleSend}
- *     buttonLoading={loading}
- * />
- */
-FormInput.WithButton = ({ 
+FormInput.WithButton = ({
     placeholder,
     disabled = false,
     buttonText,
@@ -118,7 +98,7 @@ FormInput.WithButton = ({
     id,
     className,
     buttonAriaLabel,
-    ...rest 
+    ...rest
 }) => {
     const inputStyle = {
         borderRadius: `${radius.lg} 0 0 ${radius.lg}`,

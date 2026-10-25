@@ -136,11 +136,7 @@ public class TourismImageProxyClient {
         }
     }
 
-    /**
-     * 관광공사 API 는 이미지 주소를 http:// 로 준다(2026-09-23 실측 — DB 에 저장된 주소도 전부 http).
-     * 같은 호스트가 https 로도 같은 파일을 주므로 visitkorea.or.kr 주소만 https 로 올려서 쓴다.
-     * 평문으로는 받지 않는다는 원칙은 그대로다 — 그 밖의 http 주소는 아래 검사에서 계속 거절된다.
-     */
+    /** 관광공사 허용 호스트의 http 주소만 https로 변환한다. 다른 평문 주소는 거부한다. */
     static String toHttpsImageUrl(String value) {
         if (value == null) return null;
         String trimmed = value.trim();
@@ -159,7 +155,7 @@ public class TourismImageProxyClient {
         return trimmed;
     }
 
-    /** 관광공사 서버는 비표준 image/jpg 로 응답한다(2026-09-23 실측). image/jpeg 와 같은 뜻이라 표준 이름으로 받는다. */
+    /** 관광공사의 image/jpg 응답은 표준 image/jpeg로 정규화한다. */
     private static MediaType canonicalImageType(MediaType type) {
         return "image".equalsIgnoreCase(type.getType()) && "jpg".equalsIgnoreCase(type.getSubtype())
                 ? MediaType.IMAGE_JPEG

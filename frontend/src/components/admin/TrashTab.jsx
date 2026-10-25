@@ -16,7 +16,7 @@ const { Text } = Typography;
 const SnapshotChips = ({ value }) => {
     if (!value) return <Text type="secondary" style={{ fontSize: fontSize.sm }}>-</Text>;
     let obj = null;
-    try { obj = JSON.parse(value); } catch { /* invalid JSON */ }
+    try { obj = JSON.parse(value); } catch { /* JSON이 아닌 스냅샷은 원문으로 표시한다. */ }
     if (!obj) return <Text style={{ fontSize: fontSize.sm, color: colors.text.secondary }}>{value}</Text>;
     return (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
@@ -36,21 +36,8 @@ const SnapshotChips = ({ value }) => {
     );
 };
 
-/**
- * 2026-07-09: TanStack Query로 전환 — typeFilter와 page가 서버 사이드 파라미터라 쿼리 키에 포함시킴.
- * placeholderData: keepPreviousData로 필터·페이지 변경 시에도
- * 이전 실제 데이터가 유지되다가 교체되어 스켈레톤이 다시 뜨지 않음.
- *
- * 2026-07 버그 수정(1차): keepPreviousData 덕에 필터를 바꿔도 스켈레톤은 안 뜨지만, 그 대신
- * 교체되는 순간까지 아무 시각적 신호도 없어서 "조용히 있다가 휙 바뀌는" 문제가 있었음.
- *
- * 2026-07 전수조사(2차 — 1차 수정을 되돌림): 1차에서 AntD Table의 loading prop을 썼는데 이건
- * AntD 기본 <Spin>("점 4개" 스피너)이라 우리 디자인 시스템과 이질적이었음 — 이 프로젝트의 목록
- * 로딩 관례는 일관되게 "스켈레톤"이므로 필터 변경 시에도 AdminTableSkeleton으로 통일
- * (AuditLogTab.jsx와 동일한 판단).
- *
- * 2026-07 전수조사(3차) — 필터/페이지를 URL 쿼리스트링에 동기화(useQueryParamState) —
- * 새로고침해도 유지되고 링크 공유도 가능해짐(MembersTab 등과 동일한 이유).
+/*
+ * 필터·페이지별 서버 조회를 사용하고 최초·쿼리 변경에는 골격, 수동 갱신에는 기존 행을 유지한다.
  */
 // 스켈레톤이 실제 테이블과 1:1로 대응하도록 컬럼 정의와 같은 값을 유지
 // (고정 헤더도 AdminTableSkeletonTable에서 같은 글자 크기의 뼈대로 표시한다)
@@ -60,8 +47,6 @@ const SKELETON_COLS    = [80, 55, null, 190, 100, 60, 90];
 const PAGE_SIZE = 20;
 const QUERY_DEFAULTS = { type: '', page: '1' };
 
-// 다른 관리자 탭들과 동일한 2026-07 전수조사 사유 — pagination 제어로 복구 뮤테이션 후
-// 페이지 리셋 버그와, 스켈레톤 로딩 중 페이지 버튼 소멸 문제를 동시에 해결.
 const skeletonRowCount = (total, pageIdx1, pageSize) => {
     if (!total) return Math.min(6, pageSize);
     const remaining = total - (pageIdx1 - 1) * pageSize;

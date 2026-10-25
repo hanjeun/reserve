@@ -1,5 +1,5 @@
--- Candidate DDL: apply with a reviewed DDL account after the manual-ddl.md 15.6 prerequisites.
--- Existing two-target check may have a Hibernate-generated name. Replace it in the same ALTER.
+-- 사전 조건과 복구 경로를 확인한 뒤 승인된 DDL 계정으로 적용한다.
+-- 기존 CHECK 이름을 확인하고 같은 ALTER에서 새 조건으로 교체한다.
 SET @legacy_like_check = (
     SELECT IF(COUNT(*)=1,MIN(tc.CONSTRAINT_NAME),NULL)
     FROM information_schema.TABLE_CONSTRAINTS tc

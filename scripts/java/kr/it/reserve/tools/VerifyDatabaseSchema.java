@@ -11,7 +11,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.jar.JarFile;
 
-/** Validate a release's entity schema without starting Spring, schedulers, or business integrations. */
+/** Spring·예약 작업·외부 연동을 기동하지 않고 릴리스 JAR의 엔티티 스키마를 검증한다. */
 class VerifyDatabaseSchema {
     public static void main(String[] args) throws Exception {
         if (args.length != 1) throw new IllegalArgumentException("Expected the release JAR path");
@@ -42,7 +42,7 @@ class VerifyDatabaseSchema {
         int models = 0;
         try (var jar = new JarFile(release.toFile())) {
             var mapping = jar.getJarEntry("BOOT-INF/classes/META-INF/orm.xml");
-            // BootJar는 META-INF 자원을 실행 JAR 루트에 보존한다. 어느 위치든 실제 후보의 원문만 읽는다.
+            // BootJar의 두 자원 경로에서 실제 후보의 매핑 원문만 읽는다.
             if (mapping == null) mapping = jar.getJarEntry("META-INF/orm.xml");
             if (mapping != null) {
                 try (var xml = jar.getInputStream(mapping)) { sources.addInputStream(xml); }
@@ -50,7 +50,7 @@ class VerifyDatabaseSchema {
             var entries = jar.entries();
             while (entries.hasMoreElements()) {
                 String name = entries.nextElement().getName();
-                // Spring's application scan also finds entities outside a directory named "entity".
+                // Spring처럼 entity 디렉터리 밖의 엔티티도 포함한다.
                 if (!name.startsWith("BOOT-INF/classes/kr/it/reserve/") || !name.endsWith(".class")) continue;
                 String className = name.substring("BOOT-INF/classes/".length(), name.length() - 6).replace('/', '.');
                 Class<?> model = Class.forName(className, false, VerifyDatabaseSchema.class.getClassLoader());

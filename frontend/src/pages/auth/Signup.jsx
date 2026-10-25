@@ -189,7 +189,7 @@ const Signup = () => {
                                         </span>
                                     </button>
                                     {path && (
-                                        <button type="button" style={A.viewLink}
+                                        <button type="button" className="reserve-text-link" style={A.viewLink}
                                             onClick={e => { e.stopPropagation(); window.open(path, '_blank'); }}>
                                             보기
                                         </button>

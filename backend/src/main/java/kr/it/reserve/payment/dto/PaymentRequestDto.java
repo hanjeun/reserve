@@ -13,7 +13,7 @@ import lombok.*;
 public class PaymentRequestDto {
     
     private Long reservationId;     // 예약 ID
-    private Integer amount;         // 결제 금액
+    private Integer amount;
     private String productName;     // 상품명
     private String buyerName;       // 구매자 이름
     private String buyerEmail;      // 구매자 이메일

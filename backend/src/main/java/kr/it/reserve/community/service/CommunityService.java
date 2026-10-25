@@ -175,8 +175,6 @@ public class CommunityService {
         return memberId != null && postLikeRepository.existsByPostIdAndMemberId(postId, memberId);
     }
 
-    // --- Private Helper Methods ---
-
     private CommunityPost findPostOrThrow(Long postId) {
         return postRepository.findById(postId)
                 .orElseThrow(() -> new CommunityException(POST_NOT_FOUND, HttpStatus.NOT_FOUND));

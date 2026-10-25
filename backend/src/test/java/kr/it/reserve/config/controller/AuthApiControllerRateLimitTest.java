@@ -45,8 +45,8 @@ class AuthApiControllerRateLimitTest {
         when(memberService.findByEmailOrNull(EMAIL)).thenReturn(member);
         when(passwordEncoder.matches(anyString(), eq("encoded")))
                 .thenAnswer(invocation -> "correct".equals(invocation.getArgument(0)));
-        when(tokenProvider.generateAccessToken(member)).thenReturn("access-token");
-        when(tokenProvider.generateRefreshToken(member)).thenReturn("refresh-token");
+        when(tokenProvider.issueSession(member, null)).thenReturn(new TokenProvider.IssuedSession(
+                "access-token", "refresh-token", java.time.Duration.ofDays(14)));
 
         JwtProperties properties = new JwtProperties();
         properties.getAccessToken().setExpirationMinutes(15);
@@ -66,7 +66,7 @@ class AuthApiControllerRateLimitTest {
         verify(memberService, times(capacity)).findByEmailOrNull(EMAIL);
         verify(passwordEncoder, times(capacity)).matches("wrong", "encoded");
         verify(passwordEncoder, never()).matches("correct", "encoded");
-        verify(tokenProvider, never()).generateAccessToken(org.mockito.ArgumentMatchers.any());
+        verify(tokenProvider, never()).issueSession(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test

@@ -195,7 +195,7 @@ test('fine pixel wheel deltas support trackpad-style scrolling', async ({ page }
 });
 
 test('native touch scrolling selects a centered row without scrolling the form', async ({ page, isMobile }) => {
-    // CDP touch gestures require mobile emulation; the mobile project runs these same assertions.
+    // CDP 터치는 모바일 에뮬레이션 프로젝트에서 확인한다.
     test.skip(!isMobile, 'Native touch input is covered by the mobile browser project.');
     const { dialog } = await openHours(page);
     const minutes = dialog.getByRole('listbox', { name: '분', exact: true });
@@ -313,7 +313,7 @@ const equalActions = async (dialog, confirmText) => {
         return { height: rect.height, width: rect.width, radius: style.borderRadius, border: style.borderTopStyle, borderWidth: style.borderTopWidth,
             paddingLeft: style.paddingLeft, paddingRight: style.paddingRight, background: style.backgroundColor };
     });
-    // Pointer targets and physical widths are meaningful after the modal entrance finishes.
+    // 모달 진입 뒤 포인터 대상과 실제 너비를 측정한다.
     await expect(dialog).not.toHaveClass(/ant-zoom-(appear|enter)(?:-[a-z]+)?(?:\s|$)/);
     await expect.poll(async () => (await details(cancel)).height).toBe(36);
     const cancelSize = await details(cancel);

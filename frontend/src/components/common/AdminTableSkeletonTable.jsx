@@ -3,13 +3,11 @@ import { colors } from '../../styles/tokens';
 import Bone from './Bone';
 import SkeletonText from './SkeletonText';
 
-// 표 본문만 그린다 — 페이지 버튼(antd Pagination)은 AdminTableSkeleton 이 붙인다.
-// 이 파일은 청크 로딩 뼈대(RouteLoadingSkeleton)도 쓰므로 Pagination 을 import 하지 않는다 — 초기 번들에 끌려 들어가지 않게(2026-09-29).
+// 표 본문만 그리며 페이지 이동 도구는 AdminTableSkeleton이 담당한다.
+// 라우트 골격에서 쓰는 경량 파일이므로 Pagination을 가져오지 않는다.
 const skeletonKeys = (n, prefix = 'sk') => Array.from({ length: n }, (_, i) => `${prefix}-${i}`);
 
-/* ─────────────────────────────────────────────
-   AdminTableSkeleton — 관리자/사업자 패널 테이블 로딩용
-───────────────────────────────────────────── */
+/*   AdminTableSkeleton — 관리자/사업자 패널 테이블 로딩용*/
 
 // AntD Table size="middle"의 셀 패딩 (cellPaddingBlockMD=12, cellPaddingInlineMD=8).
 // 실제 테이블은 이 패딩이 컬럼 width 안에 포함되므로 스켈레톤도 똑같이 맞춰야 글자 시작 위치가 일치한다.
@@ -18,25 +16,9 @@ const CELL_PAD_X = 8;
 // width를 지정하지 않은 "유동 컬럼"이 너무 좁아지지 않도록 하한
 const FLEX_COL_MIN = 160;
 
-/**
- * props:
- *   rows       {number}          행 개수
- *   cols       {(number|null)[]} 각 열의 width(px). null이면 "width 미지정(유동) 컬럼"
- *   headers    {string[]}        각 열의 제목 (실제 글자의 폭·줄 높이를 유지하는 골격으로 렌더)
- *   actionBtns {number}          마지막 열에 그릴 버튼 Bone 개수. 0이면 텍스트 Bone
- *   stackFirstCol {bool}         첫 열이 "이름 + 이메일" 2줄인 테이블(사업자 인증 탭)만 true
- *   pagination {object|null}     { current, pageSize, total } — 주면 스켈레톤 중에도 페이지 버튼 유지
- *
- * ── 컬럼 폭 계산: 실제 테이블과 수학적으로 동일하게 (2026-07 수정) ─────────────────
- * DataTable은 tableLayout="fixed"이고 AntD가 <table>에 min-width:100%를 붙인다.
- * 그래서 지정 width 합계가 컨테이너보다 작으면 브라우저가 "남는 공간을 지정 폭에 비례해서"
- * 나눠준다(CSS 2.1 §17.5.2.1). 예: 사업자 인증 탭은 합계 890px → 실제 약 1435px = 약 1.61배 확대.
- * 예전 스켈레톤은 고정 px를 그대로 써서 로딩이 끝나는 순간 셀 경계가 우르르 밀렸다.
- *   → flexGrow: w, flexBasis: w 로 주면 최종 폭 = w × (컨테이너/합계) 로 정확히 같은 비례 확대가 된다.
- *   → flexShrink: 0 이라 모바일처럼 좁을 땐 줄지 않고 가로 스크롤이 생긴다(실제 테이블과 동일).
- * 단, width를 안 준 컬럼(=null)이 하나라도 있으면 규칙이 달라진다 — 고정 컬럼은 지정 폭을
- * 그대로 쓰고 유동 컬럼이 남는 공간을 혼자 흡수한다.
- * (실제로 유동 컬럼이 있는 탭: AuditLogTab의 '로그 내용', TrashTab의 '핵심 정보' — 이 둘뿐)
+/*
+ * rows {number}, cols {(number|null)[]}, headers {string[]}, actionBtns {number}, stackFirstCol {bool}, pagination {object|null}.
+ * CSS 2.1 §17.5.2.1에 맞춰 고정 열만 있으면 폭 비율로 확장하고 null 열이 있으면 남는 공간을 그 열에 둔다. 좁은 화면에서는 축소하지 않고 가로 스크롤을 유지한다.
  */
 const AdminTableSkeletonTable = ({
   rows = 8,
@@ -69,10 +51,8 @@ const AdminTableSkeletonTable = ({
         style={{
           border: `1px solid ${colors.gray[100]}`,
           borderRadius: 8,
-          // 2026-07 수정: 예전엔 overflow:'hidden'이라 모바일처럼 화면이 좁을 때 컬럼 너비 합계를
-          // 넘어가는 부분이 그냥 잘려나가고 가로 스크롤도 안 됐다. 정작 실제 테이블은
-          // scroll={{ x: 'max-content' }}라 가로 스크롤이 되기 때문에 "로딩 중엔 오른쪽 컬럼을 볼 수가
-          // 없다가 로딩이 끝나면 갑자기 스크롤이 생기는" 불일치가 있었다.
+          // 좁은 화면에서도 열 너비를 유지하고 가로 스크롤을 허용한다.
+
           overflowX: 'auto',
           overflowY: 'hidden',
         }}
@@ -92,8 +72,8 @@ const AdminTableSkeletonTable = ({
               key={colKeys[i]}
               style={{
                 ...colStyle(w),
-                // 실제 AntD <th>와 동일: fontSize 14(테마 기본) / fontWeight 600 / 본문과 같은 진한 색.
-                // 예전엔 13px + text.secondary라 스켈레톤과 실제 테이블의 헤더 글자가 미세하게 달라 보였다.
+                // 열 제목은 실제 테이블의 글꼴·색상·정렬을 유지한다.
+
                 fontSize: 14,
                 fontWeight: 600,
                 color: colors.text.primary,

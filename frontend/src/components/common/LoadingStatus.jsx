@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 
-/** Keep visual loading markup outside output's phrasing-only content model. */
+/* 블록 로딩 표시는 구문 콘텐츠만 허용하는 output 밖에 둔다. */
 const LoadingStatus = ({ as: Container = 'div', children, 'aria-label': label, ...props }) => (
     <Container {...props}>
         <output className="reserve-sr-only" aria-label={label}

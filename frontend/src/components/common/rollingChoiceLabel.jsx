@@ -17,7 +17,7 @@ function optionOrder(value, { options, children, fieldNames } = {}) {
     return index < 0 ? undefined : index;
 }
 
-// Rich option labels keep their markup; plain choice labels share the existing field motion.
+// 복합 라벨은 마크업을 유지하고 일반 라벨만 필드 전환을 공유한다.
 export function renderRollingChoiceLabel({ value, label }, choices) {
     if (!['string', 'number'].includes(typeof label)) return label;
     return <RollingFieldValue value={value} order={optionOrder(value, choices)}>{label}</RollingFieldValue>;

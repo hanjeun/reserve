@@ -72,11 +72,26 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
             @Param("createdAfter") LocalDateTime createdAfter,
             @Param("eligibleStatuses") List<Reservation.ReservationStatus> eligibleStatuses);
 
-    /**
-     * 특정 회원의 예약 내역 조회 (최신순) - store, member fetch join으로 N+1 방지
-     */
-    @Query("SELECT r FROM Reservation r JOIN FETCH r.store JOIN FETCH r.member WHERE r.member = :member AND r.deletedAt IS NULL ORDER BY r.createdAt DESC")
-    List<Reservation> findByMemberOrderByCreatedAtDesc(@Param("member") Member member);
+    /** 검색·상태를 회원의 전체 내역에 적용한 뒤 페이지를 자른다. to-one fetch만 사용한다. */
+    @Query(value = """
+            SELECT r FROM Reservation r JOIN FETCH r.store s JOIN FETCH r.member
+             WHERE r.member = :member AND r.deletedAt IS NULL
+               AND (:status IS NULL OR r.status = :status)
+               AND (:keyword = ''
+                    OR LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) ESCAPE '!'
+                    OR LOWER(r.reservationCode) LIKE LOWER(CONCAT('%', :keyword, '%')) ESCAPE '!'
+                    OR LOWER(r.specialRequest) LIKE LOWER(CONCAT('%', :keyword, '%')) ESCAPE '!')
+            """, countQuery = """
+            SELECT COUNT(r) FROM Reservation r JOIN r.store s
+             WHERE r.member = :member AND r.deletedAt IS NULL
+               AND (:status IS NULL OR r.status = :status)
+               AND (:keyword = ''
+                    OR LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) ESCAPE '!'
+                    OR LOWER(r.reservationCode) LIKE LOWER(CONCAT('%', :keyword, '%')) ESCAPE '!'
+                    OR LOWER(r.specialRequest) LIKE LOWER(CONCAT('%', :keyword, '%')) ESCAPE '!')
+            """)
+    Page<Reservation> searchForMember(@Param("member") Member member, @Param("keyword") String keyword,
+            @Param("status") Reservation.ReservationStatus status, Pageable pageable);
 
     /**
      * 특정 가게 소유자의 전체 예약 목록 조회 (최신순) - store, member fetch join으로 N+1 방지
@@ -252,16 +267,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
             @Param("date") java.time.LocalDate date
     );
 
-
-    /**
-     * 달력(월 단위)용: 한 달치 활성 예약 인원을 <b>날짜·시각별로 한 번에</b> 조회한다.
-     *
-     * <p>★ 날짜마다 {@code sumActiveGuestsGroupedByTime} 을 부르면 달력 한 장에 <b>최대 31 쿼리</b>가 된다.
-     *   손님이 달을 넘길 때마다 그만큼 나가므로, 목록 화면에서 흔히 나오는 N+1 과 같은 형태다.
-     *   {@code BETWEEN} 한 번으로 묶는다.
-     *
-     * <p>반환: {@code [reservationDate, reservationTime, guestCountSum]}
-     */
+    /** 달력 한 달의 활성 인원을 날짜·시각별로 묶어 한 번에 조회한다. */
     @Query("SELECT r.reservationDate, r.reservationTime, SUM(r.guestCount) FROM Reservation r " +
            "WHERE r.store.id = :storeId AND r.reservationDate BETWEEN :from AND :to " +
            "AND r.status IN ('PENDING', 'CONFIRMED') " +
@@ -357,36 +363,15 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
            "AND r.deletedAt IS NULL AND r.status IN ('PENDING', 'CONFIRMED', 'UNCONFIRMED')")
     int countLifecycleBlockingByMemberId(@Param("memberId") Long memberId);
 
-    /**
-     * 미결제 만료 대상 예약 조회
-     * - PENDING 상태
-     * - depositAmount > 0 (예약금 있는 가게)
-     * - depositPaid = false
-     * - createdAt < :expiredBefore (가게별 timeout 기준 시각보다 오래된 것)
-     * store.paymentTimeoutMinutes 기반으로 만료 기준을 각 가게별로 계산하기 위해
-     * 스케줄러에서 조회 후 Java 레벨에서 필터링
-     */
-    // 2026-07-29: allowLatePayment 조건을 빠뜨려서 "나중 결제 허용" 가게의 예약까지
-    // 30분 뒤 자동 취소되고 있었다(= 그 설정이 사실상 동작하지 않았다).
-    // 나중 결제를 허용한 가게는 애초에 결제 없이 예약을 유지하겠다는 뜻이므로 만료 대상에서 제외한다.
+    /** 가게별 결제 제한 시간을 적용할 수 있도록 미결제 후보를 조회한다. */
+    // 나중 결제를 허용한 가게는 미결제 만료 대상에서 제외한다.
     @Query("SELECT r FROM Reservation r JOIN FETCH r.store s JOIN FETCH r.member "
          + "WHERE r.status = 'PENDING' AND r.depositAmount > 0 AND r.depositPaid = false "
          + "AND s.allowLatePayment = false "
          + "AND r.createdAt < :cutoff")
     List<Reservation> findExpiredUnpaidReservations(@Param("cutoff") LocalDateTime cutoff);
 
-    /**
-     * 예약 시각이 지났는데 아직 PENDING/CONFIRMED 로 남아 있는 예약 (2026-08-11 신설).
-     *
-     * <p>{@code ReservationElapsedScheduler} 가 PENDING 은 취소+환불, CONFIRMED 는 UNCONFIRMED 로 넘긴다.
-     *
-     * <p>⚠️ {@code date}·{@code time} 은 반드시 <b>KST 기준 현재</b>를 넘겨야 한다.
-     * 예약 날짜·시각은 이용자에게 보이는 그대로 저장된 KST 값인데, 앱 컨테이너에는 TZ 설정이 없어
-     * {@code LocalDateTime.now()} 가 UTC 로 나온다. 그대로 비교하면 9시간이 어긋나
-     * 아직 오지 않은 예약을 취소해버린다. (QrCheckinTokenProvider 가 같은 이유로 SERVICE_ZONE 을 쓴다.)
-     *
-     * <p>정렬은 오래된 것부터 — 배치 상한에 걸려도 가장 오래 방치된 건이 먼저 처리된다.
-     */
+    /** 날짜·시각은 저장된 예약과 같은 한국 시간으로 비교한다. 오래된 대상부터 처리해 배치 상한에도 먼저 정리되게 한다. */
     @Query("SELECT r FROM Reservation r JOIN FETCH r.store JOIN FETCH r.member "
          + "WHERE r.deletedAt IS NULL AND r.status IN ('PENDING', 'CONFIRMED') "
          + "AND (r.reservationDate < :date "
@@ -412,10 +397,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
      */
     boolean existsByReservationCode(String reservationCode);
 
-    /**
-     * 예약번호 백필용: reservationCode가 아직 없는(null) 예약만 조회.
-     * ddl-auto: update로 컬럼이 nullable로 추가된 뒤, 기존 행을 앱 시작 시 1회 채우기 위함.
-     */
+    /** 표시용 코드가 없는 예약만 보완 대상으로 조회한다. */
     List<Reservation> findByReservationCodeIsNull();
 
     /**

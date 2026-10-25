@@ -54,7 +54,7 @@ describe('chat intro component', () => {
         expect(screen.getByText(/안녕하세요, 이용자님/)).toBeInTheDocument();
         expect(screen.getByText('안녕하세요. RESERVE에서 안내해드려요.')).toBeInTheDocument();
         expect(screen.getByRole('group', { name: '자주 묻는 질문' }).querySelectorAll('button')).toHaveLength(4);
-        // 보낸 사람 표시(아바타 + 이름)는 대화창 헤더와 겹쳐서 두지 않는다(2026-09-24).
+        // 대화 헤더와 중복되는 발신자 표시는 생략한다.
         expect(container.querySelector('img')).toBeNull();
         expect(container.querySelector('time')).toBeNull();
         expect(container.querySelector('.reserve-chat-bubble-group')).toBeNull();

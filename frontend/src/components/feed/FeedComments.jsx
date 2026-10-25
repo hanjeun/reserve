@@ -130,7 +130,7 @@ function FeedCommentsSession({ postId }) {
     useEffect(() => () => { generation.current += 1; objectUrls.current.forEach(url => URL.revokeObjectURL(url)); objectUrls.current.clear(); }, []);
     useEffect(() => {
         if (!returningDraft || !isCurrentSession(returningDraft.session)) return;
-        // The keyed session clears local state; recreate file previews only after its DOM has mounted.
+        // 세션 키가 지역 상태를 초기화하므로 DOM을 붙인 뒤 사진 미리보기를 복원한다.
         const frame = requestAnimationFrame(() => {
             if (!isCurrentSession(returningDraft.session)) return;
             setImages(returningDraft.images.map(image => {
@@ -183,7 +183,7 @@ function FeedCommentsSession({ postId }) {
                 const uploaded = await feedService.upload(image.file);
                 assertCurrentSession(variables.session);
                 if (generation.current !== variables.generation) throw new Error('작성 화면이 바뀌었어요. 댓글을 다시 작성해주세요.');
-                image.id = uploaded.id; // Retain completed uploads when a later request fails.
+                image.id = uploaded.id; // 뒤 요청이 실패해도 완료한 업로드는 재사용한다.
                 setImages(current => current.map(item => item.uid === image.uid ? { ...item, id: uploaded.id } : item));
             }
             mediaIds.push(image.id);

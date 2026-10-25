@@ -1,7 +1,7 @@
 {
   "name": "reserve",
   "private": true,
-  "version": "2.14.1",
+  "version": "2.15.0",
   "type": "module",
   "engines": {
     "node": "^22.23.4 || ^24.22.1 || >=26.12.1"
@@ -23,6 +23,7 @@
     "capture:readme:auth": "node scripts/capture-readme-live.mjs --auth",
     "capture:readme:clean": "node scripts/capture-readme-live.mjs --clean",
     "preview": "vite preview",
+    "preview:admission": "node scripts/preview-reservation-admission.mjs",
     "postinstall": "node scripts/apply-vendor-patches.mjs"
   },
   "dependencies": {

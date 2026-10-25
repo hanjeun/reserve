@@ -53,8 +53,8 @@ if [ "$SCHEMA_COMPAT" != 'v270-refund-v1' ]; then
   exit 1
 fi
 FEATURE_COMPAT=$(sudo docker image inspect --format '{{index .Config.Labels "reserve.feature-compat"}}' "$ACTIVE_IMAGE")
-if [ "$FEATURE_COMPAT" != 'waiting-signup-hidden-feed-oauth-v7' ]; then
-  echo "Active recovery image does not support the current feed and OAuth security schema; prepare an approved compatible baseline before automatic deployment"
+if [ "$FEATURE_COMPAT" != 'waiting-signup-hidden-feed-oauth-login-session-admission-v10' ]; then
+  echo "Active recovery image does not support the current login-session and admission contract; prepare an approved compatible baseline before automatic deployment"
   exit 1
 fi
 if { [ "$CURRENT_UPSTREAM" = "blue" ] && [ "$STATUS_BLUE" != "200" ]; } \

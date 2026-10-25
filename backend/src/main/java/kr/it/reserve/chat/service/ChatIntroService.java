@@ -24,12 +24,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-/**
- * 채팅 첫 안내(공지사항 + 자동 문답) — 고객지원은 관리자가, 가게는 사장님이 설정한다 (2026-09-23).
- *
- * <p>자동 답변은 손님 화면에서만 보이는 안내다. 서버 메시지로 저장하지 않으므로
- * 사장님·관리자의 받은 문의함이나 읽지 않음 수에 영향을 주지 않는다.
- */
+/** 자동 문답은 화면 안내이며 서버 메시지나 미읽음 수를 만들지 않는다. */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)

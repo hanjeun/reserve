@@ -18,31 +18,52 @@ const useMessengerStore = create((set, get) => ({
     view: 'home',
     activeThread: false,
     selection: memberSupport(),
+    storeSearch: null,
     sessionIdentity: messengerIdentityOf(useAuthStore.getState()),
     drafts: {},
 
     syncIdentity: (identity) => {
         if (get().sessionIdentity === identity) return;
-        set({ open: false, storeOpenRevision: 0, view: 'home', activeThread: false, selection: memberSupport(), drafts: {}, sessionIdentity: identity });
+        set({ open: false, storeOpenRevision: 0, view: 'home', activeThread: false, selection: memberSupport(), storeSearch: null, drafts: {}, sessionIdentity: identity });
     },
-    openSupport: () => set({ open: true, view: 'conversations', activeThread: true, selection: memberSupport() }),
+    openSupport: () => set({ open: true, view: 'conversations', activeThread: true, selection: memberSupport(), storeSearch: null }),
     openStore: (storeId) => set((state) => ({
         open: true,
         storeOpenRevision: state.open ? state.storeOpenRevision + 1 : state.storeOpenRevision,
         view: 'conversations',
         activeThread: true,
         selection: { kind: 'store', storeId: Number(storeId) },
+        storeSearch: null,
     })),
     openOwnerRoom: (roomId) => set({
         open: true,
         view: 'conversations',
         activeThread: true,
         selection: { kind: 'owner', roomId: Number(roomId) },
+        storeSearch: null,
     }),
-    select: (selection) => set({ selection, view: 'conversations', activeThread: true }),
-    showHome: () => set({ view: 'home', activeThread: false }),
-    showConversations: () => set({ view: 'conversations', activeThread: false }),
-    showSettings: () => set({ view: 'settings', activeThread: false }),
+    select: (selection, { fromStoreSearch = false } = {}) => set(state => ({
+        selection, view: 'conversations', activeThread: true,
+        storeSearch: fromStoreSearch && state.storeSearch
+            ? { ...state.storeSearch, visible: false, selectedStoreId: selection.storeId } : null,
+    })),
+    openStoreSearch: () => set(state => ({
+        view: 'conversations', activeThread: false,
+        storeSearch: { visible: true, origin: state.view === 'home' ? 'home' : 'conversations',
+            keyword: '', page: 0, scrollTop: 0, selectedStoreId: null },
+    })),
+    updateStoreSearch: (patch, identity = get().sessionIdentity) => {
+        if (identity !== get().sessionIdentity || !get().storeSearch) return;
+        set(state => ({ storeSearch: { ...state.storeSearch, ...patch } }));
+    },
+    returnToStoreSearch: () => set(state => state.storeSearch
+        ? { view: 'conversations', activeThread: false, storeSearch: { ...state.storeSearch, visible: true } } : {}),
+    closeStoreSearch: () => set(state => ({
+        view: state.storeSearch?.origin === 'home' ? 'home' : 'conversations', activeThread: false, storeSearch: null,
+    })),
+    showHome: () => set({ view: 'home', activeThread: false, storeSearch: null }),
+    showConversations: () => set({ view: 'conversations', activeThread: false, storeSearch: null }),
+    showSettings: () => set({ view: 'settings', activeThread: false, storeSearch: null }),
     setDraft: (key, text, identity = get().sessionIdentity) => {
         if (identity !== get().sessionIdentity) return;
         const value = String(text ?? '').slice(0, MAX_DRAFT_LENGTH);
@@ -55,11 +76,11 @@ const useMessengerStore = create((set, get) => ({
             return { drafts };
         });
     },
-    openPanel: () => set({ open: true, view: 'home', activeThread: false }),
+    openPanel: () => set({ open: true, view: 'home', activeThread: false, storeSearch: null }),
     closePanel: () => set({ open: false }),
     togglePanel: () => set((state) => state.open
         ? { open: false }
-        : { open: true, view: 'home', activeThread: false }),
+        : { open: true, view: 'home', activeThread: false, storeSearch: null }),
 }));
 
 // Shell이 없는 순간에도 계정 전환과 같은 계정 재로그인의 초안을 즉시 폐기한다.

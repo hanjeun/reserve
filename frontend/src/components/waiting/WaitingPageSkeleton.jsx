@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import LoadingStatus from '../common/LoadingStatus';
+import ListingContent from '../common/ListingContent';
 import ListingControlsSkeleton from '../common/ListingControlsSkeleton';
 import StoreCardSkeleton from '../common/StoreCardSkeleton';
 import StoreListRowSkeleton from '../store/StoreListRowSkeleton';
@@ -26,8 +27,8 @@ export function WaitingStoresSkeleton({ view = 'cards', status = 'ALL', sort = '
             { value: status, options: WAITING_STORE_STATUSES, className: 'reserve-explore-domain-filter' },
             { value: sort, options: WAITING_STORE_SORTS, className: 'reserve-explore-sort-filter' },
         ]} />
-        <RefreshToolbarSkeleton search autoRefreshDomain="WAITING" />
-        <WaitingStoresContentSkeleton view={view} />
+        <RefreshToolbarSkeleton search />
+        <ListingContent><WaitingStoresContentSkeleton view={view} /></ListingContent>
     </LoadingStatus>;
 }
 WaitingStoresSkeleton.propTypes = { view: PropTypes.oneOf(['list', 'cards']), status: PropTypes.string, sort: PropTypes.string };

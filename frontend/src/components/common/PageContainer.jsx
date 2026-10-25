@@ -1,17 +1,10 @@
-/**
- * RESERVE Design System - PageContainer Component
- * 
- * 사용법:
- * <PageContainer size="sm">로그인 폼</PageContainer>
- * <PageContainer size="md" paddingTop="20px">상세 페이지</PageContainer>
- * <PageContainer size="xl">목록 페이지</PageContainer>
- */
+
 
 import React from 'react';
 import PropTypes from 'prop-types';
 import { colors, maxWidth as maxWidthTokens, heights } from '../../styles/tokens';
 
-const PageContainer = ({ 
+const PageContainer = ({
     size = 'md',
     paddingTop = '40px',
     paddingBottom = '80px',
@@ -21,7 +14,7 @@ const PageContainer = ({
     children,
     style,
     className,
-    ...rest 
+    ...rest
 }) => {
     // size별 maxWidth 매핑
     const sizeMap = {
@@ -32,7 +25,7 @@ const PageContainer = ({
     };
 
     const containerStyle = {
-        // 100% includes the gutters. Otherwise mobile pages exceed the viewport and the browser zooms out.
+        // 좌우 여백을 100% 너비에 포함해 모바일 넘침과 축소를 방지한다.
         boxSizing: 'border-box',
         width: '100%',
         maxWidth: sizeMap[size] || sizeMap.md,

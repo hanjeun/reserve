@@ -1,44 +1,6 @@
 import LoadingStatus from '../common/LoadingStatus';
-/**
- * 예약 날짜 선택 — **필드는 그대로 두고, 누르면 달력 모달이 뜬다.**
- *
- * 왜 AntD DatePicker 를 안 쓰나 (2026-08-25)
- * `disabledDate` 는 **회색으로 막는 것밖에 못 한다.** 그래서 정기휴무·임시휴무·운영기간 밖·
- * 예약 범위 초과·정원 마감이 **전부 같은 회색 하나**로 뭉개졌다.
- * 손님은 "왜 안 눌리지"를, 사장님은 "왜 예약이 안 들어오지"를 알 방법이 없었다.
- *
- * ★★ 이 컴포넌트는 판정하지 않는다. 그리기만 한다.
- * 각 날짜의 상태·사유는 **서버가 준다**(`GET /api/reservations/calendar`).
- * 여기서 휴무나 기간을 다시 계산하면 서버 `Store.isBookableOn` 과 언젠가 어긋나고,
- * 그 순간 이 프로젝트가 반복해서 당한 **"달력엔 눌리는데 예약하면 거절"** 이 돌아온다.
- * → 새 규칙을 넣고 싶으면 `ReservationService.describeDay` 에 넣을 것. 여기가 아니다.
- *
- * ★★ 왜 인라인이 아니라 모달인가 (2026-08-25, 세 번 갈아엎고 내린 결론)
- * 인라인으로 펼치는 안을 두 번 만들었고 둘 다 같은 벽에 부딪혔다 —
- *
- *   필드 아래에 펼치기   같은 정보(고른 날짜)가 위아래로 두 번 나오고 폼이 한 줄 길어진다
- *   필드 자리를 대체하기 열려 있는 동안 **필드가 사라져서**, 자동으로 접지 않으면 되돌아올 길이 없다.
- *                        그렇다고 자동으로 접으면 여러 날을 비교하며 고를 수가 없다.
- *
- * 두 요구("필드는 항상 보인다" + "고르는 동안 달력이 떠 있다")는 **한 자리에서 동시에 만족할 수 없다.**
- * 층을 하나 더 쓰면 그냥 풀린다 → 필드는 자리를 지키고, 달력은 위에 뜬다.
- *
- * <p>원래 팝업을 버린 이유는 **"AntD 가 사유를 못 그린다"** 와 **"드롭다운이 잘린다"** 였다.
- * 둘 다 모달로 가도 그대로 해결된다 — 사유는 우리가 그리고, 가운데 뜨는 모달은 잘릴 자리가 없다.
- *
- * 색은 "예약 시간" pill 과 같은 언어
- *   모달 바탕  흰색 + 검은 글자          ← 시간 pill 이 놓인 배경과 같다
- *   hover     둥근 연한 회색 gray[100]   ← `.rsv-time-pill:hover`
- *   선택      둥근 회색 gray[200] + 600  ← `.rsv-time-pill.rsv-selected`
- *   불가      연한 회색(text.disabled)   ← 취소선은 안 쓴다. 사유 라벨이 이미 말해준다
- *   화살표    평소엔 아이콘만, hover 에만 둥근 회색 판 (버튼이 작아서 항상 판을 깔면 답답하다)
- *
- * ⚠️ **파란색(primary)을 쓰지 않는다.** 예약 폼 전체가 무채색이라 파랑이 하나 끼면 그 칸만 튄다.
- *
- * 값 규약
- * `value`/`onChange` 는 **dayjs** 다 — 기존 `FormDatePicker` 와 같아서 호출부(`StoreDetail`)의
- * `dateValue` 계산과 제출 로직이 한 줄도 안 바뀐다. 고르면 모달이 닫히고 필드에 날짜가 뜨며,
- * 그 값 변화가 그대로 시간 슬롯 조회를 깨운다.
+/*
+ * 날짜 값은 Dayjs를 유지하고 가능 여부·불가 사유는 서버 달력 응답을 사용한다.
  */
 import React, { useRef, useState } from 'react';
 import PropTypes from 'prop-types';
@@ -57,19 +19,13 @@ const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 /** 이만큼은 가로로 밀어야 달이 넘어간다. 더 짧으면 날짜를 누르다 손가락이 흔들린 것까지 잡힌다. */
 const SWIPE_MIN_PX = 45;
 
-
-/**
- * 휴무·마감만 표시한다. 기간 밖·과거·예약 범위 초과는 라벨 없이 흐리게 둔다.
- *
- * ★ 예전엔 여기에 "남은 시간 N개"도 같이 찍었는데 뺐다. 30분 단위 가게는 하루 22~24개라
- *   **달력이 같은 숫자로 도배**됐다. 매 칸에 있는 숫자는 정보가 아니라 배경이다.
- */
+/* 휴무·마감은 라벨로, 기간·예약 범위 밖 날짜는 비활성 상태로 구분한다. */
 const BLOCKED_LABEL = {
     CLOSED: '휴무',
     FULL: '마감',
 };
 
-const BookingCalendar = ({ storeId, value, onChange, style, disabled = false }) => {
+const BookingCalendar = ({ storeId, reservationId, value, onChange, style, disabled = false }) => {
     const { status } = Form.Item.useStatus();
     const isError = status === 'error';
 
@@ -80,7 +36,7 @@ const BookingCalendar = ({ storeId, value, onChange, style, disabled = false }) 
 
     const monthKey = month.format('YYYY-MM');
     // 닫혀 있을 땐 부르지 않는다 — 열어야 볼 수 있는 정보라 미리 받아둘 이유가 없다.
-    const { byDate, loading, fetching, error, refetch } = useBookingCalendar(storeId, open ? monthKey : null);
+    const { byDate, loading, fetching, error, refetch } = useBookingCalendar(storeId, open ? monthKey : null, reservationId);
 
     const thisMonth = dayjs().startOf('month');
     // 지난 달로는 못 간다 — 어차피 전부 PAST 라 볼 것이 없고, 쿼리만 한 번 더 나간다.
@@ -92,10 +48,7 @@ const BookingCalendar = ({ storeId, value, onChange, style, disabled = false }) 
     const daysInMonth = month.daysInMonth();
 
     /*
-     * 1일 앞의 빈 칸도 **실제 날짜**를 들고 있게 만든다(지난달 말일들).
-     * 인덱스를 key 로 쓰면(`blank-0`, `blank-1`…) 달을 넘길 때 앞칸 개수가 바뀌는데도
-     * React 가 같은 key 를 재사용해서, "몇 번째 칸이냐"가 달마다 다른 날을 가리키게 된다.
-     * 날짜 문자열은 달을 넘겨도 절대 겹치지 않는 안정적인 key 다.
+     * 앞쪽 빈칸에도 실제 날짜 키를 사용해 달 전환 시 다른 날짜의 DOM을 재사용하지 않게 한다.
      */
     const cells = [];
     for (let i = leading; i > 0; i -= 1) cells.push({ blank: true, key: month.subtract(i, 'day').format('YYYY-MM-DD') });
@@ -108,21 +61,15 @@ const BookingCalendar = ({ storeId, value, onChange, style, disabled = false }) 
         setOpen(true);
     };
 
-    /**
-     * 고르는 순간 확정하고 닫는다.
-     *
-     * ★ 초안 + [취소][확인] 안도 만들어봤는데 되돌렸다(2026-08-25).
-     *   버튼 두 개가 달력 아래 붙으면 옛날 폼처럼 보이고, 무엇보다 **고민은 누르기 전에
-     *   격자를 보면서 하는 것**이다 — 휴무·마감과 선택 불가 상태를 칸에서 볼 수 있다.
-     *   누르는 건 이미 결정한 것이므로, 거기서 한 번 더 확인을 받는 건 일을 늘리기만 한다.
-     *   마음이 바뀌면 다시 여는 게 탭 한 번이고, 그동안 필드엔 직전 선택이 그대로 남아 있다.
+    /*
+     * 선택 가능한 날짜를 누르면 즉시 확정하고 닫는다.
      */
     const pick = (date) => {
         onChange?.(date);
         setOpen(false);
     };
 
-    /** 이번 달보다 뒤로는 못 간다. 한 해를 빼서 과거로 넘어가면 이번 달로 붙인다. */
+    /* 연 이동으로 과거에 진입하면 이번 달로 보정한다. */
     const goMonth = (delta) => {
         const next = month.add(delta, 'month');
         setMonth(next.isBefore(thisMonth) ? thisMonth : next);
@@ -133,11 +80,7 @@ const BookingCalendar = ({ storeId, value, onChange, style, disabled = false }) 
     };
 
     /*
-     * 모바일 스와이프 — 좌우로 밀면 달이 넘어간다.
-     * 터치 이벤트만 듣는다: PC 는 마우스 드래그로 달이 넘어가면 오히려 사고가 난다(날짜를 누르려다 끌림).
-     *
-     * ⚠️ "두 번 연속 스와이프 = 연 이동"은 넣지 않았다. 두 달 뒤로 가려고 두 번 미는 게
-     *    가장 흔한 동작인데 그게 갑자기 1년을 날려버린다. 연 이동은 « » 버튼이 맡는다.
+     * 터치 스와이프는 한 달만 이동하며 연 이동은 별도 버튼을 사용한다.
      */
     const onTouchStart = (e) => {
         const t = e.changedTouches[0];
@@ -196,9 +139,7 @@ const BookingCalendar = ({ storeId, value, onChange, style, disabled = false }) 
                 }}
             >
                 {/*
-                 * ★ 숫자는 칸의 정가운데. 사유 라벨은 흐름에서 빼서 아래에 띄운다.
-                 *   예전엔 둘을 세로로 쌓았는데, 라벨이 없는 날도 자리를 차지해서
-                 *   **숫자가 위로 밀려 보였다**(선택된 회색 칸에서 특히 눈에 띈다).
+                 * 날짜 숫자는 중앙에 두고 사유 라벨은 문서 흐름 밖 아래에 배치한다.
                  */}
                 <span className="reserve-cal-day" style={styles.dayNum}>{date.date()}</span>
                 {blockedLabel ? <span style={styles.tag}>{blockedLabel}</span> : null}
@@ -260,15 +201,11 @@ const BookingCalendar = ({ storeId, value, onChange, style, disabled = false }) 
                 title={<span style={styles.visuallyHidden}>예약 날짜 선택</span>}
                 styles={{ header: styles.visuallyHiddenHeader }}
                 /*
-                 * 닫기 X 를 없앤다 — 332px 폭에서 오른쪽 위는 "다음 달" 화살표 자리다.
-                 * 둘을 같이 두면 겹친다(실제로 겹쳤다). 닫는 길은 이미 셋이다:
-                 * 날짜 선택 · 바깥(마스크) 클릭 · Esc.
+                 * 다음 달 도구와 겹치는 닫기 버튼은 생략하고 선택·바깥 클릭·Escape로 닫는다.
                  */
                 closable={false}
                 /*
-                 * ⚠️ classNames={{ content }} 를 쓰면 안 붙는다 — AntD 6 는 그 자리가
-                 *   `.ant-modal-content` 가 아니라 `.ant-modal-container` 다(v5→v6 클래스 리네임).
-                 *   `rootClassName` 은 두 버전 모두에서 최상위에 그대로 붙어 안전하다.
+                 * AntD 6의 실제 최상위 클래스에 연결하도록 rootClassName을 사용한다.
                  */
                 rootClassName="reserve-cal-modal"
             >
@@ -381,6 +318,7 @@ const styles = {
 
 BookingCalendar.propTypes = {
     storeId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+    reservationId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
     /** dayjs. Form.Item 이 주입한다. */
     value: PropTypes.object,
     onChange: PropTypes.func,

@@ -26,10 +26,8 @@ import java.util.List;
 public class StoreApiController {
     private static final String EDIT_LOGIN_REQUIRED_MESSAGE = "가게 수정을 위해 로그인이 필요해요.";
 
-
     private final StoreService storeService;
 
-    // 가게 등록
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<StoreResponse> createStore(@ModelAttribute StoreCreateRequest request) {
@@ -99,7 +97,6 @@ public class StoreApiController {
         return ApiResponse.success(store, "가게 수정 정보 조회 성공");
     }
 
-    // 가게 수정
     @PutMapping("/{id}")
     public ApiResponse<StoreResponse> updateStore(
             @PathVariable Long id,

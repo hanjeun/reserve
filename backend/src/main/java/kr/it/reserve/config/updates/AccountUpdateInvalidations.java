@@ -7,7 +7,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import java.util.Set;
 
-/** Bulk withdrawal has no public author/member identifier in its invalidation. */
+/** 탈퇴 일괄 갱신에는 공개 회원·작성자 식별자를 포함하지 않는다. */
 @Component @RequiredArgsConstructor
 public class AccountUpdateInvalidations {
     private final EntityUpdates updates;

@@ -1,7 +1,7 @@
 import { colors, radius, shadows, fontSize, fontWeight } from '../../styles/tokens';
 
 const styles = {
-    // ── PC 2단 (900px 이상) ──────────────────────────────────────────────────
+    // PC 2단 (900px 이상)
     // StoreDetail의 pcLeft/pcRight와 같은 구조. gap 32는 두 카드 묶음이 서로 다른 영역으로
     // 읽히기에 충분하면서, 1000px 컨테이너에서 양쪽이 좁아지지 않는 값이다.
     pcGrid:  { display: 'flex', gap: 32, alignItems: 'flex-start' },
@@ -22,7 +22,7 @@ const styles = {
     // (미디어쿼리 없이 auto-fit + minmax 로 처리 — 브레이크포인트를 하나 더 만들 이유가 없다).
     designGrid: {
         display: 'grid',
-        // ★ 2열 고정이다. auto-fit + minmax(200px) 로 뒀더니 이 카드 폭에서 최소폭을 못 채워
+        // 2열 고정이다. auto-fit + minmax(200px) 로 뒀더니 이 카드 폭에서 최소폭을 못 채워
         //   1열로 접히고 결과적으로 2줄이 됐다 — "한 줄에 2개, 작게"가 요구사항이므로 고정한다.
         //   좁아지면 각 칸이 함께 좁아질 뿐 줄이 늘지 않는다(가게 등록 폼도 모바일에서 2열을 유지한다).
         gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',

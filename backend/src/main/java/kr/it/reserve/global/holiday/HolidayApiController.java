@@ -16,17 +16,7 @@ import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 
-/**
- * 가게와 무관한 공휴일 목록 — 가게 등록·수정의 날짜 선택 달력(운영 기간·임시 휴무)이 빨간날을 칠하는 용도.
- *
- * <p>예약 달력은 {@code /api/reservations/calendar} 가 가게 판정과 함께 {@code holiday} 를 내려주지만,
- * 가게를 만들기 전에는 storeId 가 없어서 그 API 를 쓸 수 없었다. 그래서 등록 폼 달력은 일요일만 빨갛게
- * 나왔다(크리스마스·설날이 평일처럼 보임). 판정은 여전히 하지 않는다 — {@link HolidayService} 주석처럼 색칠 전용이다.
- *
- * <p>조회 가능한 달을 오늘 기준 앞뒤로 제한한다. {@link HolidayService} 는 달마다 외부 API 를 한 번 부르고
- * 결과를 하루 동안 캐시하므로, 제한이 없으면 임의의 달을 연속으로 요청해 외부 호출과 캐시를 늘릴 수 있다.
- * 범위 밖은 오류 대신 빈 목록이다 — 달력에서 먼 해로 넘겨도 화면이 깨지지 않고 일요일만 빨갛게 나온다.
- */
+/** 공휴일 표시는 예약 가능 판정과 별개다. 외부 호출·캐시가 임의로 늘지 않도록 조회할 달 범위를 제한한다. */
 @RestController
 @RequestMapping("/api/holidays")
 @RequiredArgsConstructor

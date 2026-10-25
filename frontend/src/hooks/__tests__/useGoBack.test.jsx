@@ -38,8 +38,7 @@ describe('useGoBack', () => {
     });
 
     it('첫 진입(idx 0)이면 되감지 않고 fallback 으로 보낸다', async () => {
-        // 검색 결과·공유 링크·새 탭으로 상세에 바로 들어온 사용자.
-        // 예전에는 navigate(-1) 이 아무 일도 하지 않아 버튼이 죽어 보였다(2026-09-06 운영 재현).
+
         window.history.replaceState({ idx: 0 }, '');
         const { getByRole } = renderProbe('/stores');
 

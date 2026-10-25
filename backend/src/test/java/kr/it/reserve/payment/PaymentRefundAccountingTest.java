@@ -6,18 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * 환불 금액 회계 — 엔티티 단위.
- *
- * <h2>왜 이 테스트가 필요한가</h2>
- * 예전 {@code refundPayment} 는 환불액을 <b>대입</b>했다({@code this.refundAmount = refundAmount}).
- * 부분 환불이 두 번 일어나면 앞의 금액이 지워져 <b>얼마를 돌려줬는지가 장부에서 사라진다.</b>
- * 그리고 완료 판정이 "이번 회차 금액 == 결제액" 이라, 5만원을 2만+3만으로 나눠 돌려주면
- * 전액을 환불하고도 영원히 PARTIAL_REFUNDED 로 남았다.
- *
- * <p>스프링 컨텍스트를 띄우지 않는다 — 검증 대상이 순수한 계산과 상태 전이라 DB 가 필요 없다.
- * (동시성 방어는 여기서 검증할 수 없다. 그건 행 잠금의 몫이고 실제 MySQL 이 있어야 확인된다.)
- */
+/** 부분 환불 누적 금액과 전액 환불 상태 전이를 확인한다. 동시성 잠금은 이 엔티티 시험의 범위가 아니다. */
 class PaymentRefundAccountingTest {
 
     private Payment paidPayment(int amount) {
@@ -39,7 +28,6 @@ class PaymentRefundAccountingTest {
         assertThat(payment.getStatus()).isEqualTo(Payment.PaymentStatus.PARTIAL_REFUNDED);
 
         payment.refundPayment(30_000, "2차");
-        // 예전 코드라면 여기서 30,000 이 되어 앞의 20,000 이 사라졌다.
         assertThat(payment.refundedSoFar()).isEqualTo(50_000);
     }
 

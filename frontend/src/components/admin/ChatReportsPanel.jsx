@@ -185,7 +185,7 @@ const ChatReportsPanel = () => {
     useEffect(() => {
         if (query.isSuccess && !query.isFetching && !query.isPlaceholderData && page > lastPage) setQuery({ chatReportPage: String(lastPage) });
     }, [query.isSuccess, query.isFetching, query.isPlaceholderData, page, lastPage, setQuery]);
-    // 목록: 실패 → 로딩 → 표 순으로 판정한다.
+    // 오류를 빈 결과로 숨기지 않고 로딩·표와 구분한다.
     const renderReports = () => {
         if (query.isError) {
             return (
@@ -210,7 +210,7 @@ const ChatReportsPanel = () => {
             />
         );
     };
-    // 신고 대화 내용: 로딩 → 실패 → 본문 순으로 판정한다.
+
     const renderContext = () => {
         if (contextQuery.isPending) {
             return <ModalLoading text="대화 내용을 불러오는 중이에요." minHeight="160px" />;

@@ -42,20 +42,7 @@ public class PasswordResetToken {
     @Builder.Default
     private boolean verified = false;
 
-    /**
-     * 코드 대조 실패 누적 횟수 (2026-08-16 신설).
-     *
-     * <h3>왜 rate limit 만으로는 안 되는가</h3>
-     * 코드가 6자리 숫자라 경우의 수가 90만뿐이다. IP 기준 제한은 공격자가 프록시·봇넷으로
-     * IP 를 돌리면 매번 새 버킷이 되어 <b>사실상 무제한</b>이 된다. 그래서 상한을
-     * <b>토큰 자체</b>에 건다 — "이 코드 한 장으로 몇 번까지 시도할 수 있는가"가
-     * 요청지와 무관하게 확정되므로, 분산 공격에도 뚫리지 않는다.
-     * IP·계정 rate limit 은 그 위에 얹는 2차 방어다.
-     *
-     * <p>{@code columnDefinition} 에 DEFAULT 를 명시한 이유: {@code ddl-auto: update} 로
-     * NOT NULL 컬럼이 추가될 때 기존 행을 채울 값이 필요하다(같은 이유로 {@code verified} 도
-     * 이 형태다). 마이그레이션 툴이 없으므로 이걸 빼면 배포 시 ALTER 가 실패한다.
-     */
+    /** IP·계정 제한과 별도로 코드 자체의 대조 실패 횟수를 누적한다. 기존 행에도 적용할 기본값을 지정한다. */
     @Column(name = "attempt_count", nullable = false, columnDefinition = "INT DEFAULT 0")
     @Builder.Default
     private int attemptCount = 0;

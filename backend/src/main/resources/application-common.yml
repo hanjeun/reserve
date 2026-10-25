@@ -1,6 +1,4 @@
-# ============================================
 # 모든 환경 공통 설정
-# ============================================
 
 # 서버 공통 설정
 server:
@@ -72,6 +70,7 @@ spring:
 # JWT 설정
 jwt:
   issuer: reserve
+  absolute-session-lifetime: ${JWT_ABSOLUTE_SESSION_LIFETIME:30d}
   access-token:
     expiration-minutes: 30
   refresh-token:
@@ -106,13 +105,7 @@ mail:
 portone:
   pg-provider: ${PORTONE_PG_PROVIDER:kakaopay}
 
-# CORS 허용 출처는 프로파일별로만 정의한다 (local.yml / prod.yml).
-#
-# 여기(common)에 두면 안 되는 이유: 프로파일 그룹이 `local: secret, common` 이라
-# 활성 프로파일 순서가 [local, secret, common]이 되고, Spring은 last-wins이므로
-# common.yml이 local.yml을 덮어쓴다. 실제로 예전에 이 키가 common에 있어서
-# local.yml의 localhost 출처가 무력화돼 있었다(그래서 SecurityConfig가 코드에
-# 하드코딩된 목록을 쓰고 있었다).
+# CORS 허용 출처는 환경별 설정에만 둬 공통 설정이 로컬 출처를 덮어쓰지 않게 한다.
 
 # Actuator (헬스체크)
 management:
@@ -140,6 +133,29 @@ waiting:
     customer-notice-published-at: ${WAITING_CUSTOMER_RETENTION_NOTICE_PUBLISHED_AT:}
 
 reserve:
+  service-admission:
+    # 방문 입장권 수이며 DB 연결 수나 실측 처리량이 아니다. Redis 수동 모드가 우선한다.
+    enabled: ${RESERVE_SERVICE_ADMISSION_ENABLED:false}
+    capacity: ${RESERVE_SERVICE_ADMISSION_CAPACITY:20}
+    session-seconds: ${RESERVE_SERVICE_ADMISSION_SESSION_SECONDS:900}
+    max-session-seconds: ${RESERVE_SERVICE_ADMISSION_MAX_SESSION_SECONDS:7200}
+    heartbeat-timeout-seconds: ${RESERVE_SERVICE_ADMISSION_HEARTBEAT_TIMEOUT_SECONDS:90}
+    max-waiting: ${RESERVE_SERVICE_ADMISSION_MAX_WAITING:1000}
+    epoch: ${RESERVE_SERVICE_ADMISSION_EPOCH:}
+    automatic:
+      enabled: ${RESERVE_SERVICE_ADMISSION_AUTOMATIC_ENABLED:false}
+      # 초기 보호 임계값이며 이 관측값에서 처리량·지연 한도를 추정하지 않는다.
+      memory-pressure-mib: 128
+      memory-clear-mib: 256
+      cpu-pressure-percent: 90
+      cpu-clear-percent: 65
+      heap-pressure-percent: 90
+      heap-clear-percent: 75
+      pressure-seconds: 30
+      recovery-seconds: 120
+      minimum-emergency-seconds: 120
+  admission:
+    enabled: ${RESERVE_ADMISSION_ENABLED:false}
   redis:
     enabled: ${RESERVE_REDIS_ENABLED:false}
     port: ${RESERVE_REDIS_PORT:6379}

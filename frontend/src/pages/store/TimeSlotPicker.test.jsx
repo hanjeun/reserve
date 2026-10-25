@@ -3,13 +3,13 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { Form } from 'antd';
 import dayjs from 'dayjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ReservationPanel, TimeSlotPicker } from './StoreDetail';
+import { ReservationPanel, TimeSlotPicker } from '../../components/reservation/StoreReservationPanel';
 
 const api = vi.hoisted(() => ({ get: vi.fn() }));
 afterEach(async () => {
     cleanup();
-    // Form.Item delays error/warning updates by 10 ms, including after unmount.
-    // Let those callbacks finish while jsdom still exists; keep real async lookup tests.
+    // 언마운트 뒤에도 남는 Form.Item의 10ms 콜백은 jsdom 정리 전에 실행한다.
+
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
 });
 vi.mock('../../api/axios', () => ({ default: api }));

@@ -46,7 +46,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-/** Release-only MySQL contracts. Use a fresh synthetic database, never a restored backup or production DB. */
+/** 일회성 합성 MySQL에서 출시 계약만 확인하며 복원·운영 DB는 사용하지 않는다. */
 @EnabledIfEnvironmentVariable(named = "RESERVE_MYSQL_SIGNUP_TEST_ISOLATED", matches = "1")
 @DataJpaTest(showSql = false)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -108,7 +108,7 @@ class EmailVerificationMySqlReleaseTest {
     }
 
     @Test void concurrentFirstRequestsKeepOneRowAndSendOneEmail() throws Exception {
-        // Both transactions hold the missing-row gap before attempting the real service insert.
+        // 누락 행의 간격 잠금을 양쪽 트랜잭션이 잡은 뒤 실제 서비스 삽입을 경쟁시킨다.
         CyclicBarrier absentReads = new CyclicBarrier(2);
         List<Throwable> results = race(2, () -> new TransactionTemplate(transactions).executeWithoutResult(status -> {
             assertThat(entries.findTopByEmailOrderByCreatedAtDesc(EMAIL)).isEmpty();

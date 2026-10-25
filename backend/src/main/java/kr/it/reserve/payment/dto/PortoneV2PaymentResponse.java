@@ -21,10 +21,8 @@ public class PortoneV2PaymentResponse {
     // V2 status: READY, PAID, FAILED, CANCELLED, PARTIAL_CANCELLED
     private String status;
 
-    // 결제 금액 정보
     private Amount amount;
 
-    // 결제 수단 정보
     private Method method;
 
     private java.util.List<PortoneV2CancelResponse.Cancellation> cancellations;

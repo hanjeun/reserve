@@ -174,7 +174,7 @@ test('list region hover surface stays smaller than its touch target and reduced 
 });
 
 test('mobile region sheet entrance follows one upward path without a snap back', async ({ page, isMobile }) => {
-    // Desktop uses a centered dialog; the mobile project runs this bottom-sheet motion check.
+    // 하단 시트 모션은 모바일 프로젝트에서 확인한다.
     test.skip(!isMobile, 'Mobile bottom sheet only');
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.route('**/api/stores/regions', async route => {

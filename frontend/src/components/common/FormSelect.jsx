@@ -1,18 +1,5 @@
-/**
- * RESERVE Design System - FormSelect
- *
- * **폼에 값을 입력하는 셀렉트.** 채움형 회색 — FormInput·FormTextArea·FormDatePicker·FormTimePicker와
- * 같은 톤이고 높이도 같다(54px).
- * 목록·툴바 위의 입력 없는 필터는 `FilterMenu`(투명 텍스트 메뉴)를 쓴다.
- *
- * 사용법:
- *   <FormSelect placeholder="선택" options={[{ value: '한식', label: '한식' }]} />
- *
- * ★ 스타일은 이 파일에 없다 — `index.css` 의 "폼 입력용 Select" 블록에 있다.
- *   2026-08-04에 이 파일 안의 <style> 태그를 걷어냈다. 컴포넌트 안에 전역 CSS를 넣으면
- *   그 컴포넌트를 안 쓰는 화면에는 규칙이 존재하지 않게 되고, 이 프로젝트는 이미 그 함정에
- *   두 번 빠졌다(필터 Select 색, 카드 hover 그림자).
- *   전역 정책은 index.css, 컴포넌트 지역 스타일만 인라인 — 이 경계를 지킨다.
+/*
+ * 값을 입력하는 선택 필드는 공통 채움형을 쓰고 목록 필터와 구분한다. 전역 규칙은 공통 CSS에서 관리한다.
  */
 
 import React from 'react';

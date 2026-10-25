@@ -70,8 +70,7 @@ public class RefundLedgerService {
                         }
                         mutation.accept(attempt);
                         refundAttemptRepository.save(attempt);
-                        // RESOLVE_ATTEMPT 는 "닫혔다"가 아니라 "한 번 더 물어봤다"이다.
-                        // 로그 문구가 실제와 다르면 나중에 로그로 판단할 때 그대로 오독한다.
+                        // RESOLVE_ATTEMPT는 환불 확정이 아닌 재조회 시도 기록이다.
                         if ("RESOLVE_ATTEMPT".equals(label)) {
                             log.debug("Refund attempt re-checked: attemptId={}, count={}",
                                     attemptId, attempt.getResolveAttempts());

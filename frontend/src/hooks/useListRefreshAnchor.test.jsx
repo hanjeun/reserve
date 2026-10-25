@@ -14,8 +14,8 @@ let observers;
 let frames;
 let frameId;
 
-// jsdom has no layout: model content offsets against a real scrollTop, rather than
-// asserting calls to the hook's internal snapshot or correction functions.
+// jsdom에서는 실제 scrollTop에 대한 콘텐츠 위치를 모델링한다.
+
 function createList() {
     const port = document.createElement('div');
     const list = document.createElement('section');
@@ -105,7 +105,7 @@ describe('list refresh reading position', () => {
     it('keeps the visible row inside its nested scroller when earlier content grows', () => {
         const view = mountList();
         const readingTop = view.top('reading');
-        // This row intersects the window but is clipped by the nested viewport.
+        // 창에 걸쳐 있어도 내부 스크롤 영역에서 잘린 행은 제외한다.
         expect(view.top('above-clip') + 80).toBeLessThan(102);
         view.start();
 
@@ -161,7 +161,7 @@ describe('list refresh reading position', () => {
         expect(observers).toHaveLength(1);
         expect(observers[0].targets.has(view.list)).toBe(true);
 
-        // The data read is complete; an image above the anchor finishes later.
+        // 데이터 조회가 끝난 뒤 앵커 위 이미지의 로딩을 완료한다.
         view.setRows(shiftedRows(90));
         notifySize(view.list);
         expect(view.top('reading')).toBe(readingTop);

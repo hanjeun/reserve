@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import FormInput from './FormInput';
 import RollingFieldValue from './RollingFieldValue';
 
-/** Only an explicit choice replacement rolls; typing keeps the native input and caret. */
+/* 명시적 선택만 전환하고 직접 입력은 기본 입력·커서 동작을 유지한다. */
 export default function RollingFormInput({ value, replacementKey = 0, replacementOrder, ...props }) {
     const host = useRef(null);
     const onMotionChange = useCallback(rolling => {

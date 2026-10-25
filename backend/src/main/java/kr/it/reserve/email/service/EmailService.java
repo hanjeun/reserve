@@ -15,20 +15,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.HtmlUtils;
 
-/**
- * 메일 발송. 모든 발송 메서드는 {@code @Async} 다.
- *
- * <h2>지켜야 할 계약 — 두 가지</h2>
- * <ol>
- *   <li><b>catch 절에서 {@link MailException} 을 빼지 말 것.</b>
- *       {@code mailSender.send()} 는 {@code MessagingException} 을 던지지 않는다 —
- *       Spring 이 전부 {@code MailException}({@code RuntimeException} 계열)으로 감싼다.
- *       빼면 발송 실패가 <b>로그 한 줄 없이</b> 사라지고, {@code @Async} 라 호출자도 모른다.</li>
- *   <li><b>실패 로그의 알림 기준 문구를 유지할 것.</b> Grafana 알림 규칙이 문구 일부를 문자열로 매칭한다.
- *       기준 문구 뒤에는 수신자·제목·예외 메시지 대신 오류 타입처럼 개인정보가 아닌 진단값만 남긴다.
- *       기준 문구를 바꿔야 한다면 {@code docs/technical/monitoring.md} 의 알림 규칙을 같이 고칠 것.</li>
- * </ol>
- */
+/** 비동기 메일 실패는 {@link MailException}까지 기록한다. 알림 규칙이 참조하는 로그 문구를 유지하고 개인정보·원문 예외는 남기지 않는다. */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -55,13 +42,22 @@ public class EmailService {
 
     @Async
     public void sendVerificationEmail(String toEmail, String verificationCode) {
+        sendVerificationMessage(toEmail, verificationCode, false);
+    }
+
+    @Async
+    public void sendLoginMethodVerificationEmail(String toEmail, String verificationCode) {
+        sendVerificationMessage(toEmail, verificationCode, true);
+    }
+
+    private void sendVerificationMessage(String toEmail, String verificationCode, boolean loginMethod) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, MAIL_CHARSET);
             helper.setFrom(fromEmail, fromName);
             helper.setTo(toEmail);
-            helper.setSubject("[RESERVE] 이메일 인증 코드");
-            helper.setText(buildVerificationEmailContent(verificationCode), true);
+            helper.setSubject(loginMethod ? "[RESERVE] 이메일 로그인 설정 인증 코드" : "[RESERVE] 이메일 인증 코드");
+            helper.setText(buildVerificationEmailContent(verificationCode, loginMethod), true);
             mailSender.send(message);
             log.info("Verification email sent");
         } catch (MessagingException | UnsupportedEncodingException | MailException e) {
@@ -70,9 +66,24 @@ public class EmailService {
         }
     }
 
-    // ─────────────────────────────────────────────────
-    //  예약 알림 이메일
-    // ─────────────────────────────────────────────────
+    @Async
+    public void sendLoginMethodChangedEmail(String toEmail) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, MAIL_CHARSET);
+            helper.setFrom(fromEmail, fromName);
+            helper.setTo(toEmail);
+            helper.setSubject("[RESERVE] 로그인 방법이 변경됐어요");
+            helper.setText(HTML_HEAD_OPEN + "</head><body style=\"font-family:" + FONT_FAMILY + ";line-height:1.8;\">"
+                    + "<h1>로그인 방법이 변경됐어요.</h1><p>마이페이지의 로그인 및 보안에서 현재 로그인 방법을 확인할 수 있어요.</p>"
+                    + "<p>본인이 변경하지 않았다면 계정 접근을 확인하고 RESERVE에 문의해주세요.</p></body></html>", true);
+            mailSender.send(message);
+            log.info("Login method notification sent");
+        } catch (MessagingException | UnsupportedEncodingException | MailException exception) {
+            log.error("Email send failed: errorType={}", exception.getClass().getSimpleName());
+            throw new EmailException("보안 알림 메일 발송에 실패했어요.", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
 
     /** 예약 승인 알림 → 유저 */
     @Async
@@ -86,7 +97,7 @@ public class EmailService {
     }
 
     /**
-     * 가게 사정에 의한 예약 취소 알림 → 유저 (2026-08-11 추가).
+     * 가게 사정에 의한 예약 취소 알림 → 유저.
      *
      * <p>거절 메일과 따로 둔다 — 거절은 "아직 승인 안 된 요청을 안 받는 것"이고,
      * 취소는 "이미 확정된 약속을 가게가 깬 것"이다. 사용자가 받는 충격이 다르므로
@@ -118,13 +129,7 @@ public class EmailService {
                         rejectionReason, "거절 사유"));
     }
 
-    /**
-     * 승인 취소 알림 → 유저 (2026-08-11 신설, Undo 전용).
-     *
-     * <p>사장님이 승인을 잘못 눌러 되돌렸을 때 보낸다. <b>이 메일이 없으면 안 된다</b> —
-     * 승인 순간 이미 "예약이 승인되었습니다" 메일이 나갔기 때문에, 되돌리기만 하고 알리지 않으면
-     * 이용자는 확정된 줄 알고 방문한다. 거절이 아니라 "다시 대기 상태"라는 걸 분명히 한다.
-     */
+    /** 승인 취소 시 예약이 다시 대기 상태임을 알린다. */
     @Async
     public void sendReservationApprovalRevokedEmail(String toEmail, String memberName,
                                                     String storeName, String reservationDate,
@@ -183,9 +188,8 @@ public class EmailService {
     }
 
     /**
-     * @param reason      사유 본문. {@code null} 이면 사유 행 자체를 렌더하지 않는다.
-     * @param reasonLabel 사유 행의 라벨. <b>"거절 사유"로 고정하면 안 된다</b> (2026-08-11) —
-     *                    취소 메일에 "거절 사유"가 찍히면 이용자가 무슨 일이 있었는지 오해한다.
+     * @param reason 사유가 없으면 해당 행을 표시하지 않는다.
+     * @param reasonLabel 메일 유형에 맞는 사유 라벨
      */
     private String buildReservationStatusContent(String memberName, ReservationMailDetails details,
                                                   String statusLabel, String statusColor,
@@ -257,10 +261,6 @@ public class EmailService {
             + "  </div>"
             + "</div></body></html>";
     }
-
-    // ─────────────────────────────────────────────────
-    //  사업자 인증 알림 이메일
-    // ─────────────────────────────────────────────────
 
     /** 사업자 인증 승인 알림 → 신청자 */
     @Async
@@ -451,6 +451,10 @@ public class EmailService {
     }
 
     private String buildVerificationEmailContent(String code) {
+        return buildVerificationEmailContent(code, false);
+    }
+
+    private String buildVerificationEmailContent(String code, boolean loginMethod) {
         return HTML_HEAD_OPEN + FONT_IMPORT + "</head>"
             + "<body style=\"margin:0;padding:0;font-family:" + FONT_FAMILY + ";background-color:#f9fafb;\">"
             + "  <div style=\"width:100%;background-color:#f9fafb;padding:40px 0;\">"
@@ -463,7 +467,8 @@ public class EmailService {
             + "        <span style=\"font-size:36px;font-weight:800;color:#3182f6;letter-spacing:8px;font-family:" + FONT_FAMILY + ";\">" + code + "</span>"
             + "      </div>"
             + "      <div style=\"font-size:13px;color:#b0b8c1;line-height:1.6;border-top:1px solid #f2f4f6;padding-top:24px;\">"
-            + "        본 메일은 회원가입을 위한 본인 확인 메일이에요.<br/>"
+            + (loginMethod ? "        본 메일은 기존 계정의 이메일 로그인 설정을 위한 본인 확인 메일이에요.<br/>"
+                    : "        본 메일은 회원가입을 위한 본인 확인 메일이에요.<br/>")
             + "        인증 코드는 <span style=\"color:#8b95a1;\">5분간</span> 유효해요.<br/><br/>"
             + "        © 2026 RESERVE. All rights reserved."
             + "      </div>"

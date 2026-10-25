@@ -1,25 +1,28 @@
-/**
- * memberService — 회원 관련 API
- *
- * 백엔드 엔드포인트:
- *   GET    /api/member/me             내 정보 조회
- *   PUT    /api/member/update         일반 회원 정보 수정
- *   PUT    /api/member/password       현재 비밀번호 재인증 후 비밀번호 변경
- *   POST   /api/member/profile-image  프로필 이미지 업로드
- *   DELETE /api/member/delete         회원 탈퇴
- */
+
 import api from '../api/axios';
 import { API_ENDPOINTS } from '../constants';
+
+const loginMethodScope = memberId => ({ headers: { 'X-Reserve-Member-Id': String(memberId) } });
 
 const memberService = {
     /** 내 정보 조회 */
     getMe: () => api.get(API_ENDPOINTS.MEMBER.ME),
 
+    getLoginMethods: (signal) => api.get('/api/member/login-methods', { signal }),
+    beginLoginMethodOAuth: (memberId, data) => api.post('/api/member/login-methods/oauth', data, loginMethodScope(memberId)),
+    sendLoginMethodCode: (memberId, email) => api.post('/api/member/login-methods/password/code', { email }, loginMethodScope(memberId)),
+    setLoginMethodPassword: (memberId, data) => api.post('/api/member/login-methods/password', data, loginMethodScope(memberId)),
+    removeLoginMethodPassword: (memberId) => api.delete('/api/member/login-methods/password', loginMethodScope(memberId)),
+    unlinkSocialLogin: (memberId, currentPassword) => api.delete('/api/member/login-methods/social', {
+        ...loginMethodScope(memberId), data: { currentPassword },
+    }),
+
     /** 일반 회원 정보 수정 (비밀번호는 전용 관문 사용) */
     updateMember: (data) => api.put(API_ENDPOINTS.MEMBER.UPDATE, data),
 
     /** 현재 비밀번호 재인증 후 변경. 성공하면 authVersion 회전 + refresh token 폐기로 모든 세션을 끊는다. */
-    changePassword: (data) => api.put(API_ENDPOINTS.MEMBER.PASSWORD, data),
+    changePassword: (data, memberId) => memberId == null ? api.put(API_ENDPOINTS.MEMBER.PASSWORD, data)
+        : api.put('/api/member/login-methods/password', data, loginMethodScope(memberId)),
 
     /** 프로필 이미지 업로드 */
     uploadProfileImage: (file) => {
@@ -41,11 +44,10 @@ const memberService = {
     updateMarketingConsent: (marketingAgreed) =>
         api.patch(API_ENDPOINTS.MEMBER.MARKETING_CONSENT, { marketingAgreed }),
 
-    /** 위치(위도/경도) 등록 — 거리순 가게 정렬용. Geolocation 실패 시 마이페이지 주소 등록 폴백에서 호출 */
-    // 2026-07 전수조사: AddressSearch는 도로명 + 우편번호 + 상세주소를 한 세트로 다룬다.
-    // 예전엔 좌표(+나중엔 도로명)만 보내서, 저장 후 새로고침하면 우편번호 칸이 아예 안 뜨고
-    // 상세주소는 빈칸이 되는 버그가 있었다 — 저장할 곳(컬럼) 자체가 없었기 때문.
-    // 각 주소 필드는 서버에서 null/blank면 기존 값을 덮어쓰지 않는다.
+    /* 저장 위치는 거리순 정렬과 현재 위치 요청의 대안으로 사용한다. */
+    // 도로명·우편번호·상세주소를 함께 저장한다.
+
+    // 주소 필드의 빈 값은 서버의 기존 값 유지 정책을 따른다.
     updateLocation: ({ latitude, longitude, address, zipCode, addressDetail }) =>
         api.patch(API_ENDPOINTS.MEMBER.LOCATION, { latitude, longitude, address, zipCode, addressDetail }),
 };

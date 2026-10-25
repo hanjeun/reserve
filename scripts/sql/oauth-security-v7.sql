@@ -1,8 +1,6 @@
--- Candidate only. Production DDL requires the final JAR, current schema comparison,
--- a fresh independently downloaded/restored backup, compatible recovery inputs, and approval.
--- Baseline: the verified 2026-10-14 backup, MySQL 8.0.45 / reserve.
--- Run in the mysql CLI WITHOUT --force. Do not concatenate section 16's SQL again.
--- After any partial failure, inspect metadata and prepare only the remaining statements.
+-- 현재 스키마·최종 JAR·직전 백업/격리 복원·호환 복구 입력과 운영 DDL 승인이 필요하다.
+-- mysql CLI에 --force를 사용하지 않으며, 같은 SQL을 중복 실행하지 않는다.
+-- 부분 실패 시 메타데이터를 확인하고 남은 구문만 준비한다.
 
 SET @reserve_oauth_v7_preflight_sql = IF(
     DATABASE() = 'reserve' AND VERSION() = '8.0.45'
@@ -37,16 +35,14 @@ PREPARE reserve_oauth_v7_preflight FROM @reserve_oauth_v7_preflight_sql;
 EXECUTE reserve_oauth_v7_preflight;
 DEALLOCATE PREPARE reserve_oauth_v7_preflight;
 
--- AES-GCM's envelope must also accommodate a previously valid 2048-character token.
--- Existing values and the source column's charset/collation are preserved; no token backfill.
+-- 암호화 후에도 기존 최대 길이 토큰을 담을 수 있어야 하며, 기존 값·문자셋·정렬 규칙은 유지한다.
 ALTER TABLE member
   MODIFY COLUMN oauth_access_token TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL,
   ADD COLUMN oauth_authenticated_at DATETIME(6) NULL,
   ADD COLUMN oauth_security_revoked_at DATETIME(6) NULL,
   ADD INDEX idx_member_oauth_subject (provider, provider_id, deleted_at);
 
--- Pseudonymous provider identity state, including events received before a member exists.
--- Both login and security events lock this row before member/refresh-token rows.
+-- 회원 생성 전 수신한 사건도 처리하며 로그인·보안 사건은 회원·세션보다 이 행을 먼저 잠근다.
 CREATE TABLE oauth_subject_security (
   subject_key CHAR(64) NOT NULL,
   provider VARCHAR(20) NOT NULL,
@@ -57,7 +53,7 @@ CREATE TABLE oauth_subject_security (
   CONSTRAINT ck_oauth_subject_security_provider CHECK (provider IN ('GOOGLE', 'KAKAO', 'NAVER'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- Minimal replay protection: no raw event, provider subject, email, or token is stored here.
+-- 재전송 방지에 필요한 최소 정보만 저장하며 원문 사건·공급자 식별자·이메일·토큰은 남기지 않는다.
 CREATE TABLE oauth_security_event (
   oauth_security_event_id BIGINT NOT NULL AUTO_INCREMENT,
   provider VARCHAR(20) NOT NULL,

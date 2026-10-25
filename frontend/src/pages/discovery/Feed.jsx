@@ -94,7 +94,7 @@ export default function Feed() {
                 onDelete={onDelete} onShare={onShare} onReport={item => requestReport(item, id => { mountModal('report'); setReportId(id); })} />)}
         </div>;
     };
-    // 목록 실패 뒤 첫 닉네임 저장/작성으로 재조회해도 열린 작성기를 페이지 골격으로 언마운트하지 않는다.
+    // 목록 재조회 중에도 열린 작성기를 유지한다.
     if (!composer && !reportId && (!config.data && config.isPending || enabled && (!requiresLogin || user) && !list.data && list.isPending)) {
         return <FeedPageSkeleton view={view} enabled={enabled || config.isPending} signedIn={Boolean(user)} notificationsEnabled={notificationCount.visible} />;
     }

@@ -12,7 +12,7 @@ public class InquiryException extends BusinessException {
         super(message, status);
     }
 
-    // ========== 정적 팩토리 메서드 ==========
+    // 정적 팩토리 메서드
 
     /** 404 - 문의를 찾을 수 없을 때 */
     public static InquiryException notFound() {

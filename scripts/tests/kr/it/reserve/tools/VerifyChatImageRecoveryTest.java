@@ -11,7 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Arrays;
 
-/** Synthetic images and random test-only keys; never loads a real secret. */
+/** 합성 이미지와 임의의 테스트 키만 사용하며 실제 비밀은 읽지 않는다. */
 public final class VerifyChatImageRecoveryTest {
     private interface Checked { void run() throws Exception; }
 

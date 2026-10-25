@@ -4,10 +4,12 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import useStoreData from '../useStoreData';
 import storeService from '../../services/storeService';
+import reservationService from '../../services/reservationService';
 
 vi.mock('../../services/storeService', () => ({
     default: { getStoreById: vi.fn(), getStoreForEdit: vi.fn() },
 }));
+vi.mock('../../services/reservationService', () => ({ default: { getEditStore: vi.fn() } }));
 
 const renderStoreData = (storeId, options) => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, retryDelay: 0 } } });
@@ -72,6 +74,27 @@ describe('useStoreData failure boundary', () => {
         expect(storeService.getStoreForEdit).not.toHaveBeenCalled();
     });
 
+    it('uses only the authorized reservation context and hides cached context after access is revoked', async () => {
+        const denied = Object.assign(new Error('변경할 수 없는 예약이에요.'), { status: 403 });
+        reservationService.getEditStore.mockResolvedValueOnce({ id: 12 }).mockRejectedValueOnce(denied);
+        const { result } = renderStoreData(12, { reservationId: 31 });
+        await waitFor(() => expect(result.current.store?.id).toBe(12));
+        expect(reservationService.getEditStore).toHaveBeenCalledWith(31, 12, { signal: expect.any(AbortSignal) });
+        await act(async () => { await result.current.refetch(); });
+        await waitFor(() => expect(result.current.error).toBe(denied));
+        expect(result.current.store).toBeNull();
+        expect(storeService.getStoreById).not.toHaveBeenCalled();
+        expect(storeService.getStoreForEdit).not.toHaveBeenCalled();
+    });
+
+    it.each(['', 'abc', '-1', '0', '9007199254740992'])('never falls back to public data for invalid reservation context %s', async reservationId => {
+        const { result } = renderStoreData(12, { reservationId });
+        await act(async () => { await result.current.refetch(); });
+        expect(result.current.store).toBeNull();
+        expect(reservationService.getEditStore).not.toHaveBeenCalled();
+        expect(storeService.getStoreById).not.toHaveBeenCalled();
+    });
+
     it.each([[401, 1], [403, 1], [422, 1], [429, 2], [500, 2], [undefined, 2]])(
         'retries status %s only when the failure can be temporary', async (status, requests) => {
             const error = Object.assign(new Error('서버에 연결할 수 없습니다.'), { status });
@@ -81,4 +104,30 @@ describe('useStoreData failure boundary', () => {
             expect(storeService.getStoreById).toHaveBeenCalledTimes(requests);
         },
     );
+
+    it.each([false, true])('shares a pending original store read across StrictMode setup when forEdit=%s', async forEdit => {
+        let resolve;
+        const pending = new Promise(done => { resolve = done; });
+        const read = forEdit ? storeService.getStoreForEdit : storeService.getStoreById;
+        read.mockReturnValue(pending);
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+        const wrapper = ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+        const view = renderHook(() => useStoreData(12, { forEdit }), { wrapper, reactStrictMode: true });
+        expect(read).toHaveBeenCalledTimes(1);
+        await act(async () => { resolve({ id: 12, name: '서버 원본 가게' }); });
+        await waitFor(() => expect(view.result.current.store?.name).toBe('서버 원본 가게'));
+        expect(read).toHaveBeenCalledTimes(1);
+        view.unmount();
+    });
+
+    it('aborts the authorized reservation edit lookup on unmount', () => {
+        reservationService.getEditStore.mockReturnValue(new Promise(() => {}));
+        const { unmount } = renderStoreData(12, { reservationId: 31 });
+        expect(reservationService.getEditStore).toHaveBeenCalledOnce();
+        const signal = reservationService.getEditStore.mock.calls[0][2].signal;
+        expect(signal.aborted).toBe(false);
+        unmount();
+        expect(signal.aborted).toBe(true);
+    });
+
 });

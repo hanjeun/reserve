@@ -1,12 +1,4 @@
-/**
- * RESERVE Design System - Badge Component
- *
- * 가게 카드(StoreCard)와 가게 상세(StoreDetail) 양쪽에서 동일한 태그 스타일을 보장합니다.
- *
- * 사용법:
- *   <Badge variant="category">한식</Badge>
- *   <Badge variant="keyword">주차 가능</Badge>
- */
+
 
 import React from 'react';
 import PropTypes from 'prop-types';
@@ -16,10 +8,7 @@ const STYLES = {
     // 카테고리 태그 — Ant Design <Tag color="blue">와 동일한 시각적 결과 (border 없는 버전)
     category: {
         display: 'inline-block',
-        // 2026-07-30: AntD Tag의 blue 프리셋 값을 그대로 베껴 하드코딩했던 자리.
-        // 다크에서 밝은 하늘색 판이 그대로 남아 유일하게 튀었다 → primary 토큰으로 교체.
-        // 라이트 값(#e8f3ff / #3182f6)은 기존(#e6f4ff / #1677ff)과 육안상 차이가 없고,
-        // 오히려 우리 브랜드 파랑과 정확히 맞는다.
+
         background: colors.primary.light,
         color: colors.primary.main,
         fontSize: fontSize.xs,

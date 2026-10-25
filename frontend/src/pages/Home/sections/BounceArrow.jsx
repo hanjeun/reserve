@@ -1,10 +1,7 @@
 import { colors } from '../../../styles/tokens';
 
-/**
- * scrollIntoView + scroll-margin-top 조합
- * — 브라우저가 fixed 헤더 오프셋을 자연적으로 처리
- * — Safari 동적 뷰포트(dvh 잔퇄) 문제를 피함
- * — sectionMobile/section 스타일에 scrollMarginTop: heights.header 이미 설정됨
+/*
+ * 섹션의 scroll-margin-top으로 고정 헤더 높이를 보정한다.
  */
 const scrollToSection = (id, prefersReducedMotion) => {
     const el = document.getElementById(id);

@@ -48,7 +48,9 @@ export default function PhotoGallery({ label, sources, imageSizes, autoplay = fa
                         <LoadingAntImage src={src} alt={`${label} 사진 ${index + 1}`} referrerPolicy="no-referrer"
                             imageSize={imageSizes?.[index]}
                             placeholder={loadedSources.has(src) ? false : undefined}
-                            width="100%" style={imageStyle} draggable={false} preview={previewEnabled ? { cover: '크게 보기' } : false} />
+                            width="100%" style={imageStyle} draggable={false}
+                            aria-label={previewEnabled ? `${label} 사진 ${index + 1} 크게 보기` : undefined}
+                            preview={previewEnabled ? { cover: '' } : false} />
                     </div>)}
                 </Carousel>
             </Image.PreviewGroup>

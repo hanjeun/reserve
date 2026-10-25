@@ -54,7 +54,7 @@ export default function useReportReviewDraft({ selected, report, form, target })
             setSelection(current => current.id === id ? { ...current, baseline: { id, revision: result.data.revision, values: JSON.stringify(values) },
                 rejected: false, targetRevision: confirmed ? revision : current.targetRevision,
                 targetRejected: confirmed ? false : current.targetRejected } : current);
-        } catch { /* 조회 실패에는 이전 입력·버전을 보존한다. */ }
+        } catch { /* 조회 오류 시 기존 입력·버전을 보존한다. */ }
         finally { loading.current = false; if (isCurrentSession(session)) setRefreshing(false); }
     };
     return { ready, dirty, revision: baseline?.revision, conflict, invalidVersion, refreshing, reload,

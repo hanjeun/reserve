@@ -1,4 +1,4 @@
-/* Details and composition share QR's mobile surface; desktop Modal remains unchanged. */
+/* 상세·작성 모달은 모바일 QR 표면을 공유하고 PC 모달은 유지한다. */
 .reserve-responsive-modal-title:focus { outline: none; }
 
 @media (max-width: 575px) {
@@ -76,7 +76,7 @@
         padding: 16px 20px max(20px, env(safe-area-inset-bottom, 0px));
         border-top: 1px solid var(--c-border-light, #f2f4f6);
     }
-    /* Reuse RegionSheet / QR keyframes, including their 260ms entry and 220ms exit. */
+    /* RegionSheet·QR의 진입 260ms·퇴장 220ms 모션을 재사용한다. */
     .reserve-modal-sheet-root .ant-modal.reserve-modal-sheet-motion-enter,
     .reserve-modal-sheet-root .ant-modal.reserve-modal-sheet-motion-appear {
         animation: reserve-region-sheet-fade-enter 260ms cubic-bezier(0.22, 1, 0.36, 1) both paused;

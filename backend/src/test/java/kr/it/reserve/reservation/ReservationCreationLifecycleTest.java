@@ -59,7 +59,7 @@ class ReservationCreationLifecycleTest {
                 mock(EmailService.class),
                 memberRepository,
                 mock(AuditLogService.class),
-                mock(QrCheckinTokenProvider.class));
+                mock(QrCheckinTokenProvider.class), creationGuard());
 
         Member stalePrincipal = Member.builder().id(1L).email("withdrawn@example.com").build();
         ReservationCreateRequest request = new ReservationCreateRequest(
@@ -91,7 +91,7 @@ class ReservationCreationLifecycleTest {
                 mock(EmailService.class),
                 memberRepository,
                 mock(AuditLogService.class),
-                mock(QrCheckinTokenProvider.class));
+                mock(QrCheckinTokenProvider.class), creationGuard());
 
         Member activeMember = Member.builder()
                 .id(1L)
@@ -316,11 +316,17 @@ class ReservationCreationLifecycleTest {
         Member member = Member.builder().id(1L).email("active@example.com").termsAgreed(true).build();
         ReservationService service = new ReservationService(
                 reservations, stores, mock(HolidayService.class), payments, emails, members,
-                audits, mock(QrCheckinTokenProvider.class));
+                audits, mock(QrCheckinTokenProvider.class), creationGuard());
         return new Fixture(service, reservations, stores, members, payments, emails, audits, member);
     }
 
     private enum MissingStoreLookup { UPDATE, SEARCH }
+
+    private static kr.it.reserve.reservation.admission.ReservationCreationGuard creationGuard() {
+        var guard = mock(kr.it.reserve.reservation.admission.ReservationCreationGuard.class);
+        when(guard.begin(any(), any())).thenReturn(new kr.it.reserve.reservation.admission.ReservationCreationGuard.Attempt(null, 1L, null, null));
+        return guard;
+    }
 
     private record Fixture(
             ReservationService service, ReservationRepository reservations, StoreRepository stores,

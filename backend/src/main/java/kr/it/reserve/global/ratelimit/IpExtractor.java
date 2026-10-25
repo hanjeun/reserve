@@ -3,26 +3,10 @@ package kr.it.reserve.global.ratelimit;
 import jakarta.servlet.http.HttpServletRequest;
 
 /**
- * nginx 리버스 프록시 환경에서 실제 클라이언트 IP를 추출한다.
- *
- * <h2>왜 X-Forwarded-For의 첫 번째 값을 쓰면 안 되는가</h2>
- * nginx는 {@code proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for} 로 이 헤더를
- * <b>덮어쓰지 않고 이어붙인다</b>(nginx/default.conf L56·70·84·146).
- * 클라이언트가 {@code X-Forwarded-For: 1.2.3.4} 를 직접 보내면 백엔드가 받는 값은
- * {@code "1.2.3.4, <진짜 IP>"} 가 된다. 즉 <b>첫 번째 값은 공격자가 정한다.</b>
- * 그 값으로 rate limit 키를 만들면 요청마다 헤더만 바꿔 로그인·회원가입 제한을 무한히 우회할 수 있다.
- *
- * <h2>신뢰 경계</h2>
- * 이 앱으로 오는 트래픽은 전부 nginx를 거친다(8080/8081은 외부에서 차단돼 있다).
- * nginx가 <b>덮어쓰는</b> 헤더만 신뢰할 수 있다:
- * <ul>
- *   <li>{@code X-Real-IP} — {@code proxy_set_header X-Real-IP $remote_addr} 로 항상 덮어쓴다 → <b>신뢰 가능</b></li>
- *   <li>{@code X-Forwarded-For} — 이어붙으므로 <b>마지막 항목</b>만 nginx가 채운 값이다</li>
- * </ul>
- * 따라서 우선순위는 X-Real-IP → XFF의 <b>마지막</b> 항목 → {@code remoteAddr} 순이다.
- *
- * <p>⚠️ 앞단에 CDN·WAF(예: Cloudflare)를 붙이면 프록시가 한 단 늘어난다.
- * 그때는 "마지막 항목"이 CDN IP가 되므로 이 클래스를 다시 손봐야 한다.
+ * 신뢰하는 nginx가 덮어쓴 X-Real-IP, XFF의 마지막 값, remoteAddr 순으로 IP를 읽는다.
+ * nginx가 XFF에 값을 이어 붙이는 구성에서는 첫 값이 클라이언트 입력이므로 제한 키로 쓰지 않는다.
+ * 이 신뢰 모델은 앱 포트의 외부 직접 접근을 차단하고 nginx가 헤더를 설정한다는 전제가 필요하다.
+ * CDN·WAF 등 프록시 계층을 추가하면 신뢰 경계와 실제 IP 전달 규칙을 함께 검토해야 한다.
  */
 public final class IpExtractor {
 
@@ -54,14 +38,8 @@ public final class IpExtractor {
     }
 
     /**
-     * IP 리터럴 형식이 아닌 값을 걸러낸다.
-     *
-     * <p>이 값이 rate limit 키가 되므로 검증하지 않으면 임의 문자열이 그대로 키로 들어가
-     * 버킷 맵을 오염시킨다. 호스트명을 받으면 DNS를 조회하는 {@code InetAddress} 계열 API는
-     * 요청 경로에서 외부 지연을 유발할 수 있어 쓰지 않고, 문자 구성으로만 판별한다
-     * (IP 리터럴에 나올 수 있는 문자는 16진수·점·콜론·IPv6 zone id의 % 뿐이다).
-     *
-     * @return 정상이면 트림된 IP, 아니면 null
+     * 제한 키에는 IP 리터럴만 허용한다. 요청 중 DNS 조회를 하지 않도록 문자 형식으로 검사한다.
+     * @return 유효하면 공백을 제거한 IP, 아니면 null
      */
     private static String sanitize(String raw) {
         if (raw == null) {

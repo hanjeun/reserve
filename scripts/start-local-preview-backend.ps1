@@ -31,10 +31,10 @@ if (-not (Test-Path -LiteralPath $runtimeJar)) {
 if ((Get-FileHash -LiteralPath $runtimeJar -Algorithm SHA256).Hash.ToLowerInvariant() -ne $jarHash) {
     throw 'The JAR changed during the copy. No application was started.'
 }
-# A running JVM must never use a JAR that Gradle can overwrite during the next build.
+# 다음 빌드가 실행 중인 JVM의 JAR를 덮어쓰지 않도록 별도 경로를 사용한다.
 (Get-Item -LiteralPath $runtimeJar).IsReadOnly = $true
 
-# Reuse the existing local IDE inputs without printing secrets or changing the IDE file.
+# IDE 파일을 수정하거나 비밀값을 출력하지 않고 기존 로컬 설정을 읽는다.
 $environmentBefore = @{}
 $allowedNames = @('AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'CHAT_IMAGE_ENCRYPTION_KEY',
     'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'HOLIDAY_API_KEY', 'JWT_SECRET_KEY',

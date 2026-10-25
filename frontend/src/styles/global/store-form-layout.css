@@ -1,11 +1,6 @@
 /* RESERVE 등록·수정 작업 폼의 밀도. Core 입력·다른 폼·포털 내부 달력은 변경하지 않는다. */
 
-/* ── 가게 폼 로딩 뼈대(StoreFormSkeleton) ─────────────────────────────
-   실제 폼은 AntD Form(vertical, size=large) 규칙으로 크기가 정해지지만, 뼈대는 Form 을 그리지 않아
-   그 규칙이 주입되지 않는다. 그래서 같은 숫자를 여기 적는다(2026-09-29 390·820·1280 실측):
-   라벨 상자 40 + 아래 8 / 입력 54(선택칸 53) / 안내 문구 줄 22·최소 24 / 칸 사이 기본 24.
-   768px 미만의 작은 입력·간격은 아래 @media 블록이 실제 폼 규칙과 같은 변수로 바꾼다.
-   바깥 틀(폭·여백)은 StoreFormSkeleton 이 실제 폼과 같은 PageContainer 로 그리므로 라우트 틀은 여백을 주지 않는다. */
+/* 폼 골격은 AntD Form 없이도 실제 필드·라벨·안내의 크기를 유지한다. 반응형 변수와 바깥 PageContainer는 실제 폼과 공유한다. */
 .reserve-route-skeleton.reserve-route-skeleton--store-form { max-width: none; padding: 0; }
 .reserve-store-form-skeleton {
     --reserve-store-form-skeleton-radius: 14px;
@@ -162,7 +157,7 @@
         padding-bottom: var(--reserve-store-form-label-gap, 8px);
     }
 
-    /* Form size=large leaves a 40px label box even in a vertical form. Do not carry it into mobile density. */
+    /* 큰 폼의 40px 라벨 상자를 모바일 세로 폼에 적용하지 않는다. */
     .reserve-store-form.ant-form .ant-form-item .ant-form-item-label > label {
         height: auto;
         min-height: 22px;

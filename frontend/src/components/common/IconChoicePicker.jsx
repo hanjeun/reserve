@@ -4,7 +4,6 @@ import Tooltip from './Tooltip';
 import ChoiceIllustration from './ChoiceIllustration';
 import RollingFieldValue from './RollingFieldValue';
 
-/** Industry and setup choices share tooltip, focus, selection and press feedback. */
 export default function IconChoicePicker({ value, selectedValue, onChange, options, id, label, disabled, showDescription = false }) {
     const descriptionId = useId();
     const selected = selectedValue === undefined ? value : selectedValue;

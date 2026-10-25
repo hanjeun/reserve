@@ -1,22 +1,6 @@
 /**
- * RESERVE Design System - SegmentedGrid
- *
- * SegmentedControl 의 **여러 줄 버전**. 항목이 많아 한 줄에 안 들어갈 때 쓴다.
- * 모양(회색 트랙 + 선택 시 진한 배경)은 SegmentedControl 과 같고, 레이아웃만 그리드다.
- *
- * 사용법:
- *   <SegmentedGrid value={category} onChange={setCategory} options={CATEGORY_OPTIONS} columns={4} />
- *
- * ★ 왜 flex-wrap 이 아니라 grid 인가
- *   flex-wrap 은 **왼쪽부터 채우기** 때문에 줄당 개수를 제어할 수 없다.
- *   각 버튼에 최소 폭이 걸려 있으면 컨테이너 폭에 따라 줄당 개수가 제각각이 된다 —
- *   실제로 문의 유형 8개가 데스크톱에서 5+3 으로 갈라져 모달 높이가 한 줄만큼 늘어났다.
- *   그리드는 `repeat(columns, 1fr)` 로 줄당 개수가 고정이므로 항목 수를 columns 의 배수로 두면
- *   항상 대칭이고, 각 칸이 1fr 이라 버튼 폭도 균일해진다.
- *   덤으로 "혼자 남은 마지막 버튼이 줄 전체를 차지하는" flex-grow 버그도 구조적으로 사라진다.
- *
- * ★ 2026-08-06 신설 — SegmentedControl 에서 갈라냈다(prop 3분기 → 형제 컴포넌트).
- *   근거는 SegmentedControl.jsx 상단 주석과 docs/technical/design-system.md 참고.
+ * 여러 줄의 선택지를 고정 열 수의 그리드로 배치한다.
+ * flex-wrap에 따른 줄별 개수·폭 차이를 피하고 SegmentedControl과 선택 상태의 모양을 공유한다.
  */
 import React from 'react';
 import PropTypes from 'prop-types';

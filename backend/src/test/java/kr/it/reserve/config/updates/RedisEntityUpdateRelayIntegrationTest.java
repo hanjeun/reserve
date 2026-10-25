@@ -35,7 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-/** Two independent local connections, never production or the application's existing Redis. */
+/** 앱 Redis와 분리된 일회성 로컬 연결 두 개를 사용한다. */
 @EnabledIfEnvironmentVariable(named = "RESERVE_REDIS_INTEGRATION", matches = "true")
 @Timeout(30)
 class RedisEntityUpdateRelayIntegrationTest {
@@ -165,7 +165,7 @@ class RedisEntityUpdateRelayIntegrationTest {
         for (int attempt = 0; attempt < 40; attempt++) {
             try (var connection = redis.getConnectionFactory().getConnection()) {
                 if ("PONG".equals(connection.ping())) return;
-            } catch (RuntimeException starting) { /* Only this disposable Redis is starting. */ }
+            } catch (RuntimeException starting) { /* 이 시험이 소유한 Redis만 기동을 기다린다. */ }
             Thread.sleep(50);
         }
         throw new IllegalStateException("Disposable common relay Redis did not become ready");

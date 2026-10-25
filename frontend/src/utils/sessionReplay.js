@@ -15,7 +15,7 @@ export function scheduleSessionReplay(win = window) {
             if (cancelled || getClient() !== client || client.getIntegrationByName('Replay')) return;
             client.addIntegration(replayIntegration({ maskAllText: true, blockAllMedia: true }));
         } catch {
-            // 선택 관측 청크의 실패가 화면·기본 오류 수집을 막지 않는다.
+            // 선택적 관측 청크 오류는 화면과 기본 오류 수집에 영향을 주지 않는다.
             console.warn('Session replay could not be loaded');
         }
     };

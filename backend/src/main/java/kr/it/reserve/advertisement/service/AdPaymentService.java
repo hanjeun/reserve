@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 외부 통신 조정자. 트랜잭션 안에서 호출하면 거부해 PG 대기 동안 DB 잠금을 잡는 회귀를 막는다. */
+/** PG 대기 중 DB 잠금을 잡지 않도록 트랜잭션 안의 외부 호출을 거부한다. */
 @Service
 @RequiredArgsConstructor
 @Slf4j

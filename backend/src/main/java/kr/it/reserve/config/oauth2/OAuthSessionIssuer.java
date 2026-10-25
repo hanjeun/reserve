@@ -18,7 +18,10 @@ public class OAuthSessionIssuer {
     private final MemberRepository members;
     private final OAuthSubjectSecurityService subjects;
 
-    public record SessionTokens(String accessToken, String refreshToken) { }
+    public record SessionTokens(String accessToken, String refreshToken, java.time.Duration refreshMaxAge) {
+        public SessionTokens(String accessToken, String refreshToken) { this(accessToken, refreshToken, null); }
+        @Override public String toString() { return "SessionTokens[credentials=redacted]"; }
+    }
 
     @Transactional
     public SessionTokens issue(CustomOAuth2User principal) {
@@ -33,8 +36,8 @@ public class OAuthSessionIssuer {
         subjects.requireFreshAuthentication(authentication.authenticatedAt(), authentication.tokenExpiresAt());
         if (!subject.acceptsAuthentication(authentication.authenticatedAt())
                 || !current.acceptsOAuthAuthentication(authentication.authenticatedAt())) throw reauthenticate();
-        SessionTokens pair = new SessionTokens(tokens.generateAccessToken(current, authentication.authenticatedAt()),
-                tokens.generateRefreshToken(current, authentication.authenticatedAt()));
+        TokenProvider.IssuedSession issued = tokens.issueSession(current, authentication.authenticatedAt());
+        SessionTokens pair = new SessionTokens(issued.accessToken(), issued.refreshToken(), issued.refreshMaxAge());
         members.flush();
         subjects.requireFreshAuthentication(authentication.authenticatedAt(), authentication.tokenExpiresAt());
         return pair;

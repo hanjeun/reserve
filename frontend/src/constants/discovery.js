@@ -9,13 +9,8 @@ export const DISCOVERY_NAV_ITEMS = [
     { to: '/feed', label: '피드' },
 ];
 
-export const isDiscoveryRootPath = (pathname, search = '') => {
+export const isDiscoveryRootPath = pathname => {
     const path = pathname.replace(/\/$/, '') || '/';
-    if (path === '/stores') {
-        const params = new URLSearchParams(search);
-        // 분야 필터는 탐색 탭 안에 남는다. 검색 결과만 검색 이전 페이지로 돌아가는 하위 화면이다.
-        if (params.get('keyword')?.trim()) return false;
-    }
     return DISCOVERY_NAV_ITEMS.some(item => item.to === path);
 };
 

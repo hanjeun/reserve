@@ -14,16 +14,7 @@ import java.util.Base64;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * 웹훅 서명 검증.
- *
- * <h2>왜 이 테스트가 제일 중요한가</h2>
- * 웹훅 엔드포인트는 <b>인증 없이 열려 있다</b>(PG 서버가 부르므로). 서명 검증이 유일한 문지기라,
- * 여기가 뚫리면 아무나 "이 결제 취소됐다"를 쏴서 예약을 취소시키거나 환불 상태를 조작할 수 있다.
- *
- * <p>스프링 컨텍스트를 띄우지 않고 시크릿을 직접 주입한다 — 검증 대상이 순수한 암호 계산이라
- * 컨텍스트가 필요 없고, <b>시크릿이 없을 때 전부 거부하는지</b>도 여기서 함께 확인할 수 있다.
- */
+/** 웹훅의 서명 검증과 비밀키가 없을 때의 거부를 확인한다. */
 class PortoneWebhookVerifierTest {
 
     private static final String SECRET_B64 = "dGVzdC13ZWJob29rLXNlY3JldC0xMjM0NTY3OA==";

@@ -7,8 +7,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import MessengerContent from './MessengerContent';
 import { chatService } from '../../services';
+import storeService from '../../services/storeService';
 import useAuthStore from '../../store/useAuthStore';
 import useMessengerStore, { messengerIdentityOf } from '../../store/useMessengerStore';
+
+vi.mock('../../services/storeService', () => ({ default: { getStores: vi.fn() } }));
 
 vi.mock('../../services', () => ({
     chatService: {
@@ -40,6 +43,15 @@ const page = (content = []) => ({
     page: { number: 0, totalPages: 1, totalElements: content.length },
 });
 
+const finishThreadAnimation = thread => {
+    const animationName = thread.closest('.reserve-messenger').classList.contains('is-returning-to-list')
+        ? 'reserve-messenger-thread-back-out' : 'reserve-messenger-thread-in';
+    // AnimationEvent가 없는 jsdom에서 React는 접두사가 붙은 이벤트를 구독할 수 있다.
+    for (const type of ['animationend', 'webkitAnimationEnd']) {
+        fireEvent(thread, Object.assign(new Event(type, { bubbles: true }), { animationName }));
+    }
+};
+
 const renderMessenger = (props = {}) => {
     const client = new QueryClient({
         defaultOptions: { queries: { retry: false, gcTime: 0 } },
@@ -58,6 +70,7 @@ const renderMessenger = (props = {}) => {
 describe('MessengerContent', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        storeService.getStores.mockReset().mockResolvedValue(page());
         Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1200 });
         Element.prototype.scrollIntoView = vi.fn();
         useAuthStore.setState({
@@ -70,6 +83,7 @@ describe('MessengerContent', () => {
             activeThread: true,
             drafts: {},
             selection: { kind: 'support' },
+            storeSearch: null,
             sessionIdentity: messengerIdentityOf(useAuthStore.getState()),
         });
         chatService.listConversations.mockResolvedValue(page());
@@ -95,6 +109,92 @@ describe('MessengerContent', () => {
     afterEach(() => {
         vi.unstubAllGlobals();
         vi.restoreAllMocks();
+    });
+
+    it('searches through the conversation list without opening rooms and restores the selected result after a blocked conversation', async () => {
+        const user = userEvent.setup();
+        useMessengerStore.getState().showHome();
+        storeService.getStores.mockResolvedValue(page([
+            { id: 31, name: '내 공방', ownerId: 7, status: 'ACTIVE', address: '서울', category: '공방' },
+            { id: 42, name: '이웃 공방', ownerId: 8, status: 'ACTIVE', address: '부산', category: '공방' },
+        ]));
+        chatService.getStore.mockResolvedValue({ roomId: 12, storeId: 42, type: 'STORE', title: '이웃 공방',
+            viewerRole: 'MEMBER', canSend: false, blocked: true, blockedByMe: false,
+            sendDisabledReason: 'BLOCKED_BY_OTHER', messages: [] });
+        const { container } = renderMessenger({ surface: 'panel' });
+        expect(screen.queryByRole('button', { name: '가게에 문의' })).not.toBeInTheDocument();
+        await user.click(screen.getByRole('button', { name: '대화', exact: true }));
+        await user.click(screen.getByRole('button', { name: '가게 찾기' }));
+        const input = screen.getByRole('searchbox', { name: '가게 이름 또는 주소' });
+        expect(storeService.getStores).not.toHaveBeenCalled();
+        expect(chatService.getStore).not.toHaveBeenCalled();
+        expect(chatService.getSupport).not.toHaveBeenCalled();
+        await user.type(input, '공방');
+        const own = await screen.findByRole('button', { name: '내 공방, 내 가게에는 문의를 보낼 수 없어요.' });
+        expect(own).toHaveAttribute('aria-disabled', 'true');
+        fireEvent.click(own);
+        expect(chatService.getStore).not.toHaveBeenCalled();
+        const results = container.querySelector('.reserve-messenger-store-search .reserve-messenger-list-scroll');
+        fireEvent.scroll(results, { target: { scrollTop: 88 } });
+        const chosen = screen.getByRole('button', { name: '이웃 공방, 문의 시작' });
+        fireEvent.click(chosen);
+        fireEvent.click(chosen);
+        await waitFor(() => expect(chatService.getStore).toHaveBeenCalledExactlyOnceWith(42));
+        expect(await screen.findByText('상대방이 차단해 새 메시지를 보낼 수 없어요. 이전 대화는 계속 볼 수 있어요.')).toBeInTheDocument();
+        const thread = container.querySelector('.reserve-messenger-thread');
+        finishThreadAnimation(thread);
+        expect(container.querySelector('.reserve-messenger')).not.toHaveClass('is-opening-thread');
+        fireEvent.click(screen.getByRole('button', { name: '가게 검색으로 돌아가기' }));
+        expect(container.querySelector('.reserve-messenger')).toHaveClass('is-returning-to-list');
+        finishThreadAnimation(thread);
+        expect(useMessengerStore.getState()).toMatchObject({ activeThread: false, storeSearch: { visible: true } });
+        expect(await screen.findByRole('searchbox', { name: '가게 이름 또는 주소' })).toHaveValue('공방');
+        await waitFor(() => expect(screen.getByRole('button', { name: '이웃 공방, 문의 시작' })).toHaveFocus());
+        expect(container.querySelector('.reserve-messenger-store-search .reserve-messenger-list-scroll').scrollTop).toBe(88);
+        expect(chatService.sendStore).not.toHaveBeenCalled();
+        await user.click(screen.getByRole('button', { name: '취소' }));
+        expect(await screen.findByRole('button', { name: '가게 찾기' })).toBeInTheDocument();
+        expect(useMessengerStore.getState().storeSearch).toBeNull();
+    });
+
+    it.each([
+        [404, '가게를 찾을 수 없어요.'],
+        [409, '현재 문의를 받을 수 없는 가게예요.'],
+    ])('keeps a store search recoverable when opening it returns %s', async (status, title) => {
+        const user = userEvent.setup();
+        useMessengerStore.getState().showConversations();
+        storeService.getStores.mockResolvedValue(page([{ id: 42, name: '이웃 공방', ownerId: 8, status: 'ACTIVE' }]));
+        chatService.getStore.mockRejectedValue(Object.assign(new Error('store unavailable'), { status }));
+        const { container } = renderMessenger({ surface: 'panel' });
+        await user.click(screen.getByRole('button', { name: '가게 찾기' }));
+        await user.type(screen.getByRole('searchbox', { name: '가게 이름 또는 주소' }), '공방');
+        fireEvent.click(await screen.findByRole('button', { name: '이웃 공방, 문의 시작' }));
+        expect(await screen.findByText(title)).toBeInTheDocument();
+        const thread = container.querySelector('.reserve-messenger-thread');
+        finishThreadAnimation(thread);
+        fireEvent.click(screen.getByRole('button', { name: '가게 검색으로 돌아가기' }));
+        finishThreadAnimation(thread);
+        expect(await screen.findByRole('searchbox', { name: '가게 이름 또는 주소' })).toHaveValue('공방');
+        await user.click(screen.getByRole('button', { name: '대화 목록으로 돌아가기' }));
+        expect(await screen.findByRole('button', { name: '가게 찾기' })).toBeInTheDocument();
+        expect(chatService.sendStore).not.toHaveBeenCalled();
+    });
+
+    it('keeps a failed store search distinct from an empty result and retries it in place', async () => {
+        const user = userEvent.setup();
+        useMessengerStore.getState().showHome();
+        storeService.getStores.mockRejectedValueOnce(Object.assign(new Error('forbidden'), { status: 403 }))
+            .mockResolvedValue(page([]));
+        renderMessenger({ surface: 'panel' });
+        await user.click(screen.getByRole('button', { name: '대화', exact: true }));
+        await user.click(screen.getByRole('button', { name: '가게 찾기' }));
+        await user.type(screen.getByRole('searchbox', { name: '가게 이름 또는 주소' }), '공방');
+        expect(await screen.findByRole('alert')).toHaveTextContent('가게 검색');
+        expect(screen.queryByText('검색한 가게가 없어요.')).not.toBeInTheDocument();
+        await user.click(screen.getByRole('button', { name: '다시 불러오기' }));
+        expect(await screen.findByText('검색한 가게가 없어요.')).toBeInTheDocument();
+        expect(screen.getByRole('searchbox', { name: '가게 이름 또는 주소' })).toHaveValue('공방');
+        expect(chatService.getStore).not.toHaveBeenCalled();
     });
 
     it('opens the hidden list separately and keeps stable room access for reporting', async () => {
@@ -136,9 +236,9 @@ describe('MessengerContent', () => {
         fireEvent.click(screen.getByRole('button', { name: '고객지원에 문의' }));
         await screen.findByRole('button', { name: '대화 목록으로 돌아가기' });
         const thread = container.querySelector('.reserve-messenger-thread');
-        fireEvent.animationEnd(thread);
+        finishThreadAnimation(thread);
         fireEvent.click(screen.getByRole('button', { name: '대화 목록으로 돌아가기' }));
-        fireEvent.animationEnd(thread);
+        finishThreadAnimation(thread);
         expect(onClose).not.toHaveBeenCalled();
         expect(useMessengerStore.getState().view).toBe('conversations');
         fireEvent.click(screen.getByRole('button', { name: '메시지 닫기' }));
@@ -376,14 +476,14 @@ describe('MessengerContent', () => {
         expect(screen.getAllByRole('navigation', { name: '메신저 화면' })).toHaveLength(1);
         expect(screen.getByRole('button', { name: '홈', exact: true })).toBeDisabled();
         expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
-        fireEvent.animationEnd(screen.getByRole('button', { name: '대화 목록으로 돌아가기' }).closest('.reserve-messenger-thread'));
+        finishThreadAnimation(screen.getByRole('button', { name: '대화 목록으로 돌아가기' }).closest('.reserve-messenger-thread'));
         await waitFor(() => expect(screen.queryByLabelText('대화 목록')).not.toBeInTheDocument());
         expect(screen.queryByRole('navigation', { name: '메신저 화면' })).not.toBeInTheDocument();
         await user.click(screen.getByRole('button', { name: '대화 목록으로 돌아가기' }));
         const messenger = screen.getByRole('button', { name: '대화 목록으로 돌아가기' }).closest('.reserve-messenger');
         expect(messenger).toHaveClass('is-returning-to-list', 'has-thread');
         expect(screen.getAllByRole('navigation', { name: '메신저 화면' })).toHaveLength(1);
-        fireEvent.animationEnd(messenger.querySelector('.reserve-messenger-thread'));
+        finishThreadAnimation(messenger.querySelector('.reserve-messenger-thread'));
         await waitFor(() => expect(screen.getAllByRole('navigation', { name: '메신저 화면' })).toHaveLength(1));
         expect(chatService.getSupport).toHaveBeenCalledTimes(1);
     });
@@ -564,13 +664,13 @@ describe('MessengerContent', () => {
         expect(messenger).toHaveClass('is-opening-thread');
         fireEvent.click(screen.getByRole('button', { name: '대화 목록으로 돌아가기' }));
         expect(messenger).not.toHaveClass('is-returning-to-list');
-        fireEvent.animationEnd(messenger.querySelector('.reserve-messenger-thread'));
+        finishThreadAnimation(messenger.querySelector('.reserve-messenger-thread'));
         await waitFor(() => expect(messenger).not.toHaveClass('is-opening-thread'));
         expect(chatService.getSupport).toHaveBeenCalledTimes(1);
         fireEvent.click(screen.getByRole('button', { name: '대화 목록으로 돌아가기' }));
         expect(messenger).toHaveClass('is-returning-to-list', 'has-mobile-thread');
         expect(messenger.querySelector('.reserve-messenger-list')).toBeInTheDocument();
-        fireEvent.animationEnd(messenger.querySelector('.reserve-messenger-thread'));
+        finishThreadAnimation(messenger.querySelector('.reserve-messenger-thread'));
         await waitFor(() => expect(messenger).not.toHaveClass('has-mobile-thread'));
         expect(messenger).not.toHaveClass('is-returning-to-list');
     });
@@ -887,10 +987,31 @@ describe('MessengerContent', () => {
             'MEMBER',
             { reason: 'SPAM', details: '반복 광고 메시지' },
         ));
-        // jsdom does not emit AntD's CSS transition-end event, so the closing
-        // dialog stays mounted with its leave class. Verify that closing began
-        // and, more importantly, that a report never becomes an automatic block.
+        // jsdom의 모달 닫힘 클래스로 전환 시작을 확인한다.
+        // 신고가 자동 차단으로 이어지지 않는지도 확인한다.
+
         await waitFor(() => expect(dialog.className).toContain('ant-zoom-leave'));
         expect(chatService.setBlocked).not.toHaveBeenCalled();
     });
+    it.each([
+        [{ kind: 'support' }, 'USER', 'getSupport'],
+        [{ kind: 'owner', roomId: 78 }, 'BUSINESS', 'getStoreInboxRoom'],
+    ])('opens an explicitly selected existing mobile search conversation: %j', async (initialSelection, role, method) => {
+        Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+        useAuthStore.setState({ user: { id: 7, role }, isLoggedIn: true });
+        useMessengerStore.setState({ view: 'home', activeThread: false, sessionIdentity: messengerIdentityOf(useAuthStore.getState()) });
+        chatService.getStoreInboxRoom.mockResolvedValue({ roomId: 78, type: 'STORE', title: '받은 문의', viewerRole: 'OWNER', messages: [], canSend: true });
+        renderMessenger({ surface: 'page', initialSelection });
+        await waitFor(() => expect(chatService[method]).toHaveBeenCalledTimes(1));
+        if (method === 'getStoreInboxRoom') expect(chatService[method]).toHaveBeenCalledWith(78);
+        expect(chatService.getStore).not.toHaveBeenCalled();
+    });
+
+    it('does not open an owner conversation from an unprivileged mobile route hint', () => {
+        Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+        useMessengerStore.setState({ view: 'home', activeThread: false });
+        renderMessenger({ surface: 'page', initialSelection: { kind: 'owner', roomId: 78 } });
+        expect(chatService.getStoreInboxRoom).not.toHaveBeenCalled();
+    });
+
 });

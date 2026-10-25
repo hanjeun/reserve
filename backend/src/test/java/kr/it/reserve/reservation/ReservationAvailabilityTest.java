@@ -30,16 +30,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
-/**
- * getAvailability 슬롯 경계 로직 검증.
- *
- * 핵심: close("영업 종료 시각")는 마지막 예약 슬롯이 아니다.
- * 예약이 슬롯 단위(reservationSlotMinutes)만큼 자리를 점유한다고 보고,
- * "마지막 슬롯 + slotMin > close" 인 슬롯은 제외해야 한다.
- * (예: 09:00~21:00, 30분 단위 → 마지막 예약 슬롯은 20:30, 21:00 슬롯은 나오면 안 됨)
- *
- * 이 회귀 테스트는 close 정각 슬롯 버그(2026-07 수정)가 되살아나는 것을 막는다.
- */
+/** 마지막 슬롯의 종료 시각이 영업 종료를 넘지 않아야 한다. 영업 종료 정각에 새 슬롯을 만들지 않는다. */
 @ExtendWith(MockitoExtension.class)
 class ReservationAvailabilityTest {
 
@@ -79,14 +70,7 @@ class ReservationAvailabilityTest {
         return store;
     }
 
-    /**
-     * 조회 대상 날짜. <b>반드시 미래여야 한다.</b>
-     *
-     * <p>예전에는 {@code LocalDate.of(2026, 7, 10)} 이 박혀 있었다. 작성 시점엔 미래였지만
-     * 시간이 지나 과거가 됐고, {@code getAvailability} 가 <b>지난 시각을 걸러내기 시작한
-     * 2026-08-25 부터는 전부 빈 목록</b>이 된다. 날짜를 고정한 픽스처는 이렇게 조용히 썩는다.
-     * 이 테스트가 보려는 것은 <b>슬롯 경계와 예약 방식</b>이지 특정 날짜가 아니므로 상대값을 쓴다.
-     */
+    /** 슬롯 경계·방식만 확인하도록 날짜는 실행 시점의 미래 상대값을 사용한다. */
     private static final LocalDate TARGET_DATE = ServiceTime.today().plusDays(30);
 
     private List<String> availableTimes(Store store) {
@@ -178,11 +162,7 @@ class ReservationAvailabilityTest {
         assertThat(availableTimes(store)).containsExactly("09:00", "09:30", "10:00", "10:30");
     }
 
-    // ── 예약 방식 (2026-08-24) ─────────────────────────────────────────────
-    //
-    // 세 방식이 **같은 관문**(bookableSlotTimes)을 지나므로, 여기서 방식별 결과만 고정하면
-    // 예약 생성 검증(validateReservationSlot)도 같은 답을 내는 것이 보장된다 —
-    // 그쪽이 이 목록의 "포함 여부"만 보기 때문이다.
+    // 예약 방식별 조회 결과와 쓰기 검증이 같은 시각 목록을 사용하도록 고정한다.
 
     @Test
     @DisplayName("★ bookingType 이 null 이면 SLOT 으로 동작한다 — ddl-auto 로 컬럼만 추가된 기존 가게")

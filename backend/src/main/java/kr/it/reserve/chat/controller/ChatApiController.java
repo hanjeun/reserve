@@ -28,7 +28,7 @@ import java.util.Map;
 import org.springframework.data.domain.Page;
 
 /**
- * 손님용 채팅 API (2026-08-24 신설).
+ * 손님용 채팅 API.
  *
  * <p>방 ID 를 클라이언트가 고르지 않는다 — 손님에게는 방이 하나뿐이고,
  * 서버가 회원으로부터 찾거나 만든다. ID 를 받으면 "남의 방 번호"를 넣어볼 여지가 생긴다.

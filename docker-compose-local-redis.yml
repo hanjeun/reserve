@@ -3,7 +3,7 @@ name: reserve-local-redis
 services:
   redis:
     image: redis:8.2.9-alpine@sha256:5f2e6a105b2a8cc721911d5d29aadb032c25fe55b43e829e3d03413753ff47c2
-    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf", "--maxmemory", "64mb", "--maxmemory-policy", "noeviction"]
     user: "999:999"
     ports:
       - "127.0.0.1:6379:6379"

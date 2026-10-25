@@ -45,25 +45,10 @@ public class PaymentApiController {
     private String frontendUrl;
 
     /**
-     * [기능] 모바일 결제 사후 처리 (Redirect)
-     * 결제 성공/실패 여부에 따라 프론트엔드 결과 페이지로 리다이렉트합니다.
-     *
-     * <p>★ 이 클래스는 {@code @RestController} 다. 예전에는 여기서 {@code "redirect:" + url} 문자열을
-     * 반환했는데, 뷰 리졸버를 타지 않으므로 302 가 나가지 않고 그 문자열이 <b>응답 본문</b>으로 찍혔다.
-     * 모바일 결제 후 브라우저에 {@code redirect:https://...} 가 그대로 보이고 이동하지 않던 원인이다.
-     * 302 는 {@link ResponseEntity} 로 직접 만들어야 한다.
-     *
-     * <p>★ 2026-08-10 PortOne V2 전환 — 쿼리 파라미터 이름이 통째로 바뀌었다.
-     * <pre>
-     * V1: imp_uid / merchant_uid / imp_success / error_msg
-     * V2: paymentId / code / message            (성공 여부는 code 의 유무로 판단한다)
-     * </pre>
-     * V2 는 성공 시 {@code code} 를 보내지 않는다 — 그래서 "success 플래그"가 따로 없고
-     * <b>code 가 없으면 성공</b>이다. V1 의 {@code imp_success=true} 를 그대로 옮기면
-     * 모든 결제가 실패로 처리되므로 주의할 것.
-     *
-     * <p>{@code paymentId} 는 우리가 발급한 {@code merchantUid} 와 같은 값이다
-     * (요청 시 paymentId 에 merchantUid 를 그대로 실어 보낸다).
+     * PortOne V2의 paymentId·code·message 콜백을 받아 결과 페이지로 302 이동한다.
+     * code가 없어도 결제 성공 증거로 삼지 않고 서버 검증을 통과한 경우에만 성공으로 안내한다.
+     * paymentId는 prepare에서 발급한 merchantUid이며 결과 화면의 기존 쿼리 이름을 유지한다.
+     * RestController이므로 redirect 문자열 대신 ResponseEntity의 Location을 사용한다.
      */
     @GetMapping("/mobile-redirect")
     public ResponseEntity<Void> handleMobileRedirect(
@@ -147,21 +132,7 @@ public class PaymentApiController {
         return ApiResponse.success(response, "결제 검증 및 처리가 완료됐어요.");
     }
 
-    /**
-     * [기능] 결제 환불 — <b>본인 예약만, 금액은 가게 정책으로 계산.</b>
-     *
-     * <p>★ 2026-08-09 수정 — 예전에는 이랬다.
-     * <pre>
-     * SecurityUtil.getCurrentMember("환불 권한이 없습니다.");   // 로그인 여부만 보고 결과를 버림
-     * paymentService.refundPayment(refundDto);              // body 를 그대로 신뢰
-     * </pre>
-     * 그래서 로그인만 한 사람이 ① 남의 예약을 환불하거나 ② 환불 금액을 직접 정하거나
-     * ③ "환불 불가" 정책을 건너뛰고 전액을 받을 수 있었다.
-     * 이젠 {@code refundByMemberRequest} 가 소유자를 확인하고 금액을 정책에서 직접 계산한다.
-     *
-     * <p>요청 본문의 {@code refundAmount} · {@code paymentId} 는 <b>무시된다</b>.
-     * 환불 대상은 {@code reservationId} 로만 정해진다.
-     */
+    /** 예약 소유권을 확인하고 환불 금액은 서버 정책으로 계산한다. 본문의 금액·결제 ID는 신뢰하지 않는다. */
     @PostMapping("/refund")
     public ApiResponse<PaymentResponseDto> refundPayment(@RequestBody PaymentRefundDto refundDto) {
         Member requester = SecurityUtil.getCurrentMember("환불을 위해 로그인이 필요해요.");

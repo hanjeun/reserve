@@ -1,9 +1,7 @@
 name: Cache Cleanup
 
-# PR 에서 만든 캐시는 그 PR(refs/pull/N/merge)만 다시 쓸 수 있다.
-# PR 이 닫히면 쓸 곳이 없으므로 지워서, dev·main 캐시가 10GB 한도에 밀려나지 않게 한다.
-# Dependabot PR 은 pull_request 이벤트에서 읽기 권한만 받아서 pull_request_target 을 쓴다.
-# PR 코드를 체크아웃하지 않으므로 안전하다.
+# 닫힌 PR 전용 캐시를 정리해 공유 캐시 공간을 확보한다.
+# 쓰기 권한은 pull_request_target으로 얻되 PR 코드는 체크아웃하지 않는다.
 on:
   pull_request_target:
     types: [closed]

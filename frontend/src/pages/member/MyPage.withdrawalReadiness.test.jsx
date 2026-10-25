@@ -5,16 +5,17 @@ import { MemoryRouter } from 'react-router-dom';
 import MyPage from './MyPage';
 import useAuthStore from '../../store/useAuthStore';
 import { memberService } from '../../services';
+vi.mock('../../components/member/LoginSecuritySection', () => ({ default: ({ children }) => <section aria-label="로그인 및 보안">{children}</section> }));
 
 const feedback = vi.hoisted(() => ({
     message: { error: vi.fn(), warning: vi.fn(), success: vi.fn() },
-    confirm: vi.fn(), navigate: vi.fn(), logout: vi.fn(),
+    confirm: vi.fn(), navigate: vi.fn(), logout: vi.fn(), width: 1200,
 }));
 vi.mock('../../services', () => ({
     memberService: { getWithdrawalReadiness: vi.fn(), deleteMember: vi.fn() },
     businessService: { getMyStatus: vi.fn() },
 }));
-vi.mock('../../hooks', () => ({ useMessage: () => feedback, useWindowWidth: () => 1200 }));
+vi.mock('../../hooks', () => ({ useMessage: () => feedback, useWindowWidth: () => feedback.width }));
 vi.mock('../../hooks/useMessage', () => ({ default: () => feedback }));
 vi.mock('../../hooks/useTheme', () => ({
     default: () => ({ theme: 'light', resolvedTheme: 'light', font: 'pretendard', accent: 'blue' }),
@@ -75,6 +76,7 @@ const expectNoCompletion = () => {
 describe('MyPage withdrawal session readiness gate', () => {
     beforeEach(() => {
         vi.resetAllMocks();
+        feedback.width = 1200;
         localStorage.clear();
         useAuthStore.setState({
             user: { id: 7, role: 'USER', name: '회원7', email: 'member7@example.com' },
@@ -85,8 +87,27 @@ describe('MyPage withdrawal session readiness gate', () => {
         Element.prototype.scrollIntoView = vi.fn();
     });
 
+    it.each(['USER', 'BUSINESS'])('places security and withdrawal after all mobile settings for %s', role => {
+        feedback.width = 390;
+        useAuthStore.setState({ user: { ...useAuthStore.getState().user, role } });
+        show();
+        const security = screen.getByRole('region', { name: '로그인 및 보안' });
+        expect(screen.getByRole('main').lastElementChild).toBe(security);
+        expect(security).toContainElement(screen.getByRole('button', { name: '탈퇴하기' }));
+        expect(screen.getByText('알림 설정').compareDocumentPosition(security) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        if (role === 'BUSINESS') expect(screen.getByText('가게 작성 설정').compareDocumentPosition(security) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('keeps security in the left desktop column before the app settings', () => {
+        show();
+        const security = screen.getByRole('region', { name: '로그인 및 보안' });
+        expect(security.parentElement.parentElement.firstElementChild).toBe(security.parentElement);
+        expect(security.compareDocumentPosition(screen.getByText('디자인')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
     it('opens confirmation before any preparation or deletion and cancels without either request', async () => {
         show();
+        expect(screen.getByRole('region', { name: '로그인 및 보안' })).toContainElement(screen.getByRole('button', { name: '탈퇴하기' }));
         const options = await openConfirm();
         expect(options).toMatchObject({ title: '회원 탈퇴', okText: '탈퇴하기', cancelText: '취소', centered: true, okButtonProps: { danger: true } });
         expect(options.content).toContain('거래·환불·분쟁 대응에 필요한 기록은 비식별 상태로 보존돼요.');

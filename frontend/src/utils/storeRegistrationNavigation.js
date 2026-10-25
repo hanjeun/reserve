@@ -9,7 +9,7 @@ export const requestRegistrationStepBack = () => {
     return event.defaultPrevented;
 };
 
-// Navigation continuity is tab memory, independent of the user's disk autosave preference.
+// 탭 메모리의 이동 복구와 사용자 디스크 자동 저장 설정을 분리한다.
 export const readRegistrationNavigation = key => snapshots.get(key);
 export const rememberRegistrationNavigation = (key, snapshot) => {
     snapshots.delete(key);

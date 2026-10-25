@@ -98,7 +98,7 @@ def main():
                        f"GRANT SELECT, CREATE, ALTER, DROP, INDEX, REFERENCES ON {DATABASE}.* TO 'reserve_ddl'@'localhost';"]
         sql("\n".join(statements))
 
-        # mysqldump may exit successfully while omitting routine bodies.
+        # mysqldump가 성공해도 권한 부족으로 루틴 본문은 누락될 수 있다.
         incomplete = dump()
         require(incomplete.returncode == 0 and len(re.findall(rb"^CREATE TABLE ", incomplete.stdout, re.M)) == 12,
                 "Object coverage fixture was not dumped")

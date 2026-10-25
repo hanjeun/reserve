@@ -501,7 +501,7 @@ describe('app discovery home', () => {
     it('stays on home when location is unavailable and no saved address exists', async () => {
         const user = userEvent.setup();
         renderHome();
-        // Initial URL normalization is separate from the user's location request.
+        // 최초 URL 정규화와 사용자의 위치 요청을 구분한다.
         navigate.mockClear();
 
         await user.click(screen.getByRole('button', { name: '현재 위치로' }));

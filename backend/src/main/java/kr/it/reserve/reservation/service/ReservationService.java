@@ -1,10 +1,15 @@
 package kr.it.reserve.reservation.service;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.PersistenceContext;
+
 import kr.it.reserve.config.updates.EntityUpdates;
 
 import kr.it.reserve.audit.service.AuditLogService;
 import kr.it.reserve.email.service.EmailService;
 import kr.it.reserve.global.common.ServiceTime;
+import kr.it.reserve.global.common.PageRequests;
 import kr.it.reserve.global.holiday.HolidayService;
 import kr.it.reserve.global.error.ReservationException;
 import kr.it.reserve.member.entity.Member;
@@ -12,6 +17,7 @@ import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.payment.service.PaymentService;
 import kr.it.reserve.payment.service.RefundDispatchService;
 import kr.it.reserve.reservation.dto.CalendarDayResponse;
+import kr.it.reserve.reservation.admission.ReservationCreationGuard;
 import kr.it.reserve.reservation.dto.ReservationCreateRequest;
 import kr.it.reserve.reservation.dto.QrCheckinResponse;
 import kr.it.reserve.reservation.dto.ReservationResponse;
@@ -34,8 +40,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -68,6 +74,9 @@ public class ReservationService {
     private final MemberRepository memberRepository;
     private final AuditLogService auditLogService;
     private final QrCheckinTokenProvider qrCheckinTokenProvider;
+    private final ReservationCreationGuard creationGuard;
+    @PersistenceContext
+    private EntityManager reservationEntityManager;
     @Autowired(required = false)
     private ReservationUpdates updates;
 
@@ -82,7 +91,8 @@ public class ReservationService {
             EmailService emailService,
             MemberRepository memberRepository,
             @Lazy AuditLogService auditLogService,
-            QrCheckinTokenProvider qrCheckinTokenProvider) {
+            QrCheckinTokenProvider qrCheckinTokenProvider,
+            ReservationCreationGuard creationGuard) {
         this.reservationRepository = reservationRepository;
         this.storeRepository = storeRepository;
         this.availability = new ReservationAvailability(reservationRepository, storeRepository, holidayService);
@@ -91,12 +101,10 @@ public class ReservationService {
         this.memberRepository = memberRepository;
         this.auditLogService = auditLogService;
         this.qrCheckinTokenProvider = qrCheckinTokenProvider;
+        this.creationGuard = creationGuard;
     }
 
-    /**
-     * 예약 생성
-     */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED, timeout = 30)
     public ReservationResponse createReservation(ReservationCreateRequest request, Member member) {
         log.info("Reservation created: storeId={}, memberId={}", request.getStoreId(), member.getId());
 
@@ -108,6 +116,14 @@ public class ReservationService {
         }
         if (!freshMember.isTermsAgreed()) {
             throw new ReservationException("서비스 이용 약관에 동의해야 예약할 수 있어요.", HttpStatus.FORBIDDEN);
+        }
+
+        var attempt = creationGuard.begin(request, freshMember.getId());
+        if (attempt.replayReservationId() != null) {
+            Reservation prior = reservationRepository.findById(attempt.replayReservationId())
+                    .filter(r -> r.getMember().getId().equals(freshMember.getId()))
+                    .orElseThrow(() -> new ReservationException("기존 예약을 확인할 수 없어요.", HttpStatus.CONFLICT));
+            return ReservationResponse.fromEntity(prior);
         }
 
         // 비관적 락으로 조회 — 이 store row에 대한 동시 예약 요청을 트랜잭션 종료까지 순차화해서
@@ -166,6 +182,7 @@ public class ReservationService {
                 .build();
 
         ReservationResponse response = ReservationResponse.fromEntity(reservationRepository.save(reservation));
+        creationGuard.saved(attempt, reservation.getId());
         changed(reservation, EntityUpdates.Operation.CREATED);
 
         // 사장님에게 새 예약 알림 (비동기) — 이메일 알림 설정 ON일 때만
@@ -211,7 +228,7 @@ public class ReservationService {
             throw new ReservationException("현재 이 가게는 예약 접수를 받지 않아요.", HttpStatus.CONFLICT);
         }
         LocalDateTime reservationDateTime = LocalDateTime.of(date, time);
-        // ★ 반드시 KST 기준 "지금"이어야 한다. date·time 은 사용자가 고른 한국 시각이고,
+        // 반드시 KST 기준 "지금"이어야 한다. date·time 은 사용자가 고른 한국 시각이고,
         //   컨테이너는 UTC 라 인자 없는 now() 는 9시간 뒤처진다.
         //   그 상태에서는 **이미 지나간 시간대의 예약이 검사를 통과했다**
         //   (예: 14:00 KST 에 오늘 08:00 예약 → UTC 로는 05:00 < 08:00 이라 미래로 보인다).
@@ -221,15 +238,7 @@ public class ReservationService {
             throw new ReservationException("예약 날짜/시간은 현재 이후여야 해요.", HttpStatus.BAD_REQUEST);
         }
 
-        // ★ 휴무 검증 (2026-08-11 신설).
-        //   그 전까지 영업시간이 요일 구분 없이 하나뿐이라 **월요일 휴무인 가게도 월요일 예약을 받았다.**
-        //   기능이 없는 게 아니라 잘못된 예약을 받는 상태였고, 사장님은 그걸 하나씩 거절해야 했다.
-        //   거절은 이제 전액 환불이 나가므로 예약금이 왕복하는 비용까지 붙는다.
-        //   판정은 Store.isBookableOn 한 곳에만 둔다 — 여기와 getAvailability, 달력이 같은 답을 내야 한다.
-        //
-        //   2026-08-24: 운영 기간(openDate~closeDate)이 생기면서 isClosedOn → isBookableOn 으로 넓혔다.
-        //   휴무와 운영기간을 각각 판정하면 두 곳이 언젠가 어긋난다. 문구는 어느 쪽에 걸렸는지
-        //   구분해서 보여준다 — "휴무일"이라고만 하면 팝업스토어 기간 밖에 온 손님이 혼란스럽다.
+        // 휴무·운영 기간은 Store.isBookableOn에서 판정해 예약·가용 시각·달력이 같은 정책을 사용한다.
         if (!store.isBookableOn(date)) {
             throw new ReservationException(
                     store.isClosedOn(date)
@@ -240,12 +249,7 @@ public class ReservationService {
 
         validateBookingWindow(store, date, reservationDateTime, now);
 
-        // 브레이크 타임 검증 (breakStartTime 이상, breakEndTime 미만은 예약 불가)
-        //
-        // ★ SLOT 방식에만 적용한다 (2026-08-24). SESSION 은 사장님이 회차를 직접 적은 것이라
-        //   그 위에 브레이크타임을 얹으면 "적었는데 예약이 안 되는" 상태가 된다.
-        //   DAY 는 시각 자체가 의미를 갖지 않는다.
-        //   아래 목록 포함 검사만으로도 막히지만, 이 분기가 있어야 **왜 막혔는지**를 말해줄 수 있다.
+        // 브레이크 타임은 SLOT에만 적용한다. 직접 지정한 SESSION 회차와 DAY에는 덧씌우지 않는다.
         if (store.resolveBookingType() == Store.BookingType.SLOT
                 && store.getBreakStartTime() != null && store.getBreakEndTime() != null
                 && !time.isBefore(store.getBreakStartTime()) && time.isBefore(store.getBreakEndTime())) {
@@ -257,15 +261,7 @@ public class ReservationService {
             );
         }
 
-        // ★ 예약 시각 검증 — getAvailability 와 **같은 목록**을 써서 포함 여부만 본다 (2026-08-24).
-        //
-        //   예전에는 여기서 [open, close - slotMin] **범위**를 비교했다. 그런데 화면은 슬롯 목록을
-        //   보여주므로 둘이 같은 판정이 아니었다 — 30분 단위 가게에 09:07 을 API 로 직접 보내면
-        //   범위 검사는 통과했다(목록엔 없는 시각인데도). 목록 포함 여부로 바꾸면 그 틈이 사라지고,
-        //   예약 방식이 셋으로 늘어도 여기에 분기를 더할 필요가 없다.
-        //
-        //   ⚠️ 이 변경으로 격자에서 벗어난 시각은 이제 거절된다. UI 로 만든 예약은 항상 격자 위에
-        //      있으므로 정상 경로에는 영향이 없다.
+        // 가용 시각 조회와 같은 목록의 포함 여부를 검사해 격자 밖 시각을 거부한다.
         List<LocalTime> bookable = availability.bookableSlotTimes(store, date);
         if (!bookable.contains(time)) {
             throw new ReservationException(
@@ -276,6 +272,12 @@ public class ReservationService {
             );
         }
 
+        validateActiveReservationCapacity(store, member, date, time, guestCount, excludeReservationId);
+    }
+
+    /** 생성·수정·미래 완료 복귀가 같은 중복/정원 정책을 사용한다. 호출자는 가게 행을 잠근다. */
+    private void validateActiveReservationCapacity(Store store, Member member,
+            LocalDate date, LocalTime time, Integer guestCount, Long excludeReservationId) {
         // 중복 예약 방지: 가게 정책에 따라 같은 날짜 활성 예약 여부 확인 (수정 시 자기 자신은 제외)
         if (!Boolean.TRUE.equals(store.getAllowDuplicateReservation())) {
             boolean isDuplicate = (excludeReservationId == null)
@@ -297,7 +299,7 @@ public class ReservationService {
 
     private void validateBookingWindow(
             Store store, LocalDate date, LocalDateTime reservationDateTime, LocalDateTime now) {
-        // ★ 예약 가능 범위 검증 (2026-08-11 신설).
+        // 예약 가능 범위 검증.
         //   그 전까지 미래 날짜 제한이 없어 1년 뒤 예약도 들어왔다. 그렇게 먼 예약은 가게가 운영
         //   계획을 세울 수 없고 이용자도 잊어버린다. null = 제한 없음(기존 가게의 동작 유지).
         Integer maxAdvance = store.getMaxAdvanceBookingDays();
@@ -328,12 +330,7 @@ public class ReservationService {
         int currentGuests = (excludeReservationId == null)
                 ? reservationRepository.sumActiveGuestsBySlot(store.getId(), date, time)
                 : reservationRepository.sumActiveGuestsBySlotExcluding(store.getId(), date, time, excludeReservationId);
-        // ★ `!= null` 만 보면 안 된다 — 0 이하는 이 필드에서 **무제한**을 뜻한다(2026-08-09).
-        //   아래 getAvailableSlots 의 `capacity <= 0` 분기가 이미 그렇게 해석하고 있어서,
-        //   여기서만 null 만 거르면 조회는 "전부 예약 가능", 예약은 "항상 마감"으로
-        //   **서로 반대로 판정**한다. 사용자에겐 전 시간대가 열려 보이는데 누르면 전부 마감 에러가 난다.
-        //   신규 저장은 StoreService.normalizeCapacity 가 null 로 통일하지만,
-        //   이미 0 이 들어간 기존 데이터가 있을 수 있어 읽는 쪽에서도 방어한다.
+        // null 또는 0 이하 정원은 무제한이다. 조회와 쓰기가 같은 해석을 사용한다.
         if (store.getMaxCapacityPerSlot() != null && store.getMaxCapacityPerSlot() > 0) {
             int remaining = store.getMaxCapacityPerSlot() - currentGuests;
             if (remaining <= 0) {
@@ -361,10 +358,6 @@ public class ReservationService {
     @Transactional(readOnly = true)
     public List<CalendarDayResponse> getMonthCalendar(Long storeId, YearMonth month) { return availability.getMonthCalendar(storeId, month); }
 
-
-    /**
-     * 예약 상세 조회
-     */
     @Transactional(readOnly = true)
     public ReservationResponse getReservation(Long id, Member member) {
         Reservation reservation = findByIdOrThrow(id);
@@ -372,36 +365,26 @@ public class ReservationService {
         return ReservationResponse.fromEntity(reservation);
     }
 
-    /**
-     * 예약 수정 (사용자용)
-     *
-     * 정책:
-     * - PENDING(승인 전): 자유롭게 수정.
-     * - CONFIRMED(승인 후, 미결제): 수정 허용하되 내용이 바뀌므로 다시 PENDING으로 되돌려 사장님 재승인을 받는다.
-     *   (예약금 없음 + 자동 승인 ON인 가게는 생성과 동일하게 즉시 CONFIRMED로 자동 승인)
-     * - 이미 결제된 예약: 수정 불가 → 취소 후 재예약으로 유도(결제 정합성 보호).
-     * - COMPLETED/REJECTED/CANCELLED/NO_SHOW: 종료 상태라 수정 불가.
-     *
-     * status 필드는 사용자가 임의로 바꿀 수 없도록 요청에서 무시하고 서버가 위 규칙대로 결정한다.
-     */
+    /** 커밋된 결과만 복구하며 입장권 점유·결제·정원 검사·쓰기 잠금은 수행하지 않는다. */
+    @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
+    public ReservationResponse recoverReservation(ReservationCreateRequest request, Member member) {
+        Member current = memberRepository.findByIdAndDeletedAtIsNull(member.getId())
+                .filter(m -> !m.isDeleted())
+                .orElseThrow(() -> new ReservationException("회원 정보를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
+        Long id = creationGuard.recover(request, current.getId());
+        if (id == null) return null;
+        Reservation reservation = findByIdOrThrow(id);
+        validateOwnership(reservation, current);
+        if (reservation.isDeleted()) throw new ReservationException(RESERVATION_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND);
+        return ReservationResponse.fromEntity(reservation);
+    }
+
+    /** 결제된 예약과 종료 상태는 수정할 수 없다. 승인된 미결제 예약은 변경 후 재승인을 받고, 자동 승인은 생성과 같은 조건을 적용한다. 상태는 서버가 결정한다. */
     // 금융 잠금 전 ID 조회의 RR snapshot으로 대기 중 확정된 예약을 놓치지 않는다.
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public ReservationResponse updateReservation(Long id, ReservationUpdateRequest request, Member member) {
         Reservation reservation = findByIdForUpdateOrThrow(id);
-        validateOwnership(reservation, member);
-
-        Reservation.ReservationStatus current = reservation.getStatus();
-        boolean editableStatus = current == Reservation.ReservationStatus.PENDING
-                || current == Reservation.ReservationStatus.CONFIRMED;
-        if (!editableStatus) {
-            throw new ReservationException("완료·취소·거절·노쇼된 예약은 변경할 수 없어요.", HttpStatus.BAD_REQUEST);
-        }
-
-        // 결제된 예약은 수정 불가 — 취소 후 재예약으로 유도(부분 환불/재결제 정합성 보호)
-        if (Boolean.TRUE.equals(reservation.getDepositPaid())) {
-            throw new ReservationException(
-                    "이미 결제된 예약은 변경할 수 없어요. 취소 후 다시 예약해주세요.", HttpStatus.BAD_REQUEST);
-        }
+        ReservationAccess.editable(reservation, member);
 
         // 슬롯 재검증을 위해 가게를 비관적 락으로 조회 (생성과 동일하게 오버부킹 레이스 차단)
         Store store = storeRepository.findByIdForUpdate(reservation.getStore().getId())
@@ -427,9 +410,6 @@ public class ReservationService {
             reservation.setSpecialRequest(request.getSpecialRequest());
         }
 
-        // 재승인 정책: 내용이 바뀌었으니 CONFIRMED였던 예약도 PENDING으로 되돌려 사장님이 다시 확인하게 한다.
-        // 단, 예약금 없음 + 자동 승인 ON인 가게는 생성과 동일하게 즉시 CONFIRMED로 자동 승인.
-        // NOTE: 재승인 알림 메일은 현재 범위에서 제외 — 필요해지면 approveReservation과 동일한 패턴으로 추가.
         boolean hasDeposit = store.getNoShowDeposit() != null && store.getNoShowDeposit() > 0;
         Reservation.ReservationStatus newStatus =
                 Boolean.TRUE.equals(store.getAutoApprovalEnabled()) && !hasDeposit
@@ -531,12 +511,12 @@ public class ReservationService {
         changed(reservation, EntityUpdates.Operation.UPDATED);
         reservation.setRejectionReason(reason != null ? reason : "가게 사정으로 인한 거절");
 
-        // ★ 거절은 전액 환불이다 (2026-08-11 추가).
+        // 거절은 전액 환불이다.
         //   그 전까지 이 메서드에는 환불 호출이 **한 줄도 없었다**. 예약금을 낸 이용자의 예약을
         //   가게가 거절하면 상태만 REJECTED 로 바뀌고 돈은 가게에 남았다. 이용약관
         //   (frontend/src/pages/policy/Terms.jsx)이 "가게 사정에 의한 취소는 전액 환불"이라고
         //   명시하고 있으므로 약관 위반이었고, 이용자가 되돌릴 수단도 없었다.
-        //   ⚠️ 정책 계산(calculateRefundAmount)을 쓰면 안 된다 — 그건 이용자 귀책 취소의 위약금
+        //   주의: 정책 계산(calculateRefundAmount)을 쓰면 안 된다 — 그건 이용자 귀책 취소의 위약금
         //      규칙이라, 가게가 당일에 거절해도 0원이 나올 수 있다. 전액 경로를 따로 쓴다.
         //   외부 발신은 거절·환불 의도 커밋 후에 실행하므로 PG 오류가 거절을 되돌리지 않는다.
         prepareStoreDecisionRefund(id, "가게의 예약 거절에 따른 전액 환불", reservation);
@@ -562,23 +542,9 @@ public class ReservationService {
     }
 
     /**
-     * 예약 취소 (사업자용) — <b>확정된 예약을 가게가 취소한다. 전액 환불.</b> (2026-08-11 신설)
-     *
-     * <h3>왜 만들었나</h3>
-     * 그 전까지 가게에는 <b>예약을 취소할 수단이 아예 없었다.</b>
-     * {@link #cancelReservation} 은 {@code validateOwnership} 을 타서 예약자 본인만 통과하고
-     * 가게 주인은 403 이다. 그래서 사장님이 갑자기 문을 닫아야 할 때 할 수 있는 게
-     * "노쇼 처리"밖에 없었고, 그건 오지 않은 손님을 벌하는 상태라 사실과 정반대로 기록된다.
-     *
-     * <h3>왜 CONFIRMED 만인가</h3>
-     * PENDING 은 이미 {@link #rejectReservation}(거절)이 담당한다. 같은 일을 하는 버튼이
-     * 두 개면 사장님이 무엇을 눌러야 할지 모르고, 기록도 REJECTED/CANCELLED 로 갈린다.
-     * 상태별로 정확히 하나의 종료 경로만 둔다.
-     *
-     * <h3>환불</h3>
-     * 가게 귀책이므로 <b>정책 무시하고 전액</b>이다({@code refundFullByStoreDecision}).
-     * 사유는 {@code cancelReason} 에 넣는다 — {@code rejectionReason} 을 재사용하면
-     * 화면이 "거절 사유"라는 라벨로 보여줘 이용자가 오해한다.
+     * 가게 소유권과 처리 가능한 예약 상태를 확인한 뒤 가게 사정 취소를 기록한다.
+     * 가게 귀책은 전액 환불 경로로 준비하며 외부 호출은 커밋 뒤에 수행한다.
+     * 취소 사유는 거절 사유와 구분해 cancelReason에 저장한다.
      */
     @Transactional
     public void cancelReservationByStore(Long id, Member owner, String reason) {
@@ -632,19 +598,7 @@ public class ReservationService {
         refundDispatch.afterCommit(attemptId);
     }
 
-    /**
-     * 승인 되돌리기 (사업자용, 2026-08-11 신설) — CONFIRMED → PENDING.
-     *
-     * <p>승인 버튼은 확인 모달 없이 한 번에 확정된다. 목록에서 바로 옆 줄을 누르는 오조작이
-     * 잦은데, 그 전까지 되돌릴 방법이 <b>거절뿐</b>이었다 — 거절은 이용자에게 "거절됨"으로
-     * 남고 거절 메일까지 나가므로, 실수 정정에 쓰기엔 흔적이 너무 크다.
-     *
-     * <p><b>승인 취소 메일을 반드시 보낸다.</b> 승인 순간 이미 "승인되었습니다" 메일이 나갔다.
-     * 되돌리기만 하고 알리지 않으면 이용자는 확정된 줄 알고 방문한다.
-     *
-     * <p><b>돈은 건드리지 않는다.</b> 승인은 결제와 무관한 상태 전이라 환불할 것이 없다.
-     * 예약금을 낸 예약이면 {@code depositPaid} 는 true 로 남고, PENDING 으로 돌아가도 그대로다.
-     */
+    /** 승인 취소는 결제 상태를 유지하고 다시 대기 상태임을 메일로 알린다. */
     @Transactional
     public void undoApprove(Long id, Member owner) {
         Reservation reservation = findByIdForUpdateOrThrow(id);
@@ -675,14 +629,8 @@ public class ReservationService {
         }
     }
 
-    /**
-     * 이용완료 되돌리기 (사업자용, 2026-08-11 신설) — COMPLETED → CONFIRMED.
-     *
-     * <p>완료는 이용자에게 메일이 나가지 않으므로 알림도 필요 없다.
-     * 예약 시각이 이미 지난 건이면 {@code ReservationElapsedScheduler} 가 곧 UNCONFIRMED 로
-     * 옮긴다 — 되돌린 직후 CONFIRMED 로 두는 게 맞고, 그 뒤는 평소 규칙에 맡긴다.
-     */
-    @Transactional
+    /** 이용완료를 승인 상태로 되돌린다. 예약 시각이 지났으면 기존 경과 처리 정책을 적용한다. */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public void undoComplete(Long id, Member owner) {
         Reservation reservation = findByIdForUpdateOrThrow(id);
         validateStoreOwner(reservation, owner);
@@ -692,21 +640,25 @@ public class ReservationService {
         }
         requireWithinUndoWindow(reservation);
 
+        if (!LocalDateTime.of(reservation.getReservationDate(), reservation.getReservationTime()).isBefore(ServiceTime.now())) {
+            // 금융 잠금의 ID 조회가 만든 이전 RR snapshot을 재사용하지 않도록 이 TX는 READ_COMMITTED다.
+            Store store = storeRepository.findByIdForUpdate(reservation.getStore().getId())
+                    .orElseThrow(() -> new ReservationException(STORE_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
+            // 소유자 검사에서 이미 읽은 가게도 잠금 획득 뒤 최신 상태로 다시 읽는다.
+            reservationEntityManager.refresh(store, LockModeType.PESSIMISTIC_WRITE);
+            if (store.isDeleted() || reservation.getMember().isDeleted()) {
+                throw new ReservationException("종료된 가게나 탈퇴한 회원의 미래 예약은 복구할 수 없어요.", HttpStatus.CONFLICT);
+            }
+            validateActiveReservationCapacity(store, reservation.getMember(), reservation.getReservationDate(),
+                    reservation.getReservationTime(), reservation.getGuestCount(), reservation.getId());
+        }
+
         reservation.setStatus(Reservation.ReservationStatus.CONFIRMED);
         changed(reservation, EntityUpdates.Operation.UPDATED);
         log.info("Completion undone: reservationId={}, ownerId={}", id, owner.getId());
     }
 
-    /**
-     * Undo 는 <b>방금 누른 걸 무르는 용도</b>다. 시간 제한이 없으면 며칠 전 예약도 되돌릴 수 있어
-     * 사실상 무제한 상태 되돌리기가 되고, 이용자가 이미 안내받은 내용과 어긋난다.
-     * 오래된 건을 되돌려야 한다면 그건 Undo 가 아니라 취소·거절로 처리할 일이다.
-     *
-     * <p>⚠️ 여기서는 {@code LocalDateTime.now(Clock.systemDefaultZone())} 가 맞다 — KST 로 바꾸면 안 된다.
-     * {@code updatedAt} 은 {@code @LastModifiedDate} 가 <b>JVM 시계</b>로 찍은 값이라
-     * 같은 시계끼리 비교해야 한다. (예약 날짜·시각은 이용자에게 보이는 KST 값이라 반대다 —
-     * ReservationElapsedScheduler 가 그래서 SERVICE_ZONE 을 쓴다.)
-     */
+    /** 되돌리기는 정해진 시간 안에서만 허용한다. updatedAt과 같은 JVM 시계로 비교하고 한국 시간으로 치환하지 않는다. */
     private void requireWithinUndoWindow(Reservation reservation) {
         LocalDateTime changedAt = reservation.getUpdatedAt();
         if (changedAt == null || changedAt.isBefore(LocalDateTime.now(Clock.systemDefaultZone()).minusMinutes(UNDO_WINDOW_MINUTES))) {
@@ -749,10 +701,17 @@ public class ReservationService {
     }
 
     @Transactional(readOnly = true)
-    public List<ReservationResponse> getMyReservations(Member member) {
-        List<Reservation> reservations = reservationRepository.findByMemberOrderByCreatedAtDesc(member);
+    public Page<ReservationResponse> getMyReservations(Member member, int page, int size, String search,
+            Reservation.ReservationStatus status, String sort) {
+        Pageable pageable = PageRequests.bounded(page, size).withSort(reservationManagementSort(sort));
+        String keyword = search == null ? "" : search.trim().replace("!", "!!").replace("%", "!%").replace("_", "!_");
+        Page<Reservation> reservations = reservationRepository.searchForMember(member, keyword, status, pageable);
+        Map<Long, Long> reviews = myReservationReviewIds(reservations.getContent());
+        return reservations.map(r -> ReservationResponse.fromEntityWithReviewId(r, reviews.get(r.getId())));
+    }
 
-        // COMPLETED 예약 ID만 모아서 리뷰 ID를 IN 쿼리 1번으로 조회 (N+1 방지)
+    private Map<Long, Long> myReservationReviewIds(List<Reservation> reservations) {
+        // 신규 페이지 API는 반환할 페이지의 COMPLETED ID만 묶어 조회한다.
         List<Long> completedIds = reservations.stream()
                 .filter(r -> r.getStatus() == Reservation.ReservationStatus.COMPLETED)
                 .map(Reservation::getId)
@@ -764,14 +723,7 @@ public class ReservationService {
                     .forEach(row -> reviewIdByReservationId.put((Long) row[0], (Long) row[1]));
         }
 
-        return reservations.stream()
-                .map(r -> {
-                    Long reviewId = reviewIdByReservationId.get(r.getId());
-                    return reviewId != null
-                            ? ReservationResponse.fromEntityWithReviewId(r, reviewId)
-                            : ReservationResponse.fromEntity(r);
-                })
-                .toList();
+        return reviewIdByReservationId;
     }
 
     /**
@@ -862,7 +814,7 @@ public class ReservationService {
         log.info("Reservation removed: id={}, memberId={}", id, member.getId());
     }
 
-    // ========== 내부 도우미 메서드 ==========
+    // 내부 도우미 메서드
 
     /**
      * unique한 표시용 예약번호 생성 — DB의 unique 제약과 충돌하지 않을 때까지 재시도.
@@ -904,13 +856,7 @@ public class ReservationService {
         ReservationAccess.member(reservation, member);
     }
 
-    /**
-     * 사장님이 아직 "닫을" 수 있는 상태인가 — 완료·노쇼·취소의 공통 조건 (2026-08-11).
-     *
-     * <p>CONFIRMED 와 UNCONFIRMED 를 같이 받는다. UNCONFIRMED 는 CONFIRMED 에서
-     * 시간만 지난 것이지 성격이 다른 상태가 아니다. 세 곳에 같은 조건을 복사해두면
-     * 나중에 상태가 하나 더 생겼을 때 한 곳만 고쳐지는 사고가 난다.
-     */
+    /** 승인 상태와 시간이 지난 미확인 상태의 종료 처리는 같은 정책을 사용한다. */
     private boolean isClosable(Reservation reservation) {
         return ReservationAccess.approved(reservation);
     }

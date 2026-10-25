@@ -7,7 +7,7 @@ import { animation, colors, fontSize } from '../../styles/tokens';
 
 const PROFILE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
-/** Keep the existing account-photo control identical for account and feed photos. */
+/* 계정과 피드의 프로필 사진 도구 모양을 공유한다. */
 export default function ProfilePhotoPicker({ src, disabled = false, onSelect, label = '프로필 사진 변경', animate = false }) {
     const input = useRef(null);
     const { message } = useMessage();

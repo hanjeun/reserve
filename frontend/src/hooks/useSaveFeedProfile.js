@@ -4,7 +4,7 @@ import useMessage from './useMessage';
 import feedService from '../services/feedService';
 import { assertCurrentSession } from '../api/sessionScope';
 
-/** Onboarding and account settings share the same public-profile save boundary. */
+/* 가입 안내와 계정 설정은 같은 공개 프로필 저장 관문을 사용한다. */
 export default function useSaveFeedProfile(onSaved) {
     const client = useQueryClient();
     const { message } = useMessage();
@@ -21,7 +21,7 @@ export default function useSaveFeedProfile(onSaved) {
                 return await feedService.uploadProfileAvatar(values.avatarFile);
             } catch (error) {
                 assertCurrentSession(values.session);
-                // The text save committed; retain its real server state and the selected local file for retry.
+                // 텍스트 저장이 완료되면 서버 상태와 재시도할 로컬 사진을 유지한다.
                 client.setQueryData(feedKeys.profile(), data);
                 await invalidateFeed(client);
                 assertCurrentSession(values.session);

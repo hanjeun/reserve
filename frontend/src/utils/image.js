@@ -4,11 +4,8 @@
 
 import { API_BASE_URL } from '../constants/api';
 
-/**
- * 이미지 URL을 전체 경로로 변환
- * - https://... 로 시작하면 그대로 반환 (S3/CloudFront URL, 소셜 로그인 이미지)
- * - /uploads/... 로 시작하면 API_BASE_URL 붙여서 반환 (로컬 개발용 fallback)
- * - null/undefined면 fallback 반환
+/*
+ * 외부 이미지 URL은 보존하고 로컬 업로드 경로에는 API 주소를 붙인다. 값이 없으면 대체 이미지를 반환한다.
  */
 const FALLBACKS = {
     thumbnail:  'https://placehold.co/300x200?text=No+Image',

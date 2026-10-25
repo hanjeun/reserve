@@ -5,7 +5,7 @@ import Button from './Button';
 export const ModalActionGroup = ({ children }) => <div className="reserve-modal-actions">{children}</div>;
 ModalActionGroup.propTypes = { children: PropTypes.node };
 
-/** Modal decisions share height and padding; each label determines its own width. */
+/* 모달 결정 버튼은 높이·여백을 공유하고 너비는 문구에 맞춘다. */
 const ModalActions = ({ onCancel, onConfirm, cancelText = '취소', confirmText = '확인', loading = false, disabled = false, cancelDisabled = false }) => (
     <ModalActionGroup>
         <Button variant="outline" size="sm" onClick={onCancel} disabled={cancelDisabled}>{cancelText}</Button>

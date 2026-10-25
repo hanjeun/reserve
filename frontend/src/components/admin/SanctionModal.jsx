@@ -10,26 +10,8 @@ import { surfaceForWhiteText } from '../../utils/colorContrast';
 
 const { Text } = Typography;
 
-/**
- * RESERVE - 관리자 제재 모달 (통합)
- *
- * 2026-07 전수조사로 통합됨. 예전엔 거의 동일한 모달이 4벌 복붙되어 있었다:
- *   MembersTab.jsx      - SuspendModal      / BanModal
- *   StoresAdminTab.jsx  - StoreSuspendModal / StoreBanModal
- * 문구·버튼색·기간 필드 유무만 다르고 구조는 전부 같아서 preset 하나로 합침.
- *
- * ── 닫힘 애니메이션 버그 수정 (이 통합의 진짜 이유) ──────────────────────────────
- * 예전 호출부는 이렇게 되어 있었다:
- *     <SuspendModal key={suspendOpen ? 'suspend-open' : 'suspend-closed'} open={suspendOpen} ... />
- * 모달이 내부 useState(days/reason)를 들고 있어서, 재오픈 시 이전 입력값이 남는 걸 막으려고
- * key로 강제 remount를 시킨 것. 그런데 key가 "닫힐 때도" 바뀌기 때문에 React가 그 순간
- * 컴포넌트를 언마운트해버려서, AntD가 닫힘 애니메이션을 재생할 DOM 자체가 사라졌다.
- * → "열릴 땐 애니메이션이 되는데 닫힐 땐 툭 사라지는" 증상의 원인.
- *
- * antd 6이 정식 지원하는 destroyOnHidden(구 destroyOnClose, deprecated)을 쓰면
- * "닫힘 애니메이션이 끝난 뒤에" 내용을 파괴하므로 애니메이션 보존 + 입력값 리셋을 둘 다 얻는다.
- * 그래서 이 컴포넌트는 내부 상태를 <Modal> children 쪽(SanctionBody)에 두고,
- * Modal에 destroyOnHidden을 걸어 호출부의 key 토글을 완전히 제거했다.
+/*
+ * 모달 자식의 입력은 destroyOnHidden으로 닫힘 뒤 정리하며 open에 따라 key를 바꾸지 않는다.
  */
 
 // 파일 내부 전용 상수 — export하면 react-refresh/only-export-components 위반(컴포넌트 외의 것을
@@ -79,9 +61,8 @@ const SANCTION_PRESETS = {
         maxLength: 200,
         okStyle: 'danger',
     },
-    // 2026-07 추가 — AdminAdsTab의 광고 강제 중단은 사유를 '운영 정책 위반'으로 하드코딩해두고
-    // 관리자가 직접 입력할 수 없었다. 회원/가게 제재와 동일한 "사유 입력 + 확인" 패턴이라
-    // 이 모달을 그대로 재사용한다.
+    // 광고 중단 사유는 공용 제재 모달에서 입력받는다.
+
     AD_SUSPEND: {
         title: '광고 중단',
         icon: 'danger',

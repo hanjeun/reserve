@@ -27,12 +27,10 @@ public class Review {
     @Column(name = "review_id")
     private Long id;
 
-    // 리뷰 작성자
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "member_id", nullable = false)
     private Member member;
 
-    // 리뷰 대상 가게
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "store_id", nullable = false)
     private Store store;
@@ -46,11 +44,9 @@ public class Review {
     @Column(name = "rating", nullable = false)
     private Integer rating;
 
-    // 리뷰 제목
     @Column(name = "title", nullable = false, length = 100)
     private String title;
 
-    // 리뷰 내용
     @Column(name = "content", nullable = false, length = 1000)
     private String content;
 
@@ -62,7 +58,6 @@ public class Review {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // 리뷰 수정 메서드
     public void update(Integer rating, String title, String content) {
         this.rating = rating;
         this.title = title;

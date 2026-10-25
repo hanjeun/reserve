@@ -18,17 +18,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
- * Public synthetic vectors generated once with Git's OpenSSL 3.5.4, independently of the Java verifier.
- * These are not provider-issued vectors and contain no real credentials.
- * Protocol: https://developers.naver.com/docs/login/devguide/devguide.md
- *
- * UTF-8 SECRET through {@code openssl dgst -md5 -binary} gives raw key 6c34e587490c0bc658f7c2186c1995c9.
- * {@code openssl enc -aes-128-cbc -nosalt -K <key> -iv 000102030405060708090a0b0c0d0e0f}
- * encrypts the UTF-8 subject with default block padding; prepend that IV and encode as unpadded Base64url.
- * {@code openssl dgst -sha256 -mac HMAC -macopt hexkey:<key> -binary} signs the UTF-8 string
- * {@code clientId=CLIENT&encryptUniqueId=CIPHERTEXT&timestamp=TIMESTAMP}, again encoded as unpadded Base64url.
- * INVALID_PADDING flips C1[15] by 0x0c, forcing the final plaintext padding byte from 0x0c to zero.
- * INVALID_UTF8 encrypts the two bytes c3 28 with valid block padding. Both error fixtures have valid MACs.
+ * Java 검증기와 독립적으로 OpenSSL 3.5.4에서 만든 합성 벡터이며 제공자 발급 값이나 실제 자격정보가 아니다.
+ * 규격: https://developers.naver.com/docs/login/devguide/devguide.md
+ * UTF-8 비밀값의 MD5로 AES-128-CBC 키를 만들고 IV를 앞에 붙인 뒤 패딩 없는 Base64url로 인코딩한다.
+ * clientId·encryptUniqueId·timestamp 문자열에 HMAC-SHA256을 적용한다.
+ * 잘못된 패딩·UTF-8 벡터도 유효한 MAC을 가져 복호화 이후 검증을 확인한다.
  */
 class NaverUnlinkProtocolBoundaryTest {
     private static final String CLIENT = "public-synthetic-client";

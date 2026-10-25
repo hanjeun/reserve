@@ -34,13 +34,21 @@ public interface WaitingEntryRepository extends JpaRepository<WaitingEntry, Long
 
     boolean existsByStoreIdAndMemberIdAndStatusIn(Long storeId, Long memberId, Set<WaitingStatus> statuses);
 
-    @Query("""
-            SELECT w FROM WaitingEntry w WHERE w.memberId = :memberId
-              AND (w.status IN :active OR w.finishedAt >= :dayStart)
-            ORDER BY w.createdAt DESC, w.id DESC
-            """)
+    String PERSONAL_VISIBLE_WINDOW = "(w.status IN :active OR w.finishedAt >= :dayStart)";
+
+    @Query("SELECT w FROM WaitingEntry w WHERE w.memberId = :memberId AND " + PERSONAL_VISIBLE_WINDOW
+            + " ORDER BY w.createdAt DESC, w.id DESC")
     Page<WaitingEntry> findPersonal(@Param("memberId") Long memberId, @Param("active") Set<WaitingStatus> active,
                                     @Param("dayStart") LocalDateTime dayStart, Pageable pageable);
+
+    /** 상세 이동도 본인 목록과 같은 표시 기간과 DB 소유권 조건으로 조회한다. */
+    @Query("SELECT w FROM WaitingEntry w WHERE w.id = :entryId AND w.memberId = :memberId AND " + PERSONAL_VISIBLE_WINDOW
+            + " AND EXISTS (SELECT viewer.id FROM Member viewer WHERE viewer.id = :memberId AND viewer.deletedAt IS NULL"
+            + " AND (viewer.status = kr.it.reserve.member.entity.MemberStatus.ACTIVE OR (viewer.status = kr.it.reserve.member.entity.MemberStatus.SUSPENDED"
+            + " AND viewer.suspendedUntil < :sanctions)))")
+    Optional<WaitingEntry> findPersonalEntry(@Param("entryId") Long entryId, @Param("memberId") Long memberId,
+            @Param("active") Set<WaitingStatus> active, @Param("dayStart") LocalDateTime dayStart,
+            @Param("sanctions") LocalDateTime sanctions);
 
     // 필터와 total은 동일한 본인·표시기간 경계를 먼저 적용한다. 가게가 없어도 기존 내역은 유지한다.
     @Query(value = """

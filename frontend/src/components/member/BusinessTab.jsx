@@ -15,7 +15,6 @@ import { colors, radius, fontSize } from '../../styles/tokens';
 const { Text } = Typography;
 const PROFILE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
-
 const BusinessTab = ({ user }) => {
     const { message, confirm } = useMessage();
     const [status, setStatus]     = useState(/** @type {string | null} */ (null));
@@ -115,7 +114,7 @@ const BusinessTab = ({ user }) => {
         try {
             const current = await businessService.getMyStatus();
             if (!isCurrent()) return;
-            // 조회 실패·사라진 신청·불완전 응답으로 빈 수정 폼을 열지 않는다.
+            // 조회 오류·불완전 응답을 빈 수정 폼으로 표시하지 않는다.
             if (current?.status !== 'PENDING'
                 || typeof current.businessName !== 'string' || !current.businessName.trim()) {
                 throw new Error('Pending business verification is unavailable');
@@ -214,7 +213,7 @@ const BusinessTab = ({ user }) => {
         description="신청 상태를 확인한 뒤 인증 신청을 진행할 수 있어요."
         onRetry={retryStatus} />;
 
-    // ── 사업자 이미 완료 ──
+    // 사업자 이미 완료 ──
     if (isBusiness) return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={bizStyles.statusCard('success')}>
@@ -238,7 +237,7 @@ const BusinessTab = ({ user }) => {
         </div>
     );
 
-    // ── 심사 대기중 ──
+    // 심사 대기중 ──
     if (status === 'PENDING') {
         // 수정 모드일 때는 폼 표시
         if (isEditing && editState.scope === editScope && editState.status === 'ready') return (
@@ -287,7 +286,7 @@ const BusinessTab = ({ user }) => {
         );
     }
 
-    // ── 거절됨 ──
+    // 거절됨 ──
     if (status === 'REJECTED') return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={bizStyles.statusCard('error')}>
@@ -317,7 +316,7 @@ const BusinessTab = ({ user }) => {
         </div>
     );
 
-    // ── 미신청 (기본) ──
+    // 미신청 (기본) ──
     return (
         <>
             <BusinessForm
@@ -333,23 +332,8 @@ const BusinessTab = ({ user }) => {
     );
 };
 
-/**
- * 사업자 인증 입력 폼.
- *
- * ★ 2026-08-06 — 이 탭만 폼 규격 밖에 있었다
- *   마이페이지의 이름·비밀번호·위치 탭은 전부 `Form.Item` + `rules` 라 미입력이면
- *   **입력칸 밑에 빨간 글씨**가 붙는데, 사업자 탭만 useState 객체 + `message.warning` 토스트였다.
- *   그래서 어느 칸이 문제인지 화면에서 알 수 없었고(토스트는 상단에 뜬다) 다른 탭과 감각이 달랐다.
- *   → AntD Form 으로 옮겨 다른 탭과 같은 규격으로 맞춘다.
- *
- *   부모(BusinessTab)는 여전히 `form` state 로 값을 들고 있다(수정 모드 프리필·제출 payload 가
- *   그 값을 쓴다). 그래서 여기서는 AntD Form 을 **입력·검증 계층으로만** 쓰고
- *   `onValuesChange` 로 부모 state 를 계속 동기화한다 — 부모 쪽을 통째로 갈아엎지 않으면서
- *   검증 UX 만 규격에 맞추는 절충이다.
- *
- *   `initialValues` 만 쓰고 setFieldsValue 이펙트를 두지 않는 이유: 수정 모드는
- *   handleStartEdit 가 setForm → setIsEditing 순서로 호출해 **폼이 새 값으로 마운트**되므로
- *   초기값만으로 충분하고, 이펙트를 두면 타이핑 중 값을 되돌릴 위험만 생긴다.
+/*
+ * 새 수정 진입에만 초기값을 채우며 제출 값에서 등록증 검증용 보조 필드를 제외한다.
  */
 const BusinessForm = ({ form, setForm, fileList, onFileListChange, onPreview, onPreviewClickCapture, beforeUpload, onSubmit, loading, submitLabel = '사업자 인증 신청', licenseRequired = false, onCancel }) => {
     const [antdForm] = Form.useForm();
@@ -393,10 +377,9 @@ const BusinessForm = ({ form, setForm, fileList, onFileListChange, onPreview, on
                 <FormInput placeholder="추가 메모 (선택)" />
             </Form.Item>
 
-            {/* 사업자 등록증 — 가게 이미지 업로드(StoreImages)와 동일한 picture-card Upload + 공유 useImagePreview 재사용.
-                눈(미리보기)·휴지통(삭제) 아이콘까지 가게 폼과 완전히 동일하게 동작한다.
-                파일은 부모의 fileList 가 들고 있어 Form 의 값이 아니다 → validator 로만 검증한다.
-                수정 모드에서는 등록증 재업로드가 선택이라 licenseRequired 로 갈랐다. */}
+            {/*
+             * 등록증 파일은 부모 상태에서 보관·검증하고 수정 시 재업로드는 선택으로 둔다.
+             */}
             <Form.Item
                 name="license"
                 style={{ marginBottom: 12 }}

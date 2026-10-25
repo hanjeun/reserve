@@ -1,6 +1,6 @@
 name: Sonar CI
 
-# Static analysis is opt-in. Coverage targets do not trigger tests or block delivery.
+# 정적 분석은 요청할 때만 실행하며 커버리지 목표로 테스트나 배포를 반복하지 않는다.
 on:
   workflow_dispatch:
 

@@ -16,15 +16,7 @@ import java.util.List;
 import java.util.Optional;
 import jakarta.persistence.LockModeType;
 
-/**
- * 환불 원장 조회. 이 리포지토리의 존재 이유는 <b>"미결 건을 뽑을 수 있다"</b> 하나다 —
- * 그게 안 되면 로그와 다를 바 없다({@link RefundAttempt} 주석 참고).
- *
- * <p>미결 상태 집합은 {@link RefundAttempt#UNRESOLVED} 한 곳에서만 정의한다.
- * JPQL 안에 enum 을 문자열로 박아 넣지 않는 이유이기도 하다 — 이름이 바뀌면
- * 컴파일은 통과하고 <b>런타임에</b> 깨지는데, 하필 이 쿼리는 "미결 건이 0개"라는
- * 가장 안심되는 모습으로 실패한다.
- */
+/** 미결 상태 집합은 {@link RefundAttempt#UNRESOLVED}를 공통으로 사용한다. */
 @Repository
 public interface RefundAttemptRepository extends JpaRepository<RefundAttempt, Long> {
 

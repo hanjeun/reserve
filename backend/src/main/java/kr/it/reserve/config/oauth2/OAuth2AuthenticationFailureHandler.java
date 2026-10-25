@@ -33,6 +33,7 @@ public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationF
                                         AuthenticationException exception) throws IOException, ServletException {
 
         log.error("OAuth2 login failed: errorType={}", exception.getClass().getSimpleName());
+        kr.it.reserve.member.service.LoginMethodService.clearFlow(request);
 
         String rawMessage = resolveMessage(exception);
         String errorMessage = URLEncoder.encode(rawMessage, StandardCharsets.UTF_8);
@@ -64,6 +65,10 @@ public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationF
             case "authorization_request_not_found" -> "로그인 요청이 만료됐어요. 다시 시도해주세요.";
             case "invalid_state"                   -> "잘못된 로그인 요청이에요. 다시 시도해주세요.";
             case "email_conflict"                  -> "이미 가입된 이메일이에요. 기존 가입 방식으로 로그인해주세요.";
+            case "login_method_expired"            -> "로그인 방법 변경 요청이 만료됐어요. 기존 계정으로 로그인한 뒤 다시 진행해주세요.";
+            case "login_method_conflict"           -> "이미 연결된 소셜 계정이에요. 기존 연결을 확인해주세요.";
+            case "login_method_email_mismatch"     -> "현재 RESERVE 계정과 같은 이메일의 인증된 소셜 계정을 사용해주세요.";
+            case "login_method_identity_mismatch"  -> "처음 연결한 소셜 계정으로 본인 확인해주세요.";
             case "oauth_reauthentication_required" -> "계정 보호를 위해 소셜 로그인을 다시 진행해주세요.";
             default                                -> "소셜 로그인에 실패했어요. 다시 시도해주세요.";
         };

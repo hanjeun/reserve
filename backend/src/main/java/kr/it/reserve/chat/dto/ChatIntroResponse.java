@@ -20,11 +20,7 @@ public record ChatIntroResponse(boolean configured, String notice, String greeti
     public static final String DEFAULT_SUPPORT_GREETING = "안녕하세요, {이름}님 🙂\n반가워요.\n\n궁금한 내용을 남겨주시면\n관리자가 확인 후 답변드릴게요.";
     public static final String DEFAULT_STORE_GREETING = "안녕하세요, {이름}님 🙂\n반가워요.\n\n궁금한 내용을 남겨주시면\n사장님이 확인 후 답변드릴게요.";
 
-    /**
-     * 관리자가 아직 설정하지 않았을 때의 고객지원 기본 문답(2026-09-24). 관리자 화면에 그대로 채워져 고칠 수 있다.
-     * 답변은 실제 동작과 맞춘다 — 결제된 예약은 변경 불가(ReservationService·useStoreDetailActions),
-     * 환불은 가게 환불 기준, 사업자 인증 승인 후 가게 등록.
-     */
+    /** 설정이 없을 때 사용하는 고객지원 기본 문답. */
     static final List<Item> DEFAULT_SUPPORT_ITEMS = List.of(
             new Item("예약을 확인하고 싶어요",
                     "로그인 후 오른쪽 위 프로필 메뉴의 '내 예약'에서 예약 상태와 방문 일시, 체크인 QR을 확인할 수 있어요."),

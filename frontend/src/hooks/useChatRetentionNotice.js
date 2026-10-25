@@ -12,19 +12,19 @@ function parseRecord(raw) {
         const value = JSON.parse(raw);
         if (Number.isFinite(value?.lastActiveAt) && value.lastActiveAt >= 0
             && typeof value.dismissed === 'boolean') return { lastActiveAt: value.lastActiveAt, dismissed: value.dismissed };
-    } catch { /* A missing or invalid preference starts with the notice visible. */ }
+    } catch { /* 설정이 없거나 유효하지 않으면 보관 안내를 표시한다. */ }
     return { lastActiveAt: 0, dismissed: false };
 }
 
 function recordOf(key, storageKey) {
-    // Another tab may have been used while this messenger was unmounted.
+    // 메신저를 닫은 동안 다른 탭에서 설정을 바꿨을 수 있다.
     try {
         if (storageKey) {
             const stored = parseRecord(localStorage.getItem(storageKey));
             const current = records.get(key);
             if (!current || stored.lastActiveAt >= current.lastActiveAt) records.set(key, stored);
         }
-    } catch { /* Memory remains available when browser storage is blocked. */ }
+    } catch { /* 브라우저 저장소를 쓸 수 없어도 메모리 설정은 유지한다. */ }
     if (!records.has(key)) records.set(key, { lastActiveAt: 0, dismissed: false });
     return records.get(key);
 }
@@ -34,12 +34,12 @@ const isVisible = (record, now = Date.now()) => !record.dismissed
 
 function saveRecord(key, storageKey, record) {
     records.set(key, record);
-    // Only a timestamp and notice flag are persisted, never messages, attachments or drafts.
-    try { if (storageKey) localStorage.setItem(storageKey, JSON.stringify(record)); } catch { /* Keep it in memory. */ }
+    // 시각과 안내 플래그만 저장하고 대화·첨부·초안은 저장하지 않는다.
+    try { if (storageKey) localStorage.setItem(storageKey, JSON.stringify(record)); } catch { /* 저장소 오류 시 메모리 값만 유지한다. */ }
     listeners.forEach(listener => listener());
 }
 
-/** One reminder per member/browser, renewed after 24 hours away from the messenger. */
+/* 회원·브라우저마다 안내하며 메신저를 떠난 지 24시간 뒤 다시 표시한다. */
 export default function useChatRetentionNotice(memberId, sessionIdentity) {
     const storageKey = Number.isSafeInteger(Number(memberId)) && Number(memberId) > 0
         ? `${STORAGE_PREFIX}${Number(memberId)}` : null;

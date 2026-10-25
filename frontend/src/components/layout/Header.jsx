@@ -58,11 +58,8 @@ const Header = () => {
     const navigationStartRef = useRef(/** @type {string | null} */ (null));
     const navigationLocationRef = useRef({ location, navigationType });
     useLayoutEffect(() => { navigationLocationRef.current = { location, navigationType }; }, [location, navigationType]);
-    // 뒤로가기 버튼은 사라질 때도 나타날 때와 같은 접힘 모션을 탄다(2026-09-26).
-    // 예전엔 ← 를 직접 눌렀을 때만 접혔고, 로고·하단 탭·브라우저 뒤로가기로 탐색 루트에 돌아갈 때는
-    // 버튼이 그 자리에서 언마운트돼 RESERVE 로고가 48px 뚝 튀었다(사용자 지적).
-    // 이제 showBack 이 꺼져도 모션 시간만큼 더 남겨 두고 같은 --leaving 애니메이션을 재생한다.
-    // 로고 자체는 여전히 움직이지 않고 기다리지도 않는다 — 버튼 자리가 접히면서 로고가 따라 미끄러질 뿐이다.
+    // 뒤로가기 도구가 없어질 때도 접힘 모션이 끝날 때까지 DOM을 유지한다.
+
     const { shouldRender: backMounted } = useExitAnimation(showBack, HEADER_ACTION_MOTION_MS);
     const { shouldRender: workspaceMounted } = useExitAnimation(showWorkspaceMenu, HEADER_ACTION_MOTION_MS);
     // 모션 최소화에서는 애니메이션이 꺼져 있으므로 남겨 둘 이유가 없다 — 즉시 나타나고 사라진다.
@@ -71,8 +68,7 @@ const Header = () => {
     // 버튼이 계속 필요한 경로 사이에서는 같은 DOM을 유지하고, 실제로 없어질 때만 접는다.
     const backLeaving = renderBack && !showBack;
     const workspaceLeaving = renderWorkspaceMenu && !showWorkspaceMenu;
-    const keyword = currentPath === '/stores' ? new URLSearchParams(location.search).get('keyword')?.trim() : '';
-    const searchTarget = keyword ? '/search?keyword=' + encodeURIComponent(keyword) : '/search';
+    const searchTarget = '/search';
     const searchLeaving = navigationIntent?.intent === 'search'
         && navigationIntent.pathname === location.pathname && navigationIntent.hash === location.hash;
 
@@ -123,10 +119,8 @@ const Header = () => {
         void requestAction(() => runHeaderNavigation('search', () => navigate(searchTarget, { state: { searchEntry: true } })));
     };
 
-    // RESERVE 로고는 움직이지 않는다 — 눌림·축소·대기 없이 바로 이동한다(2026-09-21 사용자 결정:
-    // "로고가 클릭되면서 안으로 들어가는 모션은 싫다, 로고는 정적이고 페이지만 움직이게").
-    // 도착한 홈의 준비된 영역만 들어온다. 아래 가게 목록의 로딩은 이 이동을 취소하지 않는다.
-    // 홈에서 누르면 맨 위로 스크롤만 한다.
+    // 로고 자체는 정적으로 두고 목적지의 진입 모션만 사용한다.
+
     const handleLogoClick = (e) => {
         if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
         e.preventDefault();
@@ -140,10 +134,8 @@ const Header = () => {
         navigate('/', { state: { reserveRouteMotion: 'from-left', reserveHomeEntry: true } });
     };
 
-    // 주의: 정지/영구정지 회원은 이제 로그인 자체가 차단되므로(이메일/소셜 공통)
-    // 로그인된 상태에서 배너를 띄우는 분기는 더 이상 필요하지 않음 — 완전히 제거됨
     return (
-        <header data-skeleton-shown={skeletonShown ? 'true' : undefined} className={'reserve-header' + (keyword ? ' reserve-header-has-query' : '') + (!isLoggedIn ? ' reserve-header-is-guest' : '') + (showBack ? ' reserve-header-has-back' : '') + (renderWorkspaceMenu ? ' reserve-header-has-workspace-menu' : '') + (searchLeaving ? ' reserve-header--search-leaving' : '')}
+        <header data-skeleton-shown={skeletonShown ? 'true' : undefined} className={'reserve-header' + (!isLoggedIn ? ' reserve-header-is-guest' : '') + (showBack ? ' reserve-header-has-back' : '') + (renderWorkspaceMenu ? ' reserve-header-has-workspace-menu' : '') + (searchLeaving ? ' reserve-header--search-leaving' : '')}
             inert={searchLeaving ? true : undefined} aria-busy={searchLeaving || undefined}
             style={{ ...(isDiscoveryRoot ? { ...styles.header, boxShadow: 'none' } : styles.header), '--reserve-search-motion-duration': `${SEARCH_MOTION_DURATION_MS}ms` }}>
             <div className="reserve-header-inner" style={styles.inner}>
@@ -170,18 +162,10 @@ const Header = () => {
                         <span className="reserve-header-logo-wordmark" aria-hidden="true">RESERVE</span>
                     </a>
                 </div>
-                {keyword && (
-                    <Link to={searchTarget} state={{ searchEntry: true }} onClick={handleSearchEntry} className="reserve-header-query" aria-label={'검색어 수정: ' + keyword} title={keyword}>
-                        <SearchOutlined aria-hidden="true" />
-                        <span className="reserve-header-query-text">{keyword}</span>
-                    </Link>
-                )}
                 <div className="reserve-header-actions" style={styles.actions}>
-                    {!keyword && (
-                        <Tooltip title="가게·지역·서비스 검색" disabled={searchLeaving}><Link to={searchTarget} state={{ searchEntry: true }} onClick={handleSearchEntry} className="reserve-header-search" aria-label="가게·지역·서비스 검색">
-                            <SearchOutlined aria-hidden="true" />
-                        </Link></Tooltip>
-                    )}
+                    <Tooltip title="통합 검색" disabled={searchLeaving}><Link to={searchTarget} state={{ searchEntry: true }} onClick={handleSearchEntry} className="reserve-header-search" aria-label="통합 검색">
+                        <SearchOutlined aria-hidden="true" />
+                    </Link></Tooltip>
                     {isLoggedIn ? (
                         <Suspense fallback={<span className="reserve-header-account-loading" aria-hidden="true" style={styles.avatarFallback} />}>
                             <HeaderAccountMenu />
@@ -198,11 +182,8 @@ const Header = () => {
     );
 };
 
-/**
- * 앱 첫 로딩(로그인 확인) 동안 App 부트 셸이 그리는 정적 헤더(2026-09-29).
- * 진짜 헤더와 같은 틀·같은 RESERVE 로고 자리만 두고, 계정 메뉴·검색처럼 API 나 로그인 상태가 필요한 것은 그리지 않는다.
- * 예전엔 빈 64px 띠만 있어 헤더가 비어 보였다. 뒤로가기 버튼은 두지 않는다 — 진짜 헤더가 붙을 때 그 버튼은
- * 펼침 모션으로 들어오므로 로고가 옆으로 미끄러질 뿐 튀지 않는다.
+/*
+ * 인증 복구 동안 정적 헤더 틀을 유지하고 인증이 필요한 검색·계정 도구는 붙이지 않는다.
  */
 export function HeaderPlaceholder({ discoveryRoot = false, workspace = false }) {
     return (
@@ -234,8 +215,7 @@ const styles = {
         position: 'sticky',
         top: 0,
         zIndex: 1000,
-        // 구분선은 border 가 아니라 안쪽 그림자다 — border 는 64px 안에서 1px 를 먹어 로고가 9.5px 에 놓이고,
-        // 구분선 없는 홈(10px)으로 이동할 때 로고가 반 픽셀 튀었다(2026-09-23 실측).
+
         boxShadow: `inset 0 -1px 0 ${colors.border.light}`,
         height: heights.header,
         width: '100%',

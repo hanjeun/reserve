@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Set;
 
-/** Metadata-only invalidations. Recipients are internal and are never serialized into SSE. */
+/** 본문 대신 갱신 메타데이터만 전송하며 수신자 정보는 SSE에 직렬화하지 않는다. */
 @Component
 @RequiredArgsConstructor
 public class EntityUpdates {

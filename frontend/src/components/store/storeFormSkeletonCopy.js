@@ -1,7 +1,7 @@
 import { BOOKING_TYPE_HINTS } from '../../constants';
 
 // 가게 폼 로딩 뼈대(StoreFormSkeleton)가 크기·줄바꿈을 유지하며 가리는 고정 문구(라벨 밑 안내·토글 설명).
-// ⚠ StoreBasicInfo·StoreImages·StoreFormActions 의 문구와 같아야 한다 — StoreFormSkeleton.test 가 원문 포함 여부를 검사한다.
+// 주의: StoreBasicInfo·StoreImages·StoreFormActions 의 문구와 같아야 한다 — StoreFormSkeleton.test 가 원문 포함 여부를 검사한다.
 export const STORE_FORM_SKELETON_HINTS = Object.freeze({
     bookingType: BOOKING_TYPE_HINTS.SLOT,
     serviceDomain: '손님이 찾을 때 쓰는 큰 분류예요',

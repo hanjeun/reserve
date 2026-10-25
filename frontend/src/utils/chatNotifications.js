@@ -30,11 +30,8 @@ const scanMessages = (messages, previous, viewerRole) => {
     return { highest, hasIncoming };
 };
 
-/**
- * PC 브라우저 세션용 알림. enable은 반드시 사용자 클릭 핸들러에서 호출한다.
- * 초깃값은 OFF이며 서버·저장장치·Service Worker와 연결하지 않는다.
- * notify에는 최초 이력이 아닌 새 폴링 메시지를 넘긴다. 본문·이름은 읽지도 않는다.
- * onOpen은 호출부가 현재 로그인 세션과 대화 접근 권한을 다시 확인하는 콜백이다.
+/*
+ * 사용자 클릭으로 활성화한 현재 PC 세션에만 새 메시지를 알린다. 본문·이름을 읽거나 저장하지 않으며 대화 열기는 호출부가 세션·접근 권한을 재확인한다.
  */
 export function createChatNotifier({
     NotificationApi = globalThis.Notification,
@@ -54,8 +51,8 @@ export function createChatNotifier({
     let pendingEnable = null;
     let lastDisplayedAt = null;
     let displayed = null;
-    // 서버 id는 단조 증가한다. 방별 high-water cursor로 예전 메시지 재생도 막는다.
-    // LRU 50개 숫자만 보관하며 메시지나 사람·가게 정보를 담지 않는다.
+    // 방별 최대 메시지 ID로 이미 알린 메시지의 재생을 막는다.
+    // 숫자 커서만 제한된 개수로 보관하고 메시지·참가자 정보는 저장하지 않는다.
     const seen = new Map();
 
     const permission = () => {
@@ -95,7 +92,7 @@ export function createChatNotifier({
         optedIn = enabled;
         const state = snapshot();
         if (changed) {
-            try { onStateChange?.(state); } catch { /* UI 콜백 실패는 권한 상태에 영향을 주지 않는다. */ }
+            try { onStateChange?.(state); } catch { /* UI 콜백 오류는 알림 권한 상태를 바꾸지 않는다. */ }
         }
         return state;
     };
@@ -185,7 +182,7 @@ export function createChatNotifier({
                 if (disposed || displayed !== notification || ticket !== generation
                     || !getState().enabled) return;
                 closeDisplayed();
-                try { onOpen?.(roomId); } catch { /* 현재 세션에서 대화 열기에 실패해도 안전하게 닫는다. */ }
+                try { onOpen?.(roomId); } catch { /* 대화 열기 오류에도 알림은 닫는다. */ }
             };
             notification.onclose = () => {
                 if (displayed === notification) displayed = null;

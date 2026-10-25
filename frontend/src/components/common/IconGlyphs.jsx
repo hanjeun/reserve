@@ -48,6 +48,7 @@ export function LockGlyph() { return <><rect x="5" y="10" width="14" height="11"
 export function LogoutGlyph() { return <><path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5M10 12h11m-5-5 5 5-5 5" /></>; }
 export function MailGlyph() { return <><rect x="3" y="5" width="18" height="14" rx="3" /><path d="m4 6 8 7 8-7" /></>; }
 export function MinusGlyph() { return <path d="M4 12h16" />; }
+export function DisconnectGlyph() { return <path d="m14 9 2-2a3 3 0 1 1 4 4l-2 2M10 15l-2 2a3 3 0 1 1-4-4l2-2M9 3v3M3 9h3M15 18v3M18 15h3" />; }
 export function MobileGlyph() { return <><rect x="6" y="2" width="12" height="20" rx="3" /><path d="M10 5h4M11 19h2" /></>; }
 export function MoonGlyph() { return <path d="M21 13.2A9 9 0 0 1 10.8 3a9 9 0 1 0 10.2 10.2Z" />; }
 export function MoreGlyph() { return <><circle cx="5" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="19" cy="12" r="1" fill="currentColor" stroke="none" /></>; }

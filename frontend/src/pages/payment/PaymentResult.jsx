@@ -33,7 +33,7 @@ const canLookupPayment = (memberId, type, merchantUid) => Boolean(memberId)
 
 const recordsPath = (isAd) => (isAd ? '/business?tab=ads' : '/my-reservations');
 
-// 완료·실패로 확정되지 않은 화면의 제목/설명 — 조회 불가 / 조회 실패 / 아직 미확정.
+// 조회 불가·오류·미확정을 완료·실패 상태와 구분한다.
 const unavailableCopy = (canLookup, isError) => {
     if (!canLookup) {
         return {
@@ -230,7 +230,7 @@ const PaymentResultFrame = ({ children, busy = false }) => (
 const PaymentRecoveryLink = ({ isAd, onRecover }) => (
     <p className="reserve-payment-result__recovery">
         결제창으로 이동하지 못하셨나요?{' '}
-        <button type="button" onClick={onRecover}>
+        <button type="button" className="reserve-text-link" onClick={onRecover}>
             {isAd ? '광고 관리에서 다시 열기' : '내 예약에서 다시 열기'}
         </button>
     </p>

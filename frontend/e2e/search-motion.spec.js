@@ -23,6 +23,11 @@ test.beforeEach(async ({ page }) => {
             await route.continue();
             return;
         }
+        if (path === '/api/search') {
+            const keyword = new URL(route.request().url()).searchParams.get('keyword');
+            await route.fulfill({ json: { success: true, data: { keyword, groups: ['stores', 'benefits', 'feed'].map(key => ({ key, items: [], error: null, hasMore: false })) } } });
+            return;
+        }
         if (path === '/api/member/me' || path === '/api/auth/refresh') {
             await route.fulfill({ status: 401, json: { success: false, message: '세션이 없습니다.' } });
             return;
@@ -105,7 +110,9 @@ test('submitting a search shows results without a page slide', async ({ page }) 
     const field = page.locator('.reserve-search-field input');
     await field.fill('카페');
     await field.press('Enter');
-    await expect(page).toHaveURL(/\/stores\?keyword=/);
+    await expect(page).toHaveURL(/\/search\?keyword=/);
+    await expect(page.getByLabel('통합 검색 결과')).toBeVisible();
+    await expect(page.locator('.reserve-search-page')).not.toHaveClass(/reserve-search-page--leaving/);
     await expect(page.locator('.ant-layout-content')).not.toHaveClass(/reserve-route-entry--/);
 });
 

@@ -52,7 +52,7 @@ const STORE_OPEN_FAILURE_TITLES = {
     410: '현재 문의를 받을 수 없는 가게예요.',
 };
 
-const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverImageSrc, onClose }) => {
+const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initialSelection = null, coverImageSrc, onClose }) => {
     // 고객지원 표시 이름·사진(채팅 관리 설정) — 제목 계산보다 먼저 읽는다.
     const supportIdentity = useSupportIdentity();
     const navigate = useNavigate();
@@ -86,12 +86,15 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     const searchFocusFrame = useRef(null);
     useEffect(() => () => cancelAnimationFrame(searchFocusFrame.current), []);
     const routeStoreId = Number(initialStoreId);
-    const routeSelection = useMemo(
-        () => Number.isInteger(routeStoreId) && routeStoreId > 0
-            ? { kind: 'store', storeId: routeStoreId }
-            : null,
-        [routeStoreId],
-    );
+    const routeKind = initialSelection?.kind;
+    const routeRoomId = initialSelection?.roomId;
+    const selectedStoreId = initialSelection?.storeId;
+    const routeSelection = useMemo(() => {
+        if (routeKind === 'support') return { kind: 'support' };
+        if (routeKind === 'owner' && canOwnStores && Number.isSafeInteger(routeRoomId) && routeRoomId > 0) return { kind: 'owner', roomId: routeRoomId };
+        if (routeKind === 'store' && Number.isSafeInteger(selectedStoreId) && selectedStoreId > 0) return { kind: 'store', storeId: selectedStoreId };
+        return Number.isSafeInteger(routeStoreId) && routeStoreId > 0 ? { kind: 'store', storeId: routeStoreId } : null;
+    }, [routeKind, routeRoomId, selectedStoreId, canOwnStores, routeStoreId]);
     const selection = routeSelection ?? storedSelection;
     const inRoute = routeSelection !== null;
     const isHome = storedView === 'home' && !inRoute;
@@ -595,6 +598,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
 MessengerContentBody.propTypes = {
     surface: PropTypes.oneOf(['page', 'panel']),
     initialStoreId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    initialSelection: PropTypes.shape({ kind: PropTypes.oneOf(['store', 'owner', 'support']).isRequired, storeId: PropTypes.number, roomId: PropTypes.number }),
     coverImageSrc: PropTypes.string,
     onClose: PropTypes.func,
 };

@@ -1,19 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import SearchPage from './index';
 import Header from '../../components/layout/Header';
+import { searchCatalog } from '../../constants/searchCatalog';
 import useAuthStore from '../../store/useAuthStore';
 import { createLoadingPresentation, LoadingPresentationContext } from '../../components/layout/loadingPresentation';
 import { addRecentSearch, clearRecentSearches, readRecentSearches, recentSearchOwner } from '../../utils/recentSearches';
 
 const reducedMotionMock = vi.hoisted(() => ({ value: true }));
+const searchMock = vi.hoisted(() => ({ data: { groups: [] }, catalog: [] }));
+vi.mock('../../hooks/useUnifiedSearch', () => ({ default: ({ keyword, submittedKeyword, confirmed, composing }) => {
+    const current = keyword.trim();
+    const active = !composing && confirmed && current === submittedKeyword;
+    return { keyword: current, valid: current.length > 0 && current.length <= 100, ready: !composing,
+        confirmed: active, remoteConfirmed: active, catalog: searchMock.catalog,
+        publicQuery: { isFetching: false, isLoading: false, isError: false }, personalQuery: { isFetching: false },
+        personalAllowed: false, publicData: active ? searchMock.data : undefined };
+} }));
 
 vi.mock('../../hooks/useDocumentTitle', () => ({ default: () => {} }));
 vi.mock('../../hooks/useReducedMotion', () => ({ default: () => reducedMotionMock.value }));
 vi.mock('../../hooks/useGoBack', () => ({ default: () => vi.fn() }));
 vi.mock('../../components/layout/HeaderAccountMenu', () => ({ default: () => <button>페이지 메뉴 열기</button> }));
+
+function ResultDestination() {
+    const navigate = useNavigate();
+    return <button onClick={() => navigate(-1)}>검색 결과로 돌아가기</button>;
+}
 
 function RouteProbe() {
     const location = useLocation();
@@ -27,6 +42,7 @@ function renderSearch(entries = ['/search'], initialIndex = entries.length - 1, 
             <Routes>
                 <Route path="/search" element={<SearchPage />} />
                 <Route path="/stores" element={<Header />} />
+                <Route path="/store/:id" element={<ResultDestination />} />
                 <Route path="/" element={<p>홈</p>} />
             </Routes>
             <RouteProbe />
@@ -43,7 +59,11 @@ describe('dedicated search submission and result editing', () => {
         vi.clearAllMocks();
         reducedMotionMock.value = true;
         clearRecentSearches();
+        searchMock.data = { groups: [] }; searchMock.catalog = [];
+        useAuthStore.setState({ user: null, isLoggedIn: false, authRestoring: false, isLoggingOut: false, sessionRevision: 31 });
+        window.scrollTo = vi.fn();
     });
+
 
     it('loads the search term and submits it with Enter', async () => {
         const user = userEvent.setup();
@@ -51,8 +71,8 @@ describe('dedicated search submission and result editing', () => {
         expect(field().value).toBe('공방');
         expect(document.activeElement).toBe(field());
         await user.keyboard('{Enter}');
-        expect(path()).toBe('/stores?keyword=' + encodeURIComponent('공방'));
-        expect(screen.getByRole('link', { name: '검색어 수정: 공방' }).textContent).toBe('공방');
+        expect(path()).toBe('/search?keyword=' + encodeURIComponent('공방'));
+        expect(screen.getByLabelText('통합 검색 결과')).toBeInTheDocument();
     });
 
     it('uses the left search icon to submit the same trimmed keyword', async () => {
@@ -64,7 +84,7 @@ describe('dedicated search submission and result editing', () => {
         expect(submit.getAttribute('type')).toBe('submit');
         expect(submit.querySelector('.anticon-search')).toBeTruthy();
         await user.click(submit);
-        expect(path()).toBe('/stores?keyword=' + encodeURIComponent('카페 & 안산'));
+        expect(path()).toBe('/search?keyword=' + encodeURIComponent('카페 & 안산'));
     });
 
     it('keeps empty or whitespace searches on the input screen', async () => {
@@ -79,13 +99,17 @@ describe('dedicated search submission and result editing', () => {
         expect(document.activeElement).toBe(field());
     });
 
-    it('clears only the input and restores input focus', async () => {
+    it('clears the confirmed URL and restores the original landing with input focus', async () => {
         const user = userEvent.setup();
         renderSearch(['/search?keyword=' + encodeURIComponent('공방')]);
         await user.click(screen.getByRole('button', { name: '검색어 지우기' }));
         expect(field().value).toBe('');
         expect(document.activeElement).toBe(field());
-        expect(path()).toBe('/search?keyword=' + encodeURIComponent('공방'));
+        expect(path()).toBe('/search');
+        expect(screen.getByRole('heading', { name: '어떤 서비스를 찾으세요?' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: '빠른 검색' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: '최근 검색' })).toBeInTheDocument();
+        expect(screen.queryByLabelText('통합 검색 결과')).toBeNull();
     });
 
     it('returns to the same result filters, view and page when editing is cancelled', async () => {
@@ -110,8 +134,8 @@ describe('dedicated search submission and result editing', () => {
         await user.clear(field());
         await user.type(field(), '카페');
         await user.click(screen.getByRole('button', { name: '검색', exact: true }));
-        expect(path()).toBe('/stores?keyword=' + encodeURIComponent('카페'));
-        expect(screen.getByRole('link', { name: '검색어 수정: 카페' })).toBeTruthy();
+        expect(path()).toBe('/search?keyword=' + encodeURIComponent('카페'));
+        expect(field()).toHaveValue('카페');
     });
 
     it('ignores composition-confirmation Enter and keyCode 229', () => {
@@ -199,17 +223,18 @@ describe('dedicated search submission and result editing', () => {
         }
     });
 
-    it('uses the same slide-down for submitting a search and ignores repeated submissions', () => {
+    it('keeps grouped submissions on the same page without replaying entry or starting leave motion', () => {
         vi.useFakeTimers();
         try {
             reducedMotionMock.value = false;
             const { container } = renderSearch(['/search?keyword=' + encodeURIComponent('카페')]);
             fireEvent.submit(screen.getByRole('search'));
             fireEvent.submit(screen.getByRole('search'));
-            expect(container.querySelector('.reserve-search-page')).toHaveClass('reserve-search-page--leaving');
+            expect(container.querySelector('.reserve-search-page')).not.toHaveClass('reserve-search-page--leaving');
             expect(path()).toBe('/search?keyword=' + encodeURIComponent('카페'));
             act(() => vi.advanceTimersByTime(220));
-            expect(path()).toBe('/stores?keyword=' + encodeURIComponent('카페'));
+            expect(path()).toBe('/search?keyword=' + encodeURIComponent('카페'));
+            expect(readRecentSearches(recentSearchOwner(useAuthStore.getState().user))).toEqual(['카페']);
         } finally {
             vi.useRealTimers();
         }
@@ -245,7 +270,7 @@ describe('dedicated search submission and result editing', () => {
         const user = userEvent.setup();
         const { unmount } = renderSearch();
         await user.click(screen.getByRole('button', { name: '카페', exact: true }));
-        expect(path()).toBe('/stores?keyword=' + encodeURIComponent('카페'));
+        expect(path()).toBe('/search?keyword=' + encodeURIComponent('카페'));
         unmount();
         renderSearch();
         await user.click(screen.getByRole('link', { name: '맛집·카페' }));
@@ -261,14 +286,14 @@ describe('dedicated search submission and result editing', () => {
         renderSearch();
         expect(screen.queryByRole('link', { name: '가게 전체 보기' })).toBeNull();
         await user.click(screen.getByRole('button', { name: '최근 검색: 안산 공방', exact: true }));
-        expect(path()).toBe('/stores?keyword=' + encodeURIComponent('안산 공방'));
+        expect(path()).toBe('/search?keyword=' + encodeURIComponent('안산 공방'));
         expect(readRecentSearches(recentSearchOwner(useAuthStore.getState().user))).toEqual(['안산 공방']);
     });
 
     it('keeps typed input and cancelled editing out of recent searches', async () => {
         const user = userEvent.setup();
         renderSearch(['/search?keyword=' + encodeURIComponent('입력 중')]);
-        expect(screen.getByText('최근 검색한 내용이 없어요.')).toBeInTheDocument();
+        expect(screen.queryByRole('heading', { name: '최근 검색' })).toBeNull();
         fireEvent.keyDown(field(), { key: 'Enter', isComposing: true });
         await user.click(screen.getByRole('button', { name: '취소' }));
         expect(readRecentSearches(recentSearchOwner(useAuthStore.getState().user))).toEqual([]);
@@ -288,4 +313,100 @@ describe('dedicated search submission and result editing', () => {
         expect(screen.getByText('최근 검색한 내용이 없어요.')).toBeInTheDocument();
         expect(readRecentSearches(owner)).toEqual([]);
     });
+    it('keeps modified result clicks open and slides down before selecting an existing destination', () => {
+        vi.useFakeTimers();
+        try {
+            reducedMotionMock.value = false;
+            searchMock.data = { groups: [{ key: 'stores', items: [{ id: 3, title: '확인 가게', path: '/store/3' }] }] };
+            const { container } = renderSearch(['/search?keyword=' + encodeURIComponent('카페')]);
+            const link = screen.getByRole('link', { name: '확인 가게' });
+            expect(fireEvent.click(link, { ctrlKey: true })).toBe(true);
+            expect(container.querySelector('.reserve-search-page')).not.toHaveClass('reserve-search-page--leaving');
+            fireEvent.click(link);
+            expect(container.querySelector('.reserve-search-page')).toHaveClass('reserve-search-page--leaving');
+            expect(path()).toBe('/search?keyword=' + encodeURIComponent('카페'));
+            act(() => vi.advanceTimersByTime(220));
+            expect(path()).toBe('/store/3');
+        } finally { vi.useRealTimers(); }
+    });
+
+    it('keeps IME submissions out of recent searches until composition ends', () => {
+        renderSearch();
+        fireEvent.compositionStart(field());
+        fireEvent.change(field(), { target: { value: '카페' } });
+        fireEvent.submit(screen.getByRole('search'));
+        expect(path()).toBe('/search');
+        expect(readRecentSearches(recentSearchOwner(useAuthStore.getState().user))).toEqual([]);
+        fireEvent.compositionEnd(field(), { target: { value: '카페' } });
+        fireEvent.submit(screen.getByRole('search'));
+        expect(path()).toBe('/search?keyword=' + encodeURIComponent('카페'));
+        expect(readRecentSearches(recentSearchOwner(useAuthStore.getState().user))).toEqual(['카페']);
+    });
+
+    it('preserves React text escaping and keeps another group usable during a partial failure', () => {
+        searchMock.data = { groups: [
+            { key: 'stores', items: [], error: { status: 503 } },
+            { key: 'benefits', items: [{ id: 3, title: '<img src=x onerror=alert(1)>', path: '/benefits/3' }] },
+        ] };
+        renderSearch(['/search?keyword=' + encodeURIComponent('카페')]);
+        expect(screen.getByRole('alert')).toHaveTextContent('가게 결과');
+        const link = screen.getByRole('link', { name: '<img src=x onerror=alert(1)>' });
+        expect(link.querySelector('img')).toBeNull();
+        expect(field()).toBeEnabled();
+    });
+
+    it('restores the submitted URL after a result visit and still cancels to the original list filters', async () => {
+        const user = userEvent.setup();
+        const original = '/stores?keyword=' + encodeURIComponent('공방') + '&view=list&page=2';
+        searchMock.data = { groups: [{ key: 'stores', items: [{ id: 3, title: '복귀 가게', path: '/store/3' }] }] };
+        renderSearch([original, { pathname: '/search', state: { searchEntry: true } }]);
+        await user.type(field(), '카페');
+        await user.keyboard('{Enter}');
+        await user.click(screen.getByRole('link', { name: '복귀 가게' }));
+        expect(path()).toBe('/store/3');
+        await user.click(screen.getByRole('button', { name: '검색 결과로 돌아가기' }));
+        expect(path()).toBe('/search?keyword=' + encodeURIComponent('카페'));
+        expect(field()).toHaveValue('카페');
+        await user.click(screen.getByRole('button', { name: '취소' }));
+        expect(path()).toBe(original);
+    });
+
+    it('keeps the blank landing at its original three sections and never mixes it into a nonempty draft', () => {
+        const { container } = renderSearch();
+        expect(screen.getAllByRole('heading', { level: 2 }).map(node => node.textContent)).toEqual(['어떤 서비스를 찾으세요?', '빠른 검색', '최근 검색']);
+        expect(container.querySelectorAll('.reserve-search-domain')).toHaveLength(6);
+        expect(screen.queryByLabelText('통합 검색 결과')).toBeNull();
+        fireEvent.change(field(), { target: { value: '없는 내용' } });
+        expect(screen.queryByRole('heading', { name: '어떤 서비스를 찾으세요?' })).toBeNull();
+        expect(screen.queryByRole('heading', { name: '빠른 검색' })).toBeNull(); expect(screen.queryByRole('heading', { name: '최근 검색' })).toBeNull();
+        expect(screen.getByRole('button', { name: '없는 내용 검색하기' })).toBeInTheDocument();
+        expect(container.querySelector('.reserve-data-state')).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: '검색어 지우기' }));
+        expect(screen.queryByLabelText('통합 검색 결과')).toBeNull();
+        expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(3);
+    });
+    it('renders the curated reservation phrase as one existing icon row while typing', () => {
+        useAuthStore.setState({ user: { id: 7, role: 'USER', termsAgreed: true }, isLoggedIn: true });
+        searchMock.catalog = searchCatalog('내가 예약한', useAuthStore.getState());
+        renderSearch(); fireEvent.change(field(), { target: { value: '내가 예약한' } });
+        const link = screen.getByRole('link', { name: '내 예약' });
+        expect(link.querySelector('.anticon-calendar')).toBeTruthy(); expect(link).toHaveAttribute('href', '/my-reservations');
+        expect(screen.queryByRole('heading', { name: '가게' })).toBeNull();
+    });
+    it('discards stale search-return positioning immediately when the keyword is cleared', () => {
+        vi.useFakeTimers();
+        try {
+            renderSearch([{ pathname: '/search', search: '?keyword=' + encodeURIComponent('카페'), state: {
+                searchEntry: true, searchReturn: { keyword: '카페', confirmed: true, path: '/store/3', left: 0, top: 500 },
+            } }]);
+            window.scrollTo.mockClear();
+            fireEvent.click(screen.getByRole('button', { name: '검색어 지우기' }));
+            act(() => vi.advanceTimersByTime(32));
+            expect(path()).toBe('/search');
+            expect(window.scrollTo).toHaveBeenLastCalledWith({ left: 0, top: 0, behavior: 'instant' });
+            expect(window.scrollTo).not.toHaveBeenCalledWith({ left: 0, top: 500, behavior: 'instant' });
+            expect(screen.queryByLabelText('통합 검색 결과')).toBeNull();
+        } finally { vi.useRealTimers(); }
+    });
+
 });

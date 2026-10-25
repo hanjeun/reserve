@@ -993,4 +993,25 @@ describe('MessengerContent', () => {
         await waitFor(() => expect(dialog.className).toContain('ant-zoom-leave'));
         expect(chatService.setBlocked).not.toHaveBeenCalled();
     });
+    it.each([
+        [{ kind: 'support' }, 'USER', 'getSupport'],
+        [{ kind: 'owner', roomId: 78 }, 'BUSINESS', 'getStoreInboxRoom'],
+    ])('opens an explicitly selected existing mobile search conversation: %j', async (initialSelection, role, method) => {
+        Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+        useAuthStore.setState({ user: { id: 7, role }, isLoggedIn: true });
+        useMessengerStore.setState({ view: 'home', activeThread: false, sessionIdentity: messengerIdentityOf(useAuthStore.getState()) });
+        chatService.getStoreInboxRoom.mockResolvedValue({ roomId: 78, type: 'STORE', title: '받은 문의', viewerRole: 'OWNER', messages: [], canSend: true });
+        renderMessenger({ surface: 'page', initialSelection });
+        await waitFor(() => expect(chatService[method]).toHaveBeenCalledTimes(1));
+        if (method === 'getStoreInboxRoom') expect(chatService[method]).toHaveBeenCalledWith(78);
+        expect(chatService.getStore).not.toHaveBeenCalled();
+    });
+
+    it('does not open an owner conversation from an unprivileged mobile route hint', () => {
+        Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+        useMessengerStore.setState({ view: 'home', activeThread: false });
+        renderMessenger({ surface: 'page', initialSelection: { kind: 'owner', roomId: 78 } });
+        expect(chatService.getStoreInboxRoom).not.toHaveBeenCalled();
+    });
+
 });

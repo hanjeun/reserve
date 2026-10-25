@@ -45,6 +45,7 @@ public final class ServiceAdmissionRoutes {
                 "/api/oauth/events", "/api/chat", "/api/inquiries", "/api/updates"}) {
             if (path.equals(prefix) || path.startsWith(prefix + "/")) return true;
         }
+        if ("GET".equals(method) && path.equals("/api/search/me")) return true;
         if (path.equals("/api/csp-reports")) return true;
         if (path.startsWith("/api/reservations/")
                 && !path.equals("/api/reservations/availability") && !path.equals("/api/reservations/calendar")

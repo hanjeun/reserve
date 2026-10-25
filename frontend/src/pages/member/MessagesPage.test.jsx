@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import MessagesPage from './MessagesPage';
 import { requestMessengerRouteClose } from '../../components/chat/messengerRouteTransition';
 import useMessengerStore from '../../store/useMessengerStore';
+import useAuthStore from '../../store/useAuthStore';
 import { createLoadingPresentation, LoadingPresentationContext } from '../../components/layout/loadingPresentation';
 
 const { goBack } = vi.hoisted(() => ({ goBack: vi.fn() }));
@@ -90,6 +91,7 @@ describe('MessagesPage route motion', () => {
         expect(useMessengerStore.getState().activeThread).toBe(true);
     });
 
+
     it('does not restart opacity from zero after a route skeleton and still animates closing', async () => {
         const presentation = createLoadingPresentation('messages-entry');
         presentation.markSkeletonShown();
@@ -103,4 +105,26 @@ describe('MessagesPage route motion', () => {
         fireEvent.animationEnd(page);
         await waitFor(() => expect(goBack).toHaveBeenCalledTimes(1));
     });
+
+    it.each([
+        ['kind=support', 'USER', { kind: 'support' }],
+        ['ownerRoomId=78', 'BUSINESS', { kind: 'owner', roomId: 78 }],
+    ])('hands an authorized existing message target to the desktop panel: %s', async (query, role, selection) => {
+        useAuthStore.setState({ user: { id: 7, role }, isLoggedIn: true });
+        Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1200 });
+        render(<MemoryRouter initialEntries={['/messages?' + query]}><MessagesPage /></MemoryRouter>);
+        await waitFor(() => expect(goBack).toHaveBeenCalledTimes(1));
+        expect(useMessengerStore.getState().selection).toEqual(selection);
+        expect(useMessengerStore.getState().activeThread).toBe(true);
+    });
+
+    it('does not select an owner room for a regular member or an ambiguous message URL', async () => {
+        useAuthStore.setState({ user: { id: 7, role: 'USER' }, isLoggedIn: true });
+        Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1200 });
+        render(<MemoryRouter initialEntries={['/messages?ownerRoomId=78&storeId=9']}><MessagesPage /></MemoryRouter>);
+        await waitFor(() => expect(goBack).toHaveBeenCalledTimes(1));
+        expect(useMessengerStore.getState().activeThread).toBe(false);
+        expect(useMessengerStore.getState().view).toBe('home');
+    });
+
 });

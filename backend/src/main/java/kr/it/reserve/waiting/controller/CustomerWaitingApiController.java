@@ -59,6 +59,18 @@ public class CustomerWaitingApiController {
         return ApiResponse.success(waiting.mine(SecurityUtil.getCurrentMember(), page, size, keyword, status, sort), "내 웨이팅을 불러왔어요.");
     }
 
+    @GetMapping("/my/{entryId:[0-9]+}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<MyWaitingResponse>> personalEntry(@PathVariable Long entryId,
+            jakarta.servlet.http.HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store");
+        var member = SecurityUtil.getCurrentMember();
+        if (!rateLimiter.tryConsume("waiting-detail:member:" + member.getId(), RateLimiter.Policy.PROFILE_READ))
+            throw new WaitingException("접수를 잠시 후 다시 확인해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+        return ResponseEntity.ok().header("Cache-Control", "no-store")
+                .body(ApiResponse.success(waiting.personalEntry(member, entryId), "내 웨이팅을 불러왔어요."));
+    }
+
     @PostMapping("/stores/{storeId}/entries")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<WaitingEntryResponse>> join(@PathVariable Long storeId,

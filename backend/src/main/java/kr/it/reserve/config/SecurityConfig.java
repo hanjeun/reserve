@@ -183,6 +183,9 @@ public class SecurityConfig {
                                 ApiPaths.withV1Aliases("/api/advertisements/*/impression", "/api/advertisements/*/click"))
                                 .permitAll()
 
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                ApiPaths.withV1Aliases("/api/search")).permitAll()
+
                         // 예약 - 공개 조회만 허용, 나머지는 인증 필요
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
                                 ApiPaths.withV1Aliases("/api/reservations/{id}")).authenticated()

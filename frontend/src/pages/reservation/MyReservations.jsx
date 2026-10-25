@@ -1,3 +1,4 @@
+import PersonalSearchHandoff from '../Search/PersonalSearchHandoff';
 import { PageTitle, PageDescription } from '../../components/common/PageTypography';
 import LoadingStatus from '../../components/common/LoadingStatus';
 import React, { useEffect, useState } from 'react';
@@ -412,6 +413,7 @@ const MyReservations = () => {
                 next.set('tab', value);
                 return next;
             })} /></div>
+        <PersonalSearchHandoff key={revision} />
         {waiting ? <MyWaiting key={revision} /> : <ReservationHistory key={revision} />}
     </PageContainer>;
 };

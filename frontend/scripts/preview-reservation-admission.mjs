@@ -5,13 +5,13 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { expect } from '@playwright/test';
-import { installReleasePreview, TICKET } from '../e2e/fixtures/reservation-release-preview.js';
+import { installReleasePreview, TICKET, account as previewAccount, store as previewStore } from '../e2e/fixtures/reservation-release-preview.js';
 
 const flags = new Set(process.argv.slice(2));
-const allowed = new Set(['--mobile', '--headless', '--verify', '--verify-overflow', '--verify-timer', '--emergency', '--quick', '--help']);
-if ([...flags].some(flag => !allowed.has(flag))) throw new Error('옵션은 --mobile, --headless, --verify, --verify-overflow, --verify-timer, --emergency, --quick, --help만 사용할 수 있어요.');
+const allowed = new Set(['--mobile', '--headless', '--verify', '--verify-overflow', '--verify-timer', '--emergency', '--quick', '--search', '--business', '--help']);
+if ([...flags].some(flag => !allowed.has(flag))) throw new Error('옵션은 --mobile, --headless, --verify, --verify-overflow, --verify-timer, --emergency, --quick, --search, --business, --help만 사용할 수 있어요.');
 if (flags.has('--help')) {
-    console.log('npm run preview:admission -- [--mobile] [--quick] [--headless --verify] [--emergency]\n기존 재현 도구를 같은 경로에서 교체한 버전이에요. 실제 UI·합성 API를 사용하며, 브라우저를 닫으면 정상 종료해요.\n기본은 101부터 1까지 빠짐없이 진행해요(약 7분). --quick은 101→100→99→98→11→10→9→8→3→2→1 경계만 확인해요(약 1분).\n입장 후 예약 계속하기를 직접 눌러 한 줄 고정 타이머를 확인해요.\n대화형 창은 PC 작업 영역 안에 맞추며, 모바일도 아래 버튼까지 표시해요.\n숫자·번째 기준선과 한 줄 안내를 확인하고, 대기창은 취소·계속 버튼으로만 선택해요.\n--emergency는 합성 서비스 입장과 가게 목록 429·10초 재시도 제한을 보여줘요.\n--verify-overflow는 고정 타이머·일반 토스트 세 개·헤더 메뉴 클릭을 자동 확인해요.\n--verify-timer는 대기 순번 검사를 반복하지 않고 입장 후 타이머 경계만 확인해요.');
+    console.log('npm run preview:admission -- [--mobile] [--quick] [--headless --verify] [--emergency]\nnpm run preview:admission -- --search [--business] [--mobile]\n--search는 실제 통합검색 UI에 합성 공개·본인 결과 각 3그룹을 연결하는 수동 모드예요. 공방을 입력한 뒤 Enter·검색으로 결과 선택·복귀를 확인하고, --business에서는 광고 관리·홍보 별칭을 확인해요.\n검색 모드는 새 브라우저 세션을 사용하며 실제 계정·DB·결제·외부 네트워크에 연결하지 않아요. --mobile은 PC Chrome 터치 에뮬레이션이며 실물 휴대폰 확인은 별도예요.\n검색 모드는 자동 검증 옵션과 함께 사용할 수 없어요.\n기존 재현 도구를 같은 경로에서 교체한 버전이에요. 실제 UI·합성 API를 사용하며, 브라우저를 닫으면 정상 종료해요.\n기본은 101부터 1까지 빠짐없이 진행해요(약 7분). --quick은 101→100→99→98→11→10→9→8→3→2→1 경계만 확인해요(약 1분).\n입장 후 예약 계속하기를 직접 눌러 한 줄 고정 타이머를 확인해요. 남은 시간은 감소하고 시간 숫자는 움직이지 않아요.\n대화형 창은 PC 작업 영역 안에 맞추며, 모바일도 아래 버튼까지 표시해요.\n숫자·번째 기준선과 한 줄 안내를 확인하고, 대기창은 취소·계속 버튼으로만 선택해요.\n--emergency는 합성 서비스 입장과 가게 목록 429·10초 재시도 제한을 보여줘요.\n--verify-overflow는 고정 타이머·일반 토스트 세 개·헤더 메뉴 클릭을 자동 확인해요.\n--verify-timer는 대기 순번 검사를 반복하지 않고 입장 후 타이머 경계만 확인해요.');
     process.exit(0);
 }
 const mobile = flags.has('--mobile');
@@ -20,6 +20,10 @@ const overflow = flags.has('--verify-overflow');
 const timerOnly = flags.has('--verify-timer');
 const verify = headless || flags.has('--verify') || overflow || timerOnly;
 const emergency = flags.has('--emergency');
+const searchMode = flags.has('--search');
+const business = flags.has('--business');
+if (business && !searchMode) throw new Error('--business는 --search와 함께 사용해주세요.');
+if (searchMode && (verify || emergency || flags.has('--quick'))) throw new Error('--search는 --mobile·--business만 함께 사용할 수 있는 수동 모드예요.');
 if ([overflow, timerOnly, emergency].filter(Boolean).length > 1) throw new Error('비상·타이머·overflow 시나리오는 한 번에 하나만 선택해주세요.');
 const positions = timerOnly ? [] : flags.has('--quick') ? [101, 100, 99, 98, 11, 10, 9, 8, 3, 2, 1]
     : Array.from({ length: 101 }, (_, index) => 101 - index);
@@ -51,7 +55,7 @@ const interrupt = () => {
 
 async function ensureServer() {
     let response;
-    try { response = await fetch(baseURL, { signal: AbortSignal.timeout(2000) }); }
+    try { response = await fetch(baseURL, { signal: AbortSignal.timeout(2000), redirect: searchMode ? 'error' : 'follow' }); }
     catch { /* Start only our own loopback dev server when no server answers. */ }
     if (response) {
         if (!response.ok || !(await response.text()).includes('/@vite/client')) {
@@ -277,9 +281,10 @@ async function preview(fixture) {
     await check(timer).not.toHaveText(firstTime);
     await oneLineNotice(timer);
     assert.equal(await timerNode.evaluate(node => node.isConnected), true);
+    const secondsLeft = value => value.split(':').reduce((total, part) => total * 60 + Number(part), 0);
+    assert.ok(secondsLeft(await timer.textContent()) < secondsLeft(firstTime), '남은 시간은 기존 만료 시각을 향해 감소해야 해요.');
     const motions = await page.evaluate(() => window.__admissionNoticeMotions);
-    assert.ok(motions.length > 0 && motions.every(motion => motion.timer), '변하는 시간만 모션을 사용해야 해요.');
-    assert.deepEqual(motions[0].firstFrame, { opacity: 0.5, transform: 'translateY(-8px)' });
+    assert.equal(motions.filter(motion => motion.timer).length, 0, '카운트다운 시간에는 WAAPI 모션을 사용하면 안 돼요.');
     assert.equal(fixture.polls, polls, '카운트다운만으로 상태 API를 더 호출하면 안 돼요.');
     await check(page.getByPlaceholder('요청 사항을 입력하세요.')).toHaveValue('미리보기에서 작성한 예약 내용이에요.');
     const returned = await page.evaluate(() => JSON.parse(sessionStorage.getItem('reserve-admission-attempts-v1'))?.attempts['release-preview']);
@@ -287,8 +292,8 @@ async function preview(fixture) {
     assert.equal(fixture.reservations.length, 0, '폼 복귀만으로 예약을 생성하면 안 돼요.');
     assert.deepEqual(fixture.errors, []);
     console.log(timerOnly
-        ? `${mobile ? '모바일' : 'PC'} 타이머 확인 완료: 입장→폼 복귀·원래 요청 번호·한 줄 고정 안내·스크롤 뒤 표시·변경 숫자만 down 모션, 합성 예약 쓰기 0회.`
-        : `${mobile ? '모바일' : 'PC'} 확인 완료: ${positions.length}개 순번→ADMITTED→폼·한 줄 고정 타이머, 아래 버튼 표시·숫자·번째 기준선·접미사 고정·자릿수 폭 전환·시간만 down 모션·X/Esc/배경 닫기 없음, 합성 예약 쓰기 0회.`);
+        ? `${mobile ? '모바일' : 'PC'} 타이머 확인 완료: 입장→폼 복귀·원래 요청 번호·한 줄 고정 안내·스크롤 뒤 표시·시간 감소·시간 모션 0회, 합성 예약 쓰기 0회.`
+        : `${mobile ? '모바일' : 'PC'} 확인 완료: ${positions.length}개 순번→ADMITTED→폼·한 줄 고정 타이머, 아래 버튼 표시·숫자·번째 기준선·접미사 고정·자릿수 폭 전환·순번 변경 자릿수만 down 모션·시간 모션 0회·X/Esc/배경 닫기 없음, 합성 예약 쓰기 0회.`);
     if (!verify) {
         console.log('브라우저를 닫으면 정상 종료해요. 입장 기한은 3분이며 다시 실행하면 새 상태로 시작해요.');
         await closed;
@@ -386,6 +391,92 @@ async function previewOverflow(fixture) {
     console.log('고정 안내 overflow 확인 완료: 실제 App 토스트 3개→한 줄 타이머 단일 복구→원래 만료 시각·폼·스크롤 뒤 viewport 유지→헤더 avatar hit-test·실제 메뉴 클릭→다른 슬롯에서 종료·원래 슬롯 복귀 복원, 새 순번·추가 입장 시간·예약 쓰기 0회.');
 }
 
+
+const searchPreviewHeaders = route => ({
+    'access-control-allow-origin': baseURL,
+    'access-control-allow-credentials': 'true',
+    'access-control-allow-methods': 'GET, HEAD, POST, OPTIONS',
+    'access-control-allow-headers': route.request().headers()['access-control-request-headers'] || 'content-type',
+});
+
+async function installSearchPreview(context, fixture) {
+    const account = { ...previewAccount, role: business ? 'BUSINESS' : 'USER' };
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+    const waiting = { storeName: previewStore.name, teamsAhead: 2, entry: {
+        id: 701, storeId: previewStore.id, entryNumber: 17, status: 'WAITING', partySize: 2,
+        displayName: account.name, businessDate: today, createdAt: new Date(Date.now() - 600000).toISOString(),
+    } };
+    const reservation = { id: 901, memberId: account.id, storeId: previewStore.id, storeName: previewStore.name,
+        reservationCode: 'PREVIEW-901', memberName: account.name, reservationDate: today,
+        reservationTime: '14:00:00', guestCount: 2, status: 'CONFIRMED', depositAmount: 0, depositPaid: false,
+        noShowDeposit: 0, specialRequest: '합성 예약이에요. 실제 예약 내역은 사용하지 않아요.' };
+    const benefit = { id: 601, title: '공방 원데이 클래스 혜택', storeId: previewStore.id, storeName: previewStore.name,
+        state: 'PUBLISHED', revision: 0, content: '통합검색에서 여는 합성 혜택이에요. 실제 행사나 결제와 연결되지 않아요.',
+        images: [1, 2].map(id => ({ id, url: '/api/feed/media/501', width: 960, height: 640 })), createdAt: new Date().toISOString() };
+    const items = {
+        stores: [{ id: 81, type: 'STORE', title: previewStore.name, description: previewStore.address, path: '/store/81' }],
+        benefits: [{ id: 601, type: 'BENEFIT', title: benefit.title, description: previewStore.name, path: '/benefits/601' }],
+        feed: [{ id: 501, type: 'FEED', title: '공방에서 만든 작은 그릇', description: '합성 공개 피드', path: '/feed/posts/501' }],
+        reservations: [{ id: 901, type: 'RESERVATION', title: `${previewStore.name} 예약`, description: 'PREVIEW-901 · 합성 예약', path: '/my-reservations?reservationId=901' }],
+        waiting: [{ id: 701, type: 'WAITING', title: `${previewStore.name} 웨이팅`, description: '17번 · 합성 웨이팅', path: '/my-reservations?tab=waiting&entryId=701' }],
+        messages: [{ id: 301, type: 'MESSAGE', title: `${previewStore.name} 문의`, description: '공방 문의의 합성 메시지', path: '/messages?storeId=81' }],
+    };
+    const titles = { stores: '가게', benefits: '혜택', feed: '피드', reservations: '내 예약', waiting: '내 웨이팅', messages: '메시지' };
+    const comparable = value => value.normalize('NFKC').replace(/\s+/gu, '').toLocaleLowerCase('ko');
+    const pageOf = content => ({ content, page: { number: 0, totalElements: content.length, totalPages: content.length ? 1 : 0 } });
+    const ok = (route, data) => route.fulfill({ headers: searchPreviewHeaders(route), json: { success: true, data } });
+    await context.route('**/*', async route => {
+        const request = route.request();
+        const url = new URL(request.url());
+        const path = url.pathname.replace(/^\/api\/v1(?=\/|$)/, '/api');
+        if (!path.startsWith('/api/') && url.origin !== baseURL || /^\/(?:oauth2|login\/oauth2)(?:\/|$)/.test(url.pathname)) {
+            fixture.external.push(`${request.method()} ${url.origin}${url.pathname}`);
+            return route.abort('blockedbyclient');
+        }
+        if (!path.startsWith('/api/')) return route.fallback();
+        if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: searchPreviewHeaders(route) });
+        // Explicitly opening the synthetic conversation retains the existing chat read flow.
+        const chatRead = request.method() === 'POST' && (/^\/api\/chat\/stores\/81\/open$/.test(path) || /^\/api\/chat\/rooms\/\d+\/read$/.test(path));
+        if (!['GET', 'HEAD'].includes(request.method()) && !chatRead) return route.fulfill({ status: 405, headers: searchPreviewHeaders(route),
+            json: { success: false, message: '검색 프리뷰에서는 합성 조회만 확인할 수 있어요.' } });
+        if (path === '/api/member/me') return ok(route, account);
+        if (path === '/api/search' || path === '/api/search/me') {
+            const keyword = (url.searchParams.get('keyword') || '').trim();
+            const limit = Number(url.searchParams.get('limit') || 5);
+            if (keyword.length > 100 || /[\u0000-\u001f\u007f]/u.test(keyword) || !Number.isInteger(limit) || limit < 1 || limit > 5)
+                return route.fulfill({ status: 400, headers: searchPreviewHeaders(route), json: { success: false, message: '검색어와 결과 수를 확인해주세요.' } });
+            const keys = path.endsWith('/me') ? ['reservations', 'waiting', 'messages'] : ['stores', 'benefits', 'feed'];
+            const needle = comparable(keyword);
+            return ok(route, { keyword, groups: keys.map(key => ({ key, title: titles[key], error: null,
+                items: needle ? items[key].filter(item => comparable(item.title + item.description).includes(needle)).slice(0, limit) : [], hasMore: false })) });
+        }
+        if (path === '/api/reservations/my/page' || path === '/api/reservations/my-reservations/page') return ok(route, pageOf([reservation]));
+        if (path === '/api/reservations/901') return ok(route, reservation);
+        if (path === '/api/waiting/my/701') return ok(route, waiting);
+        if (path === '/api/waiting/my') return ok(route, pageOf([waiting]));
+        if (path === '/api/store-news/config') return ok(route, { enabled: true, imageEnabled: true, maxImages: 6,
+            maxImageBytes: 7340032, benefitEventsEnabled: false });
+        if (path === '/api/promotions/public') return ok(route, pageOf([benefit]));
+        if (path === '/api/promotions/public/601') return ok(route, benefit);
+        // The existing context-wide fixture handles every remaining API and rejects external resources.
+        return route.fallback();
+    });
+}
+
+async function previewSearch() {
+    await page.goto(`${baseURL}/search`);
+    console.log(`통합검색 수동 프리뷰 · 합성 ${business ? 'BUSINESS' : 'USER'} · 공개 3그룹 + 본인 3그룹`);
+    console.log('빈 검색은 서비스·빠른 검색·최근 검색만 보여요. 공방을 입력한 뒤 Enter/검색을 눌러 공개·본인 결과와 선택 후 복귀를 확인해주세요.');
+    console.log('타이핑·지우기·한글 조합은 로컬 메뉴만 찾아요. 내가 예약한은 내 예약 메뉴를 보여주고, 단일 정확 메뉴·별칭 확정은 원격 조회를 생략해요.');
+    console.log(business ? '광고 관리 또는 홍보를 검색하면 실제 사업자 광고 관리 메뉴로 이동할 수 있어요.'
+        : '광고 관리 또는 홍보를 검색해도 사업자 전용 메뉴는 표시하지 않아요. --business로 비교할 수 있어요.');
+    console.log('입력 지우기·취소·Esc·한글 조합·최근 검색·Ctrl/Cmd 새 탭·스크롤 복귀를 직접 확인해주세요.');
+    console.log('새 탭도 같은 합성 API와 외부 차단을 사용해요. DB·PG·실제 계정 쿠키는 사용하지 않아요.');
+    console.log('--mobile은 PC의 Chrome 터치 에뮬레이션이에요. 실물 휴대폰과 실제 검색·권한 API 확인은 별도예요.');
+    console.log('브라우저를 닫으면 정상 종료해요.');
+    await closed;
+}
+
 process.once('SIGINT', interrupt);
 process.once('SIGTERM', interrupt);
 try {
@@ -416,21 +507,32 @@ try {
                 }
             }, true);
         });
-        await page.routeWebSocket('**/*', socket => {
+        await (searchMode ? context : page).routeWebSocket('**/*', socket => {
             const url = new URL(socket.url());
             if (['127.0.0.1', 'localhost'].includes(url.hostname) && url.port === '4173') socket.connectToServer();
             else void socket.close();
         });
-        const fixture = await installReleasePreview(page);
+        // Context routes also cover Ctrl/Cmd-opened tabs in manual search mode.
+        const fixtureSurface = searchMode ? {
+            addInitScript: (...args) => context.addInitScript(...args),
+            route: (pattern, handler) => context.route(pattern, route => handler({
+                request: () => route.request(), abort: (...args) => route.abort(...args), continue: (...args) => route.continue(...args),
+                fulfill: options => route.fulfill({ ...options, headers: { ...searchPreviewHeaders(route), ...options.headers } }),
+            })),
+            on: (event, listener) => { page.on(event, listener); context.on('page', child => child.on(event, listener)); },
+        } : page;
+        const fixture = await installReleasePreview(fixtureSurface);
+        if (searchMode) await installSearchPreview(context, fixture);
         fixture.admissionPosition = 101;
         if (overflow || timerOnly) fixture.admissionState = 'ADMITTED';
         if (emergency) {
             fixture.serviceMode = 'EMERGENCY'; fixture.serviceState = 'WAITING'; fixture.storeThrottleErrors = 1;
         }
         console.log('실제 RESERVE 컴포넌트 + 합성 API만 사용해요. 외부 네트워크와 실제 예약·결제 호출은 차단해요.');
-        console.log(verify ? '자동 검증 중 예상하지 못한 브라우저 종료는 실패로 처리해요.'
+        if (!searchMode) console.log(verify ? '자동 검증 중 예상하지 못한 브라우저 종료는 실패로 처리해요.'
             : `순번은 약 4초 간격으로 ${positions.length}단계 진행해요. 언제든 브라우저를 닫아도 정상 종료해요.`);
-        if (overflow) await previewOverflow(fixture);
+        if (searchMode) await previewSearch();
+        else if (overflow) await previewOverflow(fixture);
         else if (emergency) await previewEmergency(fixture); else await preview(fixture);
     }
 } catch (error) {

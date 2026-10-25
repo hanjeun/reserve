@@ -451,6 +451,12 @@ public class FeedService {
         return null;
     }
 
+    /** Read-only consumers reuse the same public gate without DTO media lookups or view/read mutations. */
+    public Specification<FeedPost> publicSearchSpecification() {
+        policy.requireEnabled();
+        return publicSpecification(null, null, null);
+    }
+
     private Specification<FeedPost> publicSpecification(String region, Long author, Long favoriteMember) {
         // 기존 제재 기산일은 systemDefaultZone으로 저장한다. 새 피드 UTC 날짜와 섞지 않는다.
         LocalDateTime timestamp = LocalDateTime.now(Clock.systemDefaultZone());

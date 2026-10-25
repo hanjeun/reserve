@@ -1,39 +1,55 @@
 import { useEffect, useRef, useState } from 'react';
+import useUnifiedSearch from '../../hooks/useUnifiedSearch';
+import SearchResults from './SearchResults';
+import { normalizeSearchKeyword, SEARCH_KEYWORD_MAX_LENGTH } from '../../constants/searchCatalog';
 import { CloseOutlined, SearchOutlined } from '../../components/common/icons';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { SERVICE_DOMAIN_OPTIONS } from '../../constants';
 import ServiceDomainIcon from '../../components/common/ServiceDomainIcon';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useReducedMotion from '../../hooks/useReducedMotion';
+import SearchControls from '../../components/common/SearchControls';
 import useRecentSearches from '../../hooks/useRecentSearches';
 import Tooltip from '../../components/common/Tooltip';
-import SearchControls from '../../components/common/SearchControls';
 import { SEARCH_MOTION_DURATION_MS } from '../../components/layout/searchTransition';
 import { useSkeletonShown } from '../../components/layout/loadingPresentation';
 
 // 안내용 예시다. 실측 인기 순위나 현재 위치 기반 추천으로 표현하지 않는다.
 const QUICK_SEARCHES = ['카페', '스튜디오', '필라테스', '공방', '클리닉', '팝업'];
+const searchStateForUrl = (params, state) => {
+    const keyword = params.get('keyword') || '';
+    const submittedKeyword = normalizeSearchKeyword(keyword);
+    const wasDraft = state?.searchReturn?.keyword === submittedKeyword && state.searchReturn.confirmed === false;
+    return { keyword, submittedKeyword, confirmed: Boolean(submittedKeyword) && submittedKeyword.length <= SEARCH_KEYWORD_MAX_LENGTH && !wasDraft };
+};
 
 export default function SearchPage() {
     const navigate = useNavigate();
-    const { state } = useLocation();
+    const location = useLocation();
+    const { state } = location;
     const [searchParams] = useSearchParams();
-    const [keyword, setKeyword] = useState(() => searchParams.get('keyword') || '');
-    const [isClosing, setIsClosing] = useState(false);
-    const reducedMotion = useReducedMotion();
+    const [search, setSearch] = useState(() => searchStateForUrl(searchParams, state));
+    const { keyword, submittedKeyword, confirmed } = search;
+    const previousSearchRef = useRef(location.search);
+    const [composing, setComposing] = useState(false);
+    const restoredRef = useRef(null);
+    const restoreDisabledRef = useRef(false);
     const skeletonShown = useSkeletonShown();
     const { terms: recentSearches, add: rememberSearch, remove: removeSearch, clear: clearRecentSearches } = useRecentSearches();
     const inputRef = useRef(null);
+    const [isClosing, setIsClosing] = useState(false);
+    const reducedMotion = useReducedMotion();
     // 연달아 누른 취소가 뒤로가기를 두 번 하지 않게 한다(뒤로가기는 비동기라 화면이 잠깐 남아 있다).
     const closingRef = useRef(false);
     const exitTimerRef = useRef(null);
-    useDocumentTitle('검색', '가게 이름, 지역, 서비스로 원하는 가게를 찾아보세요.');
+    const result = useUnifiedSearch({ keyword, submittedKeyword, confirmed, composing, enabled: !isClosing });
+    useDocumentTitle('검색', '가게와 메뉴, 도움말과 내 예약·웨이팅·메시지를 찾아보세요.');
 
     useEffect(() => { inputRef.current?.focus({ preventScroll: true }); }, []);
 
     useEffect(() => () => window.clearTimeout(exitTimerRef.current), []);
 
-    // 검색 실행·취소·Esc 모두 같은 아래로 내려가는 모션 뒤 이동한다. 원래 화면은 옆으로 밀리지 않는다.
+    // 결과 선택·취소·Esc 모두 같은 아래로 내려가는 모션 뒤 이동한다. 원래 화면은 옆으로 밀리지 않는다.
     // (routeEntryMotion 이 검색 화면을 떠나는 이동에는 페이지 전환을 걸지 않는다, 2026-09-23).
     const leaveSearch = leave => {
         if (closingRef.current) return;
@@ -54,13 +70,66 @@ export default function SearchPage() {
 
     const searchFor = value => {
         const normalized = value.trim();
-        if (!normalized) {
+        if (composing || !normalized || normalized.length > SEARCH_KEYWORD_MAX_LENGTH) {
             inputRef.current?.focus();
             return;
         }
+        restoreDisabledRef.current = true;
+        setSearch({ keyword: normalized, submittedKeyword: normalized, confirmed: true });
+        rememberSearch(normalized);
+        navigate('/search?keyword=' + encodeURIComponent(normalized), { replace: true, state: { ...state, searchReturn: undefined } });
+    };
+
+    const clearSearchReturn = empty => {
+        const params = new URLSearchParams(searchParams);
+        if (empty) params.delete('keyword');
+        const nextSearch = empty ? (params.size ? '?' + params.toString() : '') : location.search;
+        navigate(location.pathname + nextSearch, { replace: true, state: { ...state, searchReturn: undefined } });
+    };
+    const changeKeyword = value => {
+        restoreDisabledRef.current = true;
+        const empty = !normalizeSearchKeyword(value);
+        setSearch(current => ({ ...current, keyword: value, confirmed: false, ...(empty ? { submittedKeyword: '' } : {}) }));
+        if (empty) {
+            restoredRef.current = null;
+            clearSearchReturn(true);
+            window.scrollTo({ left: 0, top: 0, behavior: 'instant' });
+        } else if (state?.searchReturn) clearSearchReturn(false);
+    };
+    const beginComposition = () => {
+        restoreDisabledRef.current = true;
+        setComposing(true);
+        setSearch(current => ({ ...current, confirmed: false }));
+        if (state?.searchReturn) clearSearchReturn(false);
+    };
+    useEffect(() => {
+        if (previousSearchRef.current === location.search) return;
+        previousSearchRef.current = location.search;
+        // An actual URL change owns confirmation; an edited draft never inherits it from matching text.
+        setSearch(searchStateForUrl(searchParams, state));
+    }, [location.search, searchParams, state]);
+    useEffect(() => {
+        const saved = state?.searchReturn;
+        if (restoreDisabledRef.current || !saved || saved.keyword !== result.keyword || restoredRef.current === location.key || !result.ready
+            || result.publicQuery.isFetching || result.personalAllowed && result.personalQuery.isFetching) return undefined;
+        const frame = requestAnimationFrame(() => {
+            if (restoreDisabledRef.current) return;
+            window.scrollTo({ left: saved.left, top: saved.top, behavior: 'instant' });
+            [...document.querySelectorAll('.reserve-search-content a')].find(link => link.getAttribute('href') === saved.path)?.focus({ preventScroll: true });
+            restoredRef.current = location.key;
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [location.key, state, result.keyword, result.ready, result.publicQuery.isFetching, result.personalAllowed, result.personalQuery.isFetching]);
+
+    const chooseResult = (event, destination) => {
+        if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        const normalized = keyword.trim();
+        const searchReturn = { keyword: normalized, confirmed: result.confirmed, path: destination, left: window.scrollX, top: window.scrollY };
         leaveSearch(() => {
             rememberSearch(normalized);
-            navigate('/stores?keyword=' + encodeURIComponent(normalized), { replace: true });
+            navigate('/search?keyword=' + encodeURIComponent(normalized), { replace: true, state: { ...state, searchReturn } });
+            navigate(destination);
         });
     };
 
@@ -79,13 +148,16 @@ export default function SearchPage() {
     return (
         <div className={'reserve-search-page' + motionClass} inert={isClosing ? true : undefined}
             style={{ '--reserve-search-motion-duration': `${SEARCH_MOTION_DURATION_MS}ms` }}>
-            <h1 className="reserve-discovery-visually-hidden">가게 검색</h1>
+            <h1 className="reserve-discovery-visually-hidden">통합 검색</h1>
             <header className="reserve-search-header reserve-search-controls">
-                <SearchControls value={keyword} onChange={setKeyword} onCancel={closeSearch} onSubmit={searchFor}
-                    inputRef={inputRef} label="가게 이름, 지역 또는 서비스 검색" placeholder="가게·지역·서비스 검색" />
+                <SearchControls value={keyword} onChange={changeKeyword} onCancel={closeSearch} onSubmit={searchFor}
+                    inputRef={inputRef} label="가게 이름, 지역 또는 서비스 검색" placeholder="가게·메뉴·내역 검색" maxLength={SEARCH_KEYWORD_MAX_LENGTH}
+                    composing={composing} onCompositionStart={beginComposition}
+                    onCompositionEnd={event => { changeKeyword(event.currentTarget.value); setComposing(false); }} />
             </header>
 
             <div className="reserve-search-content">
+                {normalizeSearchKeyword(keyword) ? <SearchResults result={result} onChoose={chooseResult} onSubmit={searchFor} /> : <>
                 <section className="reserve-search-domains" aria-labelledby="search-domains-title">
                     <h2 id="search-domains-title">어떤 서비스를 찾으세요?</h2>
                     <div className="reserve-search-domain-grid">
@@ -134,6 +206,7 @@ export default function SearchPage() {
                         </ul>
                     ) : <p className="reserve-search-recent-empty">최근 검색한 내용이 없어요.</p>}
                 </section>
+                </>}
             </div>
         </div>
     );

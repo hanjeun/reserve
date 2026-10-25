@@ -13,7 +13,7 @@ import lombok.*;
 public class PaymentPrepareDto {
     
     private String merchantUid;     // 가맹점 주문번호
-    private Integer amount;         // 결제 금액
+    private Integer amount;
     private String productName;     // 상품명
     private String buyerName;       // 구매자 이름
     private String buyerEmail;      // 구매자 이메일

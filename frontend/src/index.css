@@ -1,4 +1,4 @@
-/* RESERVE global styles — import order is part of the cascade contract. */
+/* 전역 CSS의 가져오기 순서는 계단식 우선순위에 영향을 준다. */
 @import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
 @import './styles/theme.css';
 @import './styles/global/foundation.css';

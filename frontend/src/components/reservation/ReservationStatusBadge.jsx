@@ -33,10 +33,9 @@ const ReservationStatusBadge = ({ status, unpaid = false }) => {
             // ReservationRow가 줄 높이를 15px로 고정하므로 기본 line-height(1.5714=20.4)를 눌러둔다.
             lineHeight: 1,
         }}>
-            {/* 사용자 화면이므로 모르는 값이라도 영어 enum을 그대로 노출하지 않는다.
-                (백엔드에 상태가 추가되면 constants/status.js 를 같이 갱신해야 한다 —
-                 2026-08 UNCONFIRMED 추가 때 이 사본들이 갱신되지 않아 화면에
-                 "UNCONFIRMED"가 그대로 보였다) */}
+            {/*
+             * 알 수 없는 상태도 enum 원문을 노출하지 않고 사용자용 대체 문구를 사용한다.
+             */}
             {RESERVATION_STATUS_LABELS[status] ?? '기타'}
             {unpaid && ' (미결제)'}
         </span>

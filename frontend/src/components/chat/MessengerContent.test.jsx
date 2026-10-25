@@ -46,7 +46,7 @@ const page = (content = []) => ({
 const finishThreadAnimation = thread => {
     const animationName = thread.closest('.reserve-messenger').classList.contains('is-returning-to-list')
         ? 'reserve-messenger-thread-back-out' : 'reserve-messenger-thread-in';
-    // jsdom lacks AnimationEvent, so React may subscribe to the WebKit-prefixed event.
+    // AnimationEvent가 없는 jsdom에서 React는 접두사가 붙은 이벤트를 구독할 수 있다.
     for (const type of ['animationend', 'webkitAnimationEnd']) {
         fireEvent(thread, Object.assign(new Event(type, { bubbles: true }), { animationName }));
     }
@@ -987,9 +987,9 @@ describe('MessengerContent', () => {
             'MEMBER',
             { reason: 'SPAM', details: '반복 광고 메시지' },
         ));
-        // jsdom does not emit AntD's CSS transition-end event, so the closing
-        // dialog stays mounted with its leave class. Verify that closing began
-        // and, more importantly, that a report never becomes an automatic block.
+        // jsdom의 모달 닫힘 클래스로 전환 시작을 확인한다.
+        // 신고가 자동 차단으로 이어지지 않는지도 확인한다.
+
         await waitFor(() => expect(dialog.className).toContain('ant-zoom-leave'));
         expect(chatService.setBlocked).not.toHaveBeenCalled();
     });

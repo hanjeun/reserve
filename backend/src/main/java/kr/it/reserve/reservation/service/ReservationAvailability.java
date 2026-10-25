@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** Availability reads and the write validator share one structural slot policy. The facade owns transactions. */
+/** 조회와 쓰기 검증은 같은 예약 시각 정책을 사용한다. 트랜잭션은 호출 서비스가 소유한다. */
 @Slf4j(topic = "kr.it.reserve.reservation.service.ReservationService")
 final class ReservationAvailability {
     private final ReservationRepository reservationRepository;
@@ -52,21 +52,9 @@ final class ReservationAvailability {
                 .toList();
     }
 
-    /**
-     * <b>그 가게가 그 날 받을 수 있는 예약 시각 목록.</b> 예약 방식별 분기는 여기 한 곳뿐이다.
-     *
-     * <p>★ 이 메서드가 이 클래스에서 가장 중요한 관문이다. 예전에는 같은 판정이 두 벌 있었다 —
-     * {@code getAvailability} 는 슬롯을 <b>생성</b>했고, {@code validateReservationSlot} 은
-     * 범위를 <b>비교</b>했다. 두 코드가 다른 모양이라 실제로 어긋나 있었다:
-     * 30분 단위 가게에 {@code 09:07} 을 API 로 직접 보내면 범위 검사는 통과했다(슬롯 목록엔 없는데도).
-     * 목록을 만들어 <b>포함 여부로 검사</b>하면 그 틈이 원천적으로 사라지고,
-     * 예약 방식이 셋으로 늘어도 분기가 한 곳에만 생긴다.
-     *
-     * <p>비어 있는 목록 = 그 날은 예약을 받지 않는다. 화면은 "예약 가능한 시간이 없습니다"를
-     * 그대로 보여주므로 호출측에 별도 분기가 필요 없다.
-     */
+    /** 예약 방식별 시각 목록을 한 곳에서 생성하고 조회·쓰기 모두 포함 여부로 판정한다. 빈 목록이면 해당 날짜에는 예약을 받지 않는다. */
     List<LocalTime> bookableSlotTimes(Store store, LocalDate date) {
-        // 휴무일·운영기간 밖 (2026-08-11, 2026-08-24). 판정은 Store 한 곳에 있다.
+        // 휴무와 운영 기간 판정은 Store의 공통 정책을 사용한다.
         if (!store.isBookableOn(date)) return List.of();
 
         return switch (store.resolveBookingType()) {
@@ -106,18 +94,7 @@ final class ReservationAvailability {
                 .toList();
     }
 
-    /**
-     * 달력(월 단위) — 날짜마다 <b>상태와 그 사유</b>를 내려준다.
-     *
-     * <p>이 API 가 생긴 이유는 {@link CalendarDayResponse} 주석에 있다. 요약하면,
-     * {@code disabledDate} 는 회색으로 막는 것밖에 못 해서 휴무·기간밖·마감이 전부 한 색이 된다.
-     *
-     * <p><b>★ 판정 순서를 {@code validateReservationSlot} 과 맞춘다.</b>
-     * 지난날 → 휴무 → 운영기간 → 예약범위 → 정원. 순서가 다르면 달력이 말하는 이유와
-     * 예약 실패 메시지가 서로 다른 말을 하게 된다(둘 다 맞는 말이라도 사용자는 혼란스럽다).
-     *
-     * <p>쿼리는 <b>한 번</b>이다. 날짜마다 조회하면 달을 넘길 때마다 31 쿼리가 나간다.
-     */
+    /** 달력도 쓰기 검증과 같은 순서로 지난날→휴무→운영 기간→예약 범위→정원을 판정한다. 월별 예약 합계는 한 번에 조회한다. */
     public List<CalendarDayResponse> getMonthCalendar(Long storeId, YearMonth month) {
         Store store = storeRepository.findById(storeId)
                 .orElseThrow(() -> new ReservationException(STORE_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
@@ -190,9 +167,7 @@ final class ReservationAvailability {
         if (store.getOpenTime() == null || store.getCloseTime() == null) return List.of();
 
         int slotMin = store.getReservationSlotMinutes() != null ? store.getReservationSlotMinutes() : 30;
-        // slotMin 이 0 이면 cursor 가 전진하지 않아 **무한루프 + OOM** 이 된다.
-        //   저장 시 clampSlotMinutes 가 막지만, 그 전에 저장된 데이터나 수동 DB 변경이 있을 수 있어
-        //   읽는 쪽에도 가드를 둔다. 이 경로는 로그인만 하면 누구나 호출할 수 있다.
+        // 저장값과 별도로 읽기 경계에서도 양수 슬롯 길이를 보장해 생성 루프가 멈추지 않게 한다.
         if (slotMin <= 0) {
             log.warn("Invalid reservationSlotMinutes: storeId={}, value={} - returning empty slots",
                     store.getId(), slotMin);

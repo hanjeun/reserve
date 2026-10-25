@@ -43,7 +43,6 @@ public class Store {
     @Column(name = "store_id")
     private Long id;
 
-    // 가게 소유자
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id")
     private Member owner;
@@ -129,38 +128,15 @@ public class Store {
     @Column(name = "break_end_time")
     private LocalTime breakEndTime;
 
-    /**
-     * 정기 휴무 요일 — ISO 요일 번호를 콤마로 이어 저장한다 (월=1 … 일=7). 예: {@code "1,3"}
-     * ({@code keywords}·{@code detailImages} 와 같은 CSV 컨벤션. 별도 테이블을 두기엔 값이 최대 7개다.)
-     *
-     * <p><b>왜 필요했나</b> — 그 전까지 영업시간이 요일 구분 없이 하나뿐이라
-     * <b>월요일 휴무인 가게도 월요일 예약을 받았다.</b> 기능이 없는 게 아니라 잘못된 예약을 받는
-     * 상태였고, 사장님은 그걸 하나씩 거절해야 했다. 거절은 이제 전액 환불이 나가므로
-     * 예약금이 왕복하는 비용까지 붙는다.
-     *
-     * <p>{@code null}·빈 문자열 = 휴무 없음(연중무휴).
-     */
+    /** 휴무 요일은 ISO 번호(월=1~일=7)의 쉼표 구분 값이다. null·빈 값은 정기 휴무가 없음을 뜻한다. */
     @Column(name = "closed_days", length = 20)
     private String closedDays;
 
-    /**
-     * 임시 휴무일 — ISO 날짜를 콤마로 이어 저장한다. 예: {@code "2026-09-15,2026-09-16"}
-     *
-     * <p>명절·개인 사정처럼 <b>특정 날짜만</b> 닫는 경우. 정기 휴무({@link #closedDays})가 있어도
-     * 이게 없으면 그날 들어온 예약을 일일이 거절해야 한다.
-     *
-     * <p>지난 날짜는 {@code StoreService} 가 저장 시점에 걸러낸다 — 안 그러면 이 값이 무한히 길어진다.
-     */
+    /** 임시 휴무일은 ISO 날짜의 쉼표 구분 값이며 지난 날짜는 저장 시 제외한다. */
     @Column(name = "closed_dates", length = 1000)
     private String closedDates;
 
-    /**
-     * 예약을 어떤 방식으로 받는가. {@code null} = {@link BookingType#SLOT}.
-     *
-     * <p>⚠️ <b>{@code null} 을 SLOT 으로 읽는 것이 생명줄이다.</b> {@code ddl-auto: update} 는
-     * 컬럼을 추가할 뿐 기존 행을 채우지 않으므로, 기존 가게는 전부 {@code NULL} 이다.
-     * 직접 읽지 말고 {@link #resolveBookingType()} 을 쓸 것.
-     */
+    /** 기존 null 값은 {@link BookingType#SLOT}으로 해석한다. 직접 읽지 않고 {@link #resolveBookingType()}을 사용한다. */
     @Enumerated(EnumType.STRING)
     @Column(name = "booking_type", length = 20)
     private BookingType bookingType;
@@ -185,13 +161,7 @@ public class Store {
     @Column(name = "open_date")
     private LocalDate openDate;
 
-    /**
-     * 운영 종료일 — 이 날짜 <b>다음</b>은 예약을 받지 않는다(종료일 당일은 영업). {@code null} = 무기한.
-     *
-     * <p>⚠️ {@code ddl-auto: update} 는 컬럼을 추가할 뿐 <b>기존 행을 채우지 않는다.</b>
-     * 기존 가게는 두 값이 모두 {@code NULL} 이고, 그건 "무기한 영업" 으로 해석돼
-     * 지금까지와 똑같이 동작한다 — 마이그레이션이 필요 없는 이유다.
-     */
+    /** 종료일 당일까지 예약을 받는다. null은 종료 기한이 없음을 뜻한다. */
     @Column(name = "close_date")
     private LocalDate closeDate;
 
@@ -394,9 +364,7 @@ public class Store {
         }
     }
 
-    // 휴무 (2026-08-11)
-    // 파싱을 엔티티에 두는 이유 — 이 CSV 를 읽는 곳이 셋이다(예약 검증, 가능시간 조회, 응답 DTO).
-    // 각자 split 하게 두면 "빈 문자열" "공백 섞임" 같은 케이스를 한 곳만 처리하는 사고가 난다.
+    // 예약 검증·가용 시각 조회·응답이 같은 휴무 값 해석을 사용한다.
 
     /** 정기 휴무 요일 (ISO: 월=1 … 일=7). 값이 없으면 빈 리스트. */
     public List<Integer> getClosedDayList() {
@@ -460,32 +428,12 @@ public class Store {
                        .collect(Collectors.joining(","));
     }
 
-    /**
-     * {@link BookingType#DAY} 예약이 저장될 시각.
-     *
-     * <p><b>왜 시간을 nullable 로 안 만들었나</b> — 정원 계산·중복 검사·QR·환불이 전부
-     * {@code reservationTime} 에 묶여 있다. nullable 로 바꾸면 그 전부에 분기가 생긴다.
-     * "하루 = 슬롯 한 개"로 보면 <b>기존 로직이 한 줄도 안 바뀌고 재사용된다.</b>
-     *
-     * <p>{@code 0} 같은 sentinel 을 쓰지 않는 것과 같은 결의 판단이다 —
-     * 이 프로젝트는 sentinel 때문에 환불 정책이 통째로 뒤집힌 전례가 있다.
-     * 여기서는 "의미 없는 특수값"이 아니라 <b>실제로 그 가게가 문 여는 시각</b>을 쓴다.
-     */
+    /** DAY도 정원·중복·QR·환불에 같은 시각 기준을 사용하도록 가게의 개점 시각에 저장한다. */
     public LocalTime dayBookingTime() {
         return openTime != null ? openTime : LocalTime.MIDNIGHT;
     }
 
-    /**
-     * 그 날짜에 <b>예약을 받을 수 있는가</b> — 운영 기간 안이고 휴무가 아니면 {@code true}.
-     *
-     * <p><b>★ 예약 검증·가능시간 조회·달력이 전부 이 메서드 하나를 지나야 한다.</b>
-     * 휴무 판정이 {@link #isClosedOn} 한 곳에 모여 있어서 지금까지 어긋난 적이 없었다.
-     * 운영 기간을 새 판정으로 따로 만들면 그 이점이 사라진다 — "화면엔 되는데 누르면 안 되는"
-     * 상태는 판정이 흩어질 때 생긴다.
-     *
-     * <p>경계는 <b>양쪽 모두 포함</b>이다. 사장님이 "9/1~9/30 운영"이라고 적으면
-     * 9월 30일은 여는 날이라고 읽는 게 자연스럽다.
-     */
+    /** 예약 검증·가용 시각·달력이 공통으로 사용하는 운영 기간·휴무 판정이다. 시작일과 종료일을 모두 포함한다. */
     public boolean isBookableOn(LocalDate date) {
         if (date == null || !isReservationEnabled()) return false;
         if (openDate != null && date.isBefore(openDate)) return false;

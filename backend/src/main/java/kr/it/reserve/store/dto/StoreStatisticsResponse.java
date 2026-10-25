@@ -20,8 +20,8 @@ public class StoreStatisticsResponse {
 
     private List<DailyValue> reservationTrend;   // 일별 예약 건수 추이
     private Map<String, Long> statusBreakdown;   // 상태별 건수 (PENDING/CONFIRMED/COMPLETED/...)
-    private Double averageRating;                // Store.rating (denormalized)
-    private Integer reviewCount;                 // Store.reviewCount (denormalized)
+    private Double averageRating;                // 가게에 집계해 둔 평점
+    private Integer reviewCount;                 // 가게에 집계해 둔 리뷰 수
     private List<DailyValue> revenueTrend;       // 결제 완료일별 예약금 순결제액 추이(확정 환불 차감)
     private Long totalDepositRevenue;            // 기간 내 예약금 순결제액 합계(호환을 위해 필드명 유지)
     private AdSummary adSummary;                 // 현재 활성 광고 요약 (없으면 null)

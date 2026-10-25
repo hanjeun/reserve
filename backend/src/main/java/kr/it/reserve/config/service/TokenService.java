@@ -22,7 +22,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
-/** Rotating refresh families; every mutation locks member -> login_session in the same order. */
+/** 모든 변경은 회원→기기 세션 순서로 잠근다. */
 @Slf4j
 @RequiredArgsConstructor
 @Service
@@ -47,7 +47,7 @@ public class TokenService {
             case INVALID -> throw reject(Reason.INVALID_JWT, null);
             case NOT_REFRESH -> throw reject(Reason.NOT_REFRESH_TOKEN, proof.memberId());
             case LEGACY -> throw reject(Reason.LEGACY_SESSION, proof.memberId());
-            case VALID, EXPIRED -> { /* An expired, signed older generation can still identify a reused family. */ }
+            case VALID, EXPIRED -> { /* 서명이 유효한 만료 토큰도 재사용된 리프레시 계열 식별에는 사용할 수 있다. */ }
         }
         Member member = memberRepository.findActiveByIdForUpdate(proof.memberId()).orElse(null);
         entityManager.flush();
@@ -82,7 +82,7 @@ public class TokenService {
         return result(tokenProvider.rotateSession(row));
     }
 
-    /** Any verified generation identifies exactly this device, including a delayed logout after rotation. */
+    /** 회전 뒤 늦게 도착한 로그아웃도 검증된 세션 식별자로 해당 기기만 폐기한다. */
     @Transactional
     public void revoke(String presentedToken) {
         RefreshTokenInspection proof = tokenProvider.inspectRefreshToken(presentedToken);
@@ -111,7 +111,7 @@ public class TokenService {
         return new RefreshResult(pair.accessToken(), pair.refreshToken(), pair.refreshMaxAge());
     }
     private void liftExpiredSuspension(Member member) {
-        // Refresh may preserve a suspended session, but access authentication still rejects the suspension.
+        // 정지 중에도 세션은 유지할 수 있지만 액세스 인증은 정지를 거부한다.
         if (member.isSuspensionExpired()) {
             member.unban();
             memberRepository.save(member);

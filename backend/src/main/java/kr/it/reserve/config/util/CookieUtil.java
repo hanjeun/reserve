@@ -13,13 +13,13 @@ import java.util.List;
 @Component
 public class CookieUtil {
     private static final String REFRESH = "refresh_token";
-    /** Nonoverlapping auth aliases: each request carries one refresh cookie, never both narrow paths. */
+    /** 인증 경로가 겹치지 않아 요청에는 리프레시 쿠키 하나만 포함된다. */
     private static final List<String> REFRESH_PATHS = List.of("/api/auth", "/api/v1/auth");
     private final boolean secureCookie;
 
     public CookieUtil(@Value("${server.env:prod}") String env) { this.secureCookie = !"local".equals(env); }
 
-    /** The Cookie header carries no Path information. Distinct same-name credentials are ambiguous. */
+    /** Cookie 헤더에는 Path가 없어 값이 다른 동명 쿠키는 구분할 수 없다. */
     public static String getCookie(HttpServletRequest request, String name) {
         List<String> values = getCookieValues(request, name);
         if (values.size() > 1 && ("access_token".equals(name) || REFRESH.equals(name))) {
@@ -37,7 +37,7 @@ public class CookieUtil {
 
     public void addCookie(HttpServletResponse response, String name, String value, int maxAge) {
         if (REFRESH.equals(name)) {
-            // Remove the old wide cookie before setting both auth aliases. No raw token is put on other routes.
+            // 넓은 경로의 기존 쿠키를 지운 뒤 인증 경로별 쿠키를 설정한다. 다른 경로에는 원문 토큰을 두지 않는다.
             write(response, name, "", 0, "/");
             for (String path : REFRESH_PATHS) write(response, name, value, maxAge, path);
         } else {

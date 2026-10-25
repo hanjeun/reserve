@@ -126,7 +126,7 @@ test('contextual header back stays beside RESERVE on desktop and mobile', async 
     });
     expect(positions.backBox).not.toBeNull();
     expect(positions.logoBox).not.toBeNull();
-    // Bounding rectangles retain subpixel rounding; a whole-pixel spacing regression must still fail.
+    // 소수점 반올림은 허용하되 1px 간격 회귀는 감지한다.
     expect(positions.logoBox.left - positions.backBox.right).toBeCloseTo(4, 1);
 });
 

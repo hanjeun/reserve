@@ -32,7 +32,7 @@ function downloadFilename(originalFilename, contentType, messageId) {
     return base + suffix;
 }
 
-/** Preview and download both use the authenticated participant/evidence image endpoint. */
+/* 미리보기·다운로드 모두 참가자·증거 권한을 확인하는 사진 경로를 사용한다. */
 export async function getChatImageBlob(url, signal) {
     if (typeof url !== 'string' || !CHAT_IMAGE_PATH.test(url)) {
         const error = new Error('사진 주소를 확인할 수 없어요.');
@@ -61,7 +61,7 @@ export async function downloadChatImage(url, signal, isCurrent, originalFilename
         if (!signal.aborted && isCurrent()) link.click();
     } finally {
         link.remove();
-        // Let the browser consume the Blob, then release its temporary URL.
+        // 브라우저가 Blob을 사용한 뒤 임시 URL을 해제한다.
         setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
     }
 }

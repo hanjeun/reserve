@@ -40,8 +40,7 @@ public class QrCheckinTokenProvider {
     private static final String CLAIM_RESERVATION_ID = "reservationId";
     private static final String CLAIM_PURPOSE = "purpose";
 
-    // 짧은 클레임 이름 (2026-08-09) — 아래 "QR 크기" 주석 참고.
-    //   기존 이름으로 발급된 토큰도 계속 읽어야 하므로 파싱은 둘 다 받는다.
+    // 짧은 클레임을 발급하되 기존 긴 이름의 클레임도 계속 읽는다.
     private static final String CLAIM_RESERVATION_ID_SHORT = "r";
     private static final String CLAIM_PURPOSE_SHORT = "p";
     private static final String PURPOSE_SHORT = "q";
@@ -52,10 +51,7 @@ public class QrCheckinTokenProvider {
     // 발급 시점 기준 상한. 예약일이 멀수록 만료가 한없이 길어지던 문제를 막는다.
     private static final int MAX_LIFETIME_HOURS = 24;
 
-    // 예약 시각·만료 계산은 서비스 운영 시간대(KST) 기준이어야 한다.
-    // 앱 컨테이너에는 TZ가 설정돼 있지 않아 systemDefault()는 UTC로 잡힌다 —
-    // 그대로 두면 "방문일 다음 날 새벽 6시"가 실제로는 다음 날 15시(KST)가 된다.
-    // 값은 ServiceTime 한 곳에서만 정한다(같은 상수가 ReservationElapsedScheduler 에도 있었다).
+    // 예약일·만료는 ServiceTime의 한국 시간으로 계산한다. JVM 기본 시간대로 바꾸지 않는다.
     private static final ZoneId SERVICE_ZONE = kr.it.reserve.global.common.ServiceTime.ZONE;
 
     /**
@@ -123,18 +119,11 @@ public class QrCheckinTokenProvider {
         LocalDateTime expiryDateTime = baseDate.plusDays(1).atStartOfDay().plusHours(GRACE_HOURS_AFTER_MIDNIGHT);
         Instant expiryInstant = expiryDateTime.atZone(SERVICE_ZONE).toInstant();
 
-        // 발급 시점 기준 상한을 씌운다 (2026-08-09).
-        //   예전엔 만료가 예약일에만 걸려 있어서, 90일 뒤 예약이면 91일짜리 토큰이 나왔다.
-        //   QR 모달은 열 때마다 서버에서 새 토큰을 받으므로 짧게 잡아도 사용성에 영향이 없다.
+        // 방문일이 멀어도 발급 시점 기준 수명 상한을 적용한다.
         Instant cap = Instant.now().plus(MAX_LIFETIME_HOURS, ChronoUnit.HOURS);
         Date expiry = Date.from(expiryInstant.isBefore(cap) ? expiryInstant : cap);
 
-        // 페이로드를 줄인다 (2026-08-09) — QR이 아예 안 읽히던 문제의 절반이 여기였다.
-        //   jwt.secret-key가 64자 이상이면 jjwt가 서명 알고리즘을 HS512로 자동 선택하고,
-        //   서명만 86자가 붙는다. 여기에 iat와 긴 클레임 이름까지 더해 토큰이 215자가 됐고
-        //   QR은 버전 11(61x61 모듈)이 됐다. 스캐너 쪽 해상도로는 못 읽는 밀도다.
-        //   HS256 고정 + iat 제거 + 짧은 클레임 이름으로 113자(버전 7, 45x45)까지 줄인다.
-        //   HS256도 이 용도(짧은 수명·서버 단독 검증)에는 충분하다.
+        // QR 밀도를 줄이기 위해 HS256·짧은 클레임을 사용하고 발급 시각은 생략한다.
         return Jwts.builder()
                 .expiration(expiry)
                 .claim(CLAIM_RESERVATION_ID_SHORT, reservationId)

@@ -22,13 +22,13 @@ function snapshotOf(pathname) {
             if (typeof parsed?.search === 'string' && isDiscoveryRootPath(path, parsed.search)) {
                 saved = { search: parsed.search, position: positionOf(parsed.position) };
             }
-        } catch { /* A denied or invalid session preference starts with the default tab. */ }
+        } catch { /* 세션 설정을 읽을 수 없으면 기본 탭으로 시작한다. */ }
         snapshots.set(path, saved);
     }
     return snapshots.get(path);
 }
 
-/** Keep each tab's existing URL options; each page still owns filter validation and normalization. */
+/* 탭별 URL 옵션을 유지하고 필터 검증·정규화는 해당 페이지가 담당한다. */
 export function rememberDiscoveryLocation({ pathname, search = '' }, position) {
     const path = discoveryPath(pathname);
     if (!isDiscoveryRootPath(path, search)) return;
@@ -40,7 +40,7 @@ export function rememberDiscoveryLocation({ pathname, search = '' }, position) {
             : positionOf(position),
     };
     snapshots.set(path, next);
-    try { sessionStorage.setItem(STORAGE_PREFIX + path, JSON.stringify(next)); } catch { /* Memory remains available. */ }
+    try { sessionStorage.setItem(STORAGE_PREFIX + path, JSON.stringify(next)); } catch { /* 저장소를 쓸 수 없으면 메모리 값만 유지한다. */ }
 }
 
 export function discoveryTabDestination(pathname, currentLocation) {

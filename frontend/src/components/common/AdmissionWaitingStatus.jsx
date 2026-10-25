@@ -2,7 +2,7 @@ import PropTypes from 'prop-types';
 import AnimatedContent from './AnimatedContent';
 import AdmissionRank from './AdmissionRank';
 
-/** Rank changes roll only the number; entering the near group changes only its message. */
+/* 순번의 숫자만 전환하고 임박 상태는 안내 문구만 바꾼다. */
 export default function AdmissionWaitingStatus({ position, caption, description, appearance }) {
     const near = Number.isFinite(position) && position >= 1 && position <= 3;
     return <div aria-live="polite" aria-atomic="true" style={appearance.container}>

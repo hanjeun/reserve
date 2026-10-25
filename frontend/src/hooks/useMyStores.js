@@ -18,7 +18,7 @@ const useMyStores = () => {
 
     const deleteMutation = useMutation({
         mutationFn: (storeId) => storeService.deleteStore(storeId),
-        // 낙관적 업데이트 — 실패 시 원복
+        // 낙관적 변경은 오류 시 이전 값으로 복구한다.
         onMutate: async (storeId) => {
             await queryClient.cancelQueries({ queryKey: storeKeys.my() });
             const prev = queryClient.getQueryData(storeKeys.my());
@@ -32,9 +32,8 @@ const useMyStores = () => {
             if (ctx?.prev) queryClient.setQueryData(storeKeys.my(), ctx.prev);
             message.error(err?.message || '영업 종료에 실패했어요.');
         },
-        // 내 가게 목록만 낙관 갱신하면 공개 목록·상세와 즐겨찾기에 닫은 가게가 남고,
-        // 서버가 함께 정리한 광고 상태도 늦게 보인다.
-        // 성공·실패와 관계없이 서버 값으로 다시 맞춘다.
+
+        // 요청 결과와 무관하게 서버 값으로 다시 맞춘다.
         onSettled: () => invalidateStoreData(queryClient),
     });
 

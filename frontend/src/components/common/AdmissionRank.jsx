@@ -3,7 +3,7 @@ import RollingFieldValue from './RollingFieldValue';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import { transitions } from '../../styles/tokens';
 
-/** Stable place keys keep unchanged digits still; changed digits roll down independently. */
+/* 자릿수 키를 유지해 바뀐 숫자만 아래로 전환한다. */
 export default function AdmissionRank({ position }) {
     const reduced = useReducedMotion();
     const number = position.toLocaleString('ko-KR');
@@ -17,7 +17,7 @@ export default function AdmissionRank({ position }) {
     </span>;
 }
 const styles = {
-    // The contained rolling grid has a synthesized baseline. Align the equal line boxes instead.
+    // 합성 기준선 대신 같은 높이의 줄 상자를 맞춘다.
     group: { display: 'inline-flex', alignItems: 'center', fontVariantNumeric: 'tabular-nums' },
     number: { display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0 },
 };

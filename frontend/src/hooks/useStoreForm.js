@@ -265,7 +265,7 @@ export const useStoreForm = ({
         const restore = async () => {
             try {
                 if (navigationDraft) {
-                    // RAM continuity uses the same cancellable restore boundary without opening IndexedDB.
+                    // 메모리 복구도 같은 취소 경계를 사용하며 IndexedDB를 열지 않는다.
                     const draft = await Promise.resolve(navigationDraft);
                     if (cancelled || !isCurrentDraftSession()) return;
                     applyDraft(draft, true);
@@ -517,10 +517,9 @@ export const useStoreForm = ({
                 clearRegistrationNavigation();
             }
 
-            // 서버 반영 뒤의 캐시 갱신 실패를 등록·수정 실패로 오인하면 사용자가 같은 요청을
-            // 다시 보내 중복 가게를 만들 수 있다. 다음 화면 진입 때 다시 조회할 수 있으므로
-            // 제출 성공 경계 밖의 보조 작업으로 취급한다.
-            // 2026-09: 가게 이름·대표 사진이 보이는 즐겨찾기·광고 목록도 함께 — invalidateAfterWrite.js 참고.
+            // 서버 저장 뒤 캐시 갱신 오류를 저장 실패로 처리해 중복 제출하지 않게 한다.
+
+            // 가게 변경은 이름·대표 사진을 참조하는 즐겨찾기·광고 캐시도 무효화한다.
             await invalidateStoreData(queryClient).catch(() => undefined);
             hasChangesRef.current = false;
             // 제출 직전에 이미 시작된 IndexedDB write가 delete보다 늦게 끝나 초안을 되살리는

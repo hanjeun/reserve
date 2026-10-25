@@ -22,7 +22,7 @@ public class SitemapService {
 
     @Value("#{siteUrls.appOrigin}")
     private String origin = kr.it.reserve.config.SiteUrls.DEFAULT_APP_ORIGIN;
-    // Home, discovery, three policy pages, and three guides reserve eight URLs.
+    // 정적 페이지 여덟 개의 URL 공간을 먼저 확보한다.
     private static final int MAX_STORE_URLS = 49_992;
 
     private final StoreRepository storeRepository;

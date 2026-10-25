@@ -124,7 +124,7 @@ public class LoginMethodService {
                     switch (challenge.getProvider()) {
                         case NAVER -> parameters.put("auth_type", "reauthenticate");
                         case KAKAO -> parameters.put("prompt", "login");
-                        // Google supports account selection, not forced password entry via prompt=login.
+                        // Google은 prompt=login 대신 계정 선택을 지원한다.
                         case GOOGLE -> {
                             parameters.remove("login_hint");
                             parameters.put("prompt", "select_account");
@@ -132,7 +132,7 @@ public class LoginMethodService {
                         default -> throw oauthExpired();
                     }
                 })
-                // from() copies the old URI; rebuild it so the provider receives the new parameters.
+                // from()은 기존 URI도 복사하므로 새 매개변수로 URI를 다시 만든다.
                 .authorizationRequestUri((String) null)
                 .build();
     }
@@ -291,12 +291,12 @@ public class LoginMethodService {
         session.removeAttribute(ISSUED); session.removeAttribute(BOUND); session.setAttribute(COMPLETING, id);
     }
 
-    /** Refresh proof identifies a cancellation target only; it never authenticates or issues a session. */
+    /** 리프레시 증명은 취소 대상만 식별하며 인증이나 새 세션 발급에는 사용하지 않는다. */
     private boolean logoutOwnsFlow(HttpServletRequest request, Long memberId) {
         String access = CookieUtil.getCookie(request, "access_token");
         if (access != null) {
             try { return memberId.equals(tokens.getUserId(access)); }
-            catch (io.jsonwebtoken.ExpiredJwtException expired) { /* The refresh cookie can outlive access. */ }
+            catch (io.jsonwebtoken.ExpiredJwtException expired) { /* 리프레시 쿠키는 액세스 쿠키보다 오래 남을 수 있다. */ }
             catch (RuntimeException invalid) { return false; }
         }
         for (String refresh : CookieUtil.getCookieValues(request, "refresh_token")) {

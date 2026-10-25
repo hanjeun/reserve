@@ -1,11 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import ImagePreviewPortal from '../components/common/ImagePreviewPortal';
 
-/**
- * Upload 파일 목록의 미리보기 상태와 직접 만든 blob URL의 수명을 관리한다.
- * 고정된 ImagePreviewPortal 타입에 props를 전달한 previewNode를 반환해 소비자의 재마운트를 피한다.
- * 서버 URL은 그대로 사용하고, blob URL은 닫힘 전환 후 또는 언마운트 때만 해제한다.
- * 닫히는 중 다시 열면 이전 정리 타이머를 취소해 새 미리보기를 지우지 않도록 한다.
+/*
+ * 미리보기의 blob URL을 닫힘 전환 후 해제한다. 닫히는 중 재개하면 정리 타이머를 취소하며 서버 URL은 해제하지 않는다.
  */
 
 // AntD Image preview의 닫힘 트랜지션(zoom/fade) 재생 시간. 여유를 조금 둠.
@@ -30,10 +27,7 @@ const useImagePreview = () => {
     const [previewItems, setPreviewItems] = useState([]);
     const [previewCurrent, setPreviewCurrent] = useState(0);
     /*
-     * 프리뷰를 열 때마다 1씩 증가하는 세션 번호 — PreviewGroup의 key로 쓴다.
-     * ref가 아니라 state인 이유: key는 **렌더 결과에 쓰이는 값**이라 ref로 두면 렌더 중 ref를
-     * 읽는 셈이 된다(위 클래스 주석의 그 함정과 같은 부류). 여는 이벤트 안에서 setPreviewOpen과
-     * 함께 갱신되므로 React가 한 번의 렌더로 묶는다 — 렌더가 늘지 않는다.
+     * 미리보기 세대는 렌더의 key에 쓰므로 상태로 보관한다.
      */
     const [previewSession, setPreviewSession] = useState(0);
     const exitTimerRef = useRef(null);
@@ -108,9 +102,7 @@ const useImagePreview = () => {
     // 지금은 App.jsx 가 useImagePreviewSwipe() 를 전역 1회 호출한다(DOM 기준으로 동작).
 
     /*
-     * 컴포넌트가 아니라 **엘리먼트**를 돌려준다.
-     * 소비 측은 `{previewNode}` 로 그냥 꽂으면 된다 — 타입(ImagePreviewPortal)이 고정이라
-     * 이 엘리먼트가 매 렌더 새로 만들어져도 React는 같은 자리로 보고 remount하지 않는다.
+     * 고정된 컴포넌트 타입의 엘리먼트를 반환해 소비자의 렌더마다 미리보기가 재마운트되지 않게 한다.
      */
     const previewNode = (
         <ImagePreviewPortal

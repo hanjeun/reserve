@@ -71,9 +71,8 @@ AdStatItem.propTypes = {
     color: PropTypes.string,
 };
 
-// 2026-07 추가 — 광고 성과가 숫자만 나열되어 허전해 보이던 것을 개선: 노출 대비 클릭/전환이 얼마나
-// 줄어드는지를 한눈에 보여주는 가로 막대 퍼널. 노출을 100%로 놓고 클릭/전환을 그 대비 비율로 그린다
-// (값이 0보다 크면 눈에 안 보일 수 있는 아주 작은 폭도 최소 2%로 보장).
+// 노출 대비 클릭·전환의 비율을 함께 표시한다.
+
 const AdFunnelBar = ({ label, value, maxValue, color }) => {
     const minPct = value > 0 ? 2 : 0;
     const pct = maxValue > 0 ? Math.max((value / maxValue) * 100, minPct) : 0;
@@ -372,11 +371,8 @@ const renderAdPerformance = (loading, adSummary) => {
     );
 };
 
-/**
- * 사업자 "통계 · 분석" 탭.
- * 관리자 DashboardTab과 동일한 StatCard/ChartCard + chart 토큰을 재사용 — 처음부터 새로 만든 화면.
- * (2026-07-10: 백엔드 GET /api/stores/{id}/statistics 신규 추가, 예약 추이/상태 분포/매출 추이를
- * DB에서 GROUP BY로 집계해서 내려받음)
+/*
+ * 서버의 예약·매출 집계를 공통 통계 카드와 차트 토큰으로 표시한다.
  */
 const StatisticsTab = () => {
     const sessionRevision = useAuthStore(state => state.sessionRevision);
@@ -403,8 +399,6 @@ const StatisticsTab = () => {
     // 통계만 다시 조회하고, 그 전에는 가게 목록 조회 함수를 넘겨 RefreshButton이 사라지지 않게 한다.
     const handleReload = storeId ? refetch : refetchStores;
 
-    // 가게 목록을 못 받아도 툴바(가게 선택·기간·새로고침)는 제자리에 두고, 오류는 통계가 나올 자리에 띄운다.
-    // 예전엔 툴바째 사라지고 오류만 탭 바로 아래에 붙었다(오류 위치 규칙 위반, 2026-09-21).
     const toolbar = (
         <FilterToolbar
             selects={[{
@@ -469,15 +463,14 @@ const StatisticsTab = () => {
                     onRetry={refetch} retrying={isFetching} compact={Boolean(stats)} />
             )}
             {(!statsError || stats) && <>
-            {/* 요약 카드 - 최소폭을 200에서 150으로 줄여 좁은 모바일 화면에서도 2열이 유지되게 함
-                (DashboardTab과 동일한 이유로 통일했다. 예전 최소폭이 넓어 모바일에서 카드들이 세로로 쌓였다) */}
+            {/*
+             * 좁은 화면에서도 요약 카드 두 열을 유지한다.
+             */}
             {renderSummaryCards(stats, loading, range)}
 
-            {/* 차트 — DashboardTab과 동일한 패턴: 카드 껍데기(제목 포함)는 항상 그리고,
-                본문만 loading/데이터있음/데이터없음 3단으로 분기해서 실제 차트 모양에 가까운 스켈레톤을 넣는다.
-                (예전엔 {'{'}!loading && stats && (...){'}'}로 전체를 감싸서 로딩 중엔 이 아래 3장이 통째로
-                안 보이다가 데이터 도착 순간 한꺼번에 나타났음 — DashboardTab에서 이미 고친 것과 동일한
-                문제라 같은 패턴을 그대로 재사용) */}
+            {/*
+             * 차트 제목·틀은 유지하고 본문만 골격·데이터·빈 상태로 나눈다.
+             */}
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                 <ChartCard
                     title="예약 추이"
@@ -519,10 +512,9 @@ const StatisticsTab = () => {
                 </ChartCard>
             </div>
 
-            {/* 광고 성과 — 현재 활성 광고가 있을 때만 보여줌(로딩 중엔 낙관적으로 보여주다가 데이터
-                도착 후 정말 광고가 없으면 숨김 — DashboardTab의 "최근 감사 로그 요약"와 동일한 판단).
-                누적 카운터만 있고 일별 추이는 아직 없음(Advertisement 엔티티에 카운터 컬럼만 있는 구조이라) —
-                노출형은 클릭 개념이 없어서 노출수만, 배너형은 클릭/전환까지 함께 보여준다. */}
+            {/*
+             * 활성 광고의 유형에 따라 노출·클릭·전환 누적 집계를 구분한다.
+             */}
             {(loading || stats?.adSummary) && (
                 <ChartCard title="광고 성과" loading={loading} height="auto">
                     {renderAdPerformance(loading, stats?.adSummary)}

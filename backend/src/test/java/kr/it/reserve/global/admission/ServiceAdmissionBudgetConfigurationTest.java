@@ -19,7 +19,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Pure configuration contracts; never opens an application context, Redis, DB, or worker. */
+/** 설정 계약만 확인하며 앱 문맥·Redis·DB·작업자를 실행하지 않는다. */
 class ServiceAdmissionBudgetConfigurationTest {
     @Test
     void commonAndProductionBindingsRemainDisabledAndUseTheSameConservativeDefaults() throws Exception {
@@ -38,7 +38,7 @@ class ServiceAdmissionBudgetConfigurationTest {
         properties.setEnabled(true);
         assertThatThrownBy(properties::validate).isInstanceOf(IllegalArgumentException.class);
 
-        // Only controlled in-memory values resolve placeholders; real process secrets are never read.
+        // 직접 만든 메모리 값으로만 설정을 해석하며 실제 프로세스 비밀값은 읽지 않는다.
         environment.getPropertySources().addFirst(new MapPropertySource("explicit-operator-input", Map.of(
                 "RESERVE_SERVICE_ADMISSION_ENABLED", "true", "RESERVE_SERVICE_ADMISSION_CAPACITY", "7",
                 "RESERVE_SERVICE_ADMISSION_AUTOMATIC_ENABLED", "true",

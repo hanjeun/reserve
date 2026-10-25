@@ -1,15 +1,15 @@
 const KEY = 'reserve:oauth-login-feedback';
 const MAX_AGE_MS = 30_000;
 
-/** Carry only a short-lived identity receipt across the OAuth document replacement. */
+/* OAuth 문서 전환에는 수명이 짧은 로그인 결과 정보만 전달한다. */
 export function rememberLoginFeedback(user) {
     if (user?.id == null || !user.role || user.termsAgreed === false) return;
     try {
         sessionStorage.setItem(KEY, JSON.stringify({ id: user.id, role: user.role, at: Date.now() }));
-    } catch { /* A blocked storage area must not prevent authentication or navigation. */ }
+    } catch { /* 저장소 차단으로 인증·이동을 막지 않는다. */ }
 }
 
-/** Consume before presenting so remounts cannot repeat it or greet another account. */
+/* 표시 전에 소비해 재마운트나 다른 계정에서 로그인 인사를 반복하지 않는다. */
 export function consumeLoginFeedback(user) {
     try {
         const saved = sessionStorage.getItem(KEY);

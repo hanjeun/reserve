@@ -2,24 +2,6 @@ package kr.it.reserve.config.oauth2;
 
 import java.util.Map;
 
-/**
- * Kakao OAuth2 사용자 정보
- * 
- * Kakao에서 제공하는 사용자 정보 구조:
- * {
- *   "id": 고유ID(Long),
- *   "kakao_account": {
- *     "email": "이메일" (비즈니스 인증 필요, 없을 수 있음),
- *     "profile": {
- *       "nickname": "닉네임",
- *       "profile_image_url": "프로필이미지URL"
- *     }
- *   }
- * }
- *
- * 비즈니스 인증이 없는 경우 이메일을 받을 수 없으므로,
- * 카카오 ID를 기반으로 가상 이메일을 생성합니다.
- */
 public class KakaoOAuth2UserInfo implements OAuth2UserInfo {
 
     private final Map<String, Object> attributes;
@@ -45,7 +27,7 @@ public class KakaoOAuth2UserInfo implements OAuth2UserInfo {
         if (kakaoAccount != null && kakaoAccount.get("email") != null) {
             return (String) kakaoAccount.get("email");
         }
-        // 이메일이 없는 경우 null 반환 (CustomOAuth2UserService에서 자동 생성)
+        // 제공자가 이메일을 주지 않으면 null을 반환한다.
         return null;
     }
 

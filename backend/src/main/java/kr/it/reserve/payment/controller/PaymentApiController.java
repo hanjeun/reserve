@@ -132,21 +132,7 @@ public class PaymentApiController {
         return ApiResponse.success(response, "결제 검증 및 처리가 완료됐어요.");
     }
 
-    /**
-     * [기능] 결제 환불 — <b>본인 예약만, 금액은 가게 정책으로 계산.</b>
-     *
-     * <p>★ 2026-08-09 수정 — 예전에는 이랬다.
-     * <pre>
-     * SecurityUtil.getCurrentMember("환불 권한이 없습니다.");   // 로그인 여부만 보고 결과를 버림
-     * paymentService.refundPayment(refundDto);              // body 를 그대로 신뢰
-     * </pre>
-     * 그래서 로그인만 한 사람이 ① 남의 예약을 환불하거나 ② 환불 금액을 직접 정하거나
-     * ③ "환불 불가" 정책을 건너뛰고 전액을 받을 수 있었다.
-     * 이젠 {@code refundByMemberRequest} 가 소유자를 확인하고 금액을 정책에서 직접 계산한다.
-     *
-     * <p>요청 본문의 {@code refundAmount} · {@code paymentId} 는 <b>무시된다</b>.
-     * 환불 대상은 {@code reservationId} 로만 정해진다.
-     */
+    /** 예약 소유권을 확인하고 환불 금액은 서버 정책으로 계산한다. 본문의 금액·결제 ID는 신뢰하지 않는다. */
     @PostMapping("/refund")
     public ApiResponse<PaymentResponseDto> refundPayment(@RequestBody PaymentRefundDto refundDto) {
         Member requester = SecurityUtil.getCurrentMember("환불을 위해 로그인이 필요해요.");

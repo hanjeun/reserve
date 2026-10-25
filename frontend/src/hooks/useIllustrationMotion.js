@@ -10,7 +10,7 @@ const MOTION = [
     { offset: 1, opacity: 1, transform: 'translateY(0) scale(1) rotate(0deg)' },
 ];
 
-// Only successful static assets are remembered in this document. No persistent cache flag or extra request.
+// 같은 문서의 정적 이미지 성공만 기억하며 영속 플래그·추가 요청을 만들지 않는다.
 const loadedSources = new Set();
 const enteredSources = new Set();
 const hasLoaded = img => Boolean(img?.complete && img.naturalWidth > 0);
@@ -18,11 +18,11 @@ const cameFromCache = img => {
     const url = img.currentSrc || img.src;
     const entries = img.ownerDocument.defaultView?.performance?.getEntriesByName?.(url, 'resource') || [];
     const latest = entries.at(-1);
-    // A zero transfer alone can also mean restricted cross-origin timing; require a known response body.
+    // 전송량 0은 출처 간 계측 제한일 수 있으므로 응답 본문도 확인한다.
     return latest?.transferSize === 0 && latest.decodedBodySize > 0;
 };
 
-/** New static art enters after loading; ready/cached art stays still and explicit replay stays local. */
+/* 새 그림만 로딩 뒤 진입하고 캐시 그림은 정적으로 두며 재생은 해당 그림에 한정한다. */
 export default function useIllustrationMotion(src) {
     const reduced = useReducedMotion();
     const scope = useContext(IllustrationMotionScope);
@@ -31,7 +31,7 @@ export default function useIllustrationMotion(src) {
     const pictureRef = useCallback(img => {
         picture.current = img;
         if (!img || !src || attached.current?.image === img && attached.current.source === src) return;
-        // Capture availability when the native image attaches, before a cold load can finish in an effect.
+        // 캐시 여부는 이미지 연결 시점에 기록해 뒤늦은 효과에서 로딩 완료와 혼동하지 않는다.
         attached.current = { image: img, source: src, cached: loadedSources.has(src) || hasLoaded(img) };
         if (hasLoaded(img)) loadedSources.add(src);
     }, [src]);

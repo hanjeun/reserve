@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
-/** Explicit opt-in per sale/slot. Queue capacity never changes the store's booking capacity. */
+/** 판매 회차별로 명시적으로 활성화하며 대기열 정원은 가게 예약 정원을 바꾸지 않는다. */
 @Getter
 @Setter
 @Component
@@ -35,7 +35,7 @@ public class AdmissionProperties {
         private int idleSeconds = 90;
         private int maxWaiting = 10000;
         private int maxParticipants = 100000;
-        // Rotate only with an explicit operator reset; missing Redis state must not reopen admission.
+        // 명시적인 운영 초기화로만 교체한다. Redis 상태 유실로 입장을 다시 열지 않는다.
         private String epoch;
     }
 

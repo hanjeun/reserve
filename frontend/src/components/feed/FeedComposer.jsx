@@ -52,7 +52,7 @@ export default function FeedComposer({ open, post, profile, config, onClose, onS
         urls.current.clear();
         form.setFieldsValue({ content: post?.content || '', region: post?.region || null,
             storeId: post?.store?.id || null });
-        // This reset belongs to a newly opened editor; it never overwrites a live edit.
+        // 새 편집기에만 초기값을 적용해 진행 중인 수정을 덮지 않는다.
         setImages((post?.images || []).map(image => ({ ...image, uid: `saved:${image.id}` })));
         setPreview(false);
         dirty.current = false;
@@ -71,7 +71,7 @@ export default function FeedComposer({ open, post, profile, config, onClose, onS
                 const uploaded = await feedService.upload(image.file);
                 assertCurrentSession(variables.session);
                 mediaIds.push(uploaded.id);
-                // Failed posting can retry these owned uploads without duplicating objects.
+                // 저장 실패 시 소유한 업로드를 재사용해 객체 중복을 방지한다.
                 setImages(current => current.map(item => item.uid === image.uid ? { ...item, ...uploaded, file: undefined } : item));
             }
             setProgress(draft ? '임시저장 중' : '게시하는 중');
@@ -122,7 +122,7 @@ export default function FeedComposer({ open, post, profile, config, onClose, onS
         if (preview) { setPreview(false); return; }
         setPreparingPreview(true);
         try { await form.validateFields(); setPreview(true); }
-        catch { /* Field validation stays in the editor. */ }
+        catch { /* 필드 검증 오류는 편집기에 표시한다. */ }
         finally { setPreparingPreview(false); }
     };
 
@@ -140,7 +140,7 @@ export default function FeedComposer({ open, post, profile, config, onClose, onS
             }
             assertCurrentSession(session);
             await save.mutateAsync({ draft, fields, selected: [...images], session });
-        } catch { /* Field and mutation errors remain in their existing presentation. */ }
+        } catch { /* 필드·저장 오류는 기존 표시 위치를 유지한다. */ }
         finally { submitLock.current = false; setPreparingSave(false); }
     };
     const close = () => {

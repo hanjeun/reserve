@@ -7,14 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * PG 취소 응답 해석.
- *
- * <h2>왜 이 테스트가 필요한가</h2>
- * 이 프로젝트에서 가장 위험한 어긋남은 <b>"장부는 환불, 실제로는 미환불"</b> 이다.
- * 그 어긋남은 딱 한 군데서 생긴다 — PortOne 이 200 과 함께 {@code REQUESTED}(접수됨)를 줬는데
- * 그걸 환불 완료로 읽을 때. 그래서 <b>SUCCEEDED 가 아닌 모든 경우</b>가 완료로 해석되지 않는지를 못박는다.
- */
+/** PG 접수(REQUESTED)를 환불 완료로 처리하지 않고 SUCCEEDED만 완료로 해석하는지 확인한다. */
 class PortoneCancelResponseTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();

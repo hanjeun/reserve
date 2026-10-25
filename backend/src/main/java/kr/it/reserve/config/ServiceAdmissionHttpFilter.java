@@ -24,7 +24,7 @@ import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
 
-/** Runs after CORS/CSRF and before JWT DB lookups. A pass grants capacity, never API authority. */
+/** CORS·CSRF 뒤, JWT 조회 앞에서 처리한다. 입장권은 API 접근 권한을 부여하지 않는다. */
 @Slf4j
 public final class ServiceAdmissionHttpFilter extends OncePerRequestFilter {
     private static final String PATH = "/api/service-admission";
@@ -99,7 +99,7 @@ public final class ServiceAdmissionHttpFilter extends OncePerRequestFilter {
             unavailable(response);
             return;
         }
-        // Downstream security and business failures must keep their original handling.
+        // 이후 인증·업무 실패는 원래 예외 처리 경계를 유지한다.
         try { chain.doFilter(request, response); }
         finally { if (emergencyAcquired) emergencyRequests.release(); }
     }
@@ -134,7 +134,7 @@ public final class ServiceAdmissionHttpFilter extends OncePerRequestFilter {
                 case "DELETE" -> service.cancel(ticket);
                 default -> service.status(ticket);
             };
-            // The IP quota bounds Redis work. Only a server-confirmed live ticket gets a response quota bucket.
+            // IP 제한으로 Redis 작업량을 묶고, 서버가 확인한 유효 입장권에만 응답 제한 버킷을 만든다.
             if (method.equals("GET") && entry.ticket() != null
                     && !limiter.tryConsume("service-entry:read:" + digest(entry.ticket()), RateLimiter.Policy.SERVICE_ENTRY_READ)) {
                 failure(response, 429, new GateError("SERVICE_ADMISSION_RATE_LIMITED", null), "입장 상태를 잠시 후 다시 확인해주세요.");

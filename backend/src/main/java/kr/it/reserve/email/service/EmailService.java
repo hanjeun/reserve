@@ -15,20 +15,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.HtmlUtils;
 
-/**
- * 메일 발송. 모든 발송 메서드는 {@code @Async} 다.
- *
- * <h2>지켜야 할 계약 — 두 가지</h2>
- * <ol>
- *   <li><b>catch 절에서 {@link MailException} 을 빼지 말 것.</b>
- *       {@code mailSender.send()} 는 {@code MessagingException} 을 던지지 않는다 —
- *       Spring 이 전부 {@code MailException}({@code RuntimeException} 계열)으로 감싼다.
- *       빼면 발송 실패가 <b>로그 한 줄 없이</b> 사라지고, {@code @Async} 라 호출자도 모른다.</li>
- *   <li><b>실패 로그의 알림 기준 문구를 유지할 것.</b> Grafana 알림 규칙이 문구 일부를 문자열로 매칭한다.
- *       기준 문구 뒤에는 수신자·제목·예외 메시지 대신 오류 타입처럼 개인정보가 아닌 진단값만 남긴다.
- *       기준 문구를 바꿔야 한다면 {@code docs/technical/monitoring.md} 의 알림 규칙을 같이 고칠 것.</li>
- * </ol>
- */
+/** 비동기 메일 실패는 {@link MailException}까지 기록한다. 알림 규칙이 참조하는 로그 문구를 유지하고 개인정보·원문 예외는 남기지 않는다. */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -98,8 +85,6 @@ public class EmailService {
         }
     }
 
-    //  예약 알림 이메일
-
     /** 예약 승인 알림 → 유저 */
     @Async
     public void sendReservationConfirmedEmail(String toEmail, String memberName,
@@ -144,13 +129,7 @@ public class EmailService {
                         rejectionReason, "거절 사유"));
     }
 
-    /**
-     * 승인 취소 알림 → 유저 (2026-08-11 신설, Undo 전용).
-     *
-     * <p>사장님이 승인을 잘못 눌러 되돌렸을 때 보낸다. <b>이 메일이 없으면 안 된다</b> —
-     * 승인 순간 이미 "예약이 승인되었습니다" 메일이 나갔기 때문에, 되돌리기만 하고 알리지 않으면
-     * 이용자는 확정된 줄 알고 방문한다. 거절이 아니라 "다시 대기 상태"라는 걸 분명히 한다.
-     */
+    /** 승인 취소 시 예약이 다시 대기 상태임을 알린다. */
     @Async
     public void sendReservationApprovalRevokedEmail(String toEmail, String memberName,
                                                     String storeName, String reservationDate,
@@ -209,9 +188,8 @@ public class EmailService {
     }
 
     /**
-     * @param reason      사유 본문. {@code null} 이면 사유 행 자체를 렌더하지 않는다.
-     * @param reasonLabel 사유 행의 라벨. <b>"거절 사유"로 고정하면 안 된다</b> (2026-08-11) —
-     *                    취소 메일에 "거절 사유"가 찍히면 이용자가 무슨 일이 있었는지 오해한다.
+     * @param reason 사유가 없으면 해당 행을 표시하지 않는다.
+     * @param reasonLabel 메일 유형에 맞는 사유 라벨
      */
     private String buildReservationStatusContent(String memberName, ReservationMailDetails details,
                                                   String statusLabel, String statusColor,
@@ -283,8 +261,6 @@ public class EmailService {
             + "  </div>"
             + "</div></body></html>";
     }
-
-    //  사업자 인증 알림 이메일
 
     /** 사업자 인증 승인 알림 → 신청자 */
     @Async

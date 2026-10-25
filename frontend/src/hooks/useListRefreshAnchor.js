@@ -12,7 +12,7 @@ const bounds = port => {
     return { top: Math.max(0, rect.top + port.clientTop), bottom: Math.min(window.innerHeight, rect.top + port.clientTop + port.clientHeight) };
 };
 
-/** Preserve a visible keyed row across background reads, including nested scrollers and late image layout. */
+/* 백그라운드 조회·늦은 이미지 로딩 뒤에도 보이는 행의 위치를 유지한다. */
 export default function useListRefreshAnchor(container, key, refreshing, data) {
     const snapshot = useRef(null);
     const navigation = useRef({ key, pending: false });
@@ -31,7 +31,7 @@ export default function useListRefreshAnchor(container, key, refreshing, data) {
         if (previous.port !== window && !previous.port.isConnected) return;
         const current = new Map(Array.from(container.current.querySelectorAll('[data-list-item-id]'))
             .map(row => [row.dataset.listItemId, row]));
-        // If the first visible item was deleted, preserve the next surviving visible item instead.
+        // 첫 행이 삭제되면 다음으로 남은 보이는 행을 기준으로 삼는다.
         const anchor = previous.rows.find(row => current.has(row.id));
         if (!anchor) return;
         const delta = current.get(anchor.id).getBoundingClientRect().top - anchor.top;

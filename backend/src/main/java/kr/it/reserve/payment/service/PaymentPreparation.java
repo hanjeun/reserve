@@ -46,10 +46,7 @@ final class PaymentPreparation {
         entityManager.flush();
         for (Payment payment : lockedPayments) entityManager.refresh(payment, LockModeType.PESSIMISTIC_WRITE);
 
-        // 본인 예약인지 확인한다 (2026-08-09).
-        //   예전엔 reservationId 를 body 에서 받아 그대로 조회만 했다. 로그인만 하면
-        //   남의 예약에 대해 결제를 준비하고, 아래 금액 문제와 겹쳐 남의 예약을
-        //   임의 금액으로 "결제 완료" 상태로 만들 수 있었다.
+        // 결제 준비 전에 예약 소유권을 확인한다.
         if (reservation.getMember() == null || !reservation.getMember().getId().equals(memberId)) {
             log.warn("Payment prepare denied - not owner: reservationId={}, memberId={}",
                     reservation.getId(), memberId);
@@ -63,11 +60,7 @@ final class PaymentPreparation {
             throw new PaymentException("이미 결제가 완료된 예약이에요.", HttpStatus.CONFLICT);
         }
 
-        // 결제 금액은 서버에서만 정한다 (2026-08-09).
-        //   예전엔 requestDto.getAmount() 를 그대로 Payment.amount 에 넣었고,
-        //   verifyAndCompletePayment 는 PG 결제액을 "그 값"과 비교했다. 즉 검증이
-        //   공격자가 정한 숫자를 기준으로 통과했고, markDepositPaid 가 예약의
-        //   예약금을 그 금액으로 덮어썼다. 요청 본문의 amount 는 이제 무시한다.
+        // 결제 금액은 요청값이 아니라 예약 당시 서버에서 확정한 금액을 사용한다.
         int amount = resolveDepositAmount(reservation);
         if (amount <= 0) {
             throw new PaymentException("결제할 예약금이 없는 예약이에요.", HttpStatus.BAD_REQUEST);
@@ -78,8 +71,7 @@ final class PaymentPreparation {
                 .filter(payment -> payment.getStatus() == Payment.PaymentStatus.READY).findFirst().orElse(null);
 
         if (existingReady != null) {
-            // 재사용 시에도 금액을 예약 당시 확정된 값으로 다시 맞춘다 — 예전 READY 행에는
-            // 클라이언트가 보냈던 금액이 그대로 남아 있을 수 있다.
+            // 재사용할 결제 대기 행도 예약의 확정 금액과 다시 맞춘다.
             if (!Integer.valueOf(amount).equals(existingReady.getAmount())) {
                 log.info("Resyncing READY payment amount: paymentId={}, {} -> {}",
                         existingReady.getId(), existingReady.getAmount(), amount);

@@ -6,7 +6,7 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
-/** Visitor capacity only. Authentication and reservation capacity remain independent boundaries. */
+/** 방문 입장량만 제어한다. 인증과 예약 정원은 별도 경계다. */
 @Getter
 @Setter
 @Component

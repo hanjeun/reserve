@@ -16,11 +16,7 @@ import java.util.HexFormat;
 import java.util.Objects;
 import java.util.UUID;
 
-/**
- * One device and one refresh family. All timestamps are UTC.
- * The old refresh_token table is deliberately not read: its sid-less tokens require a new login.
- * Only hashes and non-secret reconstruction metadata are stored, never a bearer credential.
- */
+/** 기기별 리프레시 계열을 UTC 시각으로 관리한다. 기존 refresh_token은 조회하지 않으며, 원문 자격증명 대신 해시와 재구성 메타데이터만 저장한다. */
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
 @Entity
@@ -83,7 +79,7 @@ public class RefreshToken {
         this.loginMethod = Objects.requireNonNull(loginMethod);
     }
 
-    /** Compatibility for fixtures that only seed a removable session; the argument is immediately hashed. */
+    /** 호환 세션의 입력 토큰은 즉시 해시로 바꾼다. */
     public RefreshToken(Long memberId, String token, LocalDateTime expiresAt) {
         this(memberId, UUID.randomUUID().toString(), UUID.randomUUID().toString(), null,
                 utcNow(), expiresAt, expiresAt, 0, null, "PASSWORD");

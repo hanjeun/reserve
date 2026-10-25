@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Fork the standalone helper so its logging and fixture state never affect other application tests. */
+/** 독립 자식 프로세스에서 준비 도구를 실행해 로그와 시험 상태가 앱 시험에 섞이지 않게 한다. */
 @Timeout(90)
 class ServiceAdmissionPreparationToolTest {
     @Test
@@ -40,7 +40,7 @@ class ServiceAdmissionPreparationToolTest {
         for (String key : java.util.List.of("PATH", "Path", "SystemRoot", "WINDIR", "TEMP", "TMP", "HOME", "USERPROFILE", "LOCALAPPDATA", "APPDATA")) {
             if (inherited.containsKey(key)) environment.put(key, inherited.get(key));
         }
-        // The opt-in fixture uses the local default Docker engine; remote connection variables are excluded.
+        // 로컬 기본 Docker 엔진만 사용하며 원격 연결 환경값은 전달하지 않는다.
         if (ownedRedis) {
             environment.put("DOCKER_CONTEXT", "default");
             String owner = inherited.get("RESERVE_ISOLATED_TEST_OWNER");
@@ -62,7 +62,7 @@ class ServiceAdmissionPreparationToolTest {
             String result = new String(bytes, StandardCharsets.UTF_8).trim();
             assertThat(result).matches("SERVICE_ADMISSION_HELPER_CONTRACTS checks=[1-9][0-9]* ownedRedis=" + ownedRedis);
         } finally {
-            // Let an owned Redis fixture run its finally block before terminating a stalled child.
+            // 멈춘 자식을 종료하기 전에 소유 Redis의 finally 정리 기회를 준다.
             if (process.isAlive() && !process.waitFor(5, TimeUnit.SECONDS)) {
                 process.destroy();
                 if (!process.waitFor(5, TimeUnit.SECONDS)) process.destroyForcibly();

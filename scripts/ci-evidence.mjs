@@ -1,4 +1,4 @@
-// Reuse successful tests, never a dependency-cache hit. No production builds/secrets are cached here.
+// 성공한 테스트 증거만 재사용하며 의존성 캐시 적중을 성공으로 취급하거나 운영 빌드·비밀을 보관하지 않는다.
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -15,7 +15,7 @@ const scopes = {
     frontend: ['frontend', 'backend/src/main', 'scripts', '.github', '.gitattributes', 'nginx', 'monitoring', 'docs/design-system/snapshots'],
 };
 function componentConfig(requested) {
-    // CLI input selects a literal configuration; it never becomes a filesystem path.
+    // CLI 입력은 미리 정의한 설정만 선택하며 파일 경로로 사용하지 않는다.
     switch (requested) {
         case 'backend': return { component: 'backend', directory: resolve('.ci-evidence/backend') };
         case 'frontend': return { component: 'frontend', directory: resolve('.ci-evidence/frontend') };
@@ -33,7 +33,7 @@ export function evidenceInputPaths(component) {
 }
 export function evidenceKey(component, entries, runtime) {
     componentConfig(component);
-    // Markdown is checked afresh by the documentation step; executable/lock/test blobs remain inputs.
+    // 문서는 매번 따로 검사하고 실행 코드·잠금 파일·테스트의 객체 ID를 증거 키에 포함한다.
     const tree = entries.split('\0').filter(Boolean).filter(entry => !entry.split('\t')[1]?.endsWith('.md')).sort();
     return createHash('sha256').update(JSON.stringify({ version: VERSION, component, tree, runtime })).digest('hex');
 }
@@ -52,7 +52,7 @@ export function freshProof(proof, now = Date.now()) {
 function runtimeIdentity(component) {
     let java;
     if (component === 'backend') {
-        // setup-java supplies the trusted JDK installation; never search the caller's PATH.
+        // 호출자의 PATH를 탐색하지 않고 setup-java가 제공한 JDK를 사용한다.
         const javaHome = process.env.JAVA_HOME;
         if (!javaHome || !isAbsolute(javaHome)) throw new Error('JAVA_HOME must be an absolute JDK installation path');
         java = execFileSync(join(javaHome, 'bin', process.platform === 'win32' ? 'java.exe' : 'java'), ['--version'], {
@@ -92,7 +92,7 @@ async function readProof(artifact) {
     if (redirect.status !== 302) return null;
     const location = new URL(redirect.headers.get('location'));
     if (location.protocol !== 'https:') return null;
-    // The signed download receives NO GitHub token. Check the API's archive digest before opening it.
+    // 서명된 다운로드 주소에 GitHub 토큰을 보내지 않으며 압축 해제 전 API의 해시를 대조한다.
     const response = await fetch(location, { signal: AbortSignal.timeout(10_000) });
     if (!response.ok) return null;
     const archive = Buffer.from(await response.arrayBuffer());
@@ -101,7 +101,7 @@ async function readProof(artifact) {
     try {
         const file = join(directory, 'proof.zip');
         writeFileSync(file, archive);
-        // Evidence restoration runs only on the workflow's Ubuntu runners.
+        // 증거 복원은 이 워크플로의 Ubuntu 실행기에서만 수행한다.
         return JSON.parse(execFileSync('/usr/bin/unzip', ['-p', file, 'evidence.json'], {
             encoding: 'utf8', maxBuffer: 4096, stdio: ['ignore', 'pipe', 'pipe'],
         }));
@@ -156,7 +156,7 @@ async function restore(component, key, runtime) {
         const jobs = await api(`actions/runs/${run.id}/jobs?filter=latest&per_page=100`);
         if (!jobs.jobs.some(job => job.name === `test-${component}` && job.conclusion === 'success')) continue;
         git(['fetch', '--no-tags', 'origin', run.head_sha]);
-        // Do not trust a key claimed by an artifact: recompute from that run's actual Git tree.
+        // 아티팩트가 주장하는 키를 믿지 않고 해당 실행의 실제 Git 트리로 다시 계산한다.
         if (keyAt(component, run.head_sha, runtime) !== key) continue;
         const proof = await readProof(artifact);
         if (proof?.version !== VERSION || proof.component !== component || proof.key !== key
@@ -174,10 +174,10 @@ async function restoreWithCoverageWait(component, key, runtime) {
         ? Math.min(900, Math.max(0, Number(process.env.CI_COVERAGE_WAIT_SECONDS) || 0)) : 0;
     const deadline = Date.now() + waitSeconds * 1000;
     if (!proof && waitSeconds) summary(`${component}: waiting for the existing CI coverage; no duplicate tests yet.`);
-    // Polls depend on the preceding result; parallel requests would bypass the bounded wait.
+    // 앞선 조회 결과에 따라 제한된 횟수만 대기하므로 병렬로 요청하지 않는다.
     while (!proof && Date.now() < deadline) {
         await new Promise(resolveWait => setTimeout(resolveWait, 30_000));
-        try { proof = await restore(component, key, runtime); } catch { /* Fall back to fresh tests. */ }
+        try { proof = await restore(component, key, runtime); } catch { /* 재사용에 실패하면 테스트를 새로 실행한다. */ }
     }
     return proof;
 }

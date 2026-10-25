@@ -28,7 +28,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-/** Standalone operator tool. It never starts Spring, a worker, or a remote dots action. */
+/** Spring이나 작업자를 기동하지 않고 운영자가 명시적으로 실행하는 준비 도구. */
 public final class PrepareServiceAdmission {
     private PrepareServiceAdmission() { }
 
@@ -39,7 +39,7 @@ public final class PrepareServiceAdmission {
             "heartbeatTimeoutSeconds", "maxWaiting");
     private static final List<String> SUFFIXES = List.of("control", "waiting", "active", "heartbeats", "born", "sequence");
 
-    /** Only explicit OFF may remove the fixed automatic metadata fields; pass/queue state is never removed. */
+    /** 명시한 OFF만 자동 정책 메타데이터를 지우며 통과·대기 상태는 보존한다. */
     public static final String PREPARE = """
             if #KEYS ~= 6 or #ARGV ~= 2 then return -3 end
             local marker, requested = ARGV[1], ARGV[2]
@@ -77,7 +77,7 @@ public final class PrepareServiceAdmission {
             System.err.println("{\"state\":\"REFUSED\",\"reason\":\"" + exception.reason + "\"}");
             System.exit(2);
         } catch (Exception exception) {
-            // A Redis response can be lost after commit; do not claim that no change occurred.
+            // 반영 후 응답만 유실될 수 있으므로 변경되지 않았다고 단정하지 않는다.
             System.err.println("{\"state\":\"UNKNOWN\",\"reason\":\"PREPARATION_OUTCOME_UNCONFIRMED\"}");
             System.exit(2);
         }
@@ -128,7 +128,7 @@ public final class PrepareServiceAdmission {
             properties.setMaxSessionSeconds(number(root, "maxSessionSeconds", properties.getMaxSessionSeconds()));
             properties.setHeartbeatTimeoutSeconds(number(root, "heartbeatTimeoutSeconds", properties.getHeartbeatTimeoutSeconds()));
             properties.setMaxWaiting(number(root, "maxWaiting", properties.getMaxWaiting()));
-            // Validate a candidate even while the actual application default remains disabled.
+            // 앱의 비활성 기본값과 별개로 활성화할 후보 설정을 검증한다.
             properties.setEnabled(true);
             properties.validate();
             properties.setEnabled(false);
@@ -192,7 +192,7 @@ public final class PrepareServiceAdmission {
     }
 
     static long apply(Plan plan, Endpoint endpoint) throws Exception {
-        // This dedicated CLI must not emit client diagnostics containing endpoint or credential material.
+        // 연결 주소나 자격증명이 포함될 수 있는 클라이언트 진단은 출력하지 않는다.
         if (!(LoggerFactory.getILoggerFactory() instanceof LoggerContext logging)) throw new Refused("UNSUPPORTED_CLIENT_LOGGING");
         logging.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME).setLevel(Level.OFF);
         var server = new RedisStandaloneConfiguration(endpoint.host, endpoint.port);

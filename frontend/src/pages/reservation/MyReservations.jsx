@@ -39,11 +39,8 @@ const { Text } = Typography;
 const STATUS_OPTIONS = RESERVATION_STATUS_FILTER_OPTIONS;
 const SORT_OPTIONS = RESERVATION_SORT_OPTIONS;
 
-/**
- * 카드 맨 아래 사유 문구. 상태에 따라 읽는 필드와 라벨이 다르다 (2026-08-11).
- *
- * <p>rejectionReason 하나로 뭉뚱그리지 않는다 — 취소된 예약에 "거절 사유"라는 라벨이
- * 붙으면 이용자가 무슨 일이 있었는지 오해한다. 백엔드도 같은 이유로 컬럼을 따로 뒀다.
+/*
+ * 예약 상태에 맞는 사유 필드와 라벨을 함께 선택한다.
  */
 const reasonNote = (res) => {
     const map = {
@@ -55,11 +52,8 @@ const reasonNote = (res) => {
     return <Text type="secondary" style={styles.rejection}>{note.label}: {note.value}</Text>;
 };
 
-/**
- * 예약 카드의 액션 버튼 묶음(결제/변경/QR/취소/리뷰/삭제).
- * 상태별로 나오는 버튼이 달라서 별도 컴포넌트로 추출.
- * 2026-07: 감싸는 flex wrapper(정렬/간격)는 ReservationRow가 담당하므로
- * 여기선 버튼 자체만 반환한다 — 사업자 쪽(ReservationCard.jsx)과 배치 로직을 공유하기 위함.
+/*
+ * 상태별 버튼만 반환하고 정렬·간격은 공통 ReservationRow가 맡는다.
  */
 const createReservationActions = ({ res, paying, onPay, onEdit, onQr, onCancel, onReview, onRemove }) => {
     const actions = [];
@@ -202,12 +196,10 @@ const ReservationHistory = () => {
         if (qrReservationId != null && !reservations.some(item => item.id === qrReservationId)) setQrReservationId(null);
     }
 
-    // 코드리뷰 지적사항 반영(2026-07): 마운트마다 무조건 refetch()를 불렀는데, useQuery가 이미
-    // 마운트 시 자동으로 fetch하므로 이건 대부분 중복 호출이었음 — 특히 staleTime(3분) 안에
-    // 이 페이지로 다시 돌아오면(뒤로가기 등) 캐시된 데이터가 이미 있어 isLoading은 false인데도
-    // 이 강제 refetch가 isFetching을 true로 만들어서 스켈레톤이 다시 뜨는 원인이었음.
-    // location.state.refetch로 명시적으로 요청된 경우(다른 화면에서 예약 생성 후 넘어올 때 등)만
-    // 캐시를 무시하고 강제 재조회.
+    // 최초 조회와 재진입 갱신은 useQuery의 캐시 정책에 맡긴다.
+
+    // 명시적 refetch 진입만 캐시를 무시해 다시 조회한다.
+
     useEffect(() => {
         if (location.state?.warnMsg) {
             message.warning({ content: location.state.warnMsg, key: 'review_warn' });
@@ -239,11 +231,8 @@ const ReservationHistory = () => {
         });
     };
 
-    // 코드리뷰 지적사항 반영(2026-07): 예전엔 환불 미리보기 API 응답을 기다린 뒤에야 confirm
-    // 모달을 열어서, "취소" 버튼을 눌러도 몇 초간(개발 환경 스켈레톤 딜레이 포함) 아무 반응이
-    // 없다가 갑자기 모달이 튀어나왔음 — AdminPanel.jsx의 "상세보기" 모달과 동일한 문제였음.
-    // 예약금이 있는 경우만 모달을 먼저 즉시 열고("환불 정보 확인 중..."), 데이터가 오면
-    // modal.update()로 내용만 갱신(AntD Modal.confirm이 반환하는 핸들의 update 메서드 활용).
+    // 확인창은 즉시 열고 환불 미리보기만 비동기로 갱신한다.
+
     const handleCancel = (res) => {
         if (!res.depositPaid) {
             confirm({
@@ -266,18 +255,8 @@ const ReservationHistory = () => {
                 </span>
             ),
             okText: '취소하기', cancelText: '닫기',
-            // loading 이 아니라 disabled 다 (2026-08-11).
-            //   주의: 오해 정정 — loading 이 클릭을 통과시키는 건 **아니다**.
-            //   antd 6.2.0 Button.handleClick 은 innerLoading 이면 preventDefault 하고 빠진다
-            //   (node_modules/antd/es/button/Button.js:183-188). 마우스 클릭은 이미 막혀 있었다.
-            //   진짜 문제는 그 다음 줄이다 — 렌더되는 <button> 의 disabled 속성은
-            //   mergedDisabled 로만 결정되고 innerLoading 은 넣지 않는다(같은 파일 302).
-            //   그래서 loading 상태의 버튼은 **여전히 포커스를 받고 스크린리더에는 평범한
-            //   활성 버튼으로 읽힌다.** Tab 으로 가서 Enter 를 눌러도 아무 일이 안 일어나는데
-            //   왜 안 되는지 알 방법이 없다. 되돌릴 수 없는 "취소하기"에서 그러면 안 된다.
-            //   disabled 는 DOM 속성까지 내려가서 포커스에서 빠지고 회색으로 바뀐다 —
-            //   "아직 누를 때가 아니다"가 눈과 보조기술 양쪽에 실제로 전달된다.
-            //   덤으로 본문 SpinIndicator 와 버튼 스피너가 겹치던 것도 사라진다.
+            // 조회 중에는 버튼을 비활성화해 원래 라벨을 유지한다.
+
             okButtonProps: { danger: true, disabled: true }, centered: true,
             onOk: () => cancelReservation(res.id),
         });
@@ -290,7 +269,7 @@ const ReservationHistory = () => {
                 modalHandle.update({ content, okButtonProps: { danger: true, disabled: false } });
             })
             .catch(() => {
-                // 환불 조회 실패해도 취소는 계속 가능하게 — 기본 문구로 되돌림
+                // 환불 미리보기 오류는 기본 안내로 대체하고 취소 동작은 유지한다.
                 modalHandle.update({
                     content: '예약을 취소할까요? 취소 후 되돌릴 수 없어요.',
                     okButtonProps: { danger: true, disabled: false },
@@ -325,7 +304,6 @@ const ReservationHistory = () => {
         return <ReservationRow {...itemProps} renderActions={() => actions} />;
     };
 
-    // 목록 영역 — 첫 조회 스켈레톤 / 처음부터 실패 / 목록(재조회 실패 띠 포함)
     let listBody;
     if (loading) {
         listBody = (

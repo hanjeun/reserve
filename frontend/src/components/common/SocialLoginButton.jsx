@@ -30,7 +30,6 @@ const circle = {
     display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none', padding: 0,
 };
 
-/** Login and account verification share the original brand artwork and circular control. */
 export default function SocialLoginButton({ provider, label, disabled = false, onClick, ...props }) {
     const { Icon, style } = providers[provider];
     return <button {...props} type="button" className="reserve-social-login" aria-label={label}

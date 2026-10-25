@@ -1,7 +1,5 @@
-/**
- * 한 줄에 들어가는 소수의 선택지를 표시한다. 여러 줄 선택은 SegmentedGrid를 사용한다.
- * 선택지가 많거나 검색이 필요하면 FormSelect를 사용한다.
- * 공용 segmented 클래스가 선택·hover 상태를 담당하고 block은 전체 너비 여부만 정한다.
+/*
+ * 한 줄의 적은 선택지에 사용하고 여러 줄·검색 선택과 구분한다.
  */
 import React from 'react';
 import PropTypes from 'prop-types';

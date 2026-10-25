@@ -13,8 +13,8 @@ describe('booking calendar loading boundary', () => {
         Object.assign(state, { byDate: {}, loading: true, fetching: false, error: null });
     });
     afterEach(async () => {
-        // Form.Item debounces errors/warnings for 10 ms even after this fixture unmounts.
-        // Run those callbacks while jsdom still exists instead of leaking them into teardown.
+        // 언마운트 뒤에도 남는 Form.Item의 10ms 검증 콜백은 jsdom 정리 전에 실행한다.
+
         cleanup();
         try {
             await act(async () => { await vi.runOnlyPendingTimersAsync(); });

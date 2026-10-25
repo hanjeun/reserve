@@ -2,19 +2,12 @@ version: '3.8'
 services:
   green:
     container_name: green
-    # CI가 IMAGE_TAG=sha-<커밋>을 export해서 커밋 고정 이미지를 띄운다.
-    # 수동 실행 등으로 값이 없으면 기존처럼 :latest로 폴백한다.
+    # 배포는 커밋 SHA 태그를 명시하며, 값이 없으면 latest를 사용한다.
     image: ${DOCKERHUB_USERNAME}/reserve:${IMAGE_TAG:-latest}
-    # application-green.yml 이 server.port: 8081 을 쓰므로 컨테이너 안에서도 8081 을 리슨한다.
-    # 예전에는 "8081:8080" 이어서 호스트 8081 이 아무도 안 듣는 컨테이너 8080 으로 갔다.
-    # blue 는 8080:8080 + port 8080 으로 이미 일치해 있어 문제가 없었고,
-    # 업스트림 감지가 항상 none 으로 떨어져 green 이 쓰인 적이 없어서 드러나지 않았다.
-    # nginx 도 upstream green 을 PRIVATE_IP:8081 로 보므로 세 곳이 전부 8081 로 맞아야 한다.
+    # 앱과 nginx가 모두 8081을 사용하므로 컨테이너 포트도 일치시킨다.
     ports:
       - "8081:8081"
-    # TZ 를 여기에 추가하지 말 것 — 이유는 docker-compose-blue.yml 의 같은 자리에 적어두었다.
-    #    요약: 이미 UTC 로 쌓인 컬럼에 KST 가 섞이고, promtail 타임스탬프 파싱이 깨진다.
-    #    KST 가 필요한 자리는 kr.it.reserve.global.common.ServiceTime 으로 코드에서 명시한다.
+    # 저장 시각과 로그의 UTC 관례를 유지하며 KST 업무 판단은 ServiceTime에서 명시한다.
     environment:
       - SPRING_PROFILES_ACTIVE=green
       - SERVER_ENV=green
@@ -65,9 +58,7 @@ services:
       - RESEND_API_KEY=${RESEND_API_KEY}
       - PORTONE_V2_SECRET=${PORTONE_V2_SECRET}
       - PORTONE_STORE_ID=${PORTONE_STORE_ID}
-      # PortOne 웹훅 서명 검증용 시크릿(whsec_...). 값이 비면 웹훅을 전부 거부한다(fail-closed).
-      # 앱은 이 값이 없어도 정상 기동한다 — 그래서 빠져 있어도 아무 에러가 안 난다.
-      #   PortOne 콘솔에 웹훅을 등록해두고 이 줄이 없으면, 취소 알림이 조용히 전부 4xx 로 버려진다.
+      # 서명 키가 없으면 앱은 기동하지만 모든 PortOne 웹훅을 거부한다.
       - PORTONE_WEBHOOK_SECRET=${PORTONE_WEBHOOK_SECRET}
       # QR 체크인 서명 키(선택). 비면 로그인 시크릿에서 파생한다 — 비어 있는 게 정상이다.
       - QR_TOKEN_SECRET=${QR_TOKEN_SECRET}

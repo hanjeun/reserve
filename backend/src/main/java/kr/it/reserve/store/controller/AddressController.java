@@ -39,9 +39,7 @@ public class AddressController {
             @RequestParam String query,
             @RequestParam(defaultValue = "10") int size,
             HttpServletRequest httpRequest) {
-        // 2026-07 전수조사: 이 엔드포인트는 서버 보관 Kakao REST 키로 카카오 API를 대신 호출해준다.
-        // 로그인은 필요하지만 계정 하나만 있으면 우리 카카오 쿼터를 무제한 소진시킬 수 있어서
-        // 다른 비용성 엔드포인트(이메일 발송 등)와 동일하게 IP 기준 rate limit을 건다.
+        // 서버 API 키의 호출 한도를 보호하기 위해 주소 검색에도 IP별 제한을 적용한다.
         String ip = IpExtractor.extract(httpRequest);
         if (!rateLimiter.tryConsume(ip, RateLimiter.Policy.ADDRESS_SEARCH)) {
             throw new StoreException("주소 검색 요청이 너무 많아요. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);

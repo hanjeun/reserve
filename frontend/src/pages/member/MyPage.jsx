@@ -9,7 +9,6 @@ import { useWindowWidth } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { hasAdminAccess, hasOwnerAccess } from '../../constants/roles';
 
-
 import useAuthStore from '../../store/useAuthStore';
 
 import { colors, fontSize, breakpoints } from '../../styles/tokens';
@@ -69,13 +68,8 @@ const MyPage = () => {
     }, [requestedTab, activeTab, setParams]);
     const selectTab = key => setParams(previous => { const next = new URLSearchParams(previous); next.set('tab', key); return next; });
 
-    // PC에서는 좌우 2단으로 나눈다(가게 상세의 pcLeft/pcRight와 같은 패턴).
-    // 예전엔 size="sm"(maxWidth 420)이라 PC에서도 모바일 폭 그대로였고 양옆이 텅 비었다.
-    // 모바일은 세로 1열이며 로그인·보안 카드는 앱 설정 다음에 배치한다.
-    // 경계는 tablet(768) — 아이패드·갤럭시탭도 PC처럼 2단으로 본다.
-    // pc(900)로 잡았더니 아이패드 세로(768~820)가 모바일 1열이라 좌우가 텅 비어 어색했다.
-    // 768에서도 성립하는지 계산: 컨테이너 768-48=720, gap 32 → 좌우 합 688.
-    // pcLeft basis 420 + pcRight basis 300(minWidth 280)이면 688 안에 들어간다.
+    // 마이페이지는 태블릿부터 두 열로 배치하고 모바일은 한 열을 사용한다.
+
     const isPC = useWindowWidth() >= breakpoints.tablet;
 
     const securitySection = (

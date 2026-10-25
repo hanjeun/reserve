@@ -38,14 +38,8 @@ public final class IpExtractor {
     }
 
     /**
-     * IP 리터럴 형식이 아닌 값을 걸러낸다.
-     *
-     * <p>이 값이 rate limit 키가 되므로 검증하지 않으면 임의 문자열이 그대로 키로 들어가
-     * 버킷 맵을 오염시킨다. 호스트명을 받으면 DNS를 조회하는 {@code InetAddress} 계열 API는
-     * 요청 경로에서 외부 지연을 유발할 수 있어 쓰지 않고, 문자 구성으로만 판별한다
-     * (IP 리터럴에 나올 수 있는 문자는 16진수·점·콜론·IPv6 zone id의 % 뿐이다).
-     *
-     * @return 정상이면 트림된 IP, 아니면 null
+     * 제한 키에는 IP 리터럴만 허용한다. 요청 중 DNS 조회를 하지 않도록 문자 형식으로 검사한다.
+     * @return 유효하면 공백을 제거한 IP, 아니면 null
      */
     private static String sanitize(String raw) {
         if (raw == null) {

@@ -45,7 +45,6 @@ const DashboardTab = () => {
         ? `전체 ${stats.trashCount}개 중 최근 50개를 유형별로 집계했어요.`
         : undefined;
 
-    // 감사 로그 요약 카드 본문: 로딩 → 실패 → 집계 순으로 하나만 그린다.
     const renderAuditSummary = () => {
         if (loading) {
             return <>{[1, 2, 3].map((i) => (
@@ -89,8 +88,9 @@ const DashboardTab = () => {
                     onRetry={refetch} retrying={isFetching} compact />
             )}
 
-            {/* 요약 카드 - 2026-07 수정: 최소폭을 200에서 150으로 줄여 좁은 모바일 화면에서도 2열이 유지되게 함
-                (예전 최소폭이 넓어 모바일에서 카드 4장이 한 줄씩 세로로 쌓여 허전해 보였다) */}
+            {/*
+             * 좁은 화면에서도 요약 카드 두 열을 유지한다.
+             */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16 }}>
                 <StatCard
                     icon={<ShopOutlined />}
@@ -122,11 +122,9 @@ const DashboardTab = () => {
                 />
             </div>
 
-            {/* 차트 — 코드리뷰 지적사항 반영(2026-07): 예전엔 {!loading && stats && (...)}로 통째로
-                묶여있어서 로딩 중엔 카드 자체가 아예 안 그려졌음(StatCard는 자체 스켈레톤이 있는데
-                이 아래 섹션들만 텅 빈 채로 있다가 데이터 도착 순간 툭 튀어나옴) — 카드 껍데기(제목
-                포함)는 항상 그리고, 본문만 loading/데이터있음/데이터없음 3단으로 분기해서 실제
-                차트 모양(도넛/막대)에 가까운 스켈레톤을 넣음 */}
+            {/*
+             * 카드 제목·틀은 유지하고 본문만 차트 골격·데이터·빈 상태로 나눈다.
+             */}
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                 <ChartCard
                     title="예약 상태 분포"

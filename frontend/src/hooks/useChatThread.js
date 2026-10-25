@@ -3,12 +3,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 // ChatService의 증분 조회 한도와 맞춘다. 가득 찬 배치는 이어받기를 마칠 때까지 읽음을 보류한다.
 const POLL_BATCH_SIZE = 50;
 
-/**
- * 손님·사장님·관리자의 대화 로드, 증분 폴링, 낙관적 전송을 공유한다.
- * 최초 로드와 성공한 폴링만 커서를 전진시킨다. 전송 응답은 미조회 메시지를 건너뛰지 않는다.
- * 폴링·전송 결과는 서버 id 순으로 병합하고 음수 임시 id는 끝에 유지한다.
- * 전송 실패는 false를 반환하며 입력 원문 복원은 호출부가 맡는다.
- * 선택 이유와 전송 응답 격리: docs/technical/ui-decisions.md.
+/*
+ * 대화 조회·폴링·전송을 공유한다. 조회 성공만 커서를 전진시키며 전송 응답은 미조회 메시지를 건너뛰지 않는다. 실패한 입력의 복원은 호출부가 맡는다.
  */
 
 /** 서버 id 기준 병합. 이미 있는 id 는 버린다. 새 것이 없으면 **같은 배열을 그대로** 돌려준다. */
@@ -87,8 +83,8 @@ const callSend = (send, controller, roomId, text, clientMessageId, attachment) =
     return send(roomId, text, clientMessageId);
 };
 
-// 429 는 레이트리밋이다. "실패했다"가 아니라 "너무 빠르다"라고 말해야
-// 사용자가 같은 동작을 계속 반복하지 않는다.
+// 429는 전송 속도 제한으로 안내한다.
+
 const sendFailureText = (error, controller) => {
     if (controller?.signal.aborted) return '전송 요청을 중단했어요. 서버에 도착했을 수 있으니 대화를 확인해주세요.';
     if ((error?.status ?? error?.response?.status) === 429) return '조금 천천히 보내주세요.';
@@ -124,9 +120,7 @@ export default function useChatThread({
     const [reloadRevision, setReloadRevision] = useState(0);
 
     /*
-     * 대화가 바뀌면 렌더 도중에 상태를 맞춘다 — React 가 권장하는 "prop 이 바뀔 때 state 조정" 패턴.
-     * 이펙트에서 비우면 (a) 한 프레임 동안 **이전 방 내용이 새 방에 비치고**
-     * (b) 이펙트 안 동기 setState 라 React Compiler 규칙에도 걸린다.
+     * 대화가 바뀐 렌더에서 이전 내용을 즉시 비워 다른 방에 노출하지 않는다.
      */
     const [scope, setScope] = useState(() => ({ key: threadKey }));
     if (threadKey !== scope.key) {
@@ -215,7 +209,7 @@ export default function useChatThread({
                         active.pendingPolled = handled === false;
                     }
                 })
-                .catch(() => { /* 폴링 실패는 다음 주기에 재시도한다. */ })
+                .catch(() => { /* 폴링 오류는 다음 주기에 재시도한다. */ })
                 .then(() => {
                     // 메시지 응답을 먼저 합쳐야 같은 ID의 취소를 미표시 이력으로 버리지 않는다.
                     if (!pollChanges || active.pollingChanges || document.visibilityState === 'hidden'

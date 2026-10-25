@@ -8,11 +8,9 @@ const AdminTableSkeleton = ({ pagination = null, ...table }) => (
   <div>
     <AdminTableSkeletonTable {...table} />
 
-    {/* 페이지네이션 — 스켈레톤 중에도 유지한다
-        예전엔 스켈레톤이 <DataTable>을 통째로 대체해서 페이지 버튼까지 같이 사라졌다 —
-        페이지를 넘길 때마다 방금 누른 버튼이 사라졌다 다시 나타나는 게 오히려 어색했다.
-        페이지 버튼은 total/current만 알면 그릴 수 있고, keepPreviousData 덕에 그 값은 이미 알고 있다.
-        로딩 중엔 누를 수 없게 disabled 처리한다. */}
+    {/*
+     * 골격에서도 현재 페이지·전체 건수로 페이지 영역을 유지하고 이동은 막는다.
+     */}
     {pagination && (
       <Pagination
         disabled

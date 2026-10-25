@@ -1,4 +1,4 @@
-/** Public presentation data only; the HttpOnly entry cookie remains on the server boundary. */
+/* 공개 표시 데이터만 다루며 HttpOnly 입장 쿠키는 서버에 둔다. */
 export function serviceEntryStatus(value) {
     if (value?.campaignId !== 'service-entry' || !['OFF', 'CORE', 'EMERGENCY'].includes(value.mode)
         || !['BYPASS', 'NOT_JOINED', 'WAITING', 'ADMITTED', 'EXPIRED', 'CANCELLED', 'FULL'].includes(value.state)

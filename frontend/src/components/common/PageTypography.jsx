@@ -2,7 +2,7 @@ import PropTypes from 'prop-types';
 import { Typography } from 'antd';
 import SkeletonText from './SkeletonText';
 
-/** Page headings share one responsive type scale; section and card titles keep their own scale. */
+/* 페이지 제목의 반응형 크기만 공유하고 섹션·카드 제목과 구분한다. */
 export function PageTitle({ className, level = 2, children, loading = false, ...props }) {
     return <Typography.Title {...props} level={level}
         className={['reserve-page-title', className].filter(Boolean).join(' ')}><SkeletonText loading={loading}>{children}</SkeletonText></Typography.Title>;

@@ -189,9 +189,9 @@ function FeaturedCarousel({ region = '' }) {
         const maxScroll = track.scrollWidth - track.clientWidth;
         const nextIndex = (activeIndex + 1) % FEATURED_SLIDES.length;
         const image = track.children[nextIndex]?.querySelector('img');
-        // Decode the next responsive picture before moving, including a return to slide one.
+        // 첫 슬라이드 복귀를 포함해 다음 반응형 사진을 해독한 뒤 이동한다.
         if (image && typeof image.decode === 'function') {
-            try { await image.decode(); } catch { /* A failed image must not disable the next button. */ }
+            try { await image.decode(); } catch { /* 사진 실패로 다음 이동을 막지 않는다. */ }
         }
         if (trackRef.current !== track || !track.isConnected || activeIndexRef.current !== activeIndex || document.hidden) return;
         const nextLeft = nextIndex === 0
@@ -342,8 +342,7 @@ function RecommendedStores({ region = '' }) {
         ? <DataState compact state="error" role="status" aria-live="polite"
             title="최신 정보를 불러오지 못했어요." error={error} onRetry={refetch} retrying={isFetching} /> : null;
 
-    // 로딩 → 실패 → 빈 목록 → 목록 순으로 판정한다.
-    // 로딩 영역은 <output>(암묵 role=status)이다. display 는 .reserve-discovery-store-list 가 grid 로 정한다.
+    // 목록 로딩은 output의 기본 status 역할을 사용한다.
     const renderStores = () => {
         if (isLoading) {
             return (

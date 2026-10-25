@@ -2,27 +2,16 @@ import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { surfaceForWhiteText } from '../utils/colorContrast';
 import { semanticActionPalettes } from '../styles/tokens/colors';
 
-/**
- * 테마·글꼴·포인트 색을 모듈 스토어에 두고 useSyncExternalStore로 함께 구독한다.
- * 컴포넌트별 독립 상태를 만들면 CSS 변수와 AntD 테마가 서로 다른 설정을 볼 수 있다.
- * 기기별 설정은 localStorage에서 동기로 읽어 초기 테마와 이후 전환을 맞춘다.
+/*
+ * 테마 설정은 모듈 스토어에서 함께 구독해 CSS와 AntD가 같은 값을 사용한다. 저장 설정은 동기로 읽어 초기 테마를 맞춘다.
  */
 
 const THEME_KEY = 'reserve:theme';   // 'system' | 'light' | 'dark'
 const FONT_KEY  = 'reserve:font';
 const ACCENT_KEY = 'reserve:accent';   // 포인트 색
 
-/**
- * 글꼴 선택지. stack은 CSS font-family에 그대로 들어간다.
- *
- * 명조는 웹폰트를 따로 싣지 않고 OS 기본 명조를 쓴다(번들 크기를 늘리지 않으려고).
- * 그래서 한글 명조가 실제로 존재하는 이름을 OS별로 전부 나열해야 한다 —
- * 처음에 'Nanum Myeongjo'만 적었더니 그 폰트가 설치돼 있지 않은 환경에서
- * 라틴 폰트(Georgia)로만 떨어져 **한글은 그대로 고딕**이라 "안 바뀐다"고 보였다.
- *   Windows: 바탕(Batang) / 궁서(Gungsuh)
- *   macOS·iOS: Apple Myungjo / AppleMyungjo
- *   Android: Noto Serif KR
- * 마지막 generic `serif`가 최후 폴백이다.
+/*
+ * 명조는 웹폰트 대신 운영체제의 한글 명조 글꼴을 순서대로 사용한다.
  */
 export const FONT_OPTIONS = [
     {
@@ -40,21 +29,12 @@ export const FONT_OPTIONS = [
     {
         value: 'suite',
         label: 'SUITE',
-        // self-host 다 — Pretendard 와 같은 방식으로 통일했다.
-        //   Pretendard 는 npm 패키지(index.css 의 @import)로 번들에 들어가는데, SUITE 는 npm 패키지가
-        //   없어서(suite-variable/suit-font/suite-font 전부 미등록) 폰트 파일을 레포에 직접 넣었다:
+        // SUITE는 public/fonts의 자체 제공 파일을 사용한다.
+
         //     frontend/public/fonts/SUITE-Variable.woff2  (sun-typeface/SUITE 2.0.4, OFL-1.1)
-        //   @font-face 선언은 index.css 의 "SUITE 글꼴" 블록에 있다.
-        //
-        //   한때 jsDelivr CDN <link> 주입 방식이었는데 바꾼 이유:
-        //     1) 외부 의존 — CDN 이 죽으면 글꼴이 안 뜬다
-        //     2) 프라이버시 — 사용자 IP 가 제3자(jsDelivr)에 노출된다
-        //     3) CSP 를 도입하면 style-src/font-src 에 도메인을 추가해야 하고, 놓치면 조용히 실패한다
-        //     4) 무엇보다 이 프로젝트는 이미 self-host 방식이었다 — 방식이 갈리면 안 된다
-        //   (그때 URL 을 추측으로 넣었다가 404 였다. 실제 파일명은 SUITE-Variable 로 하이픈이 들어간다)
-        //
-        // 폴백은 그대로 둔다 — 파일이 없거나 로드가 실패해도 Pretendard → 시스템 글꼴로
-        //   조용히 내려간다. "안 바뀐 것처럼" 보일 뿐 글자가 사라지지 않는다.
+
+        // 웹폰트를 불러오지 못하면 기본 글꼴 묶음으로 대체한다.
+
         stack: "'SUITE Variable', 'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif",
     },
     {
@@ -64,17 +44,8 @@ export const FONT_OPTIONS = [
     },
 ];
 
-/**
- * 포인트(강조) 색 선택지.
- *
- * 왜 값을 전부 명시하나
- * `--c-primary` 하나만 바꾸면 hover(짙게)·연한 배경(뱃지·선택 항목)이 원래 파랑에 머물러
- * 색이 섞인다. 그래서 색마다 세 값을 함께 둔다.
- * 그리고 다크 모드는 같은 색이 어두운 배경에서 채도가 낮아 보이므로 한 단계 밝은 값을 따로 둔다
- * (theme.css 가 기본 파랑에 대해 이미 그렇게 하고 있다 — 같은 원칙을 따른다).
- *
- * 주의: AntD 의 colorPrimary 토큰에는 CSS 변수를 넣을 수 없다(AntD 가 JS 로 파생색을 계산한다).
- *    그래서 App.jsx 가 이 표의 **리터럴 hex** 를 직접 받아 쓴다.
+/*
+ * 강조·호버·연한 배경을 함께 전환한다. AntD는 파생색을 계산하므로 CSS 변수 대신 현재 테마의 실제 색상값을 전달한다.
  */
 export const ACCENT_OPTIONS = [
     { value: 'blue',   label: '블루',   light: { main: '#3182f6', dark: '#2272eb', tint: '#e8f3ff' }, darkMode: { main: '#4c9aff', dark: '#3182f6', tint: '#1b2a41' } },
@@ -103,7 +74,7 @@ const read = (key, fallback) => {
 };
 
 const write = (key, value) => {
-    try { localStorage.setItem(key, value); } catch { /* 저장 실패해도 화면은 정상 동작한다 */ }
+    try { localStorage.setItem(key, value); } catch { /* 저장 오류가 나도 현재 화면 설정은 유지한다. */ }
 };
 
 // 모듈 레벨 스토어
@@ -129,13 +100,8 @@ const applyFont = (value) => {
     document.documentElement.style.setProperty('--app-font', opt.stack);
 };
 
-/**
- * 포인트 색을 <html> 인라인 스타일로 덮는다.
- *
- * 인라인이어야 하는 이유: theme.css 가 `:root` 와 `[data-theme=dark]` 양쪽에서
- *   `--c-primary` 를 정의한다. 인라인 스타일은 어떤 선택자보다 우선하므로 두 경우를
- *   한 번에 이길 수 있다. 대신 **테마가 바뀔 때마다 다시 적용해야 한다**
- *   (라이트/다크에서 쓰는 hex 가 다르기 때문) — applyTheme 이 이어서 호출한다.
+/*
+ * 루트 인라인 값으로 밝고 어두운 테마의 강조색을 함께 덮고 테마 전환 때 다시 적용한다.
  */
 const applyAccent = (value, resolvedTheme) => {
     const opt = resolveAccent(value);
@@ -237,11 +203,8 @@ export default function useTheme() {
         setFont,
         accent: snap.accent,        // 고른 색 키('blue' 등)
         setAccent,
-        /**
-         * 지금 적용돼야 하는 포인트 색 **리터럴 hex**.
-         * AntD ConfigProvider 의 colorPrimary 에 넣기 위한 것이다 —
-         * 그 토큰은 AntD 가 JS 로 파생색(hover/active/알파)을 계산하므로
-         * var(--c-primary) 같은 CSS 값을 넣으면 계산에 실패한다.
+        /*
+         * AntD가 파생색을 계산할 수 있도록 현재 테마의 실제 색상값을 제공한다.
          */
         accentColors: resolved === 'dark' ? accentOpt.darkMode : accentOpt.light,
     };

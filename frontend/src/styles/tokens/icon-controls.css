@@ -1,4 +1,4 @@
-/* Icon hit areas stay generous while the visible hover surface stays compact. */
+/* 아이콘의 클릭 영역과 작은 호버 면을 분리한다. */
 :root {
     --reserve-icon-target-size: 44px;
     --reserve-icon-glyph-size: 20px;

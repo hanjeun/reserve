@@ -59,7 +59,7 @@ class ReservationAdmissionMySqlTest extends ReservationAdmissionPersistenceTest 
         var initialLookup = new CountDownLatch(1);
         var competingBookingCommitted = new CountDownLatch(1);
         doAnswer(invocation -> {
-            // This ordinary read opens MySQL's RR snapshot before any reservation/store locks.
+            // 예약·가게 잠금 전에 일반 조회로 MySQL의 이전 읽기 스냅샷을 만든다.
             var result = jdbc.queryForObject("SELECT member_id FROM reservation WHERE reservation_id = ?",
                     Long.class, existing.getId());
             initialLookup.countDown();

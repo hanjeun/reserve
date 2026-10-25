@@ -6,11 +6,8 @@ import DataState from './DataState';
 import { useWindowWidth } from '../../hooks/useWindowWidth';
 import { DEFAULT_PAGE_SIZE, MOBILE_PAGINATION_BREAKPOINT } from '../../constants/pagination';
 
-/**
- * 관리자·사업자 표의 기본 열 배치, 페이지네이션과 빈 상태를 공유한다.
- * 서버 페이지네이션은 현재 페이지의 행 수가 아닌 전체 건수를 pagination.total로 전달한다.
- * fitContent는 모든 열의 폭이 정해진 표에 사용한다.
- * stickyFirstColumn은 폭을 명시한 식별 열을 모바일에서만 고정할 때 사용한다.
+/*
+ * 서버 전체 건수를 pagination.total로 전달한다. fitContent는 고정 너비 열만 있는 표, stickyFirstColumn은 명시적 너비의 식별 열에 사용한다.
  */
 const DataTable = ({ pageSize = DEFAULT_PAGE_SIZE, pagination, size = 'middle', fitContent = false, stickyFirstColumn = false, columns, className, locale, ...rest }) => {
     const isMobile = useWindowWidth() < MOBILE_PAGINATION_BREAKPOINT;

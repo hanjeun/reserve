@@ -19,17 +19,7 @@ import { isBlockingListReadError, queryErrorStatus } from '../../hooks/liveUpdat
 import { favoriteKeys } from '../../hooks/queryKeys';
 import favoriteService from '../../services/favoriteService';
 
-
-
-// 2026-07 추가 — masonry(columns) 대신 고정 그리드로 전환.
-// 예전엔 columns:'4 240px'라 브라우저가 컨테이너 폭에 따라 3열/4열을 오가는 방식이었고
-// (최소폭 240px만 보장), PC에서는 거의 항상 4열이 가능한 폭인데도 3열로 나오는 경우가 있었다.
-// PC에서는 항상 4열로 고정되도록 repeat(4, 1fr) 그리드로 바꾸고, 모바일은 미디어 쿼리로
-// 2열/1열로 자연스럽게 줄어들게 했다.
-// 2026-07-30 — 3열 단계 추가(경계 근거는 StoreList.jsx의 GRID_STYLE 주석 참고).
-// CSS 는 index.css 로 이관했다(2026-08-05). JSX 안 <style> 은 인스턴스마다 렌더되고,
-// 전역 규칙이 컴포넌트에 숨으면 그 컴포넌트를 안 쓰는 화면에는 규칙이 없다.
-// 전역 정책은 index.css — docs/technical/design-system.md 참고.
+// 고정 그리드의 열 수는 공통 목록 규칙을 따른다.
 
 const MyFavorites = () => {
     useDocumentTitle('좋아요');
@@ -78,7 +68,6 @@ const MyFavorites = () => {
         reviewCount: fav.storeReviewCount ?? 0,
     });
 
-    // 헤더 안내 문구 — 로딩 → 실패(빈 목록) → 목록 있음 → 빈 목록 순으로 판정한다.
     const headerMessage = () => {
         if (loading) return '즐겨찾기를 불러오는 중이에요.';
         if (blockingError) return '즐겨찾기 목록을 확인하지 못했어요.';
@@ -86,9 +75,8 @@ const MyFavorites = () => {
         return '마음에 드는 가게를 즐겨찾기에 추가해보세요.';
     };
 
-    // 컨텐츠 — 고정 4열 그리드. 규칙은 index.css 의 "즐겨찾기 그리드" 블록에 있다.
-    // 개수를 모르는 첫 로딩만 8개다. 조회 실패 시 DataState가 재시도 진행 상태를 표시한다.
-    // 로딩 영역은 <output>(암묵 role=status)이다. display 는 .rsv-fav-grid 가 grid 로 정한다.
+    // 첫 조회만 고정 개수의 골격을 쓰고 오류 재시도는 DataState에서 표시한다.
+
     const renderContent = () => {
         if (loading) {
             return (

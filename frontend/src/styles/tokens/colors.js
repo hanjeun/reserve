@@ -1,7 +1,5 @@
-/**
- * 공용 색 토큰은 theme.css의 CSS 변수를 참조해 모듈 수준 스타일도 테마 전환을 따르게 한다.
- * canvas·JS 색 계산처럼 CSS 변수를 해석하지 않는 API에는 실제 색상값을 사용해야 한다.
- * rawColors는 고정 팔레트이므로 테마에 따라 바뀌는 값과 구분한다.
+/*
+ * 테마 색은 CSS 변수를 사용하고 색상 계산 API에는 실제 색상값을 전달한다. 고정 팔레트는 rawColors로 구분한다.
  */
 
 import { surfaceForWhiteText } from '../../utils/colorContrast';
@@ -10,7 +8,7 @@ const v = (name, fallback) => `var(--c-${name}, ${fallback})`;
 const solidAction = (main, hover) => ({ main, foreground: '#ffffff',
   solid: surfaceForWhiteText(main), solidHover: surfaceForWhiteText(hover) });
 
-/** CSS variables and AntD use the same literal semantic action palette. */
+/* CSS 변수와 AntD가 같은 의미별 실행 색의 리터럴 값을 사용한다. */
 export const semanticActionPalettes = {
   light: { error: solidAction('#f04452', '#d93644'), success: solidAction('#00c73c', '#00a332') },
   dark: { error: solidAction('#ff6b76', '#f04452'), success: solidAction('#32d365', '#00c73c') },
@@ -41,14 +39,12 @@ export const colors = {
     900: v('gray-900', '#1a1f27'),  // 제목 텍스트 (primary)
   },
 
-  // Semantic Colors
   success: { main: v('success', '#00c73c'), light: v('success-light', '#e8f9ee'), foreground: v('success-fg', '#ffffff'),
     solid: v('success-solid', semanticActionPalettes.light.success.solid), solidHover: v('success-solid-hover', semanticActionPalettes.light.success.solidHover) },
   error:   { main: v('error', '#f04452'),   light: v('error-light', '#fff0f1'), foreground: v('error-fg', '#ffffff'),
     solid: v('error-solid', semanticActionPalettes.light.error.solid), solidHover: v('error-solid-hover', semanticActionPalettes.light.error.solidHover) },
   warning: { main: v('warning', '#ffb800'), light: v('warning-light', '#fff8e6') },
 
-  // Background
   background: {
     default: v('bg-default', '#ffffff'),
     subtle:  v('bg-subtle', '#f8f9fa'),
@@ -62,14 +58,11 @@ export const colors = {
     secondary: v('text-secondary', '#4e5968'),
     tertiary:  v('text-tertiary', '#8b95a1'),
     disabled:  v('text-disabled', '#b5b8bd'),
-    // 입력칸의 placeholder·비활성 글자. AntD의 colorTextPlaceholder/colorTextDisabled와 같은 값이라
-    // AntD가 아닌 **직접 만든 입력 UI**도 이걸 쓰면 AntD 입력과 톤이 정확히 맞는다.
-    // (theme.css의 --c-input-disabled-fg는 예전부터 있었는데 여기 노출이 안 돼서
-    //  StoreDetail의 TimeSlotPicker가 rgba(0,0,0,0.25)를 하드코딩했고, 다크에서 글자가 안 보였다)
+    // 입력 안내와 비활성 글자색은 공통 테마 토큰을 사용한다.
+
     placeholder: v('input-disabled-fg', 'rgba(0, 0, 0, 0.25)'),
   },
 
-  // Border
   border: {
     light:   v('border-light', '#f2f4f6'),
     default: v('border-default', '#e5e8eb'),

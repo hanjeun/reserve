@@ -1,6 +1,6 @@
 import { API_BASE_URL, API_ENDPOINTS } from '../constants/api';
 
-/** Start every OAuth flow on the API origin so its registered callback stays the same. */
+/* OAuth는 API 출처에서 시작해 등록된 콜백 주소를 유지한다. */
 export function oauthAuthorizationUrl(provider, accountLink) {
     const key = typeof provider === 'string' ? provider.toUpperCase() : '';
     if (!Object.hasOwn(API_ENDPOINTS.OAUTH, key)) throw new Error('로그인 제공자를 확인하지 못했어요.');

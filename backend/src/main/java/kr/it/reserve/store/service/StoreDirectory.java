@@ -19,7 +19,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Public search/count/region and owner edit reads use the same facade read transaction. */
+/** 공개 검색·건수·지역과 소유자 수정 조회는 호출 서비스의 읽기 트랜잭션을 공유한다. */
 final class StoreDirectory {
     private static final String EDIT_FORBIDDEN_MESSAGE = "가게를 수정할 권한이 없어요.";
     private static final String DISTANCE_SORT = "distance";

@@ -15,15 +15,8 @@ const formatDay = value => {
     return day.isValid() ? `${day.month() + 1}월 ${day.date()}일 (${WEEKDAYS[day.day()]})` : String(value ?? '');
 };
 
-/**
- * 광고 결제 직전 확인 단계 (2026-09-23 개편).
- *
- * - 광고가 보일 모습은 가게 목록과 **같은 컴포넌트**(StoreCard·StoreListRow·AdBannerSurface)를
- *   preview 로 그린다. 하트·AD 표시까지 실제 목록 그대로이고 링크·즐겨찾기 동작·노출 집계만 꺼진다.
- *   미리보기 전용 모양을 따로 두면 목록이 바뀔 때마다 둘이 어긋난다.
- * - 결제 정보는 토스 결제 확인 화면 방식: 결제할 금액을 맨 위에 크게, 그 아래 근거 항목(가게·유형·기간·
- *   하루 금액 × 일수)을 회색 라벨·진한 값으로. 테두리 없이 면 하나로 묶고, 기간과 금액을 한눈에 검산하게 한다.
- *   파란색은 결제 버튼 하나에만 둔다.
+/*
+ * 실제 목록 컴포넌트를 공유하되 미리보기의 이동·즐겨찾기·노출 집계는 실행하지 않는다.
  */
 const AdCreationPreview = ({
     adType, store, copy, motionKey, imageSrc, startDate, endDate, exposureDays, dailyPrice, amount,

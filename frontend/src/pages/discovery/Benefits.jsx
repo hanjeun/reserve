@@ -30,7 +30,6 @@ export const BenefitsSkeleton = BenefitListSkeleton;
 
 export { BenefitRow };
 
-
 export default function Benefits() {
     useDocumentTitle('혜택 · 가게 소식');
     const isMobile = useWindowWidth() < 576;
@@ -86,7 +85,7 @@ export default function Benefits() {
             return updated;
         }, { replace: true });
     }, [requested, page, isSuccess, isFetching, isPlaceholderData, totalPages, params, setParams]);
-    // 소식 본문 — 첫 로딩 → 실패 → 빈 페이지 → 목록 순으로 판정한다.
+
     const renderNews = () => {
         if (config.isPending) return <BenefitsSkeleton />;
         if (config.isError && !config.data) return <DataState state="error" title="혜택 상태를 불러오지 못했어요." error={config.error} onRetry={config.refetch} retrying={config.isFetching} />;

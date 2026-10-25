@@ -22,12 +22,12 @@ public class JwtProperties {
     private String secretKey;
     private TokenConfig accessToken = new TokenConfig();
     private TokenConfig refreshToken = new TokenConfig();
-    /** Sliding refresh expiry never extends this limit; new credentials require a new login. */
+    /** 갱신해도 절대 만료 시각은 늘어나지 않는다. */
     private Duration absoluteSessionLifetime = Duration.ofDays(30);
     private String accessAudience;
     private String refreshAudience;
     private String activeKeyId;
-    /** Optional rotation keyring. No environment key is created or changed by the application. */
+    /** 서명 키 교체용 설정이며 앱이 환경 키를 생성하거나 변경하지 않는다. */
     private Map<String, String> signingKeys = new LinkedHashMap<>();
 
     @PostConstruct

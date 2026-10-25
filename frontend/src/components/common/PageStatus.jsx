@@ -5,13 +5,8 @@ import StateIllustration, { StateIllustrationSkeleton } from './StateIllustratio
 import PageContainer from './PageContainer';
 import Bone from './Bone';
 
-/**
- * 화면 전체가 "이 주소에는 보여 줄 페이지가 없다"거나 "화면을 그리다 실패했다"는 한 가지 사실만
- * 전하는 자리의 공통 틀이다. 404 페이지와 오류 경계 폴백이 같은 모양을 쓴다.
- *
- * 목록·상세 조회 결과의 빈 상태·실패는 DataState 가 맡는다. 이 틀은 페이지 자체가 없을 때만 쓴다.
- * 스켈레톤(PageStatusSkeleton)도 같은 컨테이너·여백을 써서 청크 로딩 → 실제 화면 전환 때
- * 높이가 튀거나 푸터가 들썩이지 않게 한다.
+/*
+ * 페이지 자체의 부재·렌더 오류에 사용하며 조회 결과는 DataState로 구분한다. 골격도 같은 컨테이너를 사용한다.
  */
 const PAGE_STATUS_PADDING_TOP = 'clamp(56px, 14vh, 128px)';
 

@@ -37,7 +37,7 @@ function PublicProfileEditor({ profile }) {
         lock.current = true;
         try { await save.mutateAsync({ ...values, session: session.current, avatarFile: pendingPhoto?.file,
             previousAvatarSource: profile ? avatarSource(profile) : 'NONE' }); }
-        catch { /* The shared mutation shows the error and preserves the entered values. */ }
+        catch { /* 공유 저장 처리에서 오류를 표시하고 입력값을 보존한다. */ }
         finally { lock.current = false; }
     };
     return <Form form={form} layout="vertical" size="large" requiredMark={false} disabled={save.isPending} onFinish={submit}

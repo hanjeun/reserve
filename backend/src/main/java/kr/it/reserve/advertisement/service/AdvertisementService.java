@@ -328,15 +328,6 @@ public class AdvertisementService {
         return getAllAds(page, size, null);
     }
 
-    /**
-     * 관리자 광고 목록 (가게 이름 검색).
-     *
-     * <p>검색을 서버에서 하는 이유는 {@code AdvertisementRepository#searchForAdmin} 주석 참고 —
-     * 요약하면 예전에는 프론트가 현재 페이지만 필터링해서 다른 페이지의 광고가 검색되지 않았다.
-     *
-     * <p>keyword는 여기서 빈 문자열로 정규화한다. 쿼리 쪽에서 NULL 분기를 없애기 위한 것이고,
-     * 공백만 입력한 경우도 "검색 안 함"으로 취급하는 게 사용자 기대에 맞다.
-     */
     public Page<AdvertisementResponse> getAllAds(int page, int size, String keyword) {
         Pageable pageable = PageRequests.bounded(page, size);
         String normalized = (keyword == null) ? "" : keyword.trim();
@@ -358,12 +349,7 @@ public class AdvertisementService {
         adPaymentService.cancel(adId, owner.getId());
     }
 
-    /**
-     * 배너 광고 콘텐츠(제목/설명/이미지) 수정 (사업자용, 본인 가게만).
-     * 2026-07 추가 — 가게/유형/기간은 결제 금액과 엮여있어 수정 범위 밖(바꾸려면 취소 후 재신청).
-     * BADGE는 title/description/images 자체가 없으므로(BANNER만 사용) 수정 대상이 아니다.
-     * CANCELLED/EXPIRED/SUSPENDED/REFUNDED는 이미 끝난 광고라 수정 불가(cancelAd와 동일한 상태 체크 철학).
-     */
+    /** 본인 배너의 콘텐츠만 수정하며, 결제 조건과 종료된 광고는 변경하지 않는다. */
     @Transactional
     public AdvertisementResponse updateAd(Long adId, AdUpdateRequest request, Member owner) {
         Advertisement ad = adPaymentLedgerService.lockAdvertisement(adId);
@@ -439,13 +425,7 @@ public class AdvertisementService {
         }
     }
 
-    /**
-     * 광고 목록에서 숨기기(소프트삭제) — 2026-07 추가.
-     * 종료상태(EXPIRED/CANCELLED/REFUNDED/SUSPENDED)인 본인 가게 광고만 가능 — cancelAd와 동일하게
-     * 관리자 우회 없이 본인 확인만(기존 서비스 메서드들과 일관성 유지).
-     * 예약(ReservationService.removeReservation)과 동일한 패턴 — 결제/노출 이력은 그대로
-     * 보존하고 목록에서만 숨긴다. 금융 이력은 승인된 보존 정책 없이 영구삭제하지 않는다.
-     */
+    /** 본인 광고를 목록에서만 숨기며 금융 이력은 보존한다. */
     @Transactional
     public void removeAd(Long adId, Member owner) {
         Advertisement ad = adPaymentLedgerService.lockAdvertisement(adId);
@@ -468,17 +448,7 @@ public class AdvertisementService {
         log.info("Advertisement removed: adId={}, ownerId={}", adId, owner.getId());
     }
 
-    /**
-     * 광고 성과 지표 기록 — 누구나 볼 수 있는 공개 엔드포인트(로그인 불필요).
-     * 광고는 장식적 요소라 실패해도 조용히 무시 — 호출측에서는 에러를 사용자에게 노출하지 않는다.
-     * 공개 컨트롤러의 {@code RateLimiter.Policy.AD_METRIC}이 IP별 호출량을 제한한다.
-     * 이 서비스는 광고·가게 상태와 기간·지표별 허용 타입을 확인하는 단일 정책 관문이다.
-     *
-     * 2026-07 추가 개선 — 예전엔 여기서 바로 findById + save(dirty checking)로 DB를 즉시 건드려서,
-     * 노출 하나마다 SELECT + UPDATE가 나갔다. 지금은 유효성 SELECT 뒤 AdCounterBuffer에 쌓아두고,
-     * 실제 DB 반영은 AdCounterFlushScheduler가 30초마다 한 번에 처리한다(RateLimiter와 동일한
-     * in-memory 패턴). 조회 중 LAZY 가게 상태도 검증하므로 read-only 트랜잭션을 유지한다.
-     */
+    /** 가게·광고 상태와 기간·지표 유형을 검증한 뒤 버퍼에 모은다. 가게의 지연 로딩 검증에는 읽기 트랜잭션이 필요하다. */
     @Transactional(readOnly = true)
     public void recordImpression(Long adId) {
         recordMetricIfEligible(adId, AdCounterBuffer.CounterType.IMPRESSION);

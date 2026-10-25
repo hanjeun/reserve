@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react';
 
-/** A scanner stops once, including when the start promise completes after the screen closes. */
+/* 시작 완료가 화면 닫힘보다 늦어도 스캐너는 한 번만 중지한다. */
 export default function useQrCameraLifecycle() {
     const starts = useRef(new WeakMap());
     const stops = useRef(new WeakMap());

@@ -28,9 +28,6 @@ public class BusinessVerificationApiController {
 
     private final BusinessVerificationService verificationService;
 
-    /**
-     * 사업자 인증 신청
-     */
     @PostMapping("/submit")
     public ApiResponse<BusinessVerificationResponse> submitVerification(@ModelAttribute BusinessVerificationRequest request) {
         Member member = SecurityUtil.getCurrentMember();

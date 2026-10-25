@@ -3,7 +3,7 @@ const STATES = new Set(['WAITING', 'ADMITTED', 'CLAIMED', 'CONSUMED', 'EXPIRED',
 const activeCoordinators = new Set();
 const abortError = () => new DOMException('입장 상태 조회를 중단했어요.', 'AbortError');
 
-/** The reservation hook applies its narrower server contract before calling this utility. */
+/* 예약 훅에서 더 좁은 서버 상태 계약을 검증한 뒤 호출한다. */
 export function admissionPollingTiming(status = {}) {
     const heartbeat = Number(status.heartbeatTimeoutSeconds);
     const heartbeatTimeoutSeconds = Number.isFinite(heartbeat) && heartbeat >= 30 && heartbeat <= 86400 ? heartbeat : 90;
@@ -17,7 +17,7 @@ export function admissionPollingTiming(status = {}) {
         retryCapMs: Math.min(30000, heartbeatTimeoutSeconds * 1000 / 3 - requestTimeoutMs - failoverWaitMs) };
 }
 
-/** Also bounds clients that fail to settle their promise after an AbortSignal. */
+/* AbortSignal 뒤에도 완료하지 않는 요청의 대기 시간을 제한한다. */
 export function readAdmissionStatus(fetchStatus, { signal, ...status } = {}) {
     const timing = admissionPollingTiming(status);
     return new Promise((resolve, reject) => {
@@ -61,7 +61,7 @@ function snapshotOf(value, campaignId, ticket) {
         || value.absoluteExpiresAt != null && (!Number.isSafeInteger(value.absoluteExpiresAt) || value.absoluteExpiresAt < 0)
         || value.continuityId != null && (!/^[0-9a-f]{64}$/.test(value.continuityId) || value.continuityId !== ticket)) return null;
     const timing = admissionPollingTiming(value);
-    // Deliberately exclude the ticket, request ID, credentials, and arbitrary API response fields.
+    // 공유 데이터에서 입장권·요청 ID·인증 정보·임의 응답 필드를 제외한다.
     const snapshot = { campaignId, state: value.state, position: value.position, expiresAt: value.expiresAt,
         serverTime: value.serverTime, pollAfterSeconds: timing.pollAfterSeconds,
         heartbeatTimeoutSeconds: timing.heartbeatTimeoutSeconds };
@@ -71,10 +71,8 @@ function snapshotOf(value, campaignId, ticket) {
     return snapshot;
 }
 
-/**
- * Coordinate periodic reads only, after this tab has verified its own ticket with the server.
- * A short per-read lock avoids a permanent leader. A stalled lock permits a bounded duplicate
- * read instead of freezing followers. Remote status is presentation data, never write authority.
+/*
+ * 현재 탭의 입장권을 서버에서 검증한 뒤 주기 조회만 조정한다. 조회별 짧은 잠금을 쓰고 지연 시 제한된 중복 조회를 허용하며 공유 상태를 쓰기 권한으로 사용하지 않는다.
  */
 export function createAdmissionPollingCoordinator({ owner, campaignId, ticket, verifiedStatus,
     isCurrent = () => true, isVisible = () => true }) {
@@ -178,8 +176,8 @@ export function createAdmissionPollingCoordinator({ owner, campaignId, ticket, v
                 assertCurrent(controller.signal);
                 const snapshot = snapshotOf(result.status, campaignId, ticket);
                 if (snapshot && snapshot.serverTime >= initialStatus?.serverTime) {
-                    // A bounded fallback can overlap a slow reader. Its older response must not undo
-                    // a newer shared result; an aged result schedules an immediate follow-up in the caller.
+                    // 느린 조회와 대체 조회가 겹쳐도 이전 응답으로 새 공유 결과를 되돌리지 않는다.
+                    // 오래된 결과는 호출부에서 후속 조회를 예약한다.
                     if (latest && latest.status.serverTime > snapshot.serverTime) return { ...latest, source: 'remote' };
                     latest = { ...result, status: snapshot };
                     try { channel?.postMessage({ version: 1, scope, observedAt: result.observedAt, status: snapshot }); }
@@ -199,14 +197,14 @@ export function createAdmissionPollingCoordinator({ owner, campaignId, ticket, v
                     });
                 } catch (error) {
                     if (entered) throw error;
-                    // Restricted browser contexts may expose the API but reject its use.
+                    // 제한된 브라우저는 API를 노출해도 실행을 거절할 수 있다.
                     disableSharing();
                     return fetchOne();
                 }
             };
             try {
                 assertCurrent(controller.signal);
-                // Hash/channel initialization must never delay a heartbeat if a browser stalls it.
+                // 해시·채널 초기화 지연으로 하트비트를 늦추지 않는다.
                 if (!initialized || !locks || !channel) return await fetchOne();
                 const cached = fresh(timing);
                 let result = cached ? { ...cached, source: 'remote' } : await tryLock();

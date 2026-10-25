@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.LongSupplier;
 
-/** Separate visitor passes never authenticate a member or reserve a booking slot. */
+/** 방문 입장권은 회원 인증이나 예약 정원을 확보하지 않는다. */
 @Service
 public class ServiceAdmissionService {
     public enum Mode { OFF, CORE, EMERGENCY }
@@ -59,10 +59,10 @@ public class ServiceAdmissionService {
         script.setResultType(List.class);
     }
 
-    /** Only routing mode is cached; a failed reload never falls back to a stale OFF or admitted response. */
+    /** 경로 모드만 캐시한다. 갱신 실패 시 이전 OFF 모드나 입장 허용 응답을 사용하지 않는다. */
     public Mode currentMode() {
         if (!properties.isEnabled()) { modeSnapshot = null; return Mode.OFF; }
-        // Recovery probes use CAS, so concurrent callers never queue behind a failed Redis reload.
+        // CAS로 복구 탐색을 제한해 Redis 갱신 실패에 요청이 줄지어 기다리지 않게 한다.
         if (redisRecovery.get() != null) return loadMode(nanoTime.getAsLong());
         ModeSnapshot snapshot = modeSnapshot;
         if (snapshot != null && snapshot.fresh(nanoTime.getAsLong())) return snapshot.mode();
@@ -94,28 +94,28 @@ public class ServiceAdmissionService {
         return probe;
     }
 
-    /** Only join may replace a missing or expired cookie with a new server-generated ticket. */
+    /** join만 유효하지 않은 쿠키를 새 서버 발급 입장권으로 교체할 수 있다. */
     public Entry join(String existingTicket) {
         return call("join", uuid(existingTicket) ? existingTicket : "", UUID.randomUUID().toString());
     }
     public Entry status(String ticket) { return call("status", presented(ticket), ""); }
     public Entry cancel(String ticket) { return call("cancel", presented(ticket), ""); }
 
-    /** Actual emergency rejections only. One local monotonic timestamp; never an extra Redis operation. */
+    /** 실제 비상 거부만 로컬 단조 시각으로 관측하며 Redis 호출은 추가하지 않는다. */
     public void noteEmergencyThrottle() {
         if (!properties.isEnabled() || !properties.getAutomatic().isEnabled()) return;
         long now = nanoTime.getAsLong();
         lastEmergencyThrottleAt.updateAndGet(previous -> previous == null || now - previous >= 0 ? now : previous);
     }
 
-    /** Disabling observation never clears an existing Redis override or performs an extra Redis call. */
+    /** 관측을 꺼도 기존 Redis 수동 설정을 지우거나 추가 호출을 하지 않는다. */
     void observeAutomatic(String owner, ServiceAdmissionAutomaticPolicy.Signal signal) {
         if (!properties.isEnabled() || !properties.getAutomatic().isEnabled()) return;
         long started = nanoTime.getAsLong();
         Long throttledAt = lastEmergencyThrottleAt.get();
         if (signal == ServiceAdmissionAutomaticPolicy.Signal.CLEAR && throttledAt != null) {
             long quiet = started - throttledAt;
-            // Even a regressed/uncertain local clock cannot be evidence for relaxing protection.
+            // 역행하거나 불확실한 로컬 시계는 보호 완화의 근거로 사용하지 않는다.
             if (quiet < THROTTLE_QUIET_NANOS) signal = ServiceAdmissionAutomaticPolicy.Signal.HOLD;
         }
         try {
@@ -127,7 +127,7 @@ public class ServiceAdmissionService {
         }
     }
 
-    /** CHECK touches admitted activity only; it never creates/promotes a visitor or renews a waiting heartbeat. */
+    /** CHECK는 입장 활동만 갱신하며 방문자 생성·승격이나 대기 생존 시각 갱신은 하지 않는다. */
     public boolean admitted(String ticket) {
         var entry = call("check", presented(ticket), "");
         return entry.mode() == Mode.OFF || "ADMITTED".equals(entry.state());
@@ -139,7 +139,7 @@ public class ServiceAdmissionService {
         return scope.prefix() + "service-admission:{entry}:";
     }
 
-    /** Mode changes preserve live passes; changing any capacity/lifetime identity requires an explicit reset. */
+    /** 모드 변경은 유효 입장권을 보존한다. 정원·수명 등 식별 조건을 바꾸려면 명시적인 초기화가 필요하다. */
     public static String marker(ServiceAdmissionProperties p) {
         String canonical = "v1|" + p.getEpoch() + "|" + p.getCapacity() + "|" + p.getSessionSeconds()
                 + "|" + p.getMaxSessionSeconds() + "|" + p.getHeartbeatTimeoutSeconds() + "|" + p.getMaxWaiting();
@@ -172,7 +172,7 @@ public class ServiceAdmissionService {
             redisRecovery.set(new RedisRecovery(nanoTime.getAsLong() + REDIS_RETRY_NANOS, false));
             throw new UnavailableException();
         } catch (RuntimeException e) {
-            // A non-connection error must not leave a half-open probe permanently occupied.
+            // 연결 오류가 아닌 실패도 복구 탐색 점유를 해제해야 한다.
             if (probe != null) redisRecovery.compareAndSet(probe, null);
             throw e;
         }

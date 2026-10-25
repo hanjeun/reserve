@@ -1,8 +1,5 @@
-/**
- * 사업자 인증의 대기·전체 목록을 mode별 서버 검색·페이지 조회로 표시한다.
- * 쿼리 키에 mode·페이지·지연 검색어를 포함해 서로 다른 목록의 캐시가 섞이지 않게 한다.
- * 최초·쿼리 전환 로딩에는 실제 열 규격의 스켈레톤을 사용하고 수동 새로고침은 기존 행을 유지한다.
- * 승인·거절·자격 취소 후 관련 조회를 무효화하며 모달은 닫힘 애니메이션 후 내용을 정리한다.
+/*
+ * 인증 목록은 mode·페이지·검색어별 캐시를 분리하고 상태 변경 뒤 관련 조회를 무효화한다.
  */
 import React, { useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
@@ -48,9 +45,6 @@ const SKELETON_COLS    = [...BUSINESS_VERIFICATION_SKELETON_COLS];
 const PAGE_SIZE = 15;
 const QUERY_DEFAULTS = { search: '', page: '1' };
 
-// 다른 관리자 탭들과 동일한 2026-07 전수조사 사유 — pagination을 DataTable에 제어시켜서 승인/거절/
-// 자격취소 뮤테이션 후 페이지 리셋 버그와, 스켈레톤 로딩 중 페이지 버튼 소멸 문제를 동시에 해결
-// (mode='pending'/'all' 각각 독립적인 컴포넌트 인스턴스라 page state도 서로 영향을 주지 않는다).
 const skeletonRowCount = (total, pageIdx1, pageSize) => {
     if (!total) return Math.min(BUSINESS_VERIFICATION_SKELETON_ROWS, pageSize);
     const remaining = total - (pageIdx1 - 1) * pageSize;
@@ -131,9 +125,9 @@ const RejectModal = ({ open, target, onCancel, onOk, loading }) => {
             open={open}
             onCancel={() => requestClose(handleCancel, { discard: false })}
             onOk={handleOk}
-            /* mask.closable=false: 사업자 인증 거절 사유를 작성하는 모달 — 바깥 클릭으로 내용 유실 방지.
-               컨벤션 — 입력 폼/파괴적 확인 모달은 바깥 클릭으로 안 닫히고, 읽기 전용 모달
-               (상세보기/QR/예약상세)은 AntD 기본값(true)대로 아무데나 눌러도 닫힌다. */
+            /*
+             * 거절 사유 입력이 바깥 클릭으로 유실되지 않게 한다.
+             */
             mask={{ closable: false }}
             okText="거절 처리"
             cancelText="취소"
@@ -267,8 +261,8 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
             });
     }, []);
 
-    // 모달을 먼저 열어 기다리는 상태를 즉시 보여 주고, 실패해도 닫지 않는다. 그래야 왜 실패했는지
-    // 확인하고 같은 대상만 다시 조회할 수 있다.
+    // 조회 중에도 모달을 열어 두고 오류·재시도를 표시한다.
+
     const openDetail = (record) => {
         setDetailItem(null);
         setDetailRequestId(record.id);
@@ -457,8 +451,9 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
                                 </Button>
                             </>
                         ) : (
-                            /* 모달의 닫기/취소는 테두리 있는 outline으로 통일 (FormModal.jsx의 컨벤션 주석 참고).
-                               예전엔 ghost-sm(텍스트형)이라 이 모달만 닫기 버튼이 그냥 글자처럼 보였다. */
+                            /*
+                             * 닫기·취소는 공통 모달의 outline 버튼을 사용한다.
+                             */
                             <Button variant="outline" size="sm" onClick={() => setDetailOpen(false)}
                                 style={{ paddingLeft: 20, paddingRight: 20 }}>
                                 닫기

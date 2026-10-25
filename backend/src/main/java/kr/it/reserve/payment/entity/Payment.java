@@ -44,7 +44,6 @@ public class Payment {
     @Column(name = "merchant_uid", nullable = false, unique = true)
     private String merchantUid;
 
-    // 결제 금액
     @Column(name = "amount", nullable = false)
     private Integer amount;
 
@@ -56,13 +55,11 @@ public class Payment {
     @Column(name = "pg_provider", length = 50)
     private String pgProvider;
 
-    // 결제 상태
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
     private PaymentStatus status = PaymentStatus.READY;
 
-    // 결제 상품명
     @Column(name = "product_name")
     private String productName;
 
@@ -83,15 +80,12 @@ public class Payment {
     @Builder.Default
     private Integer refundAmount = 0;
 
-    // 환불 사유
     @Column(name = "refund_reason", length = 500)
     private String refundReason;
 
-    // 결제 완료 시간
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
 
-    // 환불 완료 시간
     @Column(name = "refunded_at")
     private LocalDateTime refundedAt;
 
@@ -108,26 +102,16 @@ public class Payment {
     private LocalDateTime updatedAt;
 
     public enum PaymentStatus {
-        READY,      // 결제 준비
-        PAID,       // 결제 완료
-        CANCELLED,  // 결제 취소
-        FAILED,     // 결제 실패
+        READY,
+        PAID,
+        CANCELLED,
+        FAILED,
         REFUNDED,   // 환불 완료
         PARTIAL_REFUNDED,  // 부분 환불
-        /**
-         * 환불을 PG 에 접수했지만 <b>아직 돈이 돌아갔는지 모르는</b> 상태 — 2026-08-23 신설.
-         *
-         * <p>PortOne V2 취소는 200 과 함께 {@code REQUESTED}(접수됨)를 돌려줄 수 있다.
-         * 그걸 REFUNDED 로 적으면 "장부는 환불, 실제로는 미환불"이라는 가장 나쁜 어긋남이 생긴다.
-         * 결말은 웹훅이나 재조회 스케줄러가 확인해 REFUNDED 또는 PAID(실패 시 원복)로 옮긴다.
-         *
-         * <p>이 상태에서는 <b>추가 환불을 받지 않는다</b> — 결말을 모르는 채로 또 취소를 걸면
-         * 이중 환불이 된다.
-         */
+        /** PG 접수는 환불 완료가 아니다. 결과가 미정인 동안 추가 환불을 막고 웹훅·재조회로 최종 상태를 확인한다. */
         REFUND_PENDING
     }
 
-    // 결제 완료 처리
     public void completePayment(String impUid, String payMethod, String pgProvider) {
         this.impUid = impUid;
         this.payMethod = payMethod;
@@ -142,10 +126,7 @@ public class Payment {
         this.failReason = failReason;
     }
 
-    /**
-     * 이미 환불된 금액. {@code null} 을 0 으로 정규화해 호출측이 매번 확인하지 않게 한다.
-     * (컬럼이 나중에 추가돼 옛 행에는 {@code NULL} 이 들어 있을 수 있다.)
-     */
+    /** 이미 환불된 금액의 null 값은 0으로 해석한다. */
     public int refundedSoFar() {
         return this.refundAmount == null ? 0 : this.refundAmount;
     }

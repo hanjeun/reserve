@@ -31,10 +31,7 @@ public class AdminMailController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String search) {
 
-        // 응답 형식이 바뀐다: 예전에는 배열을 그대로 돌려줬고 지금은 Spring Page 다.
-        // 프론트는 content 와 page.totalElements 를 읽는다
-        // (Spring Boot 3.5 부터 페이지 메타가 page 하위로 이동했다).
-        // 이 엔드포인트를 쓰는 곳은 관리자 메일함 화면 하나뿐이라 함께 바꾸면 된다.
+        // 페이지 메타데이터는 page 아래에 반환한다.
         Page<AdminSentMailResponse> result = adminMailService.getSentMailList(page, size, search);
         return ResponseEntity.ok(ApiResponse.success(result, "보낸 메일 목록 조회 성공"));
     }

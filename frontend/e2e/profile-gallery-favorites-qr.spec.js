@@ -23,7 +23,7 @@ async function mockUiApi(page, initialRead = {}) {
             ? '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="360"><rect width="240" height="360" fill="white"/><circle cx="120" cy="180" r="90" fill="#3182f6"/><circle cx="90" cy="160" r="12" fill="white"/><circle cx="150" cy="160" r="12" fill="white"/></svg>'
             : `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450"><rect width="800" height="450" fill="${route.request().url().includes('first') ? '#3182f6' : '#e5a73b'}"/></svg>`,
     }));
-    // All API traffic, including writes, is intercepted. No account, favorite, or check-in is changed.
+    // 조회와 쓰기 요청을 모두 가로채 실제 계정·즐겨찾기·입장 상태를 변경하지 않는다.
     await page.route('**/api/**', async route => {
         const path = new URL(route.request().url()).pathname;
         if (!path.startsWith('/api/')) return route.continue();
@@ -234,7 +234,7 @@ for (const [label, path, menu, destination] of [
             await page.getByRole('menuitem', { name: new RegExp(menu) }).click();
             const root = page.locator('.ant-layout-content > .reserve-page-container:not(.reserve-route-skeleton)');
             await expect(root.locator('.reserve-skeleton-block').first()).toBeVisible();
-            // The API gate keeps the data skeleton on screen for a real three-second observation.
+            // API 응답을 보류해 골격 화면을 3초 동안 관찰한다.
             await page.waitForTimeout(3_000);
             const frames = await page.evaluate(() => {
                 cancelAnimationFrame(window.__loadingRaf);
@@ -283,8 +283,8 @@ test('normal photo corners and hover covers stay clipped during both directions 
         }));
         if (index === 'autoplay') await page.mouse.move(0, 0);
         else await indicators.locator('li button').nth(index).evaluate(button => button.click());
-        // Pausing the browser's current CSS transition exposes the actual mid-slide frame;
-        // slick's direction, transform, speed and clone logic are not replaced by a fixture.
+        // 실제 CSS 전환을 멈춰 중간 프레임을 측정한다.
+
         const frame = await observation;
         expect(frame.length).toBeGreaterThan(2);
         expect(frame.filter(slide => slide.visible).length).toBeGreaterThanOrEqual(2);
@@ -304,7 +304,7 @@ test('normal photo corners and hover covers stay clipped during both directions 
 for (const motion of ['no-preference', 'reduce']) {
 test(`QR sheet content stays unboxed and mock scanning stops and closes with ${motion} motion`, async ({ page }) => {
     const { requests } = await mockUiApi(page);
-    // Replace only the development scanner dependency; this fixture cannot use a real camera or decode a QR.
+    // 개발용 스캐너만 대체하며 실제 카메라나 QR 해독은 사용하지 않는다.
     await page.route('**/node_modules/.vite/deps/html5-qrcode.js*', route => route.fulfill({
         contentType: 'application/javascript',
         body: `export class Html5Qrcode {

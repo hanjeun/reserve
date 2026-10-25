@@ -4,7 +4,7 @@ import Bone from './Bone';
 import { imageDimensions } from '../../utils/imageDimensions';
 import useLazyAntImageSource from '../../hooks/useLazyAntImageSource';
 
-/** Keep AntD preview, source changes and cached-image handling at its existing boundary. */
+/* AntD 미리보기·출처 교체·캐시 이미지 처리를 같은 관문에 둔다. */
 export default function LoadingAntImage({ placeholder, style, imageSize, src, srcSet, loading, fallback, preview, rootClassName, ...props }) {
     const size = imageDimensions(imageSize);
     const { ready, rootClassName: lazyClass } = useLazyAntImageSource(`${src ?? ''}\u0000${srcSet ?? ''}`, loading === 'lazy');

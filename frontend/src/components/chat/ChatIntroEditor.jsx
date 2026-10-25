@@ -37,12 +37,8 @@ const bodyOf = (draft, items, identityEditable) => ({
     items: items.map(item => ({ question: item.question.replace(/\s+/g, ' ').trim(), answer: item.answer.trim() })),
 });
 
-/**
- * 채팅 관리 편집기 — 사업자 패널(가게별)과 관리자 패널(고객지원)이 같은 화면을 쓴다 (2026-09-24 채팅 관리로 확장).
- *
- * <p>프로필 · 공지사항 · 인사말 · 자주 묻는 질문을 고치고, 오른쪽(모바일은 `설정 | 미리보기` 전환)에서
- * 손님이 보는 대화창 그대로 확인한다. 가게는 표시 이름·사진을 가게 정보에서 가져온다 — 채팅에서 따로 바꾸면
- * "RESERVE 고객지원" 같은 사칭이 가능해져서다. 칸 오류는 칸 아래에 바로 보인다(useFormErrors — 토스트 금지).
+/*
+ * 가게 표시 이름·사진은 사칭 방지를 위해 가게 정보에서만 바꾼다. 입력 오류는 해당 필드에 유지한다.
  */
 export default function ChatIntroEditor({ intro, onSave, onUploadAvatar, saving = false, kind = 'store', identity, noticeHelp }) {
     const isStore = kind === 'store';
@@ -118,7 +114,7 @@ export default function ChatIntroEditor({ intro, onSave, onUploadAvatar, saving 
         try {
             saved = await onSave(body);
         } catch {
-            // 실패 안내는 호출부(저장 요청)가 한다. 입력은 그대로 둬서 다시 저장할 수 있게 한다.
+            // 저장 오류 안내는 호출부가 담당하고 재시도할 입력은 보존한다.
             return;
         }
         apply(saved && Array.isArray(saved.items) ? saved : { ...body, items: body.items });
@@ -264,7 +260,7 @@ ChatIntroEditor.propTypes = {
         avatarUrl: PropTypes.string,
         items: PropTypes.arrayOf(PropTypes.shape({ question: PropTypes.string, answer: PropTypes.string })),
     }),
-    /** 저장한 응답을 돌려주면 그 값(서버가 다듬은 공백 등)으로 편집 상태를 맞춘다. 실패하면 throw — 입력은 그대로 남는다. */
+    /* 저장 성공 응답으로 편집 상태를 맞추며 실패 시 입력을 보존하고 오류를 전달한다. */
     onSave: PropTypes.func.isRequired,
     /** 고객지원 사진 올리기 — 올린 사진 주소를 돌려준다(저장은 저장하기에서). */
     onUploadAvatar: PropTypes.func,

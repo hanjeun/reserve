@@ -13,7 +13,7 @@ import lombok.Getter;
 @AllArgsConstructor
 public class CalendarDayResponse {
 
-    /** {@code "2026-09-01"}. 프론트가 문자열로 비교하도록 ISO 고정 — 타임존이 끼어들 여지를 없앤다. */
+    /** 시간대 변환 없이 비교하도록 ISO 날짜 문자열을 사용한다. */
     private String date;
 
     /** {@link DayStatus} 이름. */
@@ -25,16 +25,7 @@ public class CalendarDayResponse {
     /** 지금 실제로 고를 수 있는 시각 수. {@code 0} 이면 {@code FULL} 이거나 예약 불가 상태다. */
     private int openSlots;
 
-    /**
-     * 공휴일(빨간날)인가 — <b>달력을 빨갛게 칠하는 용도일 뿐, 예약 가능 여부와 무관하다.</b>
-     * 공휴일에도 여는 가게가 훨씬 많다. 쉬는 가게는 {@code closedDates} 로 이미 표현된다.
-     *
-     * <p>{@code status} 와 독립인 이유: 지난 공휴일도, 휴무인 공휴일도 공휴일은 공휴일이다.
-     * 어떤 상태일 때 실제로 빨갛게 그릴지는 화면이 정한다(현재는 {@code OPEN} 일 때만).
-     *
-     * <p>키가 없거나 공공데이터포털이 죽어 있으면 <b>전부 {@code false}</b> 로 온다.
-     * 그때도 달력은 정상이고 일요일만 빨갛게 나온다 — {@code HolidayService} 주석 참고.
-     */
+    /** 공휴일 표시는 예약 가능 상태와 독립이다. 조회할 수 없을 때도 예약 판정에는 영향을 주지 않는다. */
     private boolean holiday;
 
     /**

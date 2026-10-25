@@ -14,7 +14,7 @@ export default function useSearchTransition({ inputRef, animateEntry = true, act
         if (active) return;
         window.clearTimeout(exitTimerRef.current);
         closingRef.current = false;
-        // A search kept behind a conversation must finish its previous exit before it can reopen.
+        // 대화 뒤에 유지된 검색은 이전 퇴장을 마친 뒤 다시 연다.
         setIsClosing(false); // eslint-disable-line react-hooks/set-state-in-effect
     }, [active]);
 

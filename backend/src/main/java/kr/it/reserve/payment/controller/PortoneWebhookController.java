@@ -13,23 +13,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * PortOne 웹훅 수신 — 2026-08-23 신설.
- *
- * <h2>이 엔드포인트의 인증은 서명 하나뿐이다</h2>
- * PortOne 서버가 호출하므로 로그인 세션이 없다({@code SecurityConfig} 에서 permitAll).
- * 따라서 <b>서명 검증을 통과하지 못한 요청은 본문을 파싱조차 하지 않는다.</b>
- *
- * <h2>본문을 {@code String} 으로 받는 이유</h2>
- * 서명은 <b>원본 바이트</b>에 대해 계산된다. DTO 로 바인딩했다가 다시 직렬화하면
- * 공백·키 순서가 달라져 <b>정상 요청도 전부 위조로 판정된다.</b> 절대 DTO 로 바꾸지 말 것.
- *
- * <h2>응답 코드가 곧 재전송 정책이다</h2>
- * <ul>
- *   <li><b>2xx</b> — 처리 완료. PortOne 은 다시 보내지 않는다.</li>
- *   <li><b>4xx</b> — 서명 실패. 다시 보내도 결과가 같으므로 재전송을 원치 않는다.</li>
- *   <li><b>5xx</b> — 우리 쪽 일시 장애. <b>재전송을 받고 싶을 때만</b> 낸다.</li>
- * </ul>
- * 처리 중 예외를 무조건 삼켜 200 을 주면, 일시 장애로 놓친 이벤트를 <b>영영 다시 받지 못한다.</b>
+ * 서명 검증 전에는 원문을 파싱하지 않는다. 서명 대상 원문을 보존하므로 DTO로 재직렬화하지 않는다.
+ * 처리 실패를 성공 응답으로 숨기지 않아 제공자가 재전송할 수 있게 한다.
  */
 @Slf4j
 @RestController

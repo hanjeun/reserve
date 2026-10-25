@@ -87,7 +87,6 @@ export default function FaqSection({ isMobile }) {
                     <Text style={{ fontSize: 15, color: colors.text.secondary }}>궁금한 점이 있으신가요?</Text>
                 </div>
 
-                {/* 박스 제거 — 회색 바탕에 얼은 구분선만 */}
                 <div className="reveal">
                     <Collapse
                         className="faq-collapse"

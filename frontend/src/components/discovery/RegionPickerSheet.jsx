@@ -160,7 +160,7 @@ export default function RegionPickerSheet({ open, value = '', onClose, onApply, 
         () => [...new Set(popularAreas.map(area => area.group))],
         [popularAreas],
     );
-    // 사진 조회가 실패하거나 키가 아직 반영되지 않아도 지역 선택은 그대로 작동한다.
+    // 지역 사진 조회 오류와 지역 선택 동작을 분리한다.
     const { data: dynamicPhotos = [] } = useQuery({
         queryKey: tourismKeys.regionPhotos(photoRegions),
         queryFn: () => tourismService.getRegionPhotos(photoRegions),
@@ -173,7 +173,7 @@ export default function RegionPickerSheet({ open, value = '', onClose, onApply, 
         [dynamicPhotos],
     );
     // 지역 사진은 서버가 공공누리 제1유형을 확인한 관광정보 API 카탈로그만 쓴다.
-    // 사진이 없거나 이미지 프록시가 실패하면 기존 핀 아이콘이 그대로 남는다.
+    // 사진이 없거나 프록시 조회가 실패하면 핀 아이콘을 유지한다.
     const popularAreasWithPhoto = useMemo(
         () => popularAreas.map(area => ({ ...area, photo: dynamicPhotoByRegion.get(area.group) ?? null })),
         [dynamicPhotoByRegion, popularAreas],

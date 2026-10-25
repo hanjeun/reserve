@@ -37,7 +37,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('cached search entry and cancel pair the header controls and content without a sideways page slide', async ({ page, isMobile }) => {
-    // Load the route through the UI, then return without reloading so its normal module cache stays warm.
+    // 같은 문서에서 재진입해 모듈 캐시를 유지한다.
     await page.goto('/search');
     await expect(page.getByRole('searchbox')).toBeVisible();
     await page.getByRole('button', { name: '취소' }).click();
@@ -59,7 +59,7 @@ test('cached search entry and cancel pair the header controls and content withou
     })))).toEqual([{ x: 0, y: -6, opacity: 0 }, { x: 0, y: 0, opacity: 1 }]);
     await expect.poll(() => recordedEntries(page)).toEqual(entryNames(isMobile));
     await expect(page.locator('.ant-layout-content')).not.toHaveClass(/reserve-route-entry--/);
-    // The existing 220ms search contract pairs the input row with the body and restores without a sideways route entry.
+    // 검색 입력과 본문은 220ms 모션을 공유하고 복귀 시 가로 전환을 생략한다.
     await page.getByRole('button', { name: '취소' }).evaluate(button => button.click());
     await expect(header).toHaveCSS('animation-name', 'reserve-search-controls-leave');
     await expect(header).toHaveCSS('animation-duration', '0.22s');

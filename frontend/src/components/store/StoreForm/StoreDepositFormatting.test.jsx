@@ -8,7 +8,7 @@ vi.mock('../../../hooks', () => ({ useWindowWidth: () => 390 }));
 vi.mock('./AddressSearch', () => ({ default: () => <div /> }));
 vi.mock('../../common', async () => {
     const { default: FormInput } = await import('../../common/FormInput');
-    // Keep the real numeric input and form wiring; unrelated pickers have separate tests.
+    // 실제 숫자 입력·폼 연결만 확인하고 다른 선택 도구 검사는 분리한다.
     const UnrelatedField = () => <div />;
     UnrelatedField.RangePicker = UnrelatedField;
     return {

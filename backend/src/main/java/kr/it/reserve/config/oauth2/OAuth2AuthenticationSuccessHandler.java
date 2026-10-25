@@ -59,7 +59,6 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
             String baseErrorUrl = destination + "/login";
 
-            // 깨끗한 URL: /login?suspended=true&status=SUSPENDED&until=2026-08-15
             String redirectUrl = baseErrorUrl
                 + "?suspended=true"
                 + "&status=" + status

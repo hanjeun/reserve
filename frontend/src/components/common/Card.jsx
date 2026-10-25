@@ -1,18 +1,5 @@
-/**
- * RESERVE Design System - Card Component
- * 
- * 사용법:
- * 이동 카드에는 Card 자체 onClick 대신 내부에 실제 Link를 사용한다.
- * <Card hoverable>
- *     <Link to="/store/1" className="reserve-card-link">
- *         <Card.Cover src={imageUrl} alt="가게 이미지" />
- *         <Card.Body>내용</Card.Body>
- *     </Link>
- * </Card>
- * 
- * <Card.Add onClick={() => navigate('/store/register')}>
- *     새 가게 등록하기
- * </Card.Add>
+/*
+ * 이동 카드는 내부의 실제 Link를 사용하고 추가 카드는 실행 버튼으로 구분한다.
  */
 
 import React from 'react';
@@ -23,7 +10,7 @@ import { colors, fontSize, fontWeight } from '../../styles/tokens';
 import { getThumbnailUrl } from '../../utils';
 import LoadingImage from './LoadingImage';
 
-const Card = ({ 
+const Card = ({
     hoverable = false,
     actions,
     children,
@@ -33,7 +20,7 @@ const Card = ({
     role,
     tabIndex,
     className,
-    ...rest 
+    ...rest
 }) => {
     // boxShadow를 여기(인라인)에 두지 않는다 — hover 그림자가 죽는다.
     //   인라인 스타일은 클래스 규칙보다 우선이라, 인라인으로 box-shadow를 박으면
@@ -79,26 +66,18 @@ const Card = ({
             >
                 {children}
             </AntCard>
-            {/* 그림자·hover·actions 줄 CSS 는 index.css 의 "Card 그림자·hover" 블록으로 옮겼다.
-                JSX 안 <style> 은 인스턴스마다 렌더돼서, 카드가 수십 개인 목록 화면에서
-                동일한 태그가 그만큼 쌓였다. 전역 정책은 index.css — docs/technical/design-system.md 참고.
-                이 컴포넌트를 쓰는 쪽에서 인라인 boxShadow 를 주면 hover 그림자가 죽는다. */}
+            {/*
+             * 전역 카드 정책은 공통 CSS에 두며 인라인 그림자로 호버 규칙을 덮지 않는다.
+             */}
         </>
     );
 };
 
-/**
- * 카드 커버 이미지.
- * width/height props are passed through as real HTML attributes on <img> — browsers use
- * these to reserve the correct aspect-ratio space before the image resource even loads,
- * preventing layout shift independently of any skeleton (supported in all modern browsers).
- * 크기 정보가 없으면 로딩 동안 정사각형 공간을 쓰고, 로드 후에는 원본 사진 비율을 따른다.
- *
- * className은 `reserve-` 접두사를 지킨다. 전역 CSS라, 접두사 없는 이름(예전 'card-image')은
- * 다른 라이브러리나 목업 컴포넌트와 충돌할 여지가 있었다.
+/*
+ * width·height로 사진 공간을 예약하고 명시적 aspectRatio가 없으면 로딩 뒤 원본 비율을 따른다. 전역 클래스는 reserve- 접두사로 구분한다.
  */
-// 사진 주소가 404 등으로 실패하면 깨진 이미지 아이콘 대신 공통 대체 이미지를 보인다 —
-// StoreListRow 와 같은 동작이다(2026-09-23: 카드만 깨진 아이콘이 보이던 불일치).
+// 사진 오류는 공통 대체 이미지로 한 번 교체한다.
+
 const handleCoverError = (event) => {
     const fallback = getThumbnailUrl();
     if (event.currentTarget.src !== new URL(fallback, window.location.href).href) event.currentTarget.src = fallback;
@@ -132,10 +111,8 @@ Card.Body = ({ children, style }) => {
     );
 };
 
-/**
- * 추가 카드 (새 가게 등록 등)
- * 2026-07 수정 — borderRadius를 실제 Card(각진 사각형, radius 0)와 맞춤.
- * 예전엔 radius['2xl']이라 옆에 나란히 놓이는 실제 가게 카드와 모서리가 안 맞았다.
+/*
+ * 추가 카드는 같은 목록 카드의 모서리 규칙을 따른다.
  */
 Card.Add = ({ children, onClick, minHeight = '350px' }) => {
     const addCardStyle = {

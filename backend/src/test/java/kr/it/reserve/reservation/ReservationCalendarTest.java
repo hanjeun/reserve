@@ -34,17 +34,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
-/**
- * 달력(월 단위) 조회 — <b>막힌 이유가 사유별로 구분돼 내려오는가.</b>
- *
- * <h2>왜 이 테스트가 필요한가</h2>
- * 이 API 의 존재 이유 자체가 "회색 하나로 뭉개지 않는 것"이다. 사유가 뭉개지거나
- * 서버 {@code isBookableOn} 과 순서가 어긋나면 <b>달력엔 눌리는데 예약하면 거절</b>이 돌아온다.
- * 이 프로젝트가 반복해서 당한 형태라 계약으로 못 박는다.
- *
- * <p>날짜는 전부 <b>상대값</b>이다. 고정 날짜 픽스처는 시간이 지나면 과거가 돼서 조용히 썩는다
- * ({@code ReservationAvailabilityTest} 가 실제로 그렇게 썩어 있었다).
- */
+/** 달력의 제외 사유와 판정 순서가 예약 검증과 같은지 확인하며 날짜는 상대값을 사용한다. */
 @ExtendWith(MockitoExtension.class)
 class ReservationCalendarTest {
 

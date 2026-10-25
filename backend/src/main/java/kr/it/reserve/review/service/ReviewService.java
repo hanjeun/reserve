@@ -32,9 +32,6 @@ public class ReviewService {
     @Autowired(required = false)
     private ReviewUpdates updates;
 
-    /**
-     * 리뷰 작성
-     */
     @Transactional
     public ReviewResponse createReview(ReviewCreateRequest request, Member member) {
         log.info("Review created: reservationId={}, memberId={}", request.getReservationId(), member.getId());
@@ -67,9 +64,6 @@ public class ReviewService {
         return ReviewResponse.fromEntity(savedReview);
     }
 
-    /**
-     * 리뷰 삭제
-     */
     @Transactional
     public void deleteReview(Long reviewId, Member member) {
         Review review = findReviewByIdOrThrow(reviewId);
@@ -83,9 +77,6 @@ public class ReviewService {
         if (updates != null) updates.changed(review, EntityUpdates.Operation.DELETED);
     }
 
-    /**
-     * 리뷰 수정
-     */
     @Transactional
     public ReviewResponse updateReview(Long reviewId, ReviewUpdateRequest request, Member member) {
         Review review = findReviewByIdOrThrow(reviewId);

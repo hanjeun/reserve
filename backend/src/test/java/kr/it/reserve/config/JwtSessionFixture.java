@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/** Real signing, validation and rotation with an in-memory repository substitute; no external secrets or calls. */
+/** 메모리 저장소 대역과 실제 서명·검증·회전을 사용하며 외부 자격정보나 호출은 사용하지 않는다. */
 public final class JwtSessionFixture {
     public static final String SECRET = "synthetic-jwt-session-test-key-that-is-longer-than-sixty-four-characters-000";
     public final JwtProperties properties = properties();

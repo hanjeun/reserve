@@ -1,7 +1,5 @@
-/**
- * RESERVE - 거리 계산 유틸
- * 백엔드 ReservationService/StoreService의 Haversine 공식과 동일한 로직의 프론트엔드 버전.
- * "우리동네" 배지처럼 백엔드 API 호출 없이 클라이언트에서 즉시 거리를 판단해야 할 때 사용.
+/*
+ * 서버와 같은 Haversine 공식으로 동네 표시용 거리를 계산한다.
  */
 
 const EARTH_RADIUS_KM = 6371;

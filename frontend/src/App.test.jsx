@@ -38,7 +38,7 @@ const renderAt = (path) => {
 };
 
 describe('app route table fallbacks', () => {
-    // Test the route table with the real page, not the first Vite transform of its lazy module.
+    // 지연 모듈 변환 시간과 분리해 실제 페이지의 라우트 연결을 확인한다.
     beforeAll(() => Promise.all([
         import('./pages/NotFound'), import('./pages/legal/UserGuide'), import('./pages/legal/BusinessGuide'),
         import('./pages/legal/CommonGuide'), import('./pages/legal/OperationGuide'),

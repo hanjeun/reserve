@@ -23,7 +23,7 @@ const canScroll = (target, boundary, deltaX, deltaY) => {
     return false;
 };
 
-/** Install once: keep the underlying page fixed through every visible modal, including nested dialogs. */
+/* 중첩 모달의 마지막 닫힘까지 배경 페이지 위치를 고정한다. */
 export default function useModalScrollLock() {
     useEffect(() => {
         const body = document.body;
@@ -54,7 +54,7 @@ export default function useModalScrollLock() {
                 x: window.scrollX, y: window.scrollY, page: pageIdentity(),
                 styles: BODY_PROPERTIES.map(property => [property, body.style.getPropertyValue(property), body.style.getPropertyPriority(property)]),
             };
-            // AntD retains ownership of overflow and scrollbar compensation.
+            // overflow와 스크롤바 보정은 AntD가 관리한다.
             body.style.position = 'fixed';
             body.style.top = `${-saved.y}px`;
             body.style.left = `${-saved.x}px`;
@@ -76,7 +76,7 @@ export default function useModalScrollLock() {
             const target = event.target instanceof Element ? event.target : event.target?.parentElement;
             if (!target) { event.preventDefault(); return; }
             const dialog = dialogs.find(element => element.contains(target));
-            // Image zoom/pan remains owned by AntD. The fixed page still protects its background.
+            // 사진 확대·이동은 AntD에 맡기고 고정된 배경 페이지만 보호한다.
             if (dialog && (dialog.matches('.ant-image-preview') || target.closest('input[type="range"]'))) return;
             const popup = target.closest(POPUP_SELECTOR);
             const boundary = dialog?.closest('.ant-modal-wrap') ?? dialog ?? popup;

@@ -25,7 +25,7 @@ const personalResult = (keyword, destination) => result(keyword, ['reservations'
 const path = () => screen.getByLabelText('현재 경로').textContent;
 const messageLink = destination => [...document.querySelectorAll('.reserve-search-content a')].find(link => link.getAttribute('href') === destination);
 const CurrentRoute = () => { const location = useLocation(); return <output aria-label="현재 경로">{location.pathname + location.search}</output>; };
-// React selects the prefixed event when jsdom has CSS animation support without AnimationEvent.
+// AnimationEvent가 없는 jsdom에서는 React가 선택한 접두사 이벤트를 전달한다.
 function finishAnimation(target) {
     const style = document.createElement('div').style;
     const type = 'AnimationEvent' in window ? 'animationend' : 'WebkitAnimation' in style ? 'webkitAnimationEnd'

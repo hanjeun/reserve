@@ -8,18 +8,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 
-/**
- * 고객지원({@link RoomType#SUPPORT})과 가게 문의({@link RoomType#STORE})의 공통 채팅방.
- *
- * <p><b>왜 Inquiry 를 고치지 않고 새로 만드나</b> — {@code Inquiry} 는 "문의 1건 + 답변" 모양이고
- * 채팅은 "방 1개 + 메시지 N개"다. 데이터 모양 자체가 달라서 억지로 끼우면 둘 다 어정쩡해진다.
- * 기존 {@code Inquiry}는 비회원도 남길 수 있는 단건 문의로 유지하고, 로그인 사용자의 연속 대화만
- * 이 모델에 둔다. 두 도메인을 섣불리 합치면 익명 문의의 보존·답변 계약까지 흔들린다.
- *
- * <p>{@link #type} 과 {@link #store} 를 지금부터 두는 이유는 <b>나중에 컬럼을 추가하는 것보다
- * 처음부터 있는 편이 싸기</b> 때문이다 — {@code ddl-auto: update} 는 컬럼 추가는 해주지만
- * 기존 행을 채워주지 않아서, 나중에 넣으면 전부 {@code NULL} 인 채로 해석 규칙이 필요해진다.
- */
+/** 로그인 사용자의 고객지원·가게 문의를 저장한다. 비회원 단건 문의는 Inquiry에서 별도로 관리한다. */
 @Entity
 @Table(
         name = "chat_room",

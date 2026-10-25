@@ -1,6 +1,6 @@
 FROM amazoncorretto:21-alpine-jdk
 
-# The floating image may predate the eMudhra fix. Use the signed package from Corretto's repository.
+# 기반 이미지와 별개로 보안 패치가 적용된 Corretto 패키지 버전을 고정한다.
 # https://github.com/corretto/corretto-21/releases/tag/21.0.13.0.10
 RUN apk add --no-cache amazon-corretto-21=21.0.13.0.10-r0
 
@@ -11,7 +11,7 @@ USER appuser
 
 ARG JAR_FILE=build/libs/*.jar
 COPY ${JAR_FILE} app.jar
-# A compatibility label is only useful when the packaged JAR contains the new boundary.
+# 호환 표시에 필요한 클래스와 스키마가 JAR에 포함됐는지 검사한다.
 RUN for REQUIRED_CLASS in \
     META-INF/orm.xml \
     BOOT-INF/classes/kr/it/reserve/chat/entity/ChatMessageHidden.class \

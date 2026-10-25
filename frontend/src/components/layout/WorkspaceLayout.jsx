@@ -77,7 +77,7 @@ export default function WorkspaceLayout({ title, groups, activeKey, hrefFor, onS
 
     const select = key => {
         if (key === activeKey) { drawerFocusTarget.current = 'content'; focusAfterClose.current = true; setMenuOpen(false); if (!menuOpen) focusContent(); return; }
-        // Guarded navigation resolves only after the user has kept or discarded their draft.
+        // 초안 유지·폐기 결정이 끝난 뒤에만 보호된 이동을 완료한다.
         Promise.resolve(onSelect(key)).then(changed => {
             if (changed !== false) { drawerFocusTarget.current = 'content'; setMenuOpen(false); }
         });

@@ -1,9 +1,6 @@
 import LoadingStatus from '../common/LoadingStatus';
-/**
- * 날짜 필드를 유지한 채 모달에서 예약일을 선택한다. value와 onChange는 dayjs 값을 사용한다.
- * 날짜별 가능 여부와 사유는 예약 달력 API의 응답으로 표시하고 프론트에서 재계산하지 않는다.
- * 서버 판정과 달력 표시가 어긋나지 않도록 새 예약 규칙은 서버의 날짜 판정에 반영한다.
- * 선택·hover·불가 상태는 예약 시간 pill과 같은 무채색 역할을 유지한다.
+/*
+ * 날짜 값은 Dayjs를 유지하고 가능 여부·불가 사유는 서버 달력 응답을 사용한다.
  */
 import React, { useRef, useState } from 'react';
 import PropTypes from 'prop-types';
@@ -22,8 +19,7 @@ const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 /** 이만큼은 가로로 밀어야 달이 넘어간다. 더 짧으면 날짜를 누르다 손가락이 흔들린 것까지 잡힌다. */
 const SWIPE_MIN_PX = 45;
 
-
-/** 휴무·마감만 라벨로 표시하고, 기간 밖·과거·예약 범위 초과는 흐리게 구분한다. */
+/* 휴무·마감은 라벨로, 기간·예약 범위 밖 날짜는 비활성 상태로 구분한다. */
 const BLOCKED_LABEL = {
     CLOSED: '휴무',
     FULL: '마감',
@@ -52,10 +48,7 @@ const BookingCalendar = ({ storeId, reservationId, value, onChange, style, disab
     const daysInMonth = month.daysInMonth();
 
     /*
-     * 1일 앞의 빈 칸도 **실제 날짜**를 들고 있게 만든다(지난달 말일들).
-     * 인덱스를 key 로 쓰면(`blank-0`, `blank-1`…) 달을 넘길 때 앞칸 개수가 바뀌는데도
-     * React 가 같은 key 를 재사용해서, "몇 번째 칸이냐"가 달마다 다른 날을 가리키게 된다.
-     * 날짜 문자열은 달을 넘겨도 절대 겹치지 않는 안정적인 key 다.
+     * 앞쪽 빈칸에도 실제 날짜 키를 사용해 달 전환 시 다른 날짜의 DOM을 재사용하지 않게 한다.
      */
     const cells = [];
     for (let i = leading; i > 0; i -= 1) cells.push({ blank: true, key: month.subtract(i, 'day').format('YYYY-MM-DD') });
@@ -68,21 +61,15 @@ const BookingCalendar = ({ storeId, reservationId, value, onChange, style, disab
         setOpen(true);
     };
 
-    /**
-     * 고르는 순간 확정하고 닫는다.
-     *
-     * 초안 + [취소][확인] 안도 만들어봤는데 되돌렸다(2026-08-25).
-     *   버튼 두 개가 달력 아래 붙으면 옛날 폼처럼 보이고, 무엇보다 **고민은 누르기 전에
-     *   격자를 보면서 하는 것**이다 — 휴무·마감과 선택 불가 상태를 칸에서 볼 수 있다.
-     *   누르는 건 이미 결정한 것이므로, 거기서 한 번 더 확인을 받는 건 일을 늘리기만 한다.
-     *   마음이 바뀌면 다시 여는 게 탭 한 번이고, 그동안 필드엔 직전 선택이 그대로 남아 있다.
+    /*
+     * 선택 가능한 날짜를 누르면 즉시 확정하고 닫는다.
      */
     const pick = (date) => {
         onChange?.(date);
         setOpen(false);
     };
 
-    /** 이번 달보다 뒤로는 못 간다. 한 해를 빼서 과거로 넘어가면 이번 달로 붙인다. */
+    /* 연 이동으로 과거에 진입하면 이번 달로 보정한다. */
     const goMonth = (delta) => {
         const next = month.add(delta, 'month');
         setMonth(next.isBefore(thisMonth) ? thisMonth : next);
@@ -93,11 +80,7 @@ const BookingCalendar = ({ storeId, reservationId, value, onChange, style, disab
     };
 
     /*
-     * 모바일 스와이프 — 좌우로 밀면 달이 넘어간다.
-     * 터치 이벤트만 듣는다: PC 는 마우스 드래그로 달이 넘어가면 오히려 사고가 난다(날짜를 누르려다 끌림).
-     *
-     * 주의: "두 번 연속 스와이프 = 연 이동"은 넣지 않았다. 두 달 뒤로 가려고 두 번 미는 게
-     *    가장 흔한 동작인데 그게 갑자기 1년을 날려버린다. 연 이동은 « » 버튼이 맡는다.
+     * 터치 스와이프는 한 달만 이동하며 연 이동은 별도 버튼을 사용한다.
      */
     const onTouchStart = (e) => {
         const t = e.changedTouches[0];
@@ -156,9 +139,7 @@ const BookingCalendar = ({ storeId, reservationId, value, onChange, style, disab
                 }}
             >
                 {/*
-                 * 숫자는 칸의 정가운데. 사유 라벨은 흐름에서 빼서 아래에 띄운다.
-                 *   예전엔 둘을 세로로 쌓았는데, 라벨이 없는 날도 자리를 차지해서
-                 *   **숫자가 위로 밀려 보였다**(선택된 회색 칸에서 특히 눈에 띈다).
+                 * 날짜 숫자는 중앙에 두고 사유 라벨은 문서 흐름 밖 아래에 배치한다.
                  */}
                 <span className="reserve-cal-day" style={styles.dayNum}>{date.date()}</span>
                 {blockedLabel ? <span style={styles.tag}>{blockedLabel}</span> : null}
@@ -220,15 +201,11 @@ const BookingCalendar = ({ storeId, reservationId, value, onChange, style, disab
                 title={<span style={styles.visuallyHidden}>예약 날짜 선택</span>}
                 styles={{ header: styles.visuallyHiddenHeader }}
                 /*
-                 * 닫기 X 를 없앤다 — 332px 폭에서 오른쪽 위는 "다음 달" 화살표 자리다.
-                 * 둘을 같이 두면 겹친다(실제로 겹쳤다). 닫는 길은 이미 셋이다:
-                 * 날짜 선택 · 바깥(마스크) 클릭 · Esc.
+                 * 다음 달 도구와 겹치는 닫기 버튼은 생략하고 선택·바깥 클릭·Escape로 닫는다.
                  */
                 closable={false}
                 /*
-                 * 주의: classNames={{ content }} 를 쓰면 안 붙는다 — AntD 6 는 그 자리가
-                 *   `.ant-modal-content` 가 아니라 `.ant-modal-container` 다(v5→v6 클래스 리네임).
-                 *   `rootClassName` 은 두 버전 모두에서 최상위에 그대로 붙어 안전하다.
+                 * AntD 6의 실제 최상위 클래스에 연결하도록 rootClassName을 사용한다.
                  */
                 rootClassName="reserve-cal-modal"
             >

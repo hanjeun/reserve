@@ -20,19 +20,11 @@ const useManageReservations = (params) => {
 
     const onError = (err) => handleApiError(err, message);
 
-    // 상태 변경은 필터 결과·전체 건수도 바꾼다. 부분적인 낙관 갱신 대신 모든 관리 페이지를 재조회한다.
-    // 2026-09: 거절·취소는 달력의 빈자리를, 모든 상태 변경은 통계의 상태 분포를 바꾼다 —
-    // 관리 목록·내 예약뿐 아니라 그쪽도 무효화한다(invalidateAfterWrite.js).
+    // 상태 변경 후 필터 결과·전체 건수를 함께 다시 조회한다.
+    // 예약 상태 변경은 달력 빈자리와 사업자 통계도 함께 무효화한다.
+
     const onSettled = () => invalidateReservationData(queryClient);
 
-    // Undo (2026-08-11)
-    // 승인·완료는 확인 모달 없이 한 번에 확정된다. 목록에서 바로 옆 줄을 누르는 오조작이 잦은데,
-    // 그 전까지 되돌릴 방법이 거절뿐이었다 — 거절은 이용자에게 "거절됨"으로 남고 메일까지 나가서
-    // 실수 정정에 쓰기엔 흔적이 너무 크다.
-    //
-    // 왜 확인 모달이 아니라 Undo 인가 — 승인·완료는 하루에도 수십 번 누르는 동작이다.
-    // 매번 모달을 띄우면 그걸 습관적으로 넘기게 되어 오조작을 못 막는다.
-    // 되돌릴 수 있게 해두는 쪽이 빠르면서도 안전하다. (노쇼는 반대다 — 드물고 무거워서 모달이 맞다.)
     const undoMutation = useMutation({
         mutationFn: ({ id, kind }) => (kind === 'approve'
             ? reservationService.undoApprove(id)
@@ -43,10 +35,8 @@ const useManageReservations = (params) => {
         onSettled,
     });
 
-    /**
-     * "…했습니다 [실행 취소]" 토스트. 서버가 10분 이내만 되돌리기를 허용하므로
-     * 토스트가 사라진 뒤에도 잠깐은 유효하지만, 화면에서는 8초만 노출한다.
-     * 이 파일은 .js 라 JSX 를 쓸 수 없어 createElement 로 만든다(useMessage.js 와 같은 제약).
+    /*
+     * 서버의 실행 취소 제한 안에서 토스트를 8초간 노출한다.
      */
     const successWithUndo = (text, id, kind) => {
         const key = `undo-${kind}-${id}`;
@@ -124,9 +114,8 @@ const useManageReservations = (params) => {
         totalPages:    accessDenied ? 0 : data?.page?.totalPages ?? data?.totalPages ?? 0,
         hasData:       data !== undefined && !accessDenied,
         error,
-        // 코드리뷰 지적사항 반영(2026-07): useReservations.js와 동일한 이유로 isLoading만 노출 —
-        // onSettled의 invalidateQueries가 백그라운드 재조회(isFetching)를 유발하는데, 이걸
-        // loading에 같이 묶으면 승인/거절 등 처리 직후 목록이 다시 스켈레톤으로 깜빡였음.
+        // 배경 재조회 중에도 기존 목록을 유지하도록 최초 로딩만 노출한다.
+
         loading:       isLoading,
         refetching:    isFetching && !isLoading,
         actionLoading: getActionLoading(),

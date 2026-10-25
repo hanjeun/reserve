@@ -16,11 +16,7 @@
     --c-gray-100: #f2f4f6;
     --c-gray-200: #e5e8eb;
 
-    /* 스켈레톤 shimmer 하이라이트 — 바탕(--c-gray-100)보다 밝아야 한다.
-       원래 --c-gray-200 을 썼는데 라이트에서는 그게 바탕보다 **어두워서**
-       밝은 물결이 아니라 어두운 띠가 지나갔다(유튜브와 반대).
-       불투명 흰색으로 바꿨더니 이번엔 대비가 너무 커서 "또렷한 흰 막대"로 읽혀,
-       반투명으로 낮췄다. 값을 올릴수록 막대처럼 보이니 0.6 을 넘기지 말 것. */
+    /* 밝은 테마의 골격 하이라이트는 바탕보다 밝은 반투명 면을 사용한다. */
     --c-skeleton-shine: rgba(255, 255, 255, 0.55);
     --c-gray-300: #d1d6db;
     --c-gray-400: #b5b8bd;
@@ -66,9 +62,7 @@
     /* 비활성 입력 글자(placeholder 포함). AntD 라이트 기본값과 동일 → 라이트는 변화 없음. */
     --c-input-disabled-fg: rgba(0, 0, 0, 0.25);
 
-    /* hover로 칠하는 면. gray-100을 쓰다가 실패했다 —
-       다크에서 gray-100(#23262b)이 카드 배경(#1e2126)과 거의 같아서 hover가 안 보였다.
-       "면을 채운다"는 건 배경 대비 확실히 구분돼야 의미가 있으므로 전용 값을 둔다. */
+    /* 다크 테마 호버 면은 카드 배경과 구분되는 전용 값을 사용한다. */
     --c-hover-surface: #f2f4f6;
     --c-outline-hover-bg: rgba(0, 0, 0, 0.02);
     --c-outline-hover-border: #adb5bd;
@@ -77,9 +71,7 @@
 }
 
 [data-theme='dark'] {
-    /* 기본 블루 fallback은 hooks/useTheme.js ACCENT_OPTIONS.blue.darkMode와 동일하다.
-       앱 부팅 후에는 applyAccent의 인라인 변수가 정본이지만, 초기 CSS도 같은 값이어야
-       첫 페인트와 React 적용 뒤 사이에 색이 미세하게 바뀌지 않는다. */
+    /* 초기 파랑은 useTheme의 다크 기본값과 맞춰 첫 렌더와 설정 적용 사이의 색 변화를 줄인다. */
     --c-primary: #4c9aff;
     --c-primary-light: #1b2a41;
     --c-primary-dark: #3182f6;

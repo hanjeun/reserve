@@ -1,12 +1,5 @@
-/**
- * RESERVE - 관리자 전체 예약 탭
- * AdminPanel.jsx에서 분리 (Cognitive Complexity 17 → 15 목표)
- *
- * 2026-07-09: TanStack Query로 전환 (adminKeys.reservations()) + placeholderData:
- * keepPreviousData, 삭제도 useMutation, raw <Table> → 공용 DataTable.
- *
- * 2026-07 전수조사 — 검색어/상태 필터/페이지를 URL 쿼리스트링에 동기화(useQueryParamState) —
- * 새로고침해도 필터가 유지되고 링크 공유도 가능해짐(MembersTab과 동일한 이유).
+/*
+ * 예약 필터·검색어·페이지를 URL과 쿼리 키에 함께 반영한다.
  */
 import React, { useState } from 'react';
 import { Typography, Tag } from 'antd';
@@ -33,16 +26,13 @@ const { Text } = Typography;
 // 상태 라벨·색·필터 목록은 constants/status.js 하나에서만 온다.
 // 여기 있던 사본 두 벌은 같은 상태를 다른 말로 불렀다('대기 중' vs 정본 '승인 대기').
 
-// 스켈레톤이 실제 테이블과 1:1로 대응하도록 컬럼 정의와 같은 값을 유지 (2026-07 전수조사)
-// 예전엔 cols를 7개만 넘겨서 실제 8컬럼 테이블과 안 맞았고, headers는 아예 안 넘겨서
-// 고정 텍스트인 컬럼 제목까지 회색 막대로 그려졌다.
+// 골격과 실제 테이블은 같은 열 규격을 사용한다.
+
 const SKELETON_HEADERS = ['가게', '예약자', '날짜', '시간', '인원', '예약금', '상태', '처리'];
 const SKELETON_COLS    = [130, 100, 110, 80, 60, 90, 90, 80];
 const PAGE_SIZE = 20;
 const QUERY_DEFAULTS = { search: '', status: 'ALL', sort: 'recent', view: 'list', page: '1' };
 
-// MembersTab/StoresAdminTab과 동일한 2026-07 전수조사 사유 — pagination 제어로 삭제 뮤테이션 후
-// 페이지 리셋 버그와 스켈레톤 로딩 중 페이지 버튼 소멸 문제를 동시에 해결.
 const skeletonRowCount = (total, pageIdx1, pageSize) => {
     if (!total) return Math.min(8, pageSize);
     const remaining = total - (pageIdx1 - 1) * pageSize;

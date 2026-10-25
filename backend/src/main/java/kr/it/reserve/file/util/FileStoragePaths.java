@@ -1,20 +1,6 @@
 package kr.it.reserve.file.util;
 
-/**
- * S3 저장 경로 prefix 생성 유틸
- *
- * FileStorageService.storeFile()에 넘길 prefixPath를 이 클래스에서 조합한다.
- * 경로 문자열을 호출부에서 직접 조합하면 오타/불일치가 생길 수 있으므로
- * 모든 경로는 반드시 이 클래스를 통해 생성한다.
- *
- * 구조:
- *   users/{memberId}/profiles/
- *   users/{memberId}/stores/{storeId}/thumbnails/
- *   users/{memberId}/stores/{storeId}/images/
- *   users/{memberId}/businesses/
- *   notices/{noticeId}/images/       (향후 공지사항 이미지)
- *   system/{category}/               (향후 시스템 기본 이미지)
- */
+/** 저장 경로는 이 클래스에서 조합해 호출부의 경로 불일치를 막는다. */
 public final class FileStoragePaths {
 
     private static final String USER_ROOT = "users/";
@@ -67,8 +53,6 @@ public final class FileStoragePaths {
     public static String supportAvatar() {
         return system("chat/support");
     }
-
-    // 시스템 영역 (향후 확장)
 
     /** 공지사항 이미지: notices/{noticeId}/images */
     public static String notice(Long noticeId) {

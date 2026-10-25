@@ -4,12 +4,8 @@ import { WorkspaceActivityContext } from '../components/layout/workspaceActivity
 import { VIEW_MODES } from '../utils/viewMode';
 import { readQuerySelection, writeQuerySelection } from '../utils/querySelection';
 
-/**
- * 여러 URL 쿼리 값을 한 번의 탐색으로 갱신한다.
- * 검색어와 페이지처럼 함께 바뀌는 값은 하나의 patch로 전달해 이전 URL 스냅샷의 덮어쓰기를 피한다.
- * 선택 옵션·페이지의 기본값은 URL에 표시하고 빈 검색어는 생략한다.
- * 비활성 워크스페이스는 자신의 스냅샷을 유지하며 현재 라우트의 URL을 변경하지 않는다.
- * @example setQuery({ search: term, page: '1' })
+/*
+ * 함께 바뀌는 URL 값은 한 번에 갱신해 이전 스냅샷의 덮어쓰기를 막는다. 비활성 워크스페이스는 자신의 스냅샷만 유지한다.
  */
 const isEmptySelection = key => writeQuerySelection(key, '') === 'all' || /Store$/.test(key);
 

@@ -18,7 +18,7 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
 
-/** Existing reservations can be edited during emergency admission without opening public discovery reads. */
+/** 비상 입장 중에도 기존 예약 수정 조회만 허용하고 공개 탐색 조회는 열지 않는다. */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)

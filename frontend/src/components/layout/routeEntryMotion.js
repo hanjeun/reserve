@@ -20,8 +20,8 @@ export const applyRouteEntryMotion = (content, { pathnameChanged, direction, ske
     }
 };
 
-// 자기 열기·닫기 애니메이션이 있는 화면 — 모바일 메시지(/messages)는 채팅이 열리고 닫히는 것이지 페이지 이동이 아니다.
-// 들어갈 때도 나올 때도 페이지 전환(옆으로 밀기)을 걸지 않고 화면 자체 애니메이션만 재생한다(2026-09-24).
+// 자체 열림·닫힘 모션이 있는 경로는 페이지 이동 모션을 중복하지 않는다.
+// 자체 진입·퇴장이 있는 화면에는 가로 페이지 전환을 겹치지 않는다.
 const hasOwnMotion = (pathname) => isSearchPath(pathname) || /^\/messages(\/|$)/.test(pathname || '');
 
 // 두 위치가 모두 있고 서로 다르면 앞/뒤 방향을, 아니면 null 을 돌려준다.
@@ -36,8 +36,8 @@ const isHistoryIndex = (index) => index != null;
 const skipsRouteMotion = (previousPathname, pathname) => {
     if (!previousPathname || previousPathname === pathname) return true;
 
-    // 검색 화면을 닫는 이동(검색 실행·빠른 검색·취소·Esc)은 화면을 옮기는 게 아니라 검색창을 닫는 것이다.
-    // 결과(또는 원래 화면)가 전환 없이 바로 보이고, 결과는 스켈레톤으로 채워진다 (2026-09-23).
+    // 검색을 닫는 이동은 검색창의 닫힘 모션만 적용한다.
+    // 검색을 닫으면 원래 화면을 가로 전환 없이 복원한다.
     if (isSearchPath(previousPathname)) return true;
     return hasOwnMotion(previousPathname) || hasOwnMotion(pathname);
 };

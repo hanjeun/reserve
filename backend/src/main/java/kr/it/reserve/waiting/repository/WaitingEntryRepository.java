@@ -41,7 +41,7 @@ public interface WaitingEntryRepository extends JpaRepository<WaitingEntry, Long
     Page<WaitingEntry> findPersonal(@Param("memberId") Long memberId, @Param("active") Set<WaitingStatus> active,
                                     @Param("dayStart") LocalDateTime dayStart, Pageable pageable);
 
-    /** Exact navigation lookup shares the personal-list window and binds ownership in the database. */
+    /** 상세 이동도 본인 목록과 같은 표시 기간과 DB 소유권 조건으로 조회한다. */
     @Query("SELECT w FROM WaitingEntry w WHERE w.id = :entryId AND w.memberId = :memberId AND " + PERSONAL_VISIBLE_WINDOW
             + " AND EXISTS (SELECT viewer.id FROM Member viewer WHERE viewer.id = :memberId AND viewer.deletedAt IS NULL"
             + " AND (viewer.status = kr.it.reserve.member.entity.MemberStatus.ACTIVE OR (viewer.status = kr.it.reserve.member.entity.MemberStatus.SUSPENDED"

@@ -291,7 +291,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
     const historyScrollRef = useRef(null);
     const historyScopeRef = useRef(/** @type {{threadKey: string | null, roomId: number | null} | null} */ (null));
     useLayoutEffect(() => {
-        // 같은 방으로 돌아와도 전환 전 과거 조회와 스크롤 위치는 재사용하지 않는다.
+        // 같은 방으로 돌아와도 이전 과거 조회·스크롤 상태는 재사용하지 않는다.
         const scope = { threadKey, roomId: thread?.roomId ?? null };
         historyScopeRef.current = scope;
         historyScrollRef.current = null;
@@ -395,8 +395,8 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
         setDraft(selectionKey, '', identity);
         imageDraft.clear();
         try {
-            // Existing one-photo messages retain their own idempotency key and cancellation.
-            // Only the first carries the caption; a partial failure restores the unsent suffix.
+            // 사진별 멱등 키와 취소 경계를 유지한다.
+            // 첫 사진에만 설명을 싣고 일부 실패 시 미전송 사진부터 복원한다.
             const queue = files.length ? files : [null];
             for (let index = 0; index < queue.length; index++) {
                 if (batchRef.current !== batch || batch.cancelled || useMessengerStore.getState().sessionIdentity !== identity) return;
@@ -404,7 +404,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
                 if (ok !== true) {
                     if (ok === false) {
                         if (files.length) imageDraft.restore(files.slice(index));
-                        // A late failure cannot overwrite a new draft or another account.
+                        // 늦은 실패로 새 초안이나 다른 계정의 입력을 덮지 않는다.
                         if (index === 0 && !useMessengerStore.getState().drafts[selectionKey]) setDraft(selectionKey, text, identity);
                     }
                     return;
@@ -422,7 +422,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
     const { title, threadKind, emptyText } = threadCopyOf({
         selection, thread, selectedRow, supportName: supportIdentity.name,
     });
-    // 첫 안내(인사말 + 자동 문답) — 고객지원은 관리자가, 가게 문의는 사장님이 설정한다(2026-09-23).
+    // 고객지원·가게 문의의 첫 안내는 해당 관리 설정을 사용한다.
     const introScope = chatIntroScope(selection);
     const { intro } = useChatIntro(introScope, { enabled: Boolean(introScope) });
     const { showIntro, showStoreIntro } = introVisibilityOf({

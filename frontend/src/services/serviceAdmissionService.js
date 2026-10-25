@@ -5,7 +5,7 @@ import { serviceEntryStatus } from '../utils/serviceAdmissionStatus';
 
 const path = '/api/service-admission';
 
-/** Verify common capacity before consuming a scarce campaign grant. Never submits business data. */
+/* 개별 입장권을 소비하기 전에 공통 정원을 확인하며 업무 데이터를 제출하지 않는다. */
 export async function prepareCoreWork({ method, url, epoch, signal }) {
     assertCurrentSession(epoch);
     const config = { method, url, _sessionEpoch: epoch };
@@ -13,8 +13,8 @@ export async function prepareCoreWork({ method, url, epoch, signal }) {
     try { value = await api.get(path, { signal, _sessionEpoch: epoch }); }
     catch (error) {
         assertCurrentSession(epoch);
-        // A legacy server may lack this optional status route. This grants no server authority:
-        // the final creation endpoint still enforces its own capacity/authentication checks.
+        // 선택적 입장 상태 경로가 없는 서버에서도 최종 생성 API의 정원·인증 검증은 유지된다.
+
         if (error?.status === 404) return true;
         if (error?.status === 503 && error?.data?.code === 'SERVICE_ADMISSION_UNAVAILABLE') {
             observeServiceAdmission(config, error.data);

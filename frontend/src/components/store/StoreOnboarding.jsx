@@ -44,12 +44,12 @@ function usePreviewImages(mainImage, detailImages) {
     return urls;
 }
 
-/** Registration and item-based editing share questions, explicit submission and account-scoped drafts. */
+/* 등록과 항목별 수정은 질문·명시적 제출·계정별 초안 경계를 공유한다. */
 export default function StoreOnboarding({ mode = 'create', form, formRef, initialValues, originalStore,
     onSubmit, loading = false, mainImage = EMPTY_IMAGES,
     detailImages = EMPTY_IMAGES, onValuesChange, onSaveDraft, draftState, ...images }) {
     const firstStep = mode === 'edit' ? 'selection' : 'industry';
-    // Text and photo values stay in their own fields rather than serializing the entire form on each key.
+    // 매 입력마다 전체 폼을 직렬화하지 않고 텍스트·사진을 각 필드에 유지한다.
     const watched = Form.useWatch(navigationValues, { form, preserve: true });
     const values = { ...STORE_ONBOARDING_DEFAULTS, _onboardingStep: firstStep, ...watched };
     const steps = onboardingSteps(values, mode);

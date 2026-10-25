@@ -20,8 +20,8 @@ const STATUS_CONFIG = {
     ACTIVE:          { color: 'green',   label: '노출 중' },
     EXPIRED:         { color: 'default', label: '만료됨' },
     SUSPENDED:       { color: 'red',     label: '중단됨' },
-    // 2026-07 추가: AdStatus엔 진작 CANCELLED/REFUNDED가 있는데 여기에만 빠져 있어서,
-    // 사업자가 광고를 취소하면 관리자 화면엔 원문 "CANCELLED"가 그대로 노출됐다.
+    // 취소·환불 상태도 광고 필터에 포함한다.
+
     CANCELLED:       { color: 'default', label: '취소됨' },
     REFUNDED:        { color: 'purple',  label: '환불됨' },
 };
@@ -39,13 +39,12 @@ const QUERY_DEFAULTS = { search: '', page: '0' };
 //  dataSource 레퍼런스 안정성 때문에 그대로 두는 게 맞다)
 const EMPTY_ADS = [];
 
-// 스켈레톤이 실제 테이블과 1:1로 대응하도록 컬럼 정의와 같은 값을 유지 (2026-07 전수조사)
+// 골격과 실제 테이블은 같은 열 규격을 사용한다.
 const SKELETON_HEADERS = ['가게', '유형', '기간', '금액', '상태', '처리'];
 const SKELETON_COLS    = [220, 90, 190, 100, 160, 110];
 
-// 스켈레톤 행 개수를 "실제로 채워질 행 수"로 계산 (AuditLogTab과 동일 — 2026-07 추가).
-// keepPreviousData 덕에 페이지 이동 시엔 이미 total을 알고 있으므로 마지막 페이지가 3건이면
-// 스켈레톤도 3줄만 그려서 화면이 튀지 않는다. 최초 로딩엔 pageSize로 폴백.
+// 현재 페이지에 표시할 행 수만큼 골격을 그린다.
+
 const skeletonRowCount = (total, pageIdx, pageSize) => {
     if (!total) return Math.min(6, pageSize);
     const remaining = total - pageIdx * pageSize;
@@ -61,23 +60,18 @@ const AdminAdsTab = () => {
     const setPage = (p) => setQuery({ page: String(p) });
     // 검색어가 바뀌면 현재 페이지 범위가 달라지므로 0페이지로 복귀(하나의 setQuery 호출로 묶음 — useQueryParamState.js 상단 주석 참고).
     const handleSearchChange = (e) => setQuery({ search: e.target.value, page: '0' });
-    // 2026-07 추가 — 중단 사유 입력을 위해 confirm() 대신 SanctionModal(AD_SUSPEND 프리셋) 사용.
-    // 어떤 광고를 중단하려는지 기억해야 해서 target을 state로 들고 있는다(null = 닫힌 상태).
+    // 중단 사유 입력은 SanctionModal의 AD_SUSPEND 형식을 사용한다.
+
     const [suspendTarget, setSuspendTarget] = useState(null);
 
-    // queryKey에 debouncedSearch가 반드시 들어가야 한다.
-    //   예전에는 [admin(), page]뿐이라 검색어가 바뀌어도 같은 캐시를 재사용했고,
-    //   서버는 페이지네이션만 하는데 프론트가 그 페이지 안에서만 filter를 걸어서
-    //   **검색이 현재 페이지 안에서만 동작**했다(2페이지의 광고는 1페이지에서 검색해도 안 나옴).
-    //   검색을 서버로 넘기고, 검색어를 캐시 키에 포함시켜 해결한다.
     const { data, isLoading: loading, isFetching, isPlaceholderData, error: adsError, refetch } = useQuery({
         queryKey: [...adKeys.admin(), page, debouncedSearch],
         queryFn: async () => {
             const result = await adService.getAllAds(page, PAGE_SIZE, debouncedSearch);
             return {
                 ads: result?.content ?? [],
-                // Spring Boot 3.5부터 페이지 메타가 page:{} 하위로 이동(2026-07 버그 수정 — 다른
-                // 화면들과 동일 이슈) — 신버전을 우선 읽고 구버전도 폴백으로 허용.
+                // Spring 페이지의 page 하위 메타데이터를 읽는다.
+
                 totalElements: result?.page?.totalElements ?? result?.totalElements ?? 0,
             };
         },

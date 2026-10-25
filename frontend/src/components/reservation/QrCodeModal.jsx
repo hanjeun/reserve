@@ -11,15 +11,8 @@ import { colors, fontSize } from '../../styles/tokens';
 
 const { Text } = Typography;
 
-/**
- * 예약 QR 코드 모달 (고객용)
- * 모달을 열 때마다 서버에서 새 토큰을 받아와 그 자리에서 QR을 그린다 — 이미지 파일을 만들거나
- * 저장하는 과정 없이 전부 브라우저에서 렌더링.
- *
- * 2026-07: 토큰 로딩을 직접 useEffect+setState로 관리하던 것을 TanStack Query로 교체.
- * (effect 안 동기 setState를 막는 lint 룰 우회를 위해 eslint-disable를 달아뒀던 것을 제거 —
- *  이 프로젝트의 데이터 로딩 표준인 useQuery로 맞춤. enabled로 열렸을 때만 조회하고, QR 토큰은
- *  만료가 있으므로 staleTime 0 + 모달 닫힐 때 캐시가 남지 않게 gcTime을 짧게 둔다.)
+/*
+ * 열린 모달의 QR 토큰은 서버에서 받아 브라우저에서만 그린다. 토큰의 유효기간에 맞춰 조회 캐시를 제한한다.
  */
 const QrCodeModal = ({ reservationId, open, onClose }) => {
     const enabled = !!open && reservationId != null;
@@ -49,14 +42,9 @@ const QrCodeModal = ({ reservationId, open, onClose }) => {
                 {isLoading && (
                     <div style={styles.spinnerBox}><ModalLoading text="QR 코드를 불러오는 중..." minHeight="0" /></div>
                 )}
-                {/* 인식률에 직접 영향을 주는 값들이라 임의로 줄이지 말 것 (2026-08-09).
-                    - marginSize: qrcode.react 기본값이 0 이다. QR 규격은 4모듈 여백(quiet zone)을
-                      요구하고 ZXing 은 그걸로 파인더 패턴을 찾는다. 라이트 모드에선 모달 흰 배경이
-                      우연히 여백 역할을 했지만 다크 모드에선 어두운 배경이 코드에 바로 맞닿아
-                      탐지가 실패한다.
-                    - bgColor/fgColor 고정 + 흰 배경 래퍼: 다크 모드에서 색이 반전되지 않게.
-                    - size 260: 220 → 260 으로 키우면 카메라 프레임에서 차지하는 비율이 커져
-                      모듈당 픽셀 수가 늘어난다. 실측 시뮬레이션에서 인식 거리가 늘어난 값이다. */}
+                {/*
+                 * QR의 4모듈 여백·고정된 밝은 배경과 어두운 코드를 유지해 다크 모드에서도 검출 경계를 보존한다.
+                 */}
                 {!isLoading && token && (
                     <div style={styles.qrPlate}>
                         <QRCodeSVG

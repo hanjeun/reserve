@@ -56,7 +56,7 @@ const interrupt = () => {
 async function ensureServer() {
     let response;
     try { response = await fetch(baseURL, { signal: AbortSignal.timeout(2000), redirect: searchMode ? 'error' : 'follow' }); }
-    catch { /* Start only our own loopback dev server when no server answers. */ }
+    catch { /* 응답하는 서버가 없을 때만 소유한 루프백 개발 서버를 시작한다. */ }
     if (response) {
         if (!response.ok || !(await response.text()).includes('/@vite/client')) {
             throw new Error('4173 포트가 RESERVE Vite 서버인지 확인해주세요. 실행 중인 서버는 종료하지 않아요.');
@@ -74,8 +74,8 @@ async function ensureServer() {
 async function previewViewport() {
     const requested = mobile ? { width: 390, height: 844 } : { width: 1440, height: 1000 };
     if (headless) return requested;
-    // A fixed 844px mobile viewport plus Chrome and the Windows taskbar can exceed the monitor.
-    // Measure the native window before mobile emulation replaces screen.availHeight.
+    // 모바일 에뮬레이션 전에 실제 창의 가용 높이를 측정한다.
+
     displayContext = await browser.newContext({ viewport: null });
     const probe = await displayContext.newPage();
     display = await probe.evaluate(() => ({ left: screen.availLeft ?? 0, top: screen.availTop ?? 0,
@@ -219,7 +219,7 @@ async function preview(fixture) {
             const current = currentDigits[0];
             const currentText = currentDigits.map(digit => digit.textContent).join('');
             const textBox = element => { const range = document.createRange(); range.selectNodeContents(element); return range.getBoundingClientRect(); };
-            // Compare against one ordinary text run with the same font: this includes Korean fallback font metrics.
+            // 같은 글꼴의 일반 텍스트와 비교해 한글 대체 글꼴의 높이도 반영한다.
             const reference = document.createElement('span'); reference.textContent = `${currentText}번째`;
             Object.assign(reference.style, { position: 'absolute', visibility: 'hidden', whiteSpace: 'nowrap', pointerEvents: 'none' });
             node.parentElement.append(reference);
@@ -391,7 +391,6 @@ async function previewOverflow(fixture) {
     console.log('고정 안내 overflow 확인 완료: 실제 App 토스트 3개→한 줄 타이머 단일 복구→원래 만료 시각·폼·스크롤 뒤 viewport 유지→헤더 avatar hit-test·실제 메뉴 클릭→다른 슬롯에서 종료·원래 슬롯 복귀 복원, 새 순번·추가 입장 시간·예약 쓰기 0회.');
 }
 
-
 const searchPreviewHeaders = route => ({
     'access-control-allow-origin': baseURL,
     'access-control-allow-credentials': 'true',
@@ -435,7 +434,7 @@ async function installSearchPreview(context, fixture) {
         }
         if (!path.startsWith('/api/')) return route.fallback();
         if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: searchPreviewHeaders(route) });
-        // Explicitly opening the synthetic conversation retains the existing chat read flow.
+        // 사용자가 합성 대화를 열 때만 기존 읽음 처리를 따른다.
         const chatRead = request.method() === 'POST' && (/^\/api\/chat\/stores\/81\/open$/.test(path) || /^\/api\/chat\/rooms\/\d+\/read$/.test(path));
         if (!['GET', 'HEAD'].includes(request.method()) && !chatRead) return route.fulfill({ status: 405, headers: searchPreviewHeaders(route),
             json: { success: false, message: '검색 프리뷰에서는 합성 조회만 확인할 수 있어요.' } });
@@ -458,7 +457,7 @@ async function installSearchPreview(context, fixture) {
             maxImageBytes: 7340032, benefitEventsEnabled: false });
         if (path === '/api/promotions/public') return ok(route, pageOf([benefit]));
         if (path === '/api/promotions/public/601') return ok(route, benefit);
-        // The existing context-wide fixture handles every remaining API and rejects external resources.
+        // 나머지 API는 컨텍스트 합성 응답을 사용하고 외부 요청은 차단한다.
         return route.fallback();
     });
 }
@@ -512,7 +511,7 @@ try {
             if (['127.0.0.1', 'localhost'].includes(url.hostname) && url.port === '4173') socket.connectToServer();
             else void socket.close();
         });
-        // Context routes also cover Ctrl/Cmd-opened tabs in manual search mode.
+        // 컨텍스트 라우트는 수동 검색에서 연 새 탭에도 적용한다.
         const fixtureSurface = searchMode ? {
             addInitScript: (...args) => context.addInitScript(...args),
             route: (pattern, handler) => context.route(pattern, route => handler({

@@ -50,8 +50,8 @@ function parsePatch(source, entry) {
     return changes;
 }
 
-// npm ci must run this hook. Versions, patch targets and source context all fail closed.
-// Preflight every file before writing, including files which are already patched.
+// npm ci 후크는 버전·패치 대상·문맥이 다르면 적용을 중단한다.
+// 이미 패치된 파일을 포함해 전체 대상을 확인한 뒤 쓴다.
 export function applyVendorPatches(frontendRoot) {
     const modulesRoot = fs.realpathSync(path.join(frontendRoot, 'node_modules'));
     const patchesRoot = path.join(frontendRoot, 'patches');

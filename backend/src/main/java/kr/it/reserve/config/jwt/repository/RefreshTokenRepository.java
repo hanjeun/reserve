@@ -15,7 +15,7 @@ import java.util.Optional;
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
     List<RefreshToken> findByMemberId(Long memberId);
 
-    /** Always lock the member first. A locking read also avoids an older MySQL RR snapshot. */
+    /** 회원 행을 먼저 잠근다. 잠금 조회로 이전 읽기 스냅샷의 세션을 재사용하지 않는다. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT r FROM RefreshToken r WHERE r.memberId = :memberId ORDER BY r.createdAt, r.id")
     List<RefreshToken> findByMemberIdForUpdate(@Param("memberId") Long memberId);
@@ -23,7 +23,7 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
     void deleteByMemberId(Long memberId);
     Optional<RefreshToken> findBySessionIdAndMemberId(String sessionId, Long memberId);
 
-    /** Access authentication only. Issuance, rotation and revocation retain their member -> session locks. */
+    /** 액세스 인증은 잠금 없이 조회한다. 발급·갱신·폐기는 회원→세션 순서로 잠근다. */
     @Query("SELECT new kr.it.reserve.config.jwt.repository.LoginSessionAuthentication(m, r) "
             + "FROM RefreshToken r JOIN Member m ON m.id = r.memberId "
             + "WHERE r.sessionId = :sid AND r.memberId = :memberId AND m.deletedAt IS NULL")
@@ -36,7 +36,7 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
 
     Optional<RefreshToken> findByRefreshTokenHash(String hash);
 
-    /** Compatibility lookup: the supplied bearer is hashed before any database query. */
+    /** 원문 토큰은 해시로 바꾼 뒤 조회한다. */
     default Optional<RefreshToken> findByRefreshToken(String token) {
         return findByRefreshTokenHash(RefreshToken.hash(token));
     }

@@ -13,18 +13,8 @@ import StoreIdentityText from './StoreIdentityText';
 
 const { Title, Text } = Typography;
 
-/**
- * 가게 카드 컴포넌트
- * StoreList에서 사용
- *
- * userLocation({ latitude, longitude })을 받으면 가게 좌표와 3km 이내일 때
- * "우리동네" 정보 문구를 표시함. 전달 안 되면(위치 모를 때) 문구를 안 그림 —
- * 위치 권한을 이 카드가 직접 요청하지 않는다(수동적으로 있는 값만 사용).
- *
- * isAdvertised가 true면 옅은 AD 표시(AdMark)를 함께 보인다(노출형 광고 상품).
- * preview는 하트까지 실제 카드와 똑같이 그리되 링크·즐겨찾기 동작·노출 집계만 끈다.
- * actions 를 주면 카드 아래에 관리 버튼 줄(수정·삭제 등)을 붙인다 — 내 가게 관리가 같은 카드를 재사용한다.
- * showFavorite=false 는 하트 자리를 비운다(내 가게처럼 찜이 의미 없는 곳).
+/*
+ * 카드는 위치 권한을 요청하지 않고 전달받은 위치만 사용한다. 미리보기는 표시를 공유하되 이동·즐겨찾기·노출 집계는 실행하지 않는다.
  */
 const StoreCard = React.memo(({ store, userLocation, isAdvertised = false, adId, preview = false, actions, showFavorite = true, metadata, extraTools }) => {
     const { id, name, category, mainImageUrl, mainImageWidth, mainImageHeight, latitude, longitude, nearbyRadiusKm } = store;

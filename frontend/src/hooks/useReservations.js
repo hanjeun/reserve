@@ -14,10 +14,8 @@ const useReservations = (params = {}) => {
     const live = useLiveUpdatesStatus();
     const liveReservations = live.connected && live.domains.includes('RESERVATION');
 
-    // 코드리뷰 지적사항 반영(2026-07): 예전엔 loading: isLoading || isFetching라서, 취소 후
-    // 백그라운드 재조회나 focus 재검증처럼 "조용히 갱신"되는 순간에도 화면 전체가 다시
-    // 스켈레톤으로 바뀌었음(이미 데이터가 있는데도). isLoading(최초 로딩)과 isFetching(그
-    // 외 백그라운드 재조회)을 분리해서 노출 — StoreList.jsx의 refetching과 동일한 패턴.
+    // 배경 재조회에서는 목록을 유지하고 최초 로딩만 노출한다.
+
     const { data, isLoading, isFetching, error } = useQuery({
         queryKey: reservationKeys.myPage(params),
         queryFn: () => reservationService.getMyReservations(params),

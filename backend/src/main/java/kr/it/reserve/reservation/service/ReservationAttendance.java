@@ -17,7 +17,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.function.Consumer;
 
-/** QR issuance, idempotent attendance, completion/no-show run under the facade transaction. */
+/** QR 발급과 멱등 체크인·완료·노쇼는 서비스 트랜잭션 안에서 처리한다. */
 @Slf4j(topic = "kr.it.reserve.reservation.service.ReservationService")
 final class ReservationAttendance {
     private static final String RESERVATION_NOT_FOUND_MESSAGE = "예약을 찾을 수 없어요.";
@@ -49,15 +49,7 @@ final class ReservationAttendance {
         Reservation reservation = findByIdForUpdateOrThrow(reservationId);
         ReservationAccess.owner(reservation, owner);
 
-        // 방문 당일에만 체크인할 수 있다.
-        //
-        //   그 전까지 날짜 검사가 아예 없었다. 토큰 만료는 "방문일 다음 날 새벽" 과 "발급 후 24시간"
-        //   중 빠른 쪽인데, **3개월 뒤 예약이라도 방금 발급한 QR 은 24시간 동안 유효하다.**
-        //   그래서 손님이 오늘 그 QR 을 보여주면 사장님의 승인 절차를 건너뛰고 곧바로 CONFIRMED 가 됐다.
-        //   QR 체크인은 "왔다"를 증명하는 수단이지 "미리 확정받는" 수단이 아니다.
-        //
-        //   비교 기준은 반드시 KST 다 — reservationDate 는 손님이 고른 한국 날짜이고
-        //   컨테이너는 UTC 로 돈다(ServiceTime 참고). 이걸 놓치면 매일 09시 이전에 오탐이 난다.
+        // 체크인은 한국 시간의 방문 당일에만 허용한다.
         LocalDate today = ServiceTime.today();
         if (!today.equals(reservation.getReservationDate())) {
             // 감사 로그: 거부는 WARN 으로 남긴다. Loki 에 level 인덱스가 있어
@@ -110,8 +102,7 @@ final class ReservationAttendance {
         Reservation reservation = findByIdForUpdateOrThrow(id);
         ReservationAccess.owner(reservation, owner);
 
-        // UNCONFIRMED 도 받는다 (2026-08-11) — 그건 "승인됐는데 시간이 지나도록 사장님이
-        // 처리를 안 한" 상태다. 처리를 안 했다는 이유로 처리 수단을 막으면 영영 못 닫는다.
+        // 승인 후 시간이 지난 UNCONFIRMED도 완료·노쇼 처리할 수 있다.
         if (!ReservationAccess.approved(reservation)) {
             throw new ReservationException("승인된 예약만 이용완료 처리할 수 있어요.", HttpStatus.BAD_REQUEST);
         }

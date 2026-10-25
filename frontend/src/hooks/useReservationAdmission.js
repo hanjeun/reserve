@@ -88,7 +88,7 @@ function statusOf(value, campaign) {
     return { ...value, ticket, heartbeatTimeoutSeconds: timing.heartbeatTimeoutSeconds, pollAfterSeconds: timing.pollAfterSeconds };
 }
 
-// Runtime revisions restart on F5. Only the first /me restoration may reuse stable owner metadata.
+// 새로고침 시 실행 버전이 초기화되므로 첫 본인 인증 복구만 저장된 소유자 정보를 재사용한다.
 let initialOwnerRestore = !ownerOf(useAuthStore.getState()) && !useAuthStore.getState().isLoggingOut;
 const unsubscribe = useAuthStore.subscribe((state, previous) => {
     if (sessionIdentity(state) !== sessionIdentity(previous)) {
@@ -96,16 +96,16 @@ const unsubscribe = useAuthStore.subscribe((state, previous) => {
             && previous.authRestoring === true && state.authRestoring === true;
         initialOwnerRestore = false;
         if (restoring) {
-            // readMetadata removes a different saved owner; unreadable recovery data must remain fail-closed.
-            try { readMetadata(ownerOf(state)); } catch { /* The caller will require recovery before a new request. */ }
+            // 다른 소유자의 메타데이터는 지우고 읽을 수 없는 복구 데이터로 새 요청을 허용하지 않는다.
+            try { readMetadata(ownerOf(state)); } catch { /* 호출부는 새 요청 전에 결과 복구를 확인한다. */ }
         } else {
-            try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* Reads remain fail-closed if storage is unavailable. */ }
+            try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* 저장소를 읽을 수 없으면 복구 조회도 차단한다. */ }
         }
     } else if (previous.authRestoring && !state.authRestoring) initialOwnerRestore = false;
 });
 import.meta.hot?.dispose(unsubscribe);
 
-/** One pending decision; all late network responses must pass this controller's session/run boundary. */
+/* 진행 판단은 하나만 유지하고 늦은 응답도 현재 세션·실행 경계를 통과시킨다. */
 function createAdmissionFlow(onChange) {
     let mounted = false;
     let identity = sessionIdentity(useAuthStore.getState());
@@ -177,16 +177,16 @@ function createAdmissionFlow(onChange) {
             }
             const timing = admissionPollingTiming(status);
             const delay = Math.min(timing.heartbeatTimeoutSeconds * 1000 / 3, timing.intervalMs + Math.random() * 500);
-            // A shared response keeps its original observation time; receipt must not extend the lease or heartbeat.
+            // 공유 응답의 최초 관찰 시각을 유지해 수신만으로 유효 시간·하트비트를 늘리지 않는다.
             schedule(run, 'status', Math.max(0, observedAt + delay - Date.now()));
         }
         else if (status.state === 'NOT_OPEN') {
             const untilOpen = Date.parse(run.campaign.opensAt) - (Date.now() + run.serverOffset);
-            // A missing server clock must not turn a skewed local clock into a tight POST loop.
+            // 서버 시각이 없으면 로컬 시계 오차로 POST를 반복하지 않는다.
             schedule(run, 'join', untilOpen > 0 ? untilOpen : 15000);
         }
         else {
-            run.next = null; // FULL/terminal outcomes require a deliberate action, never an automatic new ticket.
+            run.next = null; // 정원 초과·종료 상태는 사용자 재시도 전까지 새 입장권을 자동 발급하지 않는다.
             run.poller?.dispose(); run.poller = null;
         }
     }
@@ -228,7 +228,7 @@ function createAdmissionFlow(onChange) {
                         return status;
                     };
                     const options = { signal: run.controller.signal, ...admissionPollingTiming(run.status || {}) };
-                    // Initial recovery and deliberate retries always verify this tab's ticket with the server.
+                    // 초기 복구와 명시적 재시도는 현재 탭의 입장권을 서버에서 확인한다.
                     const result = periodic && run.poller ? await run.poller.read(fetchStatus, options)
                         : await readAdmissionStatus(fetchStatus, options);
                     const status = result.source === 'remote' ? { ...result.status, ticket: run.attempt.ticket } : result.status;
@@ -321,7 +321,7 @@ function createAdmissionFlow(onChange) {
                 if (combined.aborted) throw abortError();
                 const status = result.status;
                 if (status.ticket && status.ticket !== attempt.ticket) throw protocolError('입장권이 변경됐어요. 기존 예약 요청을 먼저 확인해주세요.');
-                // A completed or expired ticket is kept for result recovery, never presented as a live grant.
+                // 완료·만료 입장권은 결과 복구에만 사용하고 유효 입장 권한으로 표시하지 않는다.
                 if (status.state !== 'ADMITTED' || status.expiresAt <= status.serverTime) return null;
                 const expiresAt = status.expiresAt - status.serverTime + Math.min(requestedAt, result.observedAt);
                 if (expiresAt <= Date.now()) return null;
@@ -383,12 +383,12 @@ function createAdmissionFlow(onChange) {
                 const saved = Object.values(readMetadata(owner).attempts).find(record => record.requestId === attempt.requestId
                     && (!attempt.ticket || record.ticket === attempt.ticket));
                 if (saved) forgetMetadata(owner, saved);
-            } catch { /* A confirmed reservation remains authoritative; leftover metadata can only replay the same request. */ }
+            } catch { /* 확정 예약이 정본이며 남은 메타데이터는 같은 요청의 복구에만 사용한다. */ }
         },
     };
 }
 
-/** Call getPendingAttempt before reservation recovery; enter never submits a reservation. */
+/* 예약 복구 전에 getPendingAttempt를 확인하며 enter는 예약을 제출하지 않는다. */
 export default function useReservationAdmission() {
     const identity = useAuthStore(sessionIdentity);
     const [view, setView] = useState(EMPTY_VIEW);

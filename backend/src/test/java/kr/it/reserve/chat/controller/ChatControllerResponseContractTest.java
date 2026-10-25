@@ -72,7 +72,7 @@ class ChatControllerResponseContractTest {
         SecurityContextHolder.clearContext();
     }
 
-    // Direct calls exercise SecurityUtil and response/delegation contracts, not @PreAuthorize.
+    // 직접 호출로 SecurityUtil·응답·위임을 검사하며 @PreAuthorize 실행은 확인하지 않는다.
     @ParameterizedTest(name = "{0}")
     @MethodSource("authenticatedResponses")
     void authenticatedMemberKeepsResponseAndServiceArguments(

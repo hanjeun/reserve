@@ -1,5 +1,4 @@
-# 테스트용 설정
-# Background workers are invoked explicitly by their tests, never on an unrelated fixture's timer.
+# 시험 설정. 작업자는 해당 시험에서만 명시적으로 실행하며 다른 시험의 타이머로 실행하지 않는다.
 reserve:
   scheduling:
     enabled: false
@@ -67,7 +66,7 @@ spring:
             user-info-uri: https://kapi.kakao.com/v2/user/me
             user-name-attribute: id
 
-# HealthCheckController / CookieUtil 등이 기대하는 환경 구분값 (일부는 기본값 없음)
+# 기본값이 없는 환경 구분 설정
 server:
   port: 8080
   serverAddress: localhost
@@ -83,7 +82,7 @@ jwt:
   refresh-token:
     expiration-days: 7
 
-# 메일 테스트 설정 (MailConfig가 기대하는 전체 키 — application-common.yml과 동일하게 맞춰야 함, 기본값 없음)
+# MailConfig가 요구하는 전체 메일 설정
 mail:
   host: smtp.test.com
   port: 465
@@ -101,16 +100,14 @@ mail:
 portone:
   v2-secret: test-v2-secret
   store-id: test-store-id
-  # 서명 검증 테스트용 고정 시크릿. whsec_ 접두사 뒤는 **유효한 base64** 여야 한다 —
-  # 아니면 검증기가 키를 못 만들고 모든 웹훅을 거부해서, 테스트가 "항상 401" 로 통과해버린다
-  # (거부를 기대하는 테스트만 초록이 되고 정상 서명 테스트는 원인 모를 실패가 된다).
+  # 정상 서명도 검증하도록 whsec_ 뒤에는 유효한 Base64 시험값을 사용한다.
   webhook-secret: whsec_dGVzdC13ZWJob29rLXNlY3JldC0xMjM0NTY3OA==
 
 # Kakao REST API (주소 검색용)
 kakao:
   rest-api-key: test-kakao-rest-api-key
 
-# S3 테스트 설정 (FileStorageService가 기대하는 중첩 구조 — application-secret.yml과 동일하게 맞춰야 함)
+# 파일 저장 서비스가 요구하는 중첩 S3 시험 설정
 s3:
   bucket: test-bucket
   cloudfront: test.cloudfront.net
@@ -118,22 +115,12 @@ s3:
   access-key: test-access-key
   secret-key: test-secret-key
 
-# 유출 비밀번호 검사를 테스트에서만 끈다.
-# 켜두면 테스트가 외부 네트워크(api.pwnedpasswords.com)에 의존하게 된다 —
-# 코드가 fail-open 이라 테스트가 "깨지진" 않지만, 오프라인 환경에선 검사마다
-# 타임아웃 3초를 그대로 기다리고, 테스트 결과가 외부 서비스 상태에 따라 흔들린다.
-# 운영·로컬은 코드 기본값(true)을 그대로 쓴다.
+# 시험은 외부 네트워크에 의존하지 않도록 유출 비밀번호 확인을 끈다. 다른 환경은 코드 기본값을 유지한다.
 security:
   pwned-password:
     enabled: false
 
-# DDL 생성 실패를 보이게 한다.
-#
-# Hibernate 는 CREATE TABLE 이 실패해도 **로그만 남기고 계속 진행한다.** 그래서
-# columnDefinition = "TINYINT(1) DEFAULT 0" 처럼 MySQL 전용 문법이 들어 있으면
-# H2 에서 그 테이블만 조용히 안 만들어지고, 나중에 그 테이블을 쓰는 테스트가
-# "Table not found" 로 죽는다 — 원인이 엔티티에 있는데 증상은 테스트에 나타난다.
-# 실제로 member·password_reset_token 두 테이블이 이 상태로 방치돼 있었다.
+# 일부 테이블 생성만 실패한 상태로 시험이 진행되지 않도록 DDL 오류에서 중단한다.
 logging:
   level:
     org.hibernate.tool.schema.internal.ExceptionHandlerLoggedImpl: DEBUG

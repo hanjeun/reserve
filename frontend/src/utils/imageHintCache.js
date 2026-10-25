@@ -1,7 +1,7 @@
 import { imageDimensions } from './imageDimensions';
 import { storeCoverImage, storeGalleryLayoutRatio } from './storeImages';
 
-// Only public photo identity and intrinsic dimensions survive a reload, never store/profile data.
+// 공개 사진 식별자·원본 크기만 복구하며 가게·프로필 데이터는 저장하지 않는다.
 const KEY = 'reserve:storeImageHints';
 const MAX_ENTRIES = 300;
 let memoryCache = null;
@@ -18,7 +18,7 @@ const load = () => {
 };
 const persist = () => {
     try { sessionStorage.setItem(KEY, JSON.stringify(memoryCache)); }
-    catch { /* The loading layout still works when session storage is unavailable. */ }
+    catch { /* 세션 저장소를 쓸 수 없어도 기본 로딩 배치를 유지한다. */ }
 };
 
 const geometryHint = image => {
@@ -33,7 +33,7 @@ export const extractImageHint = store => {
     return cover ? geometryHint({ ...cover, layoutRatio: storeGalleryLayoutRatio(store) }) : null;
 };
 
-/** Match the public document's exact store and managed photo path, independently of OG thumbnails. */
+/* OG 축소판과 분리해 같은 가게·관리 사진 경로의 공개 문서 힌트만 사용한다. */
 const initialImageHint = id => {
     if (typeof document === 'undefined' || supersededHtml.has(id)) return null;
     const content = suffix => document.querySelector('meta[name="reserve-store-image-' + suffix + '"]')?.content;
@@ -59,7 +59,7 @@ export const forgetImageHint = storeId => {
     if (Object.hasOwn(cache, id)) { delete cache[id]; persist(); }
 };
 
-/** A new public response replaces or invalidates the old photo hint, including missing metadata. */
+/* 새 공개 응답에서 메타데이터가 빠지면 이전 사진 힌트도 폐기한다. */
 export const rememberImageHints = stores => {
     const cache = load();
     let changed = false;
@@ -85,13 +85,13 @@ export const rememberImageHints = stores => {
     persist();
 };
 
-/** Fresh document metadata wins over an older browser hint until a public API response supersedes it. */
+/* 새 공개 API 응답 전까지 문서 메타데이터를 브라우저 힌트보다 우선한다. */
 export const getImageHint = storeId => {
     const id = storeKey(storeId);
     if (!id) return null;
     const initial = initialImageHint(id);
     if (initial) return geometryHint(initial);
     const cached = load()[id];
-    // Old dimension-only entries cannot identify a changed photo and are deliberately ignored.
+    // 사진을 식별하지 못하는 크기 전용 이전 항목은 사용하지 않는다.
     return typeof cached?.url === 'string' && cached.url ? geometryHint(cached) : null;
 };

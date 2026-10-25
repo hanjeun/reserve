@@ -94,12 +94,8 @@ const ForgotPassword = () => {
             setSendLoading(true);
             await api.post(API_ENDPOINTS.PASSWORD_RESET.SEND_CODE, { email: emailVal });
 
-            // 가입 여부를 화면에 드러내지 않는다.
-            //   예전에는 응답의 sent 값으로 "가입된 이메일이 아니거나 소셜 로그인 계정입니다"를 띄웠다.
-            //   비밀번호를 모르는 사람도 이메일만 넣어보고 가입 여부를 확정할 수 있었다(user enumeration).
-            //   서버도 이제 그 값을 주지 않는다 — 노출을 막는 지점은 프론트가 아니라 API 여야 한다.
-            //   미가입 이메일이면 아래 코드 입력 화면으로 넘어가고 메일이 오지 않을 뿐이다
-            //   (GitHub·Google 등이 쓰는 방식). 그 상황은 안내 문구가 설명한다.
+            // 가입 여부는 동일한 안내로 응답하고 실제 차단은 서버에서 처리한다.
+
             message.success('입력하신 이메일로 인증 코드를 보냈어요.');
             setEmail(emailVal);
             setIsCodeSent(true);

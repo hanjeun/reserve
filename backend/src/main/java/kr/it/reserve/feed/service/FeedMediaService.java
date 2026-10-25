@@ -98,7 +98,7 @@ public class FeedMediaService {
         Long originalPostId = originalPost == null ? null : originalPost.getId();
         Long originalCommentId = candidate.getComment() == null ? null : candidate.getComment().getId();
         if (originalPost == null && !Objects.equals(ownerId, viewerId)) throw FeedException.missing();
-        // A comment photo has both a photo owner and a post author. Lock both before the post.
+        // 댓글 사진 소유자와 게시물 작성자를 모두 잠근 뒤 게시물을 잠근다.
         var ownerIds = new java.util.TreeSet<Long>(); ownerIds.add(ownerId);
         if (originalPost != null) ownerIds.add(originalPost.getProfile().getMember().getId());
         Member owner = null;

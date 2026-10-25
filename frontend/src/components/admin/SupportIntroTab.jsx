@@ -7,10 +7,8 @@ import useMessage from '../../hooks/useMessage';
 import { chatKeys } from '../../hooks/queryKeys';
 import { chatService } from '../../services';
 
-/**
- * 관리자 패널 › 채팅 관리 — 고객지원 채팅 첫 화면(표시 이름·사진·공지사항·인사말·자주 묻는 질문) 설정 (2026-09-24).
- * 사업자 패널 › 채팅 관리와 같은 편집기·스켈레톤을 쓴다. 저장 전에는 서버 기본값(RESERVE 고객지원 · 기본 인사말 ·
- * 기본 문답 4개)이 칸에 채워져 있고, 고쳐서 저장하면 그 내용이 메신저 전체(헤더·목록·답변 말풍선)에 쓰인다.
+/*
+ * 고객지원과 가게 문의는 같은 편집기·골격을 공유하고 저장한 공개 안내를 메신저에 반영한다.
  */
 export default function SupportIntroTab() {
     const { intro, isLoading, isError, error, isFetching, refetch } = useChatIntro('support');

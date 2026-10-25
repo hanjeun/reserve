@@ -5,11 +5,11 @@ import org.springframework.web.util.UriUtils;
 
 import java.nio.charset.StandardCharsets;
 
-/** Capacity policy never replaces the downstream authentication or resource-owner checks. */
+/** 입장 정책은 이후 인증이나 자원 소유권 검사를 대체하지 않는다. */
 public final class ServiceAdmissionRoutes {
     private ServiceAdmissionRoutes() { }
 
-    /** Servlet paths are already decoded. Mock/default-mapping fallbacks decode the raw URI exactly once. */
+    /** 서블릿 경로는 이미 디코딩되어 있다. 원시 URI를 대신 사용할 때만 한 번 디코딩한다. */
     public static String path(HttpServletRequest request) {
         String path = request.getServletPath();
         if (path == null || path.isEmpty()) {
@@ -38,7 +38,7 @@ public final class ServiceAdmissionRoutes {
 
     public static boolean preserved(String method, String path) {
         if (!path.startsWith("/api/") || "OPTIONS".equals(method)) return true;
-        // Completing, cancelling, or recovering an existing transaction must remain possible.
+        // 기존 거래의 완료·취소·결과 복구 경로는 계속 허용한다.
         if ("PATCH".equals(method) || "DELETE".equals(method)) return true;
         for (String prefix : new String[]{"/api/service-admission", "/api/auth", "/api/email",
                 "/api/password-reset", "/api/member", "/api/payment", "/api/admin",

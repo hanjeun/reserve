@@ -1,21 +1,7 @@
 #!/usr/bin/env node
 /**
- * sync-release-notes.mjs
- * docs/CHANGELOG.md 의 각 버전 섹션(사용자 눈높이 요약)을
- * 해당 GitHub 릴리즈 설명 "상단"에 얹는다. 기존 자동 생성 PR 목록은 유지한다.
- *
- * - 주입 영역은 <!-- changelog:start --> ~ <!-- changelog:end --> 마커로 감싸므로
- *   여러 번 실행해도 중복되지 않고 최신 요약으로 교체된다(idempotent).
- * - 기본은 미리보기(dry-run). 실제 반영은 --apply 를 붙여야 한다.
- * - 릴리즈 형식도 함께 맞춘다: 제목은 태그 그대로(vX.Y.Z), 마커 아래는 GitHub 자동 PR 목록만.
- *   손으로 붙인 꼬리(PR 번호·배포 실행 링크·검증 메모)나 마커 없이 붙여 넣은 옛 요약은 자동 PR 목록으로 바꾼다.
- *
- * 사용법 (레포 루트에서, gh 로그인 상태):
- *   node scripts/sync-release-notes.mjs                 # 전체 미리보기
- *   node scripts/sync-release-notes.mjs --apply         # 전체 반영
- *   node scripts/sync-release-notes.mjs v1.13.0 --apply # 특정 버전만 반영
- *
- * 요구사항: Node 18+, gh CLI(로그인됨). REPO 환경변수로 대상 지정 가능(기본 hanjeun/reserve).
+ * CHANGELOG 요약 영역을 교체하고 자동 PR 목록을 유지한다.
+ * 기본은 미리보기이며 --apply를 명시해야 릴리스에 반영한다.
  */
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -30,7 +16,6 @@ const END = '<!-- changelog:end -->';
 
 const md = readFileSync(new URL('../docs/CHANGELOG.md', import.meta.url), 'utf8');
 
-// "## v1.13.0 (2026-07-06) — 제목" 헤더 기준으로 섹션 분리 (라인 기반, 견고)
 const sections = [];
 let cur = null;
 for (const line of md.split(/\r?\n/)) {
@@ -52,12 +37,11 @@ if (sections.length === 0) {
   process.exit(1);
 }
 
-// PATH 탐색 대신 절대 경로로 실행한다 — 이유는 resolve-bin.mjs 주석 참고(S4036).
 const GH_BIN = resolveBin('gh');
 const gh = (a, input) =>
   execFileSync(GH_BIN, a, { encoding: 'utf8', input, stdio: ['pipe', 'pipe', 'pipe'] });
 
-// CHANGELOG 는 최신 버전이 위에 있다 — 바로 아래 섹션이 이전 버전(자동 PR 목록의 비교 기준).
+// 바로 아래 버전을 자동 PR 목록의 비교 기준으로 사용한다.
 const previousOf = new Map(sections.map((s, i) => [s.version, sections[i + 1]?.version]));
 
 const GENERATED = /^(#{1,6}\s*What's Changed|\*{0,2}Full Changelog)/im;
@@ -86,16 +70,15 @@ for (const { version, body } of targets) {
     continue;
   }
 
-  // 이전에 주입한 블록(마커+뒤따르는 --- 구분선)을 제거해 idempotent 하게
+  // 재실행 때 중복되지 않도록 이전 주입 영역과 구분선을 제거한다.
   let base = current;
   const between = new RegExp(String.raw`${START}[\s\S]*?${END}\s*(?:\r?\n---\r?\n)?`, 'g');
   base = base.replace(between, '').trimStart();
 
-  // 예전에 손으로 적어둔 짧은 한글 태그라인 제거: "What's Changed" / "Full Changelog" 앞부분을 버린다.
-  // (우리 친근한 요약과 중복되므로) — 없으면 그대로 둔다. 재실행해도 안전(idempotent).
+// CHANGELOG 요약과 중복되지 않도록 자동 PR 목록 앞의 자유 형식 본문은 제거한다.
   const wcIdx = base.search(GENERATED);
   if (wcIdx > 0) base = base.slice(wcIdx).trimStart();
-  // 자동 PR 목록이 없으면(손으로 적은 꼬리만 있거나 옛 요약을 통째로 붙여 넣은 경우) 새로 받아 채운다.
+  // 자동 PR 목록이 없으면 비교 기준으로 다시 생성한다.
   if (!GENERATED.test(base)) base = generatedNotes(version);
 
   const injected = `${START}\n${body}\n${END}`;

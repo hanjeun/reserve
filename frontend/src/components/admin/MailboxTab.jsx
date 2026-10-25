@@ -1,15 +1,5 @@
-/**
- * RESERVE - 관리자 메일함 탭 (발송 전용)
- * 받은편지함/웹훅 수신 기능은 제거됨 — 문의는 Inquiry 도메인(문의 내역 탭)이 대신 처리.
- *
- * 2026-07 전수조사 — 검색어를 URL 쿼리스트링에 동기화(useQueryParamState) — MembersTab 등과
- * 동일한 이유(새로고침해도 유지, 링크 공유 가능).
- *
- * 2026-08-09: ★ 페이지네이션·검색을 서버로 올렸다.
- *   예전에는 page 파라미터 자체가 없어서 **보낸 메일 전량**을 받아온 뒤 그 배열을 filter 했다.
- *   보낸 메일은 지우지 않는 한 계속 쌓이기만 하는 데이터고, 응답에 본문(body)까지 통째로
- *   들어 있어서 시간이 지날수록 이 화면만 눈에 띄게 느려진다.
- *   백엔드 GET /api/admin/mail/sent 의 **응답 형식도 배열 → Page 로 바뀌었다**(같이 배포할 것).
+/*
+ * 발송 메일만 서버 검색·페이지로 조회하며 수신 문의는 Inquiry에서 처리한다.
  */
 import React, { useState } from 'react';
 import { Typography, Input, Divider, Checkbox } from 'antd';
@@ -93,10 +83,8 @@ const useSentMailData = (message, page, search) => {
 const useComposeMail = ({ message }) => {
     const queryClient = useQueryClient();
     const [composing, setComposing] = useState(false);
-    // marketing: 광고성 정보 여부 (2026-08-11).
-    // 주의: 백엔드는 이 값이 없으면 **광고로 간주**한다(안전한 쪽이 기본). 그래서 화면에서는
-    //    반드시 명시적으로 보내야 하고, 기본값은 false(=문의 답변 등 일반 발송)로 둔다.
-    //    광고를 보낼 때만 체크하게 해서, 체크하는 순간 동의 확인이 걸리게 만든다.
+    // 광고성 발송 여부를 구분한다.
+
     const [composeForm, setComposeForm] = useState({ toEmail: '', subject: '', body: '', marketing: false });
     const { errors, validate, clearError, resetErrors } = useFormErrors();
 
@@ -114,8 +102,8 @@ const useComposeMail = ({ message }) => {
 
     const handleComposeSend = () => {
         const trimmedEmail = composeForm.toEmail.trim();
-        // 네 칸을 한 번에 검사한다. 예전엔 warning 토스트를 네 번 이어 붙여서
-        // 첫 오류만 보이고, 겹쳐 누르면 토스트가 쌓였다.
+        // 모든 필드를 한 번에 검증해 각 입력 아래에 오류를 표시한다.
+
         if (!validate((e) => {
             if (!trimmedEmail) e.toEmail = '받는 사람 이메일을 입력해주세요.';
             else if (!EMAIL_REGEX.test(trimmedEmail)) e.toEmail = '올바른 이메일 형식을 입력해주세요.';
@@ -128,12 +116,8 @@ const useComposeMail = ({ message }) => {
     return { composing, setComposing, composeForm, setComposeForm, composeSending: sendMutation.isPending, resetCompose, handleComposeSend, errors, clearError };
 };
 
-/**
- * 보낸 메일을 휴지통으로 보낸다.
- *
- * 실제 삭제가 아니라 소프트 삭제다 — 보낸 메일은 "무엇을 보냈는가"의 기록이라
- * 실수로 지웠을 때 되돌릴 수 없으면 기록의 가치가 사라진다.
- * 휴지통 탭에서 30일 안에 복구할 수 있고, 그 뒤 스케줄러가 영구 삭제한다.
+/*
+ * 발송 기록은 휴지통으로 옮겨 보관 기간 내 복구할 수 있게 한다.
  */
 const useTrashMail = ({ message, selectedSent, setSelectedSent }) => {
     const queryClient = useQueryClient();
@@ -164,9 +148,8 @@ const useTrashMail = ({ message, selectedSent, setSelectedSent }) => {
     return { askAndTrash, trashing: mutation.isPending };
 };
 
-// 쿨다운·스피너 정지는 RefreshButton 이 갖는다(2026-08-25). 예전엔 여기서 3초 쿨다운을
-// 직접 구현했는데, setTimeout 을 정리하지 않아 쿨다운 도중 화면을 떠나면 사라진 컴포넌트에
-// setState 가 걸렸다. 같은 구현이 FilterToolbar·ChatTab 에도 따로 있었다.
+// 새로고침 대기·스피너 수명은 RefreshButton에서 관리한다.
+
 const SearchBar = ({ value, onChange, onReload, loading, initialLoading = false, onCompose }) => {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
@@ -186,12 +169,8 @@ const SearchBar = ({ value, onChange, onReload, loading, initialLoading = false,
     );
 };
 
-/**
- * 보낸 메일 목록 스켈레톤 — 아래 SentMailItem의 실제 3줄 구조(받는사람+날짜 / 제목 / 본문미리보기)에 대응.
- *
- * 2026-07 전수조사: 예전엔 AntD 기본 <Skeleton active paragraph>를 썼는데, 이건 우리
- * 디자인 시스템의 shimmer Bone과 전혀 다른 톤/애니메이션이라 관리자 패널 안에서 이 탭만
- * 혼자 이질적으로 보였다 — 공용 Bone으로 교체하고 실제 행 레이아웃과 같은 모양으로 맞춤.
+/*
+ * 골격을 실제 메일 행의 받는 사람·제목·본문 미리보기 배치와 맞춘다.
  */
 // 행 패딩은 아래 SentMailItem 의 본문 버튼과 **같은 값**이어야 한다('14px 16px').
 //   다르면 로딩이 끝나는 순간 글자가 옆으로 튄다.

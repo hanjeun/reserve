@@ -26,7 +26,7 @@ export default function AdmissionModal({ open = false, busy = false, campaign, s
     const state = status?.state;
     const cancellable = hasTicket && !['CLAIMED', 'CONSUMED', 'CLOSED', 'EXPIRED', 'CANCELLED'].includes(state);
     const canRejoin = ['EXPIRED', 'CANCELLED', 'FULL', 'CONSUMED'].includes(state);
-    // Polling metadata and the local countdown do not replay a status transition.
+    // 폴링 메타데이터·남은 시간 갱신으로 상태 전환을 재생하지 않는다.
     const contentKey = error
         ? `error:${error.admissionStorageError ? error.message : listRequestErrorKind(error)}:${errorStep || ''}:${hasTicket}`
         : state || 'LOADING';

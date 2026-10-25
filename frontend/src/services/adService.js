@@ -6,11 +6,11 @@ const adService = {
     createAd: (formData) => api.post(API_ENDPOINTS.ADVERTISEMENT.CREATE, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
     }),
-    /** 결제 대기/실패 상태인 기존 광고에 대해 결제창을 다시 여는 준비 요청 */
+    /* 기존 광고의 결제 대기·실패 상태에서 재결제를 준비한다. */
     preparePayment: (id) => api.post(API_ENDPOINTS.ADVERTISEMENT.PREPARE_PAYMENT(id)),
     verifyPayment: (merchantUid) => api.post(API_ENDPOINTS.ADVERTISEMENT.VERIFY_PAYMENT, { merchantUid }),
     cancelAd: (id) => api.delete(API_ENDPOINTS.ADVERTISEMENT.CANCEL(id)),
-    // 종료상태(만료/취소/환불/중단) 광고를 목록에서 숨기기(소프트삭제) — 2026-07 추가
+    // 종료 상태 광고는 서버에서 소프트 삭제해 목록에서 숨긴다.
     removeAd: (id) => api.delete(API_ENDPOINTS.ADVERTISEMENT.REMOVE(id)),
     /** 배너 광고 콘텐츠(제목/설명/이미지) 수정 — FormData(이미지는 새로 올릴 때만 포함) */
     updateAd: (id, formData) => api.patch(API_ENDPOINTS.ADVERTISEMENT.UPDATE(id), formData, {
@@ -34,9 +34,8 @@ const adService = {
         }),
     suspendAd: (id, reason) => api.patch(API_ENDPOINTS.ADVERTISEMENT.ADMIN_SUSPEND(id), { reason }),
 
-    /**
-     * 노출·클릭은 장식적 지표라 실패해도 화면을 깨뜨리지 않는다.
-     * 전환은 서버가 로그인 회원의 실제 예약을 확인한다. 예약 성공 결과는 이 기록 실패와 분리한다.
+    /*
+     * 측정 오류는 화면·예약 성공 결과와 분리한다. 전환은 서버가 현재 회원의 실제 예약을 검증한다.
      */
     recordImpression: (id) => api.patch(API_ENDPOINTS.ADVERTISEMENT.IMPRESSION(id)).catch(() => {}),
     recordClick: (id) => api.patch(API_ENDPOINTS.ADVERTISEMENT.CLICK(id)).catch(() => {}),

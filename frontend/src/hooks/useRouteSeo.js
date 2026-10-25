@@ -55,12 +55,8 @@ const BREADCRUMB_LABELS = [
 
 const BREADCRUMB_SCRIPT_ID = 'reserve-breadcrumb-jsonld';
 
-/**
- * 검색 결과에 "RESERVE > 가게 찾기 > 가게 상세" 처럼 계층을 보여주기 위한 BreadcrumbList.
- *
- * 왜 필요했나 — 색인 대상 경로가 전부 같은 깊이의 낱개 URL 로만 보여서, 검색 결과가
- * 사이트 구조 없이 제목만 나열됐다. BreadcrumbList 는 크롤러가 그 계층을 읽는 표준 방법이다.
- * 색인하지 않는 경로에는 붙이지 않는다 — 노출되지 않을 페이지의 계층은 의미가 없다.
+/*
+ * 색인 대상 경로에만 검색용 BreadcrumbList 계층을 제공한다.
  */
 const syncBreadcrumbJsonLd = (pathname) => {
     const normalized = canonicalPathFor(pathname);
@@ -100,15 +96,8 @@ const syncBreadcrumbJsonLd = (pathname) => {
     if (!existing) document.head.appendChild(script);
 };
 
-/**
- * 라우트별 검색 공개 정책과 URL 메타데이터를 한 곳에서 동기화한다.
- * 쿼리·해시는 canonical/og:url에 절대 넣지 않아 결제 식별자나 OAuth 값을 노출하지 않는다.
- *
- * 주의: 여기서 붙이는 robots 메타는 **JS 를 실행하는 크롤러에만** 보인다.
- *    JS 를 실행하지 않는 크롤러는 index.html 원본(robots: index, follow)만 보고
- *    /login, /my-page 같은 경로까지 색인해버린다. 그 경로들은 nginx 가
- *    X-Robots-Tag 헤더로 한 번 더 막는다 — nginx/default.conf 의 같은 이름 규칙 참고.
- *    두 곳의 경로 집합은 항상 같이 고쳐야 한다.
+/*
+ * canonical·og:url에는 쿼리와 해시를 제외해 결제·인증 값을 노출하지 않는다. 비공개 경로의 robots 정책은 nginx의 X-Robots-Tag 경로와 함께 유지한다.
  */
 const useRouteSeo = () => {
     const { pathname } = useLocation();

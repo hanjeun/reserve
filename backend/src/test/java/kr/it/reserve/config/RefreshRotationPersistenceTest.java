@@ -22,7 +22,7 @@ import java.time.*;
 import java.util.UUID;
 import static org.assertj.core.api.Assertions.*;
 
-/** Actual JPA/H2 persistence and rejection commits; InnoDB locking is checked by the opt-in MySQL fixture. */
+/** 실제 JPA·H2의 저장과 거부 커밋을 확인한다. InnoDB 잠금은 별도 MySQL 시험의 범위다. */
 @SpringBootTest
 class RefreshRotationPersistenceTest {
     @Autowired private TokenService tokenService;

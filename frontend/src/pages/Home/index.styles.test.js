@@ -49,7 +49,7 @@ describe('discovery banner motion policy', () => {
                 rule.walkDecls('transform', declaration => transforms.push(declaration.value));
             }
         });
-        // reduced-motion can explicitly reset transforms; geometry-changing effects cannot return.
+        // 동작 줄이기에서 transform 초기화는 허용하되 배치를 바꾸는 효과는 제외한다.
         expect(transforms.every(value => value === 'none')).toBe(true);
     });
 

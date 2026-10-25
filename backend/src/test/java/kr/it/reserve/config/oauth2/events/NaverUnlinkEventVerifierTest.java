@@ -20,7 +20,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Synthetic protocol values only. No Naver account, client secret or external API is used. */
+/** 합성 규격 값만 사용하며 실제 네이버 계정·비밀키·외부 API는 사용하지 않는다. */
 class NaverUnlinkEventVerifierTest {
     private static final Instant NOW = Instant.parse("2026-10-16T01:00:00Z");
     private static final String CLIENT = "synthetic-client";

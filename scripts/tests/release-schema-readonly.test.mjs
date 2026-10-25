@@ -8,8 +8,7 @@ const bash = process.platform === 'win32'
     ? `${process.env.ProgramFiles ?? 'C:/Program Files'}/Git/bin/bash.exe`
     : '/bin/bash';
 
-// PATH cannot resolve real tools. All Docker/MySQL responses are synthetic metadata;
-// this checks the guard and SQL contracts, not a production schema or native MySQL execution.
+// 외부 도구를 찾을 수 없는 환경의 합성 응답으로 검사하며 실제 운영 스키마·MySQL 실행은 검증하지 않는다.
 const mocks = String.raw`
 exec 3>&2
 PATH=/reserve-schema-test-no-executables

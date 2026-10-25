@@ -7,8 +7,6 @@ import {
 } from '../common/icons';
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
 
-// StoreInfoSection 행 빌더 헬퍼 (모듈 레벨 — 복잡도 분산) ───
-
 const hasPositiveNumber = value => Number.isFinite(Number(value)) && Number(value) > 0;
 
 /** 분 단위 숫자를 "N분 / N시간 / N시간 N분" 문자열로 변환 */

@@ -1,7 +1,7 @@
 import Bone from './Bone';
 
-// 가게 소식 상세(BenefitDetail)의 데이터 로딩 뼈대. 청크 로딩(RouteLoadingSkeleton)도 이것을 그대로 써서
-// 코드 로딩 → 데이터 로딩으로 넘어갈 때 모양이 바뀌지 않는다(2026-09-29). 상태 알림(role=status)은 감싸는 쪽이 붙인다.
+// 상세 데이터와 청크 로딩에서 같은 골격을 사용한다.
+// 모듈·데이터 로딩에서 같은 배치를 사용하며 상태 알림은 호출부가 담당한다.
 export default function BenefitDetailSkeleton(props) {
     return (
         <section className="reserve-benefits-page reserve-benefit-detail" {...props}>

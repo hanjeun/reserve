@@ -20,7 +20,7 @@ import { LoadingPresentationContext, createLoadingPresentation } from '../layout
 const MessengerContent = lazy(() => import('./MessengerContent'));
 const BADGE_POLL_MS = 60000;
 
-// A saved destination controls presentation only. Opening a room still rechecks its participant on the server.
+// 저장한 목적지는 표시만 제어하며 대화 참가 권한은 서버에서 다시 확인한다.
 function searchMessageReturn(location, role) {
     const saved = location.state?.searchReturn;
     const keyword = new URLSearchParams(location.search).get('keyword')?.trim();
@@ -76,7 +76,7 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
         : activeThread && selection.kind === searchReturn?.kind
             && (searchReturn.kind === 'support' || (selection.storeId ?? selection.roomId) === searchReturn.id);
     const capturedSearchPath = !isMobile && settledSession && open && selectedReturn ? searchReturnPath : null;
-    // Bind the explicit hint to this visit and account; an ordinary search entry cannot reveal an existing panel.
+    // 검색 복귀 힌트는 현재 방문·계정에만 적용해 기존 패널이 노출되지 않게 한다.
     const [searchPanelVisit, setSearchPanelVisit] = useState(() => ({ key: location.key, identity, path: capturedSearchPath }));
     if (searchPanelVisit.key !== location.key || searchPanelVisit.identity !== identity) {
         setSearchPanelVisit({ key: location.key, identity, path: capturedSearchPath });

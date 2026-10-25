@@ -44,9 +44,6 @@ public interface AdvertisementRepository extends JpaRepository<Advertisement, Lo
     Optional<Long> findIdByMerchantUid(@Param("uid") String uid);
     List<Advertisement> findByStoreId(Long storeId);
 
-    // 2026-07 추가: 종료상태(만료/취소/환불/중단) 광고를 사업자가 직접 목록에서 숨길 수 있게(소프트삭제)
-    // 되면서, 데리베이션 쿼리로는 WHERE를 추가할 수 없어 명시적 @Query로 바꿈 —
-    // 예약(ReservationRepository)의 동일한 패턴.
     @Query(value = "SELECT a FROM Advertisement a JOIN FETCH a.store s "
                  + "WHERE s.owner = :owner AND a.deletedAt IS NULL "
                  + "AND (:storeId = 0 OR s.id = :storeId) "
@@ -62,11 +59,7 @@ public interface AdvertisementRepository extends JpaRepository<Advertisement, Lo
             @Param("keyword") String keyword,
             Pageable pageable);
 
-    // 노출용 — ACTIVE 상태 + 기간 내, 타입별로 조회 (StoreList 배지 / 배너 위젯)
-    // 배너는 AdBanner.jsx가 첫 원소(ads[0])만 보여주므로, 여러 건이 동시에 ACTIVE일 때 가장 최근에
-    // 결제한 광고가 노출되도록 OrderByCreatedAtDesc 필수(2026-07 버그 수정 — 예전엔 정렬 없이 DB 기본순(PK순)로
-    // 나와서 가장 먼저 결제한 광고 하나가 만료될 때까지 계속 독점하고, 다른 사업자가 동시에 결제한 배너는 한 번도
-    // 노출되지 못하는 문제가 있었다)
+    // 배너는 첫 항목을 표시하므로 최근 광고부터 반환한다.
     List<Advertisement> findByStatusAndAdTypeAndStartDateLessThanEqualAndEndDateGreaterThanEqualOrderByCreatedAtDesc(
             AdStatus status, AdType adType, LocalDate today1, LocalDate today2);
 

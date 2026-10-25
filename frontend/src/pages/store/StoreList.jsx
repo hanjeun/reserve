@@ -90,7 +90,6 @@ const StoreList = () => {
     const { user } = useAuthStore();
     const { message } = useMessage();
     const { liveLocation, setLiveLocation } = useLocationStore();
-    
 
     // 우리동네 배지는 저장된 위치를 우선하고 없을 때만 라이브 위치를 사용한다. 거리순 정렬과 구분한다.
     const nearbyUserLocation = React.useMemo(() => {
@@ -119,7 +118,7 @@ const StoreList = () => {
         staleTime: 1000 * 60 * 5,
     });
 
-    /** 거리순 좌표를 기다리는 동안 선택 라벨을 먼저 반영하고 적용 실패 시 URL의 정렬로 되돌린다. */
+    /* 거리 좌표를 기다릴 때 선택 라벨을 먼저 반영하고 오류 시 URL의 정렬로 복구한다. */
     const [pendingSort, setPendingSort] = useState(null);
 
     const handleSortChange = useCallback(async (value) => {
@@ -230,9 +229,9 @@ const StoreList = () => {
                 onChange: event => setSearchParams({ keyword: event.target.value }),
                 placeholder: '가게 검색' }} onReload={refetch} loading={refetching} initialLoading={initialLoading} />
 
-            {/* 스켈레톤은 첫 조회나 쿼리 전환으로 이전 결과를 그대로 보여줄 수 없을 때만 쓴다.
-                수동 새로고침은 현재 카드와 읽던 위치를 유지하고, 툴바 버튼만 진행 상태를 표시한다.
-                grid는 고정 4열(rsv-store-grid)로 시작해 화면 폭에 따라 반응형으로 줄어든다. */}
+            {/*
+             * 최초 조회·쿼리 전환에만 골격을 사용한다. 수동 새로고침은 카드와 읽던 위치를 유지하고 툴바에서 진행 상태를 표시한다.
+             */}
             <ListingContent notice={error && !blockingError && <DataState state="error" kind="store" subject="가게 목록" error={error}
                 title="최신 가게 정보를 확인하지 못해 이전 목록을 보여드리고 있어요."
                 onRetry={refetch} retrying={refetching} compact />}>

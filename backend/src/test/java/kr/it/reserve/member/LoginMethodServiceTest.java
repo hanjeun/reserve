@@ -280,7 +280,7 @@ class LoginMethodServiceTest {
                 TokenProvider.RefreshTokenState.VALID, 7L, 0, null, "PASSWORD", UUID.randomUUID().toString(),
                 0, UUID.randomUUID().toString(), NOW.plusDays(30)));
         when(subjects.lock(AuthProvider.NAVER, "naver-owner")).thenAnswer(call -> {
-            // The callback has verified its browser identity, then waits while that access credential expires.
+            // 콜백의 브라우저 신원을 확인한 뒤 기다리는 동안 액세스 자격증명이 만료된 상황이다.
             request.setCookies(expiredCookiePresent
                     ? new Cookie[]{new Cookie("access_token", "test-session"), new Cookie("refresh_token", "test-refresh")}
                     : new Cookie[]{new Cookie("refresh_token", "test-refresh")});

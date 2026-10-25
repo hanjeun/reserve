@@ -18,7 +18,7 @@ export function isSearchResultPath(key, item, role) {
     return Boolean(match && positiveSearchId(match[2]) && (match[1] !== 'ownerRoomId' || ['BUSINESS', 'ADMIN'].includes(role)));
 }
 
-/** Keep unknown routes, mismatched IDs and unrecognized response shapes out of navigation. */
+/* 알 수 없는 경로·식별자 불일치·잘못된 응답을 이동 대상으로 사용하지 않는다. */
 export function normalizeSearchResponse(response, keyword, keys, role) {
     if (response?.keyword !== keyword || !Array.isArray(response.groups)) {
         const error = new Error('검색 응답 형식을 확인할 수 없어요.');

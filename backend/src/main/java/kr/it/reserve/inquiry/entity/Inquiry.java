@@ -65,17 +65,7 @@ public class Inquiry {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    /**
-     * 문의 유형.
-     *
-     * 순서가 곧 화면 표시 순서다(프론트 InquiryModal.CATEGORY_OPTIONS와 1:1로 맞춰 둘 것).
-     * 8개인 이유: 5개는 모바일에서 4+1로 갈라져 마지막 줄에 하나만 남아 어색했다.
-     * 4의 배수로 맞추면 어느 폭에서든 대칭으로 접힌다. `ETC`는 항상 마지막.
-     *
-     * 주의: 값을 추가할 때: 컬럼이 @Enumerated(EnumType.STRING) + varchar 라 ddl-auto로 안전하지만,
-     *    **이름을 바꾸거나 지우면 기존 행의 문자열이 매핑되지 않아 조회 시 예외가 난다.**
-     *    (이미 저장된 문의가 있으므로 기존 5개의 이름은 건드리지 말 것)
-     */
+    /** 화면 표시 순서를 맞추고 ETC는 마지막에 둔다. 저장된 문자열과의 호환성을 위해 기존 열거값 이름을 바꾸거나 삭제하지 않는다. */
     public enum InquiryCategory {
         RESERVATION("예약 문의"),
         PAYMENT("결제 문의"),

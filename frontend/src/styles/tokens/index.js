@@ -1,6 +1,4 @@
-/**
- * RESERVE Design System - Tokens Index
- */
+
 
 export * from './colors';
 export * from './breakpoints';

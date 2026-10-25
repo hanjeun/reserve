@@ -20,7 +20,7 @@ it('same query keys never reuse private cache or local state across account boun
     view.rerender(ui('B'));
     expect(screen.queryByText('A:A')).toBeNull();
     await screen.findByText('B:B');
-    // An old mutation callback can still run, but it only owns the old client.
+    // 이전 뮤테이션 콜백은 이전 클라이언트만 갱신한다.
     act(() => clients[0].setQueryData(['my-private-records'], 'late A'));
     await vi.waitFor(() => expect(screen.getByText('B:B')).toBeInTheDocument());
     expect(clients).toHaveLength(2);

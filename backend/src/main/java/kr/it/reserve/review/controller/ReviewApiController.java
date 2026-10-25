@@ -25,9 +25,6 @@ public class ReviewApiController {
 
     private final ReviewService reviewService;
 
-    /**
-     * 리뷰 작성
-     */
     @PostMapping
     public ResponseEntity<ApiResponse<ReviewResponse>> createReview(@Valid @RequestBody ReviewCreateRequest request) {
         ReviewResponse review = reviewService.createReview(request, SecurityUtil.getCurrentMember());
@@ -63,18 +60,12 @@ public class ReviewApiController {
         return ApiResponse.success(reviewService.getMyReviews(SecurityUtil.getCurrentMember()), "내 리뷰 목록 조회 성공");
     }
 
-    /**
-     * 리뷰 삭제
-     */
     @DeleteMapping("/{id}")
     public ApiResponse<Void> deleteReview(@PathVariable Long id) {
         reviewService.deleteReview(id, SecurityUtil.getCurrentMember());
         return ApiResponse.success(null, "리뷰가 삭제됐어요.");
     }
 
-    /**
-     * 리뷰 수정
-     */
     @PutMapping("/{id}")
     public ApiResponse<ReviewResponse> updateReview(@PathVariable Long id, @Valid @RequestBody ReviewUpdateRequest request) {
         ReviewResponse review = reviewService.updateReview(id, request, SecurityUtil.getCurrentMember());
@@ -98,9 +89,6 @@ public class ReviewApiController {
         return ApiResponse.success(review, "예약 기반 리뷰 조회 성공");
     }
 
-    /**
-     * 리뷰 작성 가능 여부 확인
-     */
     @GetMapping("/can-write/{reservationId}")
     public ApiResponse<Map<String, Boolean>> canWriteReview(@PathVariable Long reservationId) {
         boolean canWrite = reviewService.canWriteReview(reservationId, SecurityUtil.getCurrentMember());

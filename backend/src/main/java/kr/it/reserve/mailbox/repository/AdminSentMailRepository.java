@@ -18,13 +18,6 @@ public interface AdminSentMailRepository extends JpaRepository<AdminSentMail, Lo
      */
     List<AdminSentMail> findByDeletedAtIsNullOrderBySentAtDesc();
 
-    /**
-     * 관리자 메일함 화면용 — 페이지 단위 조회.
-     *
-     * <p>예전에는 화면이 페이지 파라미터 없이 <b>보낸 메일 전량</b>을 받았다.
-     * 보낸 메일은 지우지 않는 한 계속 쌓이므로 시간이 지날수록 느려지고,
-     * 본문({@code body})까지 통째로 내려오므로 응답이 빠르게 커진다.
-     */
     Page<AdminSentMail> findByDeletedAtIsNullOrderBySentAtDesc(Pageable pageable);
 
     /**

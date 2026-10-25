@@ -62,7 +62,7 @@ test.beforeEach(async ({ context, page }) => {
     editFixtureState.set(page, server);
     await context.clearCookies();
     await page.addInitScript(() => {
-        // A same-origin preview frame shares storage with the page under test.
+        // 같은 출처의 미리보기 프레임은 저장소를 공유한다.
         if (window !== window.top) return;
         window.localStorage.clear();
         window.sessionStorage.clear();
@@ -148,7 +148,7 @@ test('store editing keeps a local draft and warns when the server base changed',
     await page.getByRole('button', { name: '임시저장' }).click();
     await expect(page.getByText(/임시저장됨/)).toBeVisible();
     await expect(nameInput).toHaveValue('내 수정 초안 가게');
-    // A server edit happens after the local save, independently of GET retries or preview navigation.
+    // 서버 변경 시점을 로컬 저장 뒤로 고정해 조회 재시도와 분리한다.
     editFixtureState.get(page).baseChanged = true;
 
     await page.reload();
@@ -311,7 +311,7 @@ test('store editing reserves its selection skeleton while the initial data is de
         });
     });
 
-    // Measure the held data request, not the first load of the form/authentication chunks.
+    // 인증·모듈 로딩을 제외하고 보류한 데이터 요청 시간을 측정한다.
     await page.goto('/store/register');
     await expect(page.getByRole('heading', { name: '어떤 가게를 운영하시나요?', exact: true })).toBeVisible();
     const skeleton = page.getByRole('status', { name: '가게 정보를 불러오는 중' });

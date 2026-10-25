@@ -7,7 +7,7 @@ import { versionedApiUrl } from '../../api/apiVersion';
 import { createLiveQueryRefresh, LIVE_UPDATE_DOMAINS, nextNewsBoundary, parseLiveUpdate } from '../../hooks/liveUpdateQueries';
 import { LiveUpdatesContext } from '../../hooks/useLiveUpdatesStatus';
 
-/** One account-scoped connection per query client. All changes are authorized again by existing read APIs. */
+/* 쿼리 클라이언트의 계정별 연결 하나를 공유하고 데이터 권한은 조회 API에서 재검증한다. */
 export default function LiveUpdatesProvider({ children }) {
     const client = useQueryClient();
     const revision = useAuthStore(state => state.sessionRevision);
@@ -40,7 +40,7 @@ export default function LiveUpdatesProvider({ children }) {
             else refreshQueries(updates, mode === 'full');
         };
         const schedule = mode => {
-            // A ready/return or overflow reconciliation must survive a periodic tick in the same batch.
+            // 같은 배치의 주기 갱신이 복귀·누락 이벤트 조정을 덮지 않게 한다.
             if (mode && (mode === 'full' || !resync)) resync = mode;
             if (current() && !document.hidden && !pending) pending = setTimeout(flush, 250);
         };
@@ -89,7 +89,7 @@ export default function LiveUpdatesProvider({ children }) {
                 if (!active()) return;
                 connection.close(); stream = undefined;
                 setStatus(previous => previous.connected ? { ...previous, connected: false } : previous);
-                // Periodic reconciliation also covers undelivered events and server-only time transitions.
+                // 누락 이벤트와 서버 시각에 따른 전환을 주기 조회로 보완한다.
                 poll();
                 const delay = Math.min(60_000, 5_000 * 2 ** Math.min(failures++, 4));
                 reconnect = setTimeout(connect, delay + Math.floor(Math.random() * 1_000));

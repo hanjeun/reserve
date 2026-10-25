@@ -11,7 +11,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.Set;
 
-/** Dynamic callback keeps the OAuth session on its host, constrained to configured trusted origins. */
+/** 설정된 신뢰 출처 안에서만 콜백 호스트를 선택해 OAuth 세션 쿠키를 같은 호스트에 유지한다. */
 public final class TrustedOAuth2AuthorizationRequestResolver implements OAuth2AuthorizationRequestResolver {
     private final DefaultOAuth2AuthorizationRequestResolver delegate;
     private final Set<String> allowed;

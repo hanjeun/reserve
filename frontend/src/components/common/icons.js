@@ -19,7 +19,7 @@ import {
 const createIcon = (type, glyph, filled = false) => {
     const label = type.replace(/(?:Outlined|Filled)$/, '').replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
     const Icon = forwardRef(({ className, spin = false, rotate, tabIndex, onClick, twoToneColor: _twoToneColor, ...rest }, ref) => {
-        void _twoToneColor; // AntD compatibility prop must not reach the DOM.
+        void _twoToneColor; // AntD 호환 속성은 DOM에 전달하지 않는다.
         return createElement('span', { role: 'img', 'aria-label': label, ...rest, ref, onClick,
             tabIndex: tabIndex ?? (onClick ? -1 : undefined),
             className: ['anticon', `anticon-${label}`, 'reserve-ui-icon', spin && 'anticon-spin', className].filter(Boolean).join(' '),

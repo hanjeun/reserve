@@ -5,7 +5,7 @@ import { versionedApiUrl } from '../api/apiVersion';
 import { invalidateStoreNews } from './storeNewsQueries';
 import useLiveUpdatesStatus from './useLiveUpdatesStatus';
 
-/** Signals invalidate authorized queries; no content or credentials are carried in events. */
+/* 이벤트는 식별자만 전달하고 권한 있는 쿼리를 무효화한다. */
 export default function useStoreNewsEvents(enabled, managed = false) {
     const client = useQueryClient();
     const live = useLiveUpdatesStatus();

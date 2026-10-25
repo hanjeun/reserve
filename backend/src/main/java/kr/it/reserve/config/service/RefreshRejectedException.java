@@ -14,9 +14,9 @@ public class RefreshRejectedException extends AuthException {
     public enum Reason {
         /** refresh_token 쿠키가 없다. 쿠키 Max-Age가 끝났거나 이미 로그아웃한 브라우저. */
         MISSING_COOKIE,
-        /** The deployment deliberately requires one new login for sid-less legacy cookies. */
+        /** sid 없는 기존 쿠키는 새 로그인이 필요하다. */
         LEGACY_SESSION,
-        /** Reconstruction metadata/key no longer reproduces the stored current-token hash. */
+        /** 재구성한 토큰이 저장된 해시와 다르면 세션 불일치로 처리한다. */
         SESSION_INCONSISTENT,
         /** JWT exp가 지났다. */
         EXPIRED_JWT,

@@ -29,7 +29,7 @@ const makeLogMessage = (action, entityType, entityId, snapshot) => {
     try {
         const obj = JSON.parse(snapshot || '{}');
         detail = obj['사유'] || obj['상호명'] || '';
-    } catch { /* ignore */ }
+    } catch { /* 스냅샷을 읽지 못하면 공통 감사 문구만 표시한다. */ }
     switch (action) {
         case 'SOFT_DELETE': return `${entity} #${entityId} 소프트 삭제 처리됨`;
         case 'RESTORE':     return `${entity} #${entityId} 복구 완료`;
@@ -57,11 +57,8 @@ const SKELETON_HEADERS = ['일시', '행위', '대상', '로그 내용', '처리
 // 그래야 스켈레톤도 실제 테이블처럼 "고정 컬럼은 지정 폭, 로그 내용이 남는 공간 흡수"가 된다.
 const SKELETON_COLS    = [155, 115, 120, null, 200];
 
-/**
- * 스켈레톤 행 개수를 "실제로 채워질 행 수"로 계산한다.
- * keepPreviousData 덕에 페이지를 넘기는 순간엔 이미 totalElements를 알고 있으므로,
- * 마지막 페이지가 3건이면 스켈레톤도 3줄만 그릴 수 있다 — 10줄 그렸다가 3줄로
- * 줄어들면서 화면이 튀는 걸 막는다. 최초 로딩(total을 모름)엔 pageSize로 폴백.
+/*
+ * 전체 건수를 알면 마지막 페이지의 실제 행 수만큼 골격을 표시하고 최초 조회는 pageSize를 사용한다.
  */
 const skeletonRowCount = (total, pageIdx, pageSize) => {
     if (!total) return pageSize;
@@ -69,10 +66,8 @@ const skeletonRowCount = (total, pageIdx, pageSize) => {
     return Math.max(1, Math.min(pageSize, remaining));
 };
 
-/**
- * 감사 로그는 유형·페이지를 포함한 쿼리 키로 서버 페이지를 조회하고 URL에 선택을 유지한다.
- * 최초·쿼리 전환 로딩은 공용 테이블 스켈레톤으로 표시하며 수동 새로고침은 기존 행을 유지한다.
- * 스켈레톤에도 현재 페이지·전체 수를 전달해 로딩 중 페이지 영역의 위치를 유지한다.
+/*
+ * 조회 조건은 URL·쿼리 키에 포함하고 갱신 중 기존 행과 페이지 영역을 유지한다.
  */
 const AuditLogTab = () => {
     const [{ type: typeFilter, page: pageStr }, setQuery] = useQueryParamsState(QUERY_DEFAULTS);

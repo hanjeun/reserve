@@ -81,14 +81,8 @@ export const BOOKING_DEADLINE_OPTIONS = [
     { value: 48, label: '48시간 전' },
 ];
 
-// 결제 마감 시간 옵션
-//
-// 2026-08-09 — "제한 없음"의 값을 1440 → 0 으로 바꿨다.
-//   1440분은 제한 없음이 아니라 **24시간 뒤 자동 취소**였다(ReservationExpiryScheduler).
-//   가게 상세 페이지는 같은 값을 "24시간"으로 정직하게 표시하고 있어서
-//   등록 폼과 상세 화면이 서로 다른 말을 하고 있었다.
-//   이젠 0 이 sentinel 이고 스케줄러가 그 가게를 건너뛴다.
-//   24시간이 필요한 사람을 위해 1440 은 제 이름으로 남겨둔다.
+// 제한 없음은 서버와 같은 0 값으로 전달한다.
+
 export const PAYMENT_TIMEOUT_OPTIONS = [
     { value: 0,    label: '제한 없음' },
     { value: 10,   label: '10분' },

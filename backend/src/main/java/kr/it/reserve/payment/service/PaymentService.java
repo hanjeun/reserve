@@ -111,8 +111,6 @@ public class PaymentService {
         return new PaymentPreparation(paymentRepository, reservationRepository, memberRepository, portoneService, entityManager).preparePayment(requestDto, memberId);
     }
 
-
-
     /** 사용자 요청은 소유권을 먼저 확인한다. requesterId가 없는 내부 모바일 복귀도 상태 검사는 공유한다. */
     @Transactional(readOnly = true)
     public VerificationSnapshot prepareVerification(String merchantUid, Long requesterId) {
@@ -125,10 +123,7 @@ public class PaymentService {
             throw new PaymentException("본인의 결제만 검증할 수 있어요.", HttpStatus.FORBIDDEN);
         }
 
-        // 상태 가드 (2026-08-09) — 예전엔 상태를 보지 않아 몇 번이든 다시 돌릴 수 있었다.
-        //   PC 결제는 usePayment 와 PaymentResult 에서 실제로 두 번 호출되고 있고,
-        //   환불된 결제에 대고 재실행하면 completePayment 가 다시 돌아 상태가 뒤엉킨다.
-        //   이미 끝난 검증은 같은 결과를 그대로 돌려주고(멱등), 그 외 상태는 막는다.
+        // 완료된 결제 검증은 같은 결과를 반환하고, 재실행할 수 없는 상태는 거부한다.
         if (payment.getStatus() == Payment.PaymentStatus.PAID) {
             log.info("Payment already verified, returning existing result: {}", payment.getMerchantUid());
             return new VerificationSnapshot(payment.getMerchantUid(), PaymentResponseDto.fromEntity(payment));
@@ -673,14 +668,11 @@ public class PaymentService {
     private Integer resolveRefundAmount(Payment payment, Integer requestedAmount) {
         Integer refundAmount = requestedAmount != null ? requestedAmount : payment.getAmount();
 
-        // 마지막 방어선 — 환불액은 결제액을 넘을 수 없다(2026-08-09).
-        //   넘는 값이 들어오면 PG 가 거절하거나, 받아버리면 결제액보다 많은 돈이 나간다.
-        //   호출측을 믿지 않고 여기서 한 번 더 자른다.
+        // 환불액은 결제액을 넘을 수 없다.
         if (refundAmount == null || refundAmount <= 0) {
             throw new PaymentException("환불 금액이 올바르지 않아요.", HttpStatus.BAD_REQUEST);
         }
-        // 2026-08-23: 비교 대상이 결제액 → **남은 환불 가능액** 으로 바뀌었다.
-        // 부분 환불이 이미 있었다면 결제액 기준으로는 통과하면서 총액을 넘길 수 있었다.
+        // 부분 환불을 포함한 남은 환불 가능액을 기준으로 상한을 확인한다.
         if (refundAmount > payment.remainingRefundable()) {
             log.warn("Refund amount exceeds refundable balance: paymentId={}, requested={}, paid={}, alreadyRefunded={}",
                     payment.getId(), refundAmount, payment.getAmount(), payment.refundedSoFar());
@@ -964,12 +956,7 @@ public class PaymentService {
         return reservation;
     }
 
-    /**
-     * 환불 예상 금액 조회 — <b>본인 예약 또는 ADMIN 만.</b>
-     *
-     * <p>2026-08-09 추가. 예전 컨트롤러는 로그인 여부만 보고 reservationId 를 그대로 받아서,
-     * 아무나 예약 ID 를 훑으며 다른 사람의 결제 금액·가게 환불 정책·예약 존재 여부를 읽을 수 있었다.
-     */
+    /** 환불 예상 금액은 본인 예약 또는 관리자만 조회한다. */
     @Transactional(readOnly = true)
     public RefundCalculationResult calculateRefundAmountForMember(Long reservationId, Member requester) {
         Reservation reservation = reservationRepository.findById(reservationId)
@@ -1007,18 +994,7 @@ public class PaymentService {
         //   그러면 daysUntil 이 1 커져서 **정책보다 한 구간 후한 환불**이 나갔다(부분 환불 → 전액 등).
         long daysUntil = ChronoUnit.DAYS.between(ServiceTime.today(), reservation.getReservationDate());
 
-        // 금액의 출처를 하나로 모은다 (2026-08-09)
-        //   예전엔 계산은 reservation.depositAmount(예약 만들 때 복사해둔 값)를 쓰고,
-        //   실제 환불 실행은 payment.amount(결제 요청 시 프론트가 보낸 값)를 썼다.
-        //   둘이 어긋나면 화면엔 "5,000원 환불"이라고 보여주고 실제로는 다른 금액이 나간다.
-        //   → **실제 결제 기록이 진실**이다. 결제 기록이 없을 때만 예약의 예약금으로 폴백한다
-        //   (나중 결제·미결제 예약은 어차피 환불할 게 없어 0 으로 떨어진다).
-        // 폴백을 없앴다 (2026-08-09).
-        //   예전엔 PAID 행이 없으면 reservation.depositAmount 로 폴백했다. 그런데
-        //   실행부(refundPayment)는 PAID 행이 없으면 404 를 던진다. 그래서 미리보기는
-        //   "10,000원 환불 가능"이라고 보여주고 실제 취소는 404 로 실패하는 상태였다.
-        //   부분 환불 후(PAID 행이 PARTIAL_REFUNDED 로 바뀜)와 미결제 예약에서 둘 다 발생한다.
-        //   미리보기와 실행이 같은 조회를 쓰도록 맞춘다 — 결제 기록이 없으면 환불액은 0 이다.
+        // 미리보기와 실행은 같은 결제 기록을 기준으로 계산한다. 환불할 결제 기록이 없으면 예상 환불액은 0이다.
         int paidAmount = lockedPaidAmount != null ? lockedPaidAmount : paymentRepository.findPaidByReservationId(reservationId)
                 .map(Payment::getAmount)
                 .orElse(0);
@@ -1029,18 +1005,7 @@ public class PaymentService {
         int partialDays = store.getPartialRefundDays() != null ? store.getPartialRefundDays() : 1;
         int partialRate = store.getPartialRefundRate() != null ? store.getPartialRefundRate() : 50;
 
-        // 0 은 "기준일"이 아니라 **비활성 sentinel** 이다 (2026-08-09 수정)
-        //
-        // 프론트 옵션(categories.js)이 fullRefundDays=0 을 "환불 없음",
-        // partialRefundDays=0 을 "적용 안 함" 으로 보낸다.
-        // 그런데 예전 코드는 그냥 `daysUntil >= 0` 을 평가했고,
-        // 미래 예약은 항상 daysUntil >= 0 이므로 **"환불 없음"을 고른 가게가
-        // 당일 취소에도 전액을 돌려주는** 정반대 동작이 됐다. 사장님 돈이 그대로 나간다.
-        //
-        // 정책(사용자 확인 2026-08-09):
-        //   fullRefundDays == 0  → 이 가게는 **어떤 환불도 하지 않는다**(부분 환불도 함께 막는다).
-        //     → "환불 없음"으로 공지해 놓고 부분 환불만 조용히 나가는 것이 더 큰 분쟁 요인이다.
-        //   partialRefundDays == 0 → 부분 환불만 미적용(전액 구간은 그대로 살린다).
+        // fullRefundDays가 0이면 모든 환불을 비활성화한다. partialRefundDays가 0이면 부분 환불만 비활성화한다.
         if (fullDays <= 0) {
             return new RefundCalculationResult(0, 0, "환불 불가");
         }
@@ -1068,8 +1033,6 @@ public class PaymentService {
                 .map(PaymentResponseDto::fromEntity)
                 .toList();
     }
-
-
 
     @lombok.Getter
     @lombok.AllArgsConstructor

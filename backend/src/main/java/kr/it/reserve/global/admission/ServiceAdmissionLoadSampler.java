@@ -10,7 +10,7 @@ import java.nio.file.Path;
 import java.util.function.DoubleSupplier;
 import java.util.regex.Pattern;
 
-/** Small local observations only: no process, database query, or remote metric request. */
+/** 프로세스 실행·DB 조회·원격 요청 없이 로컬 관측값만 수집한다. */
 @Component
 public class ServiceAdmissionLoadSampler {
     public record Sample(long availableBytes, double cpuLoad, double heapRatio) {

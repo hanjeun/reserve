@@ -3,9 +3,7 @@ import holidayService from '../services/holidayService';
 
 const EMPTY = new Set();
 
-// 'YYYY-MM' → Promise<Set<'YYYY-MM-DD'>>. 공휴일은 공개 정보이고 한 번 받으면 탭이 살아 있는 동안 그대로 쓴다.
-// TanStack Query 를 쓰지 않는 이유: FormDatePicker 는 공통 입력이라 QueryClient 밖(단위 테스트·디자인 미리보기)에서도
-// 그려진다. 공통 입력이 Provider 유무에 따라 깨지면 안 된다. 실패한 달은 기억하지 않아 다음에 다시 시도한다.
+// 공통 입력은 Provider 없이도 동작한다. 조회하지 못한 달은 다음 요청에서 다시 시도한다.
 const cache = new Map();
 
 const load = month => {

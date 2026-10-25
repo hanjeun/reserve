@@ -34,7 +34,7 @@ function Countdown({ expiresAt, onExpire, onPresenceChange }) {
 Countdown.propTypes = { expiresAt: PropTypes.number.isRequired, onExpire: PropTypes.func.isRequired,
     onPresenceChange: PropTypes.func.isRequired };
 
-/** One keyed viewport message; its mounted content updates without reopening the live region. */
+/* 같은 키의 알림 내용을 갱신해 라이브 영역을 다시 열지 않는다. */
 export default function ReservationEntryNotice({ expiresAt }) {
     const { message } = useMessage();
     const id = useId();
@@ -51,7 +51,7 @@ export default function ReservationEntryNotice({ expiresAt }) {
             contentMounted = mounted;
             if (mounted || !active || restoreQueued) return;
             restoreQueued = true;
-            // maxCount eviction skips onClose. A StrictMode cleanup/setup restores presence first.
+            // maxCount로 제거되면 onClose가 생략되므로 StrictMode 재설정 전에 존재 여부를 복원한다.
             queueMicrotask(() => {
                 restoreQueued = false;
                 if (!active || contentMounted) return;

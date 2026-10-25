@@ -22,7 +22,7 @@ const svg = (avatar, second) => avatar
     ? '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240"><rect width="240" height="240" fill="#e1e9ee"/><circle cx="120" cy="91" r="40" fill="#647e8b"/><path d="M43 234c0-74 154-74 154 0" fill="#647e8b"/></svg>'
     : `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="640"><rect width="960" height="640" fill="${second ? '#e0e8e2' : '#e7ded1'}"/><rect x="70" y="55" width="285" height="335" rx="8" fill="#faf8f2"/><path d="M210 55v335M70 220h285" stroke="#b4a58c" stroke-width="10"/><path d="M0 455h960v185H0" fill="#b79b7b"/><path d="M455 443c-35-71-37-174 28-194h72c65 20 63 123 28 194z" fill="${second ? '#648879' : '#b96949'}"/><ellipse cx="519" cy="247" rx="37" ry="10" fill="#7e4e3c"/><path d="M672 447c-28-51-30-123 18-145h58c48 22 46 94 18 145z" fill="#f0e9dd"/><ellipse cx="719" cy="301" rx="30" ry="9" fill="#bbb0a2"/><path d="M805 447c-6-91 29-138 55-172" stroke="#597764" stroke-width="9" fill="none"/><path d="M846 303c-61 11-57-42-56-58 47-2 62 30 56 58M842 325c55-5 64-46 60-62-47 0-65 35-60 62" fill="#698a75"/><text x="68" y="588" font-family="sans-serif" font-size="28" fill="#fff">RESERVE · LOCAL UI PREVIEW</text></svg>`;
 
-/** Every API response is synthetic. External origins are aborted before any network call. */
+/* 모든 API는 합성 응답을 사용하고 외부 출처 요청은 차단한다. */
 export async function installReleasePreview(page) {
     const state = { admissionState: 'WAITING', admissionPosition: 3, admissionDate: null, statusErrors: 0, cancelErrors: 0, joins: 0, polls: 0, cancels: 0,
         reservations: [], roomOpens: 0, writes: [], external: [], unknown: [], errors: [], lastProfileSave: null,
@@ -124,7 +124,7 @@ export async function installReleasePreview(page) {
         if (pathname === '/api/reservations/availability') return ok(route, ['10:00', '11:00', '14:00', '15:00']
             .map(time => ({ time, available: true, remainingCapacity: 6, maxCapacity: 6 })));
         if (pathname === '/api/reservations/admission') {
-            // Match the server's store/date/time gate; another time must not restore this slot's ticket.
+            // 같은 가게·날짜·시간의 입장권만 복원한다.
             const time = /^(\d{2}:\d{2})(?::00)?$/.exec(url.searchParams.get('time') || '')?.[1];
             const date = url.searchParams.get('date');
             if (Number(url.searchParams.get('storeId')) !== store.id || time !== '14:00' || !/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return ok(route, null);

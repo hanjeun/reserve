@@ -6,7 +6,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import static org.assertj.core.api.Assertions.*;
 
-/** Uses only the runner's disposable login database and restricted account, never an app/restored database. */
+/** 실행 도구의 일회성 로그인 DB와 전용 계정만 사용한다. */
 @EnabledIfEnvironmentVariable(named = "RESERVE_MYSQL_LOGIN_TEST_ISOLATED", matches = "1")
 class SearchMySqlTest extends SearchPersistenceTest {
     @DynamicPropertySource static void isolatedDatabase(DynamicPropertyRegistry properties) {

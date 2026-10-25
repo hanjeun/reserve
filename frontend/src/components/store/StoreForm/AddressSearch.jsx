@@ -120,10 +120,8 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
     const dropdownOpen = state.open && state.results.length > 0;
     const { shouldRender: dropdownShouldRender, isClosing: dropdownClosing } = useExitAnimation(dropdownOpen, 200);
 
-    // ② 블록(우편번호+상세주소)도 드롭다운과 같은 규칙을 따른다.
-    // 2026-08-06 이전엔 여기가 그냥 `{(selected || zipCode) && ...}` 였다 — 등장은 slideUpIn 이
-    // 재생되는데 주소를 지우면 **애니메이션 없이 툭 사라졌다.** 훅이 이미 있는데 드롭다운에만
-    // 걸려 있던 케이스라, 같은 훅을 통과시켜 좌우 대칭을 맞춘다.
+    // 주소 도구는 퇴장 모션이 끝날 때까지 DOM을 유지한다.
+
     const sectionOpen = state.selected || !!state.zipCode;
     const { shouldRender: sectionShouldRender, isClosing: sectionClosing } = useExitAnimation(sectionOpen, 200);
     // 닫히는 200ms 동안 state.zipCode/detail 은 이미 비워져 있다. 그대로 그리면 슬라이드가
@@ -150,8 +148,8 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
         }
     }, [value]);
 
-    // 서버값뿐 아니라 form.setFieldsValue로 복원한 초안도 동기화한다. 빈 문자열도 반영해야
-    // "새로 작성"이나 주소 재선택 뒤에 예전 우편번호가 화면에 남지 않는다.
+    // 서버값과 복원 초안을 동기화하며 빈 문자열도 반영한다.
+    // 초기화·재선택 시 이전 우편번호를 함께 폐기한다.
     useEffect(() => {
         if (zipCodeProp !== state.zipCode) dispatch({ type: 'SET_ZIPCODE', zipCode: zipCodeProp });
     }, [state.zipCode, zipCodeProp]);
@@ -219,11 +217,8 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
         const v = e.target.value;
         searchRequestRef.current += 1;
         queryRef.current = v;
-        // 2026-07 재작업 — 이전엔 주소 필드에 "포커스만 해도"(커서만 올려도) 우편번호/상세주소/좌표를
-        // 싹 비웠다(FOCUS_RESET_FOR_EDIT). 커서만 올렸다 뗐을 뿐인데 기존 값이 다 날아가 사용자 경험이
-        // 나빴다. 이제 포커스로는 아무것도 안 지우고, 사용자가 실제로 주소를 "고치기 시작할 때"(=이미
-        // 선택된 상태에서 타이핑) 그 시점에만 이전 우편번호/상세주소/좌표를 무효화한다.
-        // wasSelected 플래그로 리듀서가 zipCode/detail을 함께 비우고, 여기서 부모의 메타도 비운다.
+        // 단순 포커스 이동으로 주소·우편번호·좌표를 초기화하지 않는다.
+
         const wasSelected = selectedRef.current;
         selectedRef.current = false;
         if (wasSelected) {
@@ -287,9 +282,8 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                         onChange={handleQueryChange}
                         onKeyDown={handleKeyDown}
                         onFocus={() => {
-                            // 2026-07 — 포커스(커서 올림)로는 절대 기존 값을 지우지 않는다. 이미 선택된 주소가
-                            // 있으면 그대로 두고, 검색 결과가 남아 있을 때만 드롭다운을 다시 연다.
-                            // (실제 초기화는 사용자가 주소를 직접 고치기 시작할 때 handleQueryChange에서 처리)
+                            // 주소값은 포커스가 아닌 명시적 초기화·재선택에서 변경한다.
+
                             setActiveField('query');
                             if (!selectedRef.current && state.results.length > 0) {
                                 dispatch({ type: 'OPEN_IF_RESULTS' });
@@ -312,11 +306,9 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                     )}
                 </div>
 
-                {/* 드롭다운 — 닫힐 때(선택/blur/ESC)도 슬라이드 아웃 애니메이션이 재생되도록
-                    useExitAnimation으로 열림/닫힘 렌더링을 분리(2026-07 버그 수정: 이전엔
-                    state.open이 false가 되는 즉시 언마운트되어 여는 애니메이션만 보이고
-                    닫힐 때는 애니메이션 없이 바로 사라졌음). 목록은 SELECT_RESULT 시 즉시
-                    비워지는 state.results 대신, 닫히는 동안 마지막으로 유효했던 lastResults를 사용 */}
+                {/*
+                 * 닫힘 중에는 마지막 검색 결과를 유지해 퇴장 모션이 끝난 뒤 정리한다.
+                 */}
                 {dropdownShouldRender && (
                     <div
                         role="listbox"

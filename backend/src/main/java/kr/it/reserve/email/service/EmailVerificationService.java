@@ -57,7 +57,7 @@ public class EmailVerificationService {
         verification.setVerified(false);
         verification.setVerificationTicketHash(null);
         verification.setAttemptCount(0);
-        // Flush the unique-email boundary before sending mail, including concurrent first requests.
+        // 동시 최초 요청에서도 이메일 유일성을 확정한 뒤 메일을 보낸다.
         try {
             verificationRepository.saveAndFlush(verification);
         } catch (DataIntegrityViolationException failure) {
@@ -71,12 +71,7 @@ public class EmailVerificationService {
         return verification.getExpiresAt().atZone(ZoneId.systemDefault()).toInstant();
     }
 
-    /**
-     * 코드 검증.
-     *
-     * <p>{@code noRollbackFor} 가 없으면 실패 카운터가 예외와 함께 롤백돼 <b>영원히 0</b>이 된다 —
-     * 근거는 {@code PasswordResetService.verifyCode} 주석에 자세히 적어뒀다.
-     */
+    /** 실패 횟수가 예외로 롤백되지 않도록 noRollbackFor를 유지한다. */
     @Transactional(noRollbackFor = BusinessException.class)
     public boolean verifyCode(String email, String code) {
         EmailVerification verification = verificationRepository
@@ -88,7 +83,7 @@ public class EmailVerificationService {
             throw new EmailException("인증 시간이 만료됐어요. 다시 요청해주세요.", HttpStatus.GONE);
         }
 
-        // 시도 횟수 상한 (2026-08-16) — 코드가 6자리 숫자라 이 상한이 1차 방어다.
+        // 인증 코드별 대조 시도 횟수를 제한한다.
         if (verification.isAttemptExhausted()) {
             log.warn("Email verification attempts exhausted");
             throw new EmailException("인증 시도 횟수를 초과했어요. 코드를 재발송해주세요.", HttpStatus.BAD_REQUEST);
@@ -131,7 +126,7 @@ public class EmailVerificationService {
 
     public record VerificationResult(String verificationTicket, Instant expiresAt) {}
 
-    /** The signup transaction owns consumption; failed account creation restores the verification. */
+    /** 가입 트랜잭션이 인증 소모를 소유하므로 가입 실패 시 인증도 복원된다. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void consumeVerifiedEmail(String email, String ticket) {
         EmailVerification verification = verificationRepository.findTopByEmailOrderByCreatedAtDesc(email)

@@ -5,12 +5,8 @@ import adService from '../services/adService';
 import useMessage from './useMessage';
 import { invalidateAdData } from './invalidateAfterWrite';
 
-/**
- * 광고 생성·기존 광고 결제를 PortOne V2의 준비 응답으로 처리한다.
- * PC는 서버 verifyPayment, 모바일은 서버 redirect 경로에서 결제 결과를 검증한다.
- * SDK 반환값이 없으면 리다이렉트로 처리하고 code가 있으면 실패·취소로 구분한다.
- * 실패·취소도 결과 객체로 반환하므로 mutation의 onSuccess가 결제 성공을 뜻하지는 않는다.
- * 목록은 mutation 완료 후 무효화하며 진행 중인 기존 광고 ID는 mutation variables에서 읽는다.
+/*
+ * 광고 결제 결과는 PC 검증 또는 모바일 리다이렉트의 서버 검증으로 확정한다. 실패·취소도 결과 객체이므로 mutation 완료만으로 결제 성공을 판단하지 않는다.
  */
 const useAdPayment = () => {
     const { message } = useMessage();
@@ -81,10 +77,8 @@ const useAdPayment = () => {
                 const prepared = await adService.createAd(formData);
                 return await runPayment(prepared);
             } catch (err) {
-                // 2026-07 버그 수정: axios 인터셉터는 항상 진짜 Error 객체를 throw하는데(err instanceof Error),
-                // 여기서는 typeof err === 'string'으로 검사해서 항상 false가 되고 있었다 — 그 결과 백엔드가
-                // 보낸 구체적인 오류 문구(예: 이미 결제 대기 중인 신청이 있음, 노출 기간 오류 등)가 한 번도 사용자에게
-                // 보이지 않고 늘 같은 뭉뚝한 fallback 문구만 떠 있었다. BusinessVerificationTab 등과 동일한 컨벤션으로 통일.
+                // 인터셉터가 던진 Error의 message를 사용자 오류 안내에 사용한다.
+
                 message.error(err instanceof Error ? err.message : '광고 신청에 실패했어요.');
                 return { success: false };
             }
@@ -92,14 +86,14 @@ const useAdPayment = () => {
         onSuccess: invalidateMyAds,
     });
 
-    // 결제 대기(PENDING_PAYMENT)/실패(PAYMENT_FAILED) 상태인 기존 광고에 대해 결제창을 다시 여는 mutation — "결제" 버튼용
+    // 결제 대기·실패 상태의 기존 광고는 결제창을 다시 열 수 있다.
     const payExistingMutation = useMutation({
         mutationFn: async (adId) => {
             try {
                 const prepared = await adService.preparePayment(adId);
                 return await runPayment(prepared);
             } catch (err) {
-                // 위 createMutation과 동일한 이유로 err.message를 읽도록 수정(2026-07)
+
                 message.error(err instanceof Error ? err.message : '결제 준비에 실패했어요.');
                 return { success: false };
             }

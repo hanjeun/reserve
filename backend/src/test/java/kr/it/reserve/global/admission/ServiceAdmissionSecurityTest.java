@@ -39,7 +39,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
-/** Real SecurityConfig and MVC routing; all account, queue, provider and rate-limit dependencies are in-memory mocks. */
+/** 실제 SecurityConfig·MVC 경로를 사용하고 계정·대기열·제공자·호출 제한 의존성은 메모리 대역으로 둔다. */
 @SpringJUnitWebConfig(classes = {SecurityConfig.class, ServiceAdmissionSecurityTest.Fixture.class})
 @TestPropertySource(properties = {"reserve.service-admission.enabled=true", "server.env=prod",
         "cors.allowed-origins=https://reserve.it.kr"})

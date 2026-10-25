@@ -328,7 +328,7 @@ test('image publication and frontend staging remain main-push-only', () => {
             || /docker (build|push)\b/.test(entry.run ?? ''));
         assert.ok(writes.length > 0);
         for (const entry of writes) {
-            // GitHub requires the job condition as well as any step condition.
+            // GitHub는 단계 조건과 별개로 작업 조건도 요구한다.
             if (job.if !== mainPush) assert.equal(entry.if, mainPush, entry.name);
         }
     }
@@ -443,8 +443,7 @@ test('latency logs contain coarse routes and durations, never request identifier
 });
 
 test('public pages ship an indexable robots meta in the raw HTML', () => {
-    // nginx map 은 빈 값에 정규식을 평가하지 않는다. "~^$" 로 색인 대상(빈 X-Robots-Tag)을 잡으면
-    // 항상 default(noindex)로 떨어져 공개 페이지 원본 HTML 전체가 noindex 가 된다(2026-09-28 운영 사고).
+// nginx map은 빈 값에 정규식을 평가하지 않으므로 색인 허용 값은 빈 리터럴로 명시한다.
     const config = read('nginx/default.conf');
     const robotsMeta = config.match(/map \$reserve_robots_tag \$reserve_robots_meta \{[\s\S]*?\}/)?.[0];
     assert.ok(robotsMeta);

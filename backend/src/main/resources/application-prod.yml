@@ -27,17 +27,17 @@ spring:
           kakao:
             redirect-uri: "{baseUrl}/login/oauth2/code/kakao"
 
-# Redis remains disabled unless explicitly enabled. Only the internal service alias or RFC1918 address is accepted.
+# 명시적으로 켰을 때만 Redis를 사용하며 내부 서비스 이름이나 RFC1918 주소만 허용한다.
 reserve:
   service-admission:
-    # Opt-in only; capacity/lifetime bindings are shared with application-common.yml.
+    # 명시적으로 켜야 하며 정원·수명 설정은 application-common.yml과 공유한다.
     enabled: ${RESERVE_SERVICE_ADMISSION_ENABLED:false}
     automatic:
       enabled: ${RESERVE_SERVICE_ADMISSION_AUTOMATIC_ENABLED:false}
   redis:
     host: ${RESERVE_REDIS_HOST:}
 
-# Limits/relays have a bounded fallback. Enabled admission gates fail closed when Redis is unavailable.
+# 호출 제한·릴레이는 제한된 대체 경로를 사용하지만 활성 입장 관문은 Redis 장애 시 허용하지 않는다.
 management:
   health:
     redis:
@@ -58,18 +58,10 @@ app:
 cors:
   allowed-origins: "https://reserve.it.kr"
 
-# 가게 검색의 FULLTEXT 후보 기능은 코드 기본값 true이며, 아래 설정을 추가할 필요는 없다.
-# StoreFulltextSearch가 MySQL/ngram_token_size=2/정확한 다섯 컬럼의 ngram 인덱스를 한 번 확인한다.
-# H2·인덱스 미설치·탐지 실패는 LIKE를 사용한다. 명시 false는 탐지 없이 LIKE만 사용한다.
-# 후보 MATCH에도 원문 LIKE·공개 필터·정렬을 적용하고, 같은 repeatable-read 스냅샷의 count가
-# 일치할 때만 후보 페이지를 반환한다. 누락·MATCH 오류는 LIKE로 폴백하며 반복 오류를 막는다.
-# LIKE count 비용도 유지하므로 속도 향상을 보장하지 않는다.
-# DDL은 docs/technical/manual-ddl.md를 따라 승인된 계정으로 적용한다.
-# 미설치 판정은 캐시되므로 실행 중 인덱스를 설치했다면 새 앱 기동 때 다시 탐지한다.
-#
-# search:
-#   store:
-#     fulltext-enabled: true
+# 가게 목록은 MySQL/ngram=2와 일치하는 다섯 컬럼 색인에서만 후보 검색을 사용한다.
+# 원문 count·공개 필터·정렬의 동등성이 맞지 않거나 오류가 나면 LIKE로 복귀한다.
+# search.store.fulltext-enabled=false는 탐지도 끈다. 미설치 판정은 앱 기동 동안 캐시한다.
+# 통합검색은 search.store.unified-fulltext-enabled=false가 기본이며 count 비용을 별도로 검증한 뒤 켠다.
 
 # 운영 환경 로깅 — DEBUG 로그 비활성화
 logging:

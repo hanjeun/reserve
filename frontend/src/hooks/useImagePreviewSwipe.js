@@ -1,10 +1,7 @@
 import { useEffect } from 'react';
 
-/**
- * 열린 AntD 이미지 프리뷰의 좌우 스와이프를 공용으로 처리한다. App에서 한 번만 등록한다.
- * 훅 기반·직접 PreviewGroup 경로를 모두 지원하도록 열린 DOM을 찾고 AntD 탐색 버튼에 넘김을 위임한다.
- * capture 단계의 pointer 이벤트를 사용하며 확대 상태의 드래그는 사진 이동으로 남겨둔다.
- * 사진이 한 장이라 탐색 버튼이 없으면 넘김을 수행하지 않는다.
+/*
+ * 열린 AntD 미리보기의 탐색 버튼으로 좌우 넘김을 위임한다. 확대 중 드래그는 사진 이동으로 남기고 사진이 한 장이면 넘기지 않는다.
  */
 
 const PREVIEW_ROOT = '.ant-image-preview';

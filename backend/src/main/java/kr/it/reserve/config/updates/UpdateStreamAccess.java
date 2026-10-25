@@ -11,7 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
-/** A new persistence context prevents an after-commit listener from reading a stale managed member. */
+/** 커밋 후 리스너가 이전 회원 객체를 읽지 않도록 새 영속성 문맥을 사용한다. */
 @Service
 @RequiredArgsConstructor
 public class UpdateStreamAccess {

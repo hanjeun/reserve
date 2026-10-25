@@ -4,16 +4,12 @@ import reservationService from '../services/reservationService';
 import { storeKeys } from './queryKeys';
 import { httpStatusOf, isMissingRequestError } from '../utils/listErrorMessage';
 
-/**
- * 가게 데이터 로딩 훅
+/*
+ * 공개·가게 수정·예약 변경 조회의 경로와 캐시 범위를 구분한다.
  * @param {string|number} storeId
  * @param {object} options
  * @param {boolean} options.forEdit true면 인증된 /edit 엔드포인트 사용 (소유자만 접근 가능)
  * @param {string|number|null} options.reservationId 본인 예약 변경에 필요한 공개 가게 정보 조회
- *
- * 2026-07-10: TanStack Query로 전환 — 이전엔 useState+useEffect라 캐싱이 전혀 없어서
- * 목록에서 봤던 가게를 다시 눌러 들어가도 항상 새로 요청 + 스켈레톤부터 다시 보여줬음.
- * 이제 같은 가게를 짧은 시간(staleTime) 안에 다시 열면 캐시에서 즉시 보여줌.
  */
 const useStoreData = (storeId, { forEdit = false, reservationId = null } = {}) => {
     const validId = /^\d+$/.test(String(storeId ?? ''))
@@ -26,7 +22,7 @@ const useStoreData = (storeId, { forEdit = false, reservationId = null } = {}) =
             : forEdit ? [...storeKeys.detail(storeId), 'edit'] : storeKeys.detail(storeId),
         queryFn: context => {
             if (!enabled) return null;
-            // Reading this getter opts into cancellation; keep the original store reads shared across StrictMode.
+            // signal 접근이 취소 참여를 뜻하므로 일반 가게 조회는 StrictMode에서 공유한다.
             if (reservationEdit) return reservationService.getEditStore(reservationId, storeId, { signal: context.signal });
             return forEdit ? storeService.getStoreForEdit(storeId) : storeService.getStoreById(storeId);
         },

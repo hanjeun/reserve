@@ -11,15 +11,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-/**
- * 가게 광고.
- *
- * 현재 노출 상태와 현재 merchantUid를 갖는다. 금융 판단의 정본은 AdPaymentAttempt이며,
- * 기존 결제 시도는 새 UID가 생겨도 보존한다. 예약 결제 원장과는 별개다.
- *
- * 노출 방식: 결제 완료 즉시 ACTIVE(사전 관리자 승인 없음) — 문제가 생기면
- * 관리자가 사후에 SUSPENDED로 내린다(Store의 정지 패턴과 동일한 철학).
- */
+/** 노출 상태는 광고에, 결제·환불 판단과 이전 결제 시도는 AdPaymentAttempt 원장에 보존한다. */
 @Entity
 /*
  * 인덱스는 AdvertisementRepository의 실제 쿼리에서 역산했다. (근거는 Reservation 엔티티 주석 참고)
@@ -121,9 +113,7 @@ public class Advertisement {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    // 2026-07 추가 — 종료상태(EXPIRED/CANCELLED/REFUNDED/SUSPENDED) 광고를 사업자가 목록에서 직접
-    // 숨길 수 있게 — 예약(Reservation.deletedAt)과 동일한 소프트삭제 패턴(휴지통 30일 보관 후 자동 영구삭제).
-    // 결제/노출 이력은 지우지 않고 그대로 보존하는 게 목적이라 하드삭제가 아니라 소프트삭제.
+    // 목록에서 숨겨도 결제·노출 이력은 보존한다.
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 

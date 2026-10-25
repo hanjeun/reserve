@@ -5,7 +5,7 @@ import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.reservation.entity.Reservation;
 import org.springframework.http.HttpStatus;
 
-/** All reservation workflows share the same member/owner and approved attendance policy. */
+/** 예약의 회원·소유자 확인과 승인된 방문 상태 정책을 공통으로 적용한다. */
 final class ReservationAccess {
     private ReservationAccess() {}
     static void member(Reservation reservation, Member member) {

@@ -67,7 +67,7 @@ public class AdmissionService {
         return scope.prefix() + "admission:{" + c.getId() + "}:";
     }
 
-    /** Exact configuration identity is provisioned separately; an empty/restarted Redis fails closed. */
+    /** 설정 식별자는 별도로 준비한다. Redis가 비거나 재시작되어 상태가 없으면 입장을 허용하지 않는다. */
     public static String marker(AdmissionProperties.Campaign c) {
         String canonical = c.getId() + "|" + c.getEpoch() + "|" + c.getStoreId() + "|" + c.getDate()
                 + "|" + c.getTime() + "|" + c.getOpensAt() + "|" + c.getClosesAt() + "|" + c.getConcurrent()
@@ -95,7 +95,7 @@ public class AdmissionService {
                 position, number(result, 3), number(result, 4), pollAfterSeconds(c, state, position), c.getIdleSeconds());
     }
 
-    /** A rank policy, not measured load feedback; leave three heartbeat opportunities within the idle timeout. */
+    /** 실측 부하가 아닌 순번 기반 정책이다. 유휴 만료 전에 최소 세 번 생존 신호를 보낼 여유를 둔다. */
     private static int pollAfterSeconds(AdmissionProperties.Campaign campaign, String state, long position) {
         int interval = 4;
         if ("WAITING".equals(state)) interval = position <= 10 ? 4 : position <= 100 ? 10 : 20;

@@ -28,7 +28,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-/** Standalone helper contracts only: no Spring application, DB, worker, or operational connection. */
+/** 앱·DB·작업자·운영 연결 없이 독립 준비 도구의 계약만 검사한다. */
 public final class PrepareServiceAdmissionTest {
     private static int checks;
     private static final String CONFIG = "{\"epoch\":\"11111111-1111-4111-8111-111111111111\"}";

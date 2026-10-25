@@ -39,7 +39,6 @@ public class ReservationResponse {
      */
     private String cancelReason;
 
-
     // 결제 관련 필드
     private Boolean depositPaid;
     private Integer depositAmount;
@@ -57,11 +56,6 @@ public class ReservationResponse {
     // 리뷰 관련 필드 (null = 아직 리뷰 미작성)
     private Long reviewId;
 
-    /**
-     * 필드를 추가할 땐 {@link #fromEntityWithReviewId} 한 곳만 고치면 된다 (2026-08-11 정리).
-     * 예전엔 두 팩토리가 같은 빌더 체인을 통째로 복사해 갖고 있어서, 새 필드를 한쪽에만 넣으면
-     * <b>화면에 따라 값이 있다 없다</b> 했다(목록엔 뜨는데 상세엔 안 뜨는 식). 이제 위임한다.
-     */
     public static ReservationResponse fromEntity(Reservation reservation) {
         return fromEntityWithReviewId(reservation, null);
     }

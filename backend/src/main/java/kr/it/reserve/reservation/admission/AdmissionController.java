@@ -37,7 +37,7 @@ public class AdmissionController {
     private Long member(boolean write) {
         var m = SecurityUtil.getCurrentMember();
         if (m.isSuspended() || !m.isTermsAgreed()) throw new ReservationException("예약할 수 있는 회원 상태를 확인해주세요.", HttpStatus.FORBIDDEN);
-        // Separate user bucket: NAT users do not share a single queue status budget.
+        // 같은 IP를 공유해도 사용자별 대기 상태 조회 예산은 분리한다.
         if (!limiter.tryConsume("admission:" + m.getId(), write ? RateLimiter.Policy.WAITING_JOIN : RateLimiter.Policy.PROFILE_READ))
             throw new ReservationException("대기 상태를 잠시 후 다시 확인해주세요.", HttpStatus.TOO_MANY_REQUESTS);
         return m.getId();

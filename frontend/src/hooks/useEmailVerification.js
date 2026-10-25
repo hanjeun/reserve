@@ -9,7 +9,7 @@ const clearStorage = () => {
 };
 
 // 순수 헬퍼
-/** localStorage에서 저장된 인증 상태를 읽어온다. 실패 시 null 반환. */
+/* 저장된 인증 상태를 읽지 못하면 null로 처리한다. */
 const getStoredState = () => {
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
@@ -29,7 +29,6 @@ const formatTimer = (sec) => {
     return `${m}:${s}`;
 };
 
-// Hook
 export default function useEmailVerification({
     sendEndpoint,
     verifyEndpoint,

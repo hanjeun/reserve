@@ -35,15 +35,8 @@ const ReservationRow = ({ reservation, onOpenDetail, renderActions, extraNote, s
     const actionsNode = renderActions ? renderActions(isWide) : null;
     const hasActions = actionsNode != null && (!Array.isArray(actionsNode) || actionsNode.length > 0);
 
-    // 카드 클릭 = 상세 열기. 클릭 경로는 "가게명 버튼" 하나뿐이다
-    // 예전에는 바깥 div·썸네일 <button>·가게명 <button> 세 곳이 각각 같은 onOpenDetail을 들고
-    // 있었다. 같은 동작인데 누른 자리에 따라 반응이 달라 보였고(가게명은 즉시 열리는데 그 주변을
-    // 누르면 글자가 파랗게 선택된 뒤 열림), 접근성 노드도 둘로 중복됐다.
-    // 지금은 가게명 <button> 하나만 진짜 클릭 타깃이고, 그 버튼의 ::after 가 카드 전체를 덮어
-    // (.reserve-tap-card__trigger, interactions.css) 어디를 눌러도 같은 한 번의 클릭이 된다.
-    // 액션 버튼은 z-index로 오버레이 위에 올려 자기 클릭을 지킨다 — stopPropagation이 필요 없다.
-    // user-select:none 은 같은 CSS 관문에 있다 — 이게 없으면 텍스트 위를 살짝 끌며 누른 탭이
-    // iOS/안드로이드에서 "글자 선택" 제스처로 해석돼 밑줄 같은 하이라이트가 먼저 뜬다.
+    // 상세 진입은 가게명 버튼의 행 전체 오버레이로 공유하고 독립 액션은 그 위에 둔다.
+
     return (
         <div className="reserve-tap-card" style={styles.row} data-list-item-id={`reservation:${reservation.id}`}>
             <div style={styles.mainRow}>
@@ -85,10 +78,9 @@ const ReservationRow = ({ reservation, onOpenDetail, renderActions, extraNote, s
                         </span>
                     </div>
 
-                    {/* 줄3 — 날짜·시간(공간이 모자라면 여기만 말줄임) | 액션 버튼.
-                        래퍼를 두지 않고 평평하게 나열한다 — 중간에 inline-flex 래퍼가 끼면
-                        그 래퍼의 overflow:hidden이 안쪽 텍스트가 줄어들기 전에 잘라버려서
-                        말줄임표 없이 "2026-07-31"이 "2."로 뭉개진다. */}
+                    {/*
+                     * 날짜·시간을 중간 overflow 래퍼 없이 배치해 말줄임을 텍스트에 적용한다.
+                     */}
                     <div style={styles.line3}>
                         <div style={styles.metaLine}>
                             {showMemberInfo && isWide && (
@@ -109,11 +101,9 @@ const ReservationRow = ({ reservation, onOpenDetail, renderActions, extraNote, s
                             <span style={styles.fixedText}>{formatTime(reservationTime)}</span>
                         </div>
                         {hasActions && (
-                            // 승인/취소를 눌렀는데 상세까지 열리면 안 된다. 예전엔 부모 onClick을
-                            // stopPropagation으로 막았지만, 지금은 부모에 onClick이 없고 카드 전체를
-                            // 덮는 건 가게명 버튼의 ::after 오버레이다. 오버레이는 조상이 아니라
-                            // 형제 레이어이므로 z-index로 이 그룹을 위에 올리기만 하면 된다
-                            // (.reserve-tap-card .reserve-reservation-actions, interactions.css).
+                            // 상태 변경 도구를 눌러 상세까지 열리지 않게 한다.
+
+                            // 실행 도구 영역은 interactions.css의 예약 행 규칙을 따른다.
                             <div
                                 className="reserve-reservation-actions"
                                 style={isWide ? styles.actionGroupWide : styles.actionGroup}
@@ -131,9 +121,9 @@ const ReservationRow = ({ reservation, onOpenDetail, renderActions, extraNote, s
     );
 };
 
-// 썸네일·가게명은 <div role="button">이 아니라 네이티브 <button>으로 렌더한다 —
-// 키보드(Tab/Enter/Space)와 스크린리더 지원을 브라우저에 맡기기 위해서다(SonarCloud a11y).
-// 대신 버튼 기본 외형(배경·테두리·패딩·폰트·가운데정렬)을 지워 예전 div 시절 모양을 유지한다.
+// 가게명은 기본 button으로 키보드·보조기술 동작을 제공한다.
+
+// 실제 버튼의 기본 배경·여백을 초기화해 행의 기존 배치를 유지한다.
 const btnReset = { background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', textAlign: 'left' };
 
 // 왼쪽 요소 공통 — flex item이 내용보다 작아지려면 minWidth:0이 필요하고,
@@ -180,12 +170,8 @@ const styles = {
     // 클릭은 부모 <button>으로 버블링되므로 눌러도 상세가 열리는 동작은 그대로다.
     requestIcon:   { fontSize: 12, color: colors.text.tertiary, flexShrink: 0, position: 'relative', zIndex: 1 },
 
-    // 예약번호 줄 / 날짜·시간 줄 — 아이콘과 텍스트를 한 겹에 평평하게 나열한다.
-    // 주의: text-overflow는 flex 컨테이너에 적용되지 않는다. 텍스트를 inline-flex 래퍼로 한 번 더 감싸면
-    //    그 래퍼의 overflow:hidden이 먼저 잘라서 말줄임표가 사라진다("2026-07-31" → "2." 로 뭉개짐).
-    //    말줄임을 걸 대상은 flex item이면서 block인 요소여야 한다 → 아래 ellipsis.
-    // 2026-07-30: <button>이 아니라 <div>다. 카드 전체가 클릭 영역이 되면서 이 줄들이
-    // 따로 버튼일 이유가 없어졌고, 버튼이면 안쪽 액션 버튼과 중첩될 위험도 있었다.
+    // 말줄임은 flex 컨테이너가 아닌 내부 블록 요소에 적용한다.
+
     metaLine: { flex: 1, minWidth: 0, display: 'inline-flex', alignItems: 'center', gap: 4,
                 fontSize: fontSize.sm, lineHeight: 1, color: colors.text.secondary, overflow: 'hidden' },
     metaIcon: { fontSize: 12, color: colors.text.tertiary, flexShrink: 0 },
@@ -199,21 +185,10 @@ const styles = {
     priceGroup: { display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 },
     price:      { fontSize: fontSize.base, lineHeight: 1, color: colors.text.primary, whiteSpace: 'nowrap' },
     timeout:    { fontSize: fontSize.xs, lineHeight: 1, color: colors.warning.main, whiteSpace: 'nowrap' },
-    // 항상 한 줄(nowrap) — wrap을 허용하면 버튼 4개일 때 줄이 늘어나 카드 높이가 들쭉날쭉해진다.
-    //
-    // gap 6의 근거 (2026-07-30 브라우저 실측, 13px 폰트)
-    // 미결제 대기 예약의 버튼 3개(결제하기·변경·취소)가 최대 폭이다. 아이콘을 숨긴 모바일 기준
-    // 버튼 실폭은 45 + 22.5 + 22.5 = 90px 안팎이다.
-    //
-    //   390px 화면: 카드 342(뷰포트-좌우패딩 24×2) - 썸네일56 - 갭16 = 3줄 영역 270
-    //               버튼그룹 약90 + gap6×2 = 102  →  날짜 몫 약160
-    //               "2026-07-31 · 14:00" 필요량 = 70.5+4+3.3+4+32.6 = 114.4  → 22px 여유
-    //   375px(iPhone SE): 여유 7px — 아슬아슬하게 들어간다
-    //   360px(구형 안드로이드): 8px 부족 — 날짜 끝이 …로 잘린다
-    //
-    // gap을 1 키울 때마다 3px(갭 3개)씩 날짜 몫이 줄어든다. 즉 gap 10으로 올리면
-    // 375px에서 날짜가 잘리기 시작한다. 버튼 사이가 좁아 보이더라도 여기서 올리면 안 되고,
-    // 늘리려면 폭을 다른 데서 만들어 와야 한다(예: 버튼 4개일 때만 액션을 아랫줄로).
+    // 액션을 한 줄로 유지해 카드 높이를 일정하게 한다.
+
+    // 좁은 화면에서도 날짜·시간과 실행 도구가 겹치지 않을 간격을 둔다.
+
     actionGroup: { display: 'flex', gap: 6, flexWrap: 'nowrap', justifyContent: 'flex-end', flexShrink: 0 },
     // PC는 폭 제약이 전혀 없다 — 3줄 영역 1080px 중 버튼그룹이 198px뿐이라 874px이 남는다.
     // 모바일 때문에 좁힌 gap 6을 PC까지 끌고 갈 이유가 없어서 여기서만 넉넉하게 준다.

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import RefreshButton from './RefreshButton';
 import MessengerListHeading from '../chat/MessengerListHeading';
 
-// Popup motion timers are separate from the refresh cooldown under test.
+// 팝업 모션 타이머와 새로고침 대기 타이머를 구분한다.
 vi.mock('./Tooltip', () => ({ default: ({ children }) => children }));
 
 describe('RefreshButton loading feedback', () => {
@@ -77,8 +77,8 @@ describe.each(['toolbar', 'messenger'])('shared refresh cooldown: %s', surface =
         vi.useFakeTimers();
         const { unmount } = render(renderRefresh(vi.fn()));
         fireEvent.click(button());
-        // AntD Modal's document click listener clears its position marker after 100ms.
-        // Drain that independent timer while the three-second refresh cooldown remains pending.
+        // 클릭 위치를 지우는 AntD의 100ms 타이머만 먼저 정리한다.
+        // 3초 새로고침 대기 타이머는 남겨 해제 여부를 확인한다.
         act(() => vi.advanceTimersByTime(100));
         expect(vi.getTimerCount()).toBe(1);
         unmount();

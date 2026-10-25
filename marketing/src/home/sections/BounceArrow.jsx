@@ -1,6 +1,6 @@
 import { colors } from '../../../../frontend/src/styles/tokens/index.js';
 
-/** 다음 섹션 버튼의 목표 ID를 전달한다. 실제 이동과 헤더 높이 보정은 scroll.js가 처리한다. */
+/* 섹션 이동과 헤더 높이 보정은 공통 탐색 처리에 맡긴다. */
 
 export default function BounceArrow({ targetId, style = {} }) {
     return (

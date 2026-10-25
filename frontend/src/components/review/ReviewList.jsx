@@ -51,9 +51,9 @@ const ReviewForm = ({ userName, form, setForm, onSubmit, onCancel, loading: form
                                 style={{ fontSize: 15, color: colors.warning.main }}
                                 allowClear={false}
                             />
-                            {/* 별점은 카드 헤더에 있어 FormField 로 감쌀 자리가 없다.
-                                에러 표기는 같은 클래스(.reserve-field-error)를 직접 써서
-                                아래 입력칸들과 모양을 맞춘다 — 스타일 출처는 index.css 하나다. */}
+                            {/*
+                             * 별점도 공통 필드 오류 클래스로 입력 오류를 표시한다.
+                             */}
                             {errors.rating && (
                                 <span className="reserve-field-error" role="alert">{errors.rating}</span>
                             )}
@@ -109,13 +109,8 @@ const ReviewForm = ({ userName, form, setForm, onSubmit, onCancel, loading: form
     );
 };
 
-/**
- * 가게 상세 페이지 리뷰 목록 + 작성/수정/삭제
- *
- * 2026-07 추가 — isPC prop. 리뷰 섹션이 StoreDetail.jsx의 2단 레이아웃(pcGrid) 밖으로 나와
- * 풀와이드가 되면서, PC에서는 카드 목록을 2열 그리드로 채우고("빈 오른쪽 공간" 문제 해결),
- * 리뷰가 없을 때의 안내 문구도 그 풀와이드 안에서 진짜로 중앙에 오도록 한다.
- * isPC를 안 넘기면(기존 호출부 호환) 모바일과 동일한 1열 레이아웃으로 동작한다.
+/*
+ * PC 리뷰는 별도 전체 너비 영역의 두 열, 기본 호출은 한 열로 표시한다.
  */
 const ReviewList = ({
     storeId,
@@ -144,8 +139,8 @@ const ReviewList = ({
 
     const reviewRefs = useRef({});
 
-    // 2026-07-09: TanStack Query로 전환 (reviewKeys.byStore) — 생성/수정/삭제는
-    // 다시 불러오기 대신 setQueryData로 캐시를 직접 수정해서(기존 로컬 state 스플라이싱과 동일한 체감) 즉시 반영된다.
+    // 리뷰 변경 뒤 같은 가게의 리뷰 캐시를 갱신한다.
+
     const { data: reviews = [], isLoading: loading, isError, error, isFetching, refetch } = useQuery({
         queryKey: reviewKeys.byStore(storeId),
         queryFn: async () => {
@@ -247,8 +242,8 @@ const ReviewList = ({
         });
     };
 
-    // 2026-07 추가: PC에서는 2열 그리드라 한 화면에 더 많이 채워지는 게 자연스러워서 개수를 4로 늘림
-    // (3개면 2열 그리드에서 한 칸이 어중간하게 비어 보인다). 모바일은 기존과 동일하게 3.
+    // PC의 두 열에 맞춰 골격 네 행을 표시한다.
+
     if (loading) return <LoadingStatus aria-label="리뷰를 불러오는 중" aria-busy="true"><ReviewCardSkeleton count={isPC ? 4 : 3} isPC={isPC} /></LoadingStatus>;
     if (isError) return <DataState state="error" kind="review" subject="리뷰" error={error}
         onRetry={refetch} retrying={isFetching} />;
@@ -299,9 +294,8 @@ const ReviewList = ({
             )}
 
             {reviews.length === 0 ? (
-                // 2026-07 수정 — 리뷰 섹션이 풀와이드가 된 만큼, 안내 문구도 그 풀와이드 폭 전체를
-                // 기준으로 진짜 중앙에 오도록 flex 중앙정렬로 감쌌다(예전엔 상태 컴포넌트 자체는 좌우 중앙이지만
-                // 그 바깥을 감싼 섹션이 좁은 폭에 고정되어 있어서 화면 전체 기준으로는 왼쪽에 쏠려 보였다).
+                // 안내는 리뷰 영역 전체 너비의 중앙에 배치한다.
+
                 <div style={styles.emptyWrap}>
                     <DataState state="empty" kind="review" title="아직 리뷰가 없어요. 첫 번째 리뷰를 남겨보세요!" />
                 </div>
@@ -389,7 +383,7 @@ const styles = {
         lineHeight: 1, letterSpacing: '-1px',
     },
     reviewCount: { color: colors.text.tertiary, fontSize: fontSize.sm, marginTop: 2 },
-    // 2026-07 수정 — 풀와이드 섹션 전체를 기준으로 아이콘+문구가 진짜 중앙에 오도록 flex 중앙정렬.
+    // 빈 결과 안내는 전체 리뷰 영역의 중앙에 배치한다.
     emptyWrap: {
         padding: '60px 0 40px',
         display: 'flex',
@@ -399,16 +393,13 @@ const styles = {
         width: '100%',
     },
     list: { display: 'flex', flexDirection: 'column', gap: 12 },
-    // 2026-07 추가 — PC 전용 2열 그리드. 리뷰 섹션이 풀와이드가 되면서 1열로만 쌓으면
-    // 오른쪽 절반이 계속 비어 보이는 문제가 있었다.
+    // PC 리뷰는 두 열 그리드를 사용한다.
+
     listGridPC: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, alignItems: 'start' },
     // 작성/수정 폼은 입력창이 있어 2열 중 한 칸에 넣기엔 좁으므로 그리드 전체 폭을 차지하게 함
     gridSpanAll: { gridColumn: '1 / -1' },
     card: {
-        // 2026-07 버그 수정: 예전엔 padding이 '20px 16px 0 16px'(하단 0)이었다.
-        // 하단을 cardActions(marginTop 16 + 좌우 -16)가 채워주는 구조였는데, 그 액션바는
-        // isOwner일 때만 렌더된다 — 즉 남의 리뷰에서는 본문 마지막 줄이 카드 아래 테두리에
-        // 그대로 붙어버렸다. 살리려면 하단에도 padding을 주고, 액션바가 있을 땐 marginBottom으로 상쇄한다.
+
         padding: '20px 16px',
         backgroundColor: colors.background.paper, borderRadius: radius.xl,
         border: `1px solid ${colors.border.light}`, boxShadow: shadows.card,

@@ -59,7 +59,7 @@ const defaults = {
 };
 const isAttribution = key => /^(utm_(source|medium|campaign|term|content|id)|gclid|fbclid)$/.test(key);
 
-/** Recover list options without turning an otherwise valid page into an error screen. */
+/* 잘못된 목록 옵션은 정상 페이지를 오류로 바꾸지 않고 정규화한다. */
 export function normalizeListQueryParams(pathname, searchParams) {
     const next = new URLSearchParams(searchParams);
     const normalizedPath = pathname.replace(/\/+$/, '').toLowerCase();
@@ -81,13 +81,13 @@ export function normalizeListQueryParams(pathname, searchParams) {
             next.set(key, value);
         }
         const rule = schema[key];
-        // 예전 빈 전체 선택도 region=all로 보정하고, 지역 기억값과 구분한다.
+        // 빈 전체 선택은 region=all로 정규화해 저장된 지역과 구분한다.
         const emptySelection = value === '' && (defaultValues[key] === ''
             || key === 'region' && (path === '/stores' || path === '/waiting'));
         const valid = Object.hasOwn(schema, key) && (emptySelection || value !== ''
             && (rule == null || (rule instanceof Set ? rule.has(value) : rule(value))));
         if (!valid) next.delete(key);
-        else next.set(key, writeQuerySelection(key, value)); // Keep one value for each supported option.
+        else next.set(key, writeQuerySelection(key, value)); // 지원하는 옵션마다 값 하나만 유지한다.
     }
     if (Object.hasOwn(schema, 'lat') && !hasDistanceCoordinates(next.get('lat'), next.get('lng'))) {
         next.delete('lat');

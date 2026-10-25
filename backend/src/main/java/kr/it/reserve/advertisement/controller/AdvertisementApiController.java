@@ -207,10 +207,7 @@ public class AdvertisementApiController {
                 advertisementService.getMyAds(member, page, size, storeId, search), QUERY_SUCCESS);
     }
 
-    // 전체 광고 목록 (관리자용)
-    // search: 가게 이름 부분 일치. 비우면 전건.
-    // 예전에는 프론트가 받은 페이지 안에서만 필터링해 다른 페이지의 광고가 검색되지 않았다 —
-    // 검색을 서버로 옮긴 이유는 AdvertisementRepository#searchForAdmin 주석 참고.
+    // 가게 이름으로 검색한 관리자 광고 목록.
     @GetMapping("/admin/all")
     public ApiResponse<Page<AdvertisementResponse>> getAllAds(
             @RequestParam(defaultValue = "0") int page,
@@ -249,7 +246,7 @@ public class AdvertisementApiController {
         return ApiResponse.success(null, "광고 취소 요청을 접수했어요. 환불 여부는 광고 내역에서 확인해주세요.");
     }
 
-    // 종료상태(만료/취소/환불/중단) 광고를 목록에서 숨기기(소프트삭제) — 2026-07 추가, 사업자용
+    // 종료된 본인 광고를 목록에서만 숨긴다.
     @DeleteMapping("/{id}/remove")
     public ApiResponse<Void> removeAd(@PathVariable Long id) {
         Member member = SecurityUtil.getCurrentMember(LOGIN_REQUIRED);

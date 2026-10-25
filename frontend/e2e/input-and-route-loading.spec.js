@@ -110,7 +110,7 @@ for (const destination of ['search', 'my-page']) {
         await page.goto('/');
         await expect(page.locator('.reserve-discovery-home')).toBeVisible();
         try {
-            // dispatch navigates through the rendered UI, without waiting for the deliberately blocked import.
+            // 지연시킨 모듈을 기다리지 않고 렌더된 링크로 이동한다.
             if (destination === 'search') {
                 await page.getByRole('link', { name: '통합 검색' }).evaluate(link => link.click());
             } else {

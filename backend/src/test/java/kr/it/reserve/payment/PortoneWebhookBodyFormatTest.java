@@ -23,27 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
- * 웹훅 <b>본문 형식</b>에서 결제 식별자를 뽑아내는 부분.
- *
- * <h2>왜 이 테스트가 있나 — 2026-08-24</h2>
- * 포트원 콘솔의 웹훅 등록 화면에는 <b>버전 드롭다운</b>이 있고, 신규 등록 시 기본값이
- * 구버전({@code 2024-01-01})이다. 두 버전은 본문 구조가 완전히 다르다:
- *
- * <pre>
- * 2024-04-25   {"type":"...","data":{"paymentId":"..."}}
- * 2024-01-01   {"payment_id":"...","tx_id":"...","status":"Ready"}
- * </pre>
- *
- * 예전 코드는 {@code data.paymentId} 만 읽었다. 콘솔에서 구버전이 선택돼 있으면
- * <b>서명 검증은 통과하고 본문만 조용히 버려진다.</b> 컨트롤러는 200 을 주므로
- * 포트원 콘솔에는 "정상 전송"으로 찍히고 재전송도 오지 않는다 —
- * <b>어느 쪽 로그에도 에러가 남지 않는</b> 고장이다.
- *
- * <p>그래서 이 테스트는 "두 형식 모두에서 같은 결제 ID를 inbox에 남긴다"를 계약으로 고정한다.
- * 실제 PG 조회는 durable inbox에 저장된 뒤에만 일어나야 한다.
- *
- * <p>스프링 컨텍스트를 띄우지 않는다 — 검증 대상이 JSON 파싱뿐이다.
- * {@code getPaymentInfo} 가 <b>어떤 식별자로 호출됐는지</b>까지만 보고 멈춘다.
+ * 2024-04-25(data.paymentId)와 2024-01-01(payment_id) 규격이 같은 결제 ID를 inbox에 남기는지 확인한다.
+ * 실제 PG 조회는 inbox 저장 뒤에만 수행하며 이 시험에서는 실행하지 않는다.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 
-/** Optional device-local QR bounds. The decoder and server validation remain independent. */
+/* 기기에서 얻은 QR 영역은 안내에만 사용하며 해독·서버 검증과 분리한다. */
 export default function QrTrackingGuide({ previewRef, active, aspect }) {
     const frame = useRef(null);
     useEffect(() => {
@@ -51,7 +51,7 @@ export default function QrTrackingGuide({ previewRef, active, aspect }) {
                 }
                 if (!tracked && view.performance.now() - lastSeen > 400) reset();
             } catch {
-                // Unsupported camera/detector combinations keep the fixed guide.
+                // 지원하지 않는 카메라·검출기는 고정 안내선을 유지한다.
                 disposed = true;
                 reset();
             } finally {

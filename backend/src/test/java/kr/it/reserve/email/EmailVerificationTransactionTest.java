@@ -28,7 +28,7 @@ import java.time.LocalDateTime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** H2 transaction contracts; the production MySQL locking boundary needs separate release verification. */
+/** H2 트랜잭션 계약이며 운영 MySQL 잠금은 별도 출시 검사가 필요하다. */
 @DataJpaTest(showSql = false, properties = "spring.datasource.driver-class-name=org.h2.Driver")
 @ActiveProfiles("test")
 @ContextConfiguration(classes = EmailVerificationTransactionTest.Config.class)

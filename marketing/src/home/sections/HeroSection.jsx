@@ -38,10 +38,8 @@ export default function HeroSection({ isMobile }) {
             padding: isMobile ? '0 20px' : '0 24px',
         }}>
 
-            {/* ── 상단 spacer: 콘텐츠를 세로 중앙으로 밀어올림 ── */}
             <div style={{ flex: 1 }} />
 
-            {/* ── 메인 콘텐츠 ── */}
             <div style={{
                 width: '100%',
                 maxWidth: 1000,
@@ -76,18 +74,13 @@ export default function HeroSection({ isMobile }) {
                 </div>
             </div>
 
-            {/* ── 하단 spacer: 콘텐츠를 세로 중앙으로 밀어내림 ── */}
             <div style={{ flex: 1 }} />
 
-            {/* ── BounceArrow ──
-              * 모바일: flex 마지막 자식 → spacer 아래, 컨테이너 하단에 자연스럽게 붙음
-              * PC:     absolute bottom:0 유지 (콘텐츠 흐름 밖)
-              */}
             <BounceArrow
                 targetId="section-0"
                 style={{
                     position: 'absolute',
-                    bottom: isMobile ? 10 : 0,  // ✨ 핵심: 모바일은 띄우고, PC는 바닥에 붙임
+                    bottom: isMobile ? 10 : 0,
                     left: 0,
                     right: 0,
                     opacity: 0,

@@ -29,7 +29,7 @@ import java.util.UUID;
 import java.util.concurrent.*;
 import static org.assertj.core.api.Assertions.*;
 
-/** Actual transactions; no mail, payment, social or production endpoints are used. */
+/** 실제 트랜잭션을 사용하되 메일·결제·소셜·운영 주소는 호출하지 않는다. */
 @SpringBootTest
 @Timeout(90)
 class ReservationAdmissionPersistenceTest {

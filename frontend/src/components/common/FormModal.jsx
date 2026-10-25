@@ -63,9 +63,9 @@ const FormModal = ({
         allowUnload: navigationAllowUnload, onDiscard: onClose });
     const close = () => requestClose(() => onClose?.(), { discard: false });
 
-    /* 다단계 폼에서 본문만 바뀌면 AntD의 같은 .ant-modal-body 노드를 재사용한다.
-       이전 단계의 scrollTop까지 남겨두면 다음 단계 제목이 잘린 채 열린다. Modal에 key를 주면
-       닫힘 애니메이션이 깨지므로, 단계 키가 바뀔 때 공용 본문 스크롤만 되돌린다. */
+    /*
+     * 단계가 바뀌면 공용 본문 스크롤만 되돌리고 모달 key를 바꾸지 않아 닫힘 모션을 유지한다.
+     */
     useEffect(() => {
         if (!open) return;
         const modalBody = contentRef.current?.closest('.ant-modal-body');
@@ -81,9 +81,9 @@ const FormModal = ({
             rootClassName={rootClassName}
             mobileSize={mobileSize}
             mobileSheet={mobileSheet}
-            /* mask.closable=false: 문의/새 광고 신청/메일 작성 — 사용자가 직접 작성하는 모달이라 바깥 클릭으로 내용이 날아가면 안 된다.
-               컨벤션 — 입력 폼/파괴적 확인 모달은 바깥 클릭으로 안 닫히고, 읽기 전용 모달
-               (상세보기/QR/예약상세)은 AntD 기본값(true)대로 아무데나 눌러도 닫힌다. */
+            /*
+             * 입력·파괴적 확인 모달은 바깥 클릭으로 입력을 잃지 않게 한다.
+             */
             mask={{ closable: false }}
             footer={
                 footer !== undefined ? footer : (

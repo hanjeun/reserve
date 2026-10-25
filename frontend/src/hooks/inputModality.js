@@ -12,7 +12,7 @@ const keyboard = () => update('keyboard');
 
 export const getInputModality = () => modality;
 
-/** Share actual input events rather than equating a narrow viewport with touch. */
+/* 화면 너비로 터치를 가정하지 않고 실제 입력 이벤트를 공유한다. */
 export const subscribeInputModality = listener => {
     if (!listeners.size) {
         document.addEventListener('pointerdown', pointer, true);

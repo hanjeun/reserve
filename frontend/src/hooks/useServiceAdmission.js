@@ -15,7 +15,7 @@ const identityOf = state => `${state.user?.id ?? 'anonymous'}:${state.user?.role
 const shouldPoll = (status, workActive) => status?.state === 'WAITING'
     || status?.state === 'ADMITTED' && (status.mode === 'EMERGENCY' || status.mode === 'CORE' && workActive);
 
-/** One controller per account epoch. Page contents stay mounted throughout admission. */
+/* 계정 세션마다 처리기 하나를 두고 입장 중에도 페이지 내용을 유지한다. */
 export function createServiceAdmissionFlow(onChange, { entryAllowed = true } = {}) {
     const session = currentSession();
     const identity = identityOf(useAuthStore.getState());
@@ -78,7 +78,7 @@ export function createServiceAdmissionFlow(onChange, { entryAllowed = true } = {
             if (live(existing) || existing.state === 'BYPASS') return existing;
             return serviceEntryStatus(await service.join(signal));
         };
-        // Only first-cookie creation needs a separate lock. Periodic reads use the shared coordinator.
+        // 첫 쿠키 생성만 별도 잠금을 사용하고 주기 조회는 공유 조정기를 사용한다.
         if (!globalThis.navigator?.locks?.request) return verifiedJoin();
         let entered = false;
         try {
@@ -135,7 +135,7 @@ export function createServiceAdmissionFlow(onChange, { entryAllowed = true } = {
         } catch (error) {
             if (!current(run) || signal.aborted) return;
             failures += 1;
-            // A disabled/older backend must not interrupt ordinary browsing at bootstrap.
+            // 선택적 입장 기능의 초기 오류로 일반 페이지 탐색을 막지 않는다.
             if (action !== 'restore' || requested) emit({ busy: false, error });
             else emit({ busy: false });
             schedule();

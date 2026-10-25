@@ -19,61 +19,15 @@ import { colors, radius, shadows, fontSize } from '../../styles/tokens';
 const { Text } = Typography;
 const SCANNER_ELEMENT_ID = 'qr-checkin-scanner';
 
-// 디코딩 해상도 (2026-08-09) — QR이 아예 안 읽히던 원인이자 그 해결책이다.
-//
-// html5-qrcode는 디코딩용 캔버스를 <video>의 **레이아웃 CSS 픽셀**(clientWidth/Height)로 만들고,
-// 카메라 프레임 전체를 그 캔버스로 축소해서 ZXing에 넘긴다(esm/html5-qrcode.js:484-545, 553-575).
-// DPR 보정도 없다. 즉 카메라가 1280이든 4K든 **디코더가 보는 건 컨테이너 CSS 폭이 전부**다.
-// 390px 폰에서 프리뷰 박스는 약 302px이었고, 그러면 모듈당 1.3px 수준이라 ZXing 하한(약 2px)에
-// 못 미쳐 영원히 못 읽는다. 폰 기본 카메라 앱은 센서 원본을 읽으니 같은 QR이 잘 읽혔다.
-//
-// transform: scale()은 페인트 단계라 clientWidth를 바꾸지 않는다. 그래서 <video>를 CSS상
-// 720x540으로 두고 화면에서만 축소해 보여주면, 보이는 크기는 그대로인데 디코딩 캔버스만 720이 된다.
-// 실측 시뮬레이션(합성 프레임 → 캔버스 축소 → jsQR): 캔버스 302에선 10cm에서도 실패,
-// 캔버스 720에선 10~20cm에서 인식. 값을 줄이면 그만큼 인식 거리가 짧아진다.
+// 디코더는 영상의 CSS 크기로 캔버스를 만들므로 가로 720px을 유지하고 화면 표시만 축소한다.
+
 const DECODE_WIDTH = 720;
 const DEFAULT_PREVIEW_SCALE = 302 / DECODE_WIDTH;
 
-// 종횡비 (2026-08-11) — QR이 "가끔" 안 읽히던 나머지 절반의 원인.
-//
-// 라이브러리는 카메라 프레임 **전체**를 컨테이너 크기의 캔버스로 그린다
-// (html5-qrcode.js:558-571). 축소 비율을 가로·세로 따로 계산하는 게 핵심이다.
-//
-//   widthRatio  = videoWidth  / video.clientWidth
-//   heightRatio = videoHeight / video.clientHeight
-//   drawImage(video, 0, 0, videoWidth, videoHeight, 0, 0, 컨테이너W, 컨테이너H)
-//
-// 즉 **컨테이너 비율 ≠ 카메라 비율이면 프레임이 눌린다.** 배포 후 실측한 값이 정확히 그랬다:
-// 캔버스 720x540(4:3) 인데 카메라는 1280x720(16:9) 이라 가로만 1.33배 압축됐다.
-// QR 모듈이 정사각형이 아니게 되니 파인더 패턴의 1:1:3:1:1 비율이 축마다 달라지고,
-// 인식 거리가 눈에 띄게 짧아진다. `videoConstraints` 에 4:3(1280x960)을 ideal 로 요청했지만
-// ideal 은 강제가 아니라 선호도라, 카메라가 16:9 모드를 주면 그냥 그게 온다.
-//
-// 2026-08-11 실측 (아이폰 Safari)
-// native 720x1280 (세로!) / canvas 720x405 → heightRatio 3.16 배 압축.
-// **아이폰은 기기를 가로로 눕혀도 스트림을 돌리지 않는다.** 화면 표시만 회전하고
-// videoWidth/Height 는 그대로 720x1280 이다. 그래서 "가로로 들면 될 것"은 틀렸다.
-// 이 상태에선 QR 모듈이 가로로 3배 긴 직사각형이 되어 파인더 패턴이 아예 안 잡힌다 —
-// 크게 비추든 밝게 하든 소용없다. 형태가 망가진 것이라서.
-// (PC 웹캠은 진짜 1280x720 이라 기본값과 우연히 맞아 멀쩡했다. 그래서 "PC 는 되는데
-//  폰만 안 되는" 증상이 나왔고, PC 에서 잰 값으로 판단하면 원인을 놓친다.)
-//
-// 그래서 **컨테이너 비율을 카메라에 맞춘다**(반대가 아니라).
-// ① 기본값은 16:9 — 첫 프레임 전까지 쓸 잠정값일 뿐이다. 폰은 대개 세로라 곧 교체된다.
-// ② 해상도가 확정되는 이벤트('loadedmetadata'·'resize')에서 실제 videoWidth/videoHeight 를
-//    읽어, 다르면 컨테이너를 고치고 재시작한다.
-//    주의: start() 직후에 읽으면 안 된다 — 그때는 0 이다. 라이브러리가 setupSurface() 를 부르고
-//    곧바로 반환하므로 start() 의 Promise 는 'playing' **이전에** resolve 된다
-//    (camera/core-impl.js). 이 함정에 한 번 빠져 보정이 통째로 죽어 있었다.
-//
-// 세로(720x1280)면 디코딩 캔버스가 921,600px 이 되어 가로(291,600px)의 3.2배다.
-// 프레임당 비용이 그만큼 늘지만, 형태가 맞아야 읽히기라도 하므로 정확도를 택한다.
-// 체감이 느리면 fps 를 낮추는 쪽으로 상쇄할 것 — 폭 720 을 깎으면 인식 거리가 짧아진다.
-// 비율이 맞으면 object-fit:cover 가 아무것도 자르지 않으므로,
-// **화면에 보이는 영역 = 디코더가 보는 영역** 이 된다(예전엔 보이는 건 잘리고 디코더는 전체였다).
-//
-// 주의: 가로 720은 건드리지 말 것 — 2026-08-09에 실측으로 잡은 값이다(위 주석).
-//    세로는 이 값에서 비율로 유도된다(16:9면 405).
+// 컨테이너 비율을 실제 영상 비율에 맞춰 QR 모듈이 눌리지 않게 한다.
+
+// 디코딩 너비를 유지하고 높이만 실제 영상 비율로 계산한다.
+
 const DEFAULT_DECODE_ASPECT = 16 / 9;
 const decodeHeightFor = (aspect) => Math.round(DECODE_WIDTH / aspect);
 // 이 이상 어긋나면 재시작해서 고친다. 1~2%는 반올림 오차라 재시작할 값어치가 없다.
@@ -81,11 +35,8 @@ const ASPECT_TOLERANCE = 0.02;
 // 재시작 상한. 카메라가 비율을 흔들어도 무한 재시작에 빠지지 않게 한다.
 const MAX_ASPECT_FIXES = 3;
 
-/**
- * Html5Qrcode의 디코딩 API와 공용 UI로 사업자 QR 체크인을 제공한다.
- * 시작 시 컨테이너 크기를 측정하므로 숨겨진 0 크기 상자에서 카메라를 시작하지 않는다.
- * 가이드 오버레이는 디코딩 영역과 분리하며 영상 비율은 실제 카메라에 맞춰 보정한다.
- * 시트 종료·라우트 이탈 시 카메라와 타이머를 정리하고 중복 디코딩 요청을 막는다.
+/*
+ * 숨겨진 0 크기 영역에서는 스캐너를 시작하지 않는다. 안내선은 디코딩과 분리하며 이탈 시 카메라·타이머를 정리한다.
  */
 const QrScannerTab = ({ sheet = false, onClose }) => {
     const { message } = useMessage();
@@ -106,7 +57,7 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
     const [scanResult, setScanResult] = useState(null);
     const [processing, setProcessing] = useState(false);
 
-    // 디코딩 루프가 실제로 도는지 확인하는 유일한 신호 (아래 startScanning 주석 참고)
+    // 프레임 콜백 횟수로 디코딩 루프의 시작 여부를 확인한다.
     const decodeTickRef = useRef(0);
     const resumeTimerRef = useRef(null);
     const previewRef = useRef(null);
@@ -126,36 +77,25 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
 
     const decodeHeight = decodeHeightFor(decodeAspect);
 
-    // 정사각 가이드의 한 변 = 프레임의 **짧은 쪽**. 어느 쪽이 짧은지는 카메라 비율이 정한다.
-    //
-    // 2026-08-16: 예전엔 `height: 100%` 로 고정하고 "프리뷰는 항상 가로가 긴 비율"이라 적어뒀는데,
-    // 종횡비 정렬을 넣으면서 그 전제가 깨졌다 — 아이폰 후면 카메라는 720x1280 **세로** 스트림을 준다.
-    // 세로 프레임에서 높이를 한 변으로 잡으면 정사각형이 폭을 넘쳐(1280 > 720) 잘려나가고,
-    // 결과적으로 가이드가 프레임 전체에 걸친 직사각형처럼 보인다. 실제로 그렇게 나갔다.
-    //
-    // CSS 만으로는 `min(가로, 세로)` 를 잡기가 번거롭다(aspect-ratio 는 max-* 로 눌러도
-    // 확정된 쪽을 되돌리지 않는다). 비율 숫자를 이미 갖고 있으니 여기서 한 번에 정한다.
+    // 정사각 안내선은 영상 프레임의 짧은 변을 기준으로 계산한다.
 
-    // ?qrdebug=1 — 화면에 실측값을 띄운다.
-    // 모바일 Safari 는 콘솔을 붙이기가 사실상 불가능해서(맥이 있어야 한다) 숫자를 볼 방법이 없었다.
-    // 북마클릿도 iOS 에서 주소창 경로가 막혀 실패했다. 그래서 앱 안에 넣는다 —
-    // 쿼리 파라미터가 없으면 아무것도 렌더하지 않으므로 평소 화면에는 영향이 없다.
+    // 카메라의 실제 비율이 확정되면 컨테이너 높이를 보정한다.
+
+    // qrdebug=1일 때만 화면에 카메라 진단값을 표시한다.
+
     const debugOn = typeof window !== 'undefined'
         && new URLSearchParams(window.location.search).get('qrdebug') === '1';
     const [debugInfo, setDebugInfo] = useState(null);
 
-    // 2026-07 추가: 다른 탭(예약 관리 등)은 다 서버 데이터 로딩 스켈레톤이 있는데 이 탭만
-    // 없어서 이질적으로 보였다. 카메라 상태(idle/starting/scanning)는 서버 데이터가 아니라
-    // 로컬 상태라 원래 기다릴 게 없지만, BusinessPanel Tabs가 destroyOnHidden이라 이 탭으로
-    // 올 때마다 컴포넌트가 매번 새로 마운트되므로, 짧게라도 카드 모양 그대로의 shimmer
-    // 스켈레톤을 한 번 보여줘서 다른 탭들과 같은 로딩 언어를 쓰게 한다.
+    // 카메라 준비 중에도 동일한 로딩 배치를 유지한다.
+
     const [ready, setReady] = useState(false);
     useEffect(() => {
         const t = setTimeout(() => setReady(true), 400);
         return () => clearTimeout(t);
     }, []);
 
-    // 고정 720x540 스캐너 영역을 실제 프리뷰 박스 폭에 맞춰 시각적으로만 축소한다.
+    // 디코딩 영역의 레이아웃 크기는 유지하고 화면 표시만 축소한다.
     // (레이아웃 크기는 720 그대로여야 디코딩 캔버스가 720이 된다 — 위 DECODE_WIDTH 주석)
     useEffect(() => {
         if (!ready) return undefined;
@@ -171,7 +111,7 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
         return () => observer.disconnect();
     }, [ready]);
 
-    // ?qrdebug=1 일 때만 도는 폴링. 화면에 실측값을 계속 갱신한다.
+    // qrdebug=1일 때만 카메라 진단값을 주기적으로 갱신한다.
     useEffect(() => {
         if (!debugOn || status !== 'scanning') return undefined;
         const tick = () => {
@@ -184,10 +124,10 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
             setDebugInfo({
                 native: `${nw}x${nh}`,
                 canvas: `${c.width}x${c.height}`,
-                // 이 둘이 다르면 프레임이 눌린다 — 그게 QR 이 안 읽히는 원인이었다.
+                // 영상과 캔버스의 비율 차이를 진단한다.
                 nativeAspect: nh ? (nw / nh).toFixed(3) : '-',
                 canvasAspect: c.height ? (c.width / c.height).toFixed(3) : '-',
-                // 디코딩 루프가 살아 있다는 유일한 신호. 멈춰 있으면 이 숫자가 안 는다.
+                // 프레임 콜백 횟수로 디코딩 루프의 시작 여부를 확인한다.
                 ticks: decodeTickRef.current,
                 fixes: aspectFixCountRef.current,
             });
@@ -209,8 +149,8 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
         const kind = isWaiting ? 'waiting' : 'reservation';
         setScanResult({ kind, state: 'checking' });
 
-        // 스캐너를 잠시 멈춘다 (2026-08-09). 예전엔 루프가 계속 돌아서 QR이 화면에 남아 있는 동안
-        // 2초마다 체크인 API를 다시 호출했다 — 성공 토스트가 무한히 다시 뜨고 요청도 계속 나갔다.
+        // 처리 중에는 스캐너를 멈춰 같은 QR의 중복 요청을 막는다.
+
         try { html5QrRef.current?.pause(false); } catch { /* 이미 멈춰 있으면 무시 */ }
 
         try {
@@ -251,15 +191,8 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
         }
     }, [message, queryClient]);
 
-    /**
-     * 카메라 해상도가 확정되는 시점에 컨테이너 비율을 맞춘다.
-     *
-     * <p>왜 이벤트냐 — start() 가 resolve 될 때 videoWidth 는 아직 0 이다(위 주석).
-     * 'loadedmetadata' 는 해상도가 처음 정해질 때, 'resize' 는 **도중에 바뀔 때**
-     * (기기 회전·카메라 전환) 발생한다. 둘 다 듣는다.
-     *
-     * <p>보정 후 decodeAspectRef 가 실측값이 되므로 다음 측정은 그냥 통과한다(자기 제한).
-     * 카운터는 하드웨어가 값을 흔들 때 재시작이 반복되는 것만 막는다.
+    /*
+     * 영상 해상도는 start 완료 직후 0일 수 있어 loadedmetadata·resize에서 확인한다. 보정 재시작은 상한을 둔다.
      */
     const attachAspectWatcher = useCallback(() => {
         aspectWatcherCleanupRef.current?.();
@@ -336,29 +269,22 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
             if (generation !== scanGenerationRef.current) return;
             const html5Qr = new Html5Qrcode(SCANNER_ELEMENT_ID);
             html5QrRef.current = html5Qr;
-            // qrbox는 여전히 주지 않는다 — 프레임 전체를 스캔 영역으로 쓴다.
-            // (예전에 qrbox를 넣었다가 비디오가 잘려 보이고 검은 여백이 생겼던 이력이 있다.
-            //  해상도는 qrbox가 아니라 위 DECODE_WIDTH 방식으로 해결한다.)
+            // 프레임 전체를 디코딩하며 안내선은 화면 표시로만 사용한다.
+
             const startup = html5Qr.start(
                 { facingMode: 'environment' },
                 {
                     fps: 10,
-                    // videoConstraints가 있으면 첫 인자 대신 이 값이 쓰인다(내부 areVideoConstraintsEnabled).
-                    // 4:3으로 요청해 DECODE_WIDTH/HEIGHT 비율과 맞춘다 — 16:9가 오면 드로잉 단계에서
-                    // 프레임이 4:3으로 눌려 모듈이 정사각형이 아니게 되고 인식률이 떨어진다.
-                    // 16:9 를 요청한다 (2026-08-11 변경, 이전엔 4:3 1280x960).
-                    //   ideal 은 "강제"가 아니라 적합도 점수라, 카메라에 없는 모드를 요청하면
-                    //   가장 가까운 걸 준다 — 4:3을 달라고 해놓고 16:9를 받아 프레임이 눌리고 있었다.
-                    //   휴대폰·웹캠이 사실상 항상 갖고 있는 1280x720 을 요청해 적합도 거리를 0으로 만든다.
-                    //   그래도 다른 비율이 오면 아래에서 실측해 컨테이너를 맞추고 한 번 재시작한다.
+
+                    // 기본 요청 비율은 선호값이며 실제 카메라 비율은 별도로 확인한다.
+
                     videoConstraints: {
                         facingMode: 'environment',
                         width: { ideal: 1280 },
                         height: { ideal: 720 },
                     },
-                    // 미설정이면 라이브러리가 실패한 프레임마다 캔버스를 좌우반전해서 한 번 더 디코딩하는데,
-                    // 변환을 원복하지 않아 그 다음 프레임까지 반전된 상태로 그려진다. 결과적으로 절반의
-                    // 프레임이 버려진다. QR은 반전되면 못 읽으므로 끄는 쪽이 항상 이득이다.
+                    // 프레임 반전 재해독은 사용하지 않아 중복 디코딩 비용을 줄인다.
+
                     disableFlip: true,
                 },
                 decodedText => {
@@ -366,13 +292,11 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
                 },
                 () => {
                     if (generation !== scanGenerationRef.current || html5QrRef.current !== html5Qr) return;
-                    // 이 콜백은 "이번 프레임에서 QR을 못 찾음"으로 초당 10회 호출된다.
-                    // 예전엔 빈 함수라 통째로 버렸는데, 이게 **디코딩 루프가 살아 있다는 유일한 신호**다.
-                    // start()의 Promise는 video.play()를 부른 직후 resolve되고, 실제 스캔 루프는
-                    // 그 뒤 'playing' 이벤트 핸들러에서 만들어진다. 그래서 루프가 안 떠도
-                    // "스캔 대기 중…"이 그대로 보이는 상태가 가능했다.
+
+                    // 디코딩 오류 콜백은 루프가 계속 실행되는 신호로도 사용한다.
+
                     decodeTickRef.current += 1;
-                    // Release the local duplicate gate only after the QR has left the frame.
+                    // QR이 화면을 벗어난 뒤에만 중복 인식 잠금을 해제한다.
                     consecutiveMissesRef.current += 1;
                     if (consecutiveMissesRef.current >= 5) lastDecodedRef.current = null;
                 }
@@ -383,15 +307,8 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
 
             setStatus('scanning');
 
-            // 종횡비 실측·보정
-            // 주의: 여기서 videoWidth 를 바로 읽으면 안 된다 (2026-08-11 실패에서 배움).
-            //   start() 의 Promise 는 'playing' **이전에** resolve 된다 — 라이브러리가
-            //   setupSurface() 를 부르고 곧바로 반환하기 때문이다(camera/core-impl.js).
-            //   그래서 이 시점의 videoWidth 는 0 이고, 예전 코드는 `nativeW > 0` 가드에 막혀
-            //   보정이 **한 번도 실행되지 않았다.** 컨테이너는 카메라와 무관하게 16:9 로 굳었다.
-            //   PC 웹캠(1280x720)은 우연히 그 값이라 멀쩡했고, 아이폰(720x1280 세로)에서만
-            //   세로가 3.16배 짓눌려 QR 이 아예 안 읽혔다.
-            //   → 해상도가 확정되는 이벤트에 붙는다.
+            // 영상 메타데이터 확정 전에는 videoWidth를 사용하지 않는다.
+
             attachAspectWatcher();
 
             // 루프가 정말 도는지 확인한다. 1.5초면 fps 10 기준 10회 이상 들어와야 한다.
@@ -420,11 +337,8 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
         void startScanning();
     }, [decodeAspect, startScanning]);
 
-    // isScanning으로 가드하지 않는다 (2026-08-09).
-    //   isScanning은 'playing' 이벤트 핸들러 안에서야 true가 된다. 카메라가 켜지는 도중에
-    //   탭을 옮기면 이 값이 false여서 stop()을 건너뛰었고, 컴포넌트는 사라졌는데 카메라
-    //   트랙만 살아남았다(녹색 표시등이 계속 켜져 있는 상태). 무조건 stop()을 부르고
-    //   "이미 멈춰 있음" 예외는 삼킨다.
+    // 시작 완료가 늦어도 종료 처리기가 카메라를 정리할 수 있게 한다.
+
     const stopScanning = useCallback(async () => {
         const generation = ++scanGenerationRef.current;
         clearTimeout(decodeCheckTimerRef.current);
@@ -493,11 +407,9 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
                         style={{ ...styles.scannerFill, height: decodeHeight, transform: `scale(${previewScale})` }}
                     />
 
-                    {/* 스캔 중에만 보이는 모서리 브라켓 가이드 — 순수 장식, 실제 스캔 영역과 무관.
-                        2026-08-11: 프레임 전체(4:3)에 걸쳐 있던 걸 **정사각형**으로 바꿨다.
-                        QR 자체가 정사각형이라 직사각 가이드는 "어디에 맞추라는 건지"가 흐릿하고,
-                        가로로 넓은 가이드는 사용자가 QR을 멀찍이 들게 만들어 오히려 인식이 나빠졌다.
-                        가이드보다 바깥도 실제로는 스캔된다 — 안에 넣으면 확실하다는 뜻일 뿐이다. */}
+                    {/*
+                     * 안내선은 장식이며 실제 스캔 영역을 제한하지 않는다.
+                     */}
                     {status === 'scanning' && (
                         <QrTrackingGuide previewRef={previewRef} active={!processing} aspect={decodeAspect} />
                     )}
@@ -515,10 +427,9 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
                                     )}
                                 </>
                             )}
-                            {/* 2026-07: 순수 CSS 스피너 링 대신 앱 전체가 쓰는 shimmer Bone 스켈레톤으로 통일 —
-                                다른 로딩 화면(예약 목록 등)과 같은 로딩 언어를 쓰도록. 실제 서버 데이터를
-                                기다리는 건 아니지만(카메라 시작은 클라이언트 로컬 작업), 사용자 입장에선
-                                '뭔가 준비되는 중'이라는 신호는 동일하게 필요하다. */}
+                            {/*
+                             * 카메라 준비는 공통 골격으로 표시한다.
+                             */}
                             {status === 'starting' && (
                                 <>
                                     <Bone width="100%" height="100%" borderRadius={0} style={{ position: 'absolute', inset: 0 }} />
@@ -553,9 +464,9 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
 
                 <QrScanResult result={scanResult} />
 
-                {/* ?qrdebug=1 진단 패널. 모바일에서 콘솔을 못 붙여 매번 원인 추적이 막혔던 걸 없앤다.
-                    nativeAspect ≠ canvasAspect 면 프레임이 눌린 상태이고, 그게 QR 이 안 읽히는 원인이다.
-                    ticks 가 안 늘면 디코딩 루프 자체가 안 도는 것이라 완전히 다른 문제다. */}
+                {/*
+                 * 진단 화면에서 영상·캔버스 비율과 디코딩 반복 여부를 구분한다.
+                 */}
                 {debugOn && debugInfo && (
                     <div style={styles.debugPanel}>
                         <div>native <b>{debugInfo.native}</b> ({debugInfo.nativeAspect})</div>
@@ -599,7 +510,7 @@ const styles = {
     sheetCard: { background: 'transparent', border: 'none', borderRadius: 0, boxShadow: 'none', padding: 0 },
     cardTitle: { display: 'block', fontSize: fontSize.base, color: colors.text.primary, marginBottom: 4 },
     hint:     { display: 'block', marginBottom: 16, fontSize: fontSize.sm, lineHeight: 1.5 },
-    // aspectRatio 는 렌더에서 카메라 실측값으로 덮는다 — 여기 고정값을 두지 않는다.
+    // qrdebug=1일 때만 카메라 진단값을 표시한다.
     previewBox: {
         position: 'relative',
         width: '100%',

@@ -4,7 +4,7 @@ const same = (a, b) => a != null && b != null && String(a) === String(b);
 const affected = (value, id) => !id || same(value, id);
 const forStore = (params, id) => !id || !params?.storeId || params.storeId === 'ALL' || same(params.storeId, id);
 
-/** Events carry identifiers, never authoritative content or a form's concurrency version. */
+/* 이벤트는 식별자만 전달하며 정본 데이터·폼의 동시성 버전으로 사용하지 않는다. */
 export function parseLiveUpdate(raw) {
     let event;
     try { event = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { return null; }
@@ -54,7 +54,7 @@ export function liveUpdateMatches(query, event) {
     if (domain === 'COMMENT') {
         if (!event.targetType && interaction(key, 'notifications')) return true;
         if (interaction(key, 'comments')) return affected(key[3], parentId);
-        if (interaction(key, 'replies')) return true; // A reply's parent may have moved outside the loaded page.
+        if (interaction(key, 'replies')) return true; // 답글의 부모가 현재 페이지 밖으로 이동했을 수 있다.
         if (interaction(key, 'comment')) return affected(key[3], id);
         if (interaction(key, 'status')) return key[3] === 'COMMENT' && affected(key[4], id)
             || key[3] === 'POST' && affected(key[4], parentId);
@@ -77,7 +77,7 @@ export function liveUpdateMatches(query, event) {
     return false;
 }
 
-/** Reconnect/fallback only reads supported domains; no QR generation, payment or admin audit prefixes. */
+/* 재연결은 지원하는 조회만 갱신하며 QR 발급·결제·관리자 감사 경로를 제외한다. */
 export function isLiveReadQuery(query) {
     const key = query.queryKey;
     return feedRead(key) || feedOwn(key) || storeRead(key) || reservationRead(key)
@@ -91,7 +91,7 @@ export function isLiveReadQuery(query) {
 export const queryErrorStatus = error => Number(error?.status ?? error?.response?.status);
 export const isReadAccessDenied = error => [401, 403, 404, 410].includes(queryErrorStatus(error));
 
-/** A failed read may retain visible rows, but must never turn an empty cache into a successful empty result. */
+/* 실패한 조회에서 기존 행은 유지하되 빈 캐시를 성공한 빈 결과로 바꾸지 않는다. */
 export const isBlockingListReadError = (error, items) => Boolean(error)
     && (isReadAccessDenied(error) || !items?.length);
 
@@ -103,7 +103,7 @@ export function clearDeniedQueryData(error, query) {
         || key[0] === 'reservations' && key[1] === 'qrToken' || key[0] === 'waitingQr'
         || ['public-promotions', 'store-news', 'stores'].includes(key[0]) && ['detail', 'application'].includes(key[1]);
     if ([401, 403].includes(status) || [404, 410].includes(status) && entityRead) {
-        // Keep the error state: resetting/removing an active query can otherwise start an endless retry loop.
+        // 활성 쿼리를 초기화하면 재시도가 반복될 수 있어 오류 상태를 유지한다.
         query.setState({ data: undefined, dataUpdatedAt: 0 });
     }
 }
@@ -126,7 +126,7 @@ export function nextNewsBoundary(client, now) {
     return Number.isFinite(next) ? next : null;
 }
 
-/** If a signal arrives after an in-flight read's snapshot, read once more after that request settles. */
+/* 진행 중인 조회 뒤에 이벤트가 도착하면 완료 뒤 한 번 더 조회한다. */
 export function createLiveQueryRefresh(client, current) {
     const following = new Map();
     return (events = [], all = false, { periodic = false } = {}) => {

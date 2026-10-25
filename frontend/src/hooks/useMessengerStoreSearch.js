@@ -9,7 +9,7 @@ import { shouldRetryChatList } from '../components/chat/chatListQueryPolicy';
 
 export const MESSENGER_STORE_PAGE_SIZE = 20;
 
-/** Public search only. Opening a room remains an explicit result-selection action. */
+/* 공개 가게만 검색하며 대화 열기는 결과를 선택할 때 실행한다. */
 export default function useMessengerStoreSearch({ keyword, page, composing = false, enabled = true }) {
     const identity = useMessengerStore(state => state.sessionIdentity);
     const normalized = keyword.trim();

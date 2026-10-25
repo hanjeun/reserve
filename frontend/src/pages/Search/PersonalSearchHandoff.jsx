@@ -26,7 +26,7 @@ const targetOf = params => {
         && (kind !== 'waiting' || params.get('tab') === 'waiting') ? id : null };
 };
 
-/** A search target is a one-time hint. Its own server read remains the authorization boundary. */
+/* 검색 목적지는 한 번 쓰는 힌트이며 본인 상세 조회가 권한 관문이다. */
 function PersonalSearchHandoffBody() {
     const [params, setParams] = useSearchParams();
     const target = targetOf(params);
@@ -98,7 +98,7 @@ function PersonalSearchHandoffBody() {
         : <WaitingDetailModal detail={data} open={!closed} onClose={close} />;
 }
 
-// Ordinary list visits do not mount an extra query observer; an explicit hint activates it once.
+// 명시적 검색 힌트가 있을 때만 추가 상세 관찰자를 붙인다.
 export default function PersonalSearchHandoff() {
     const [params] = useSearchParams();
     const requested = params.has('reservationId') || params.has('entryId');

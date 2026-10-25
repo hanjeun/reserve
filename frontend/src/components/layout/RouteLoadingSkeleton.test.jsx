@@ -144,7 +144,7 @@ describe('route chunk loading patterns', () => {
         const row = container.querySelector('.reserve-filter-toolbar-secondary');
         expect(row.firstElementChild).toHaveStyle({ flexShrink: '1', minWidth: '0px', maxWidth: '480px' });
         expect(row.querySelector('.reserve-filter-toolbar-refresh > .reserve-icon-tool .reserve-skeleton-block')).toHaveStyle({ width: '32px', height: '32px', borderRadius: '10px' });
-        // The shared toolbar is sized by its actual 44px view slot, including while it is a bone.
+        // 골격에서도 실제 보기 도구의 44px 자리를 유지한다.
         expect(container.querySelector('.reserve-explore-filters').firstElementChild).toHaveClass('reserve-icon-tool');
     });
 

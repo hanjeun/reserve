@@ -6,7 +6,7 @@ import { transitions } from '../../styles/tokens';
 const hasMotionValue = value => value != null && value !== ''
     && (typeof value !== 'number' || Number.isFinite(value));
 
-/** Only the visible value rolls; form state and the accessible current label update immediately. */
+/* 표시값만 전환하고 폼 상태와 접근성 이름은 즉시 갱신한다. */
 const RollingFieldValue = ({ value, children, modalOpen = false, motionKey, order, direction: forcedDirection, onMotionChange }) => {
     const currentRef = useRef(null);
     const previousRef = useRef(null);
@@ -39,7 +39,7 @@ const RollingFieldValue = ({ value, children, modalOpen = false, motionKey, orde
         motionChangeRef.current = onMotionChange;
         const current = currentRef.current;
         const previous = previousRef.current;
-        // The first selection replaces a placeholder immediately; only existing values roll.
+        // 첫 선택은 자리표시자를 즉시 대체하고 기존 값만 전환한다.
         if (reducedMotion || typeof current.animate !== 'function'
             || !hasMotionValue(value) || !hasMotionValue(before.value)) {
             stopMotion();
@@ -49,12 +49,12 @@ const RollingFieldValue = ({ value, children, modalOpen = false, motionKey, orde
             if (modalOpen !== before.modalOpen) stopMotion();
             return;
         }
-        // Native typing interrupts an explicit replacement and keeps the caret immediate.
+        // 직접 입력은 값 전환을 중단하고 커서 위치를 즉시 유지한다.
         if (motionKey !== undefined && motionKey === before.motionKey) {
             stopMotion();
             return;
         }
-        // Rapid choices update the current text in the same cycle instead of replaying it.
+        // 빠른 연속 선택은 현재 프레임의 텍스트만 갱신한다.
         const active = motionRef.current?.incoming;
         if (active && (active.playState === 'running' || active.pending)) {
             if (value === motionRef.current.fromValue) stopMotion();
@@ -81,7 +81,7 @@ const RollingFieldValue = ({ value, children, modalOpen = false, motionKey, orde
             { transform: `translateY(${-direction * 70}%) rotateX(${direction * 25}deg)`, opacity: 0 },
         ], { ...timing, fill: 'both' });
         motionRef.current = { incoming, outgoing, fromValue: before.value };
-        // Keep the old layer transparent until cleanup, including a delayed finish event.
+        // 늦은 완료 이벤트에도 이전 레이어는 정리 전까지 투명하게 둔다.
         outgoing.onfinish = () => {
             if (motionRef.current?.outgoing === outgoing) previous.style.visibility = 'hidden';
         };

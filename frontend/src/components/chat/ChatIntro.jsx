@@ -3,18 +3,8 @@ import PropTypes from 'prop-types';
 import { NotificationOutlined } from '../common/icons';
 import { DEFAULT_STORE_GREETING, DEFAULT_SUPPORT_GREETING, fillGreeting } from '../../constants/chatIntro';
 
-/**
- * 채팅 첫 안내 — 고객지원(관리자 설정)과 가게 문의(사장님 설정)가 같은 컴포넌트·같은 구성을 쓴다 (2026-09-23).
- * 채팅 관리 화면의 미리보기도 이 컴포넌트를 그대로 그린다(preview).
- *
- * <p>구성(2026-09-24 채팅 관리):
- * <ol>
- *   <li>확성기 줄 — 공지사항. 없으면 "안녕하세요. {표시 이름}입니다."</li>
- *   <li>인사말 — 설정한 문구({이름} → 손님 이름, 빈 줄 = 문단). 없으면 범위별 기본 문구.
- *       보낸 사람 표시(아바타 + 이름)는 대화창 헤더와 겹쳐서 두지 않는다.</li>
- *   <li>자주 묻는 질문 — 답변이 있으면 누르는 즉시 답변을 보여준다(자동 문답, 서버로 보내지 않음).
- *       답변이 없는 질문(서버를 못 부를 때의 대체값)은 입력칸에 질문을 채운다.</li>
- * </ol>
+/*
+ * 실제 대화와 미리보기에 같은 안내를 사용한다. 자동 문답은 서버 전송 없이 표시하며 답변이 없을 때만 입력칸을 채운다.
  */
 export default function ChatIntro({
     variant = 'support',

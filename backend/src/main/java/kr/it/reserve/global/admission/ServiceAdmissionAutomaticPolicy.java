@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 
-/** Initial thresholds, not measured throughput feedback. Redis owns continuity and the writer lease. */
+/** 초기 임계값을 사용하며 실측 처리량의 피드백 제어는 아니다. Redis가 연속성과 쓰기 소유권을 관리한다. */
 @Slf4j
 @Component
 public class ServiceAdmissionAutomaticPolicy {
@@ -31,7 +31,7 @@ public class ServiceAdmissionAutomaticPolicy {
         catch (RuntimeException unavailable) { sample = ServiceAdmissionLoadSampler.Sample.unknown(); }
         try { service.observeAutomatic(owner, classify(sample, properties.getAutomatic())); }
         catch (RuntimeException unavailable) {
-            // No stale mode fallback and no credentials, raw observations, or Redis connection data in logs.
+            // 이전 모드로 복귀하지 않으며 자격증명·원본 관측값·Redis 접속 정보는 기록하지 않는다.
             log.warn("Automatic service admission observation unavailable: errorType={}", unavailable.getClass().getSimpleName());
         }
     }

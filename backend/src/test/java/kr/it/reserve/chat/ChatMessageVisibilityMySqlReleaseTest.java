@@ -43,7 +43,7 @@ import java.util.concurrent.TimeoutException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Release gate for the exact manual DDL on an empty, loopback-only MySQL database. */
+/** 빈 로컬 MySQL에 수동 DDL 계약을 확인하는 출시 검사다. */
 @EnabledIfEnvironmentVariable(named = "RESERVE_MYSQL_HIDDEN_TEST_ISOLATED", matches = "1")
 @DataJpaTest(showSql = false)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -85,7 +85,7 @@ class ChatMessageVisibilityMySqlReleaseTest {
         properties.add("spring.datasource.password", () -> password);
         properties.add("spring.datasource.hikari.transaction-isolation", () -> "TRANSACTION_REPEATABLE_READ");
         properties.add("spring.datasource.hikari.connection-init-sql", () -> "SET SESSION innodb_lock_wait_timeout = 5");
-        // The operator must create the schema from manual-ddl.md; tests cannot create or repair it.
+        // 검사 전에 수동 DDL로 준비해야 하며 시험이 구조를 생성하거나 복구하지 않는다.
         properties.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
     }
 

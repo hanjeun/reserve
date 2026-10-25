@@ -1,4 +1,4 @@
-/** Keep the form's inline validation and explain the first missing step after submission. */
+/* 인라인 검증을 유지하고 제출 시 먼저 필요한 단계를 안내한다. */
 export function reportLoginMethodFormError(failure, form, message) {
     if (failure?.outOfDate) return;
     const field = failure?.errorFields?.find(item => item.errors?.length);

@@ -98,7 +98,7 @@ const ReservationListBody = ({ loading, view, reservations, statusFilter, deboun
     );
 };
 
-// 가게 목록·예약 목록이 둘 다 실패하면 하나의 오류로, 예약만 실패하면 예약 오류만 보여 준다.
+// 가게·예약 조회가 함께 실패하면 하나로 안내하고 개별 오류는 해당 목록에만 표시한다.
 const renderMainContent = ({ error, blockingError, myStoresError, myStoresLoading, busy, retryAll, refetch, retryStores, listBody }) => {
     let content = listBody;
     if (blockingError && myStoresError) {
@@ -229,9 +229,9 @@ const ReservationTab = () => {
                 initialLoading={loading}
             />
 
-            {/* 가게 필터 목록과 예약 목록은 서로 독립 요청이다. 예약은 가게 목록 없이도 '전체 가게'로
-                조회된다. 그래서 가게 목록만 실패했을 때 예약까지 가리면 멀쩡히 받아 온 예약을 버리는 셈이다.
-                그때는 목록 위에 좁은 오류만 얹고, 둘 다 실패했을 때만 하나의 오류로 합친다. */}
+            {/*
+             * 가게 필터와 예약은 독립 조회다. 가게 목록 오류만으로 조회된 예약을 가리지 않는다.
+             */}
             {mainContent}
             {hasData && !blockingError && total > 0 && (
                 <nav aria-label="예약 목록 페이지" className="reserve-listing-pagination">

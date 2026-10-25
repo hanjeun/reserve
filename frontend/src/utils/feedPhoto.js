@@ -6,7 +6,7 @@ export function reorderFeedPhotos(images, order) {
     return next.every(Boolean) ? next : images;
 }
 
-/** WebP is converted before preview/upload; the server independently decodes and validates the result. */
+/* 미리보기·업로드 전에 WebP로 변환해도 서버에서 독립적으로 해독·검증한다. */
 export async function prepareFeedPhoto(file, maxBytes) {
     if (file.type !== 'image/webp') return file;
     if (typeof createImageBitmap !== 'function') throw new Error('이 브라우저에서는 WebP 변환을 지원하지 않아요. JPG나 PNG 사진을 선택해주세요.');

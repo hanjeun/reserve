@@ -10,8 +10,8 @@ export const RESERVATION_STATUS = {
     COMPLETED: 'COMPLETED',
     REJECTED:  'REJECTED',
     NO_SHOW:   'NO_SHOW',
-    // 2026-08-11 백엔드 Reservation.ReservationStatus 에 추가된 값. 이 목록이 백엔드 enum과
-    // 어긋나면 아래 라벨/색상 맵에도 구멍이 생겨 화면에 영어 enum이 그대로 노출된다.
+    // 예약 상태 라벨은 서버 상태와 함께 유지한다.
+
     UNCONFIRMED: 'UNCONFIRMED',
 };
 
@@ -27,13 +27,8 @@ export const RESERVATION_STATUS_LABELS = {
     UNCONFIRMED: '미확인',
 };
 
-/**
- * AntD <Tag color> 프리셋 이름.
- *
- * 2026-09-03 — 이 상수는 만들어만 두고 아무도 쓰지 않는 죽은 코드였고, 실제로 화면에
- * 칠해지던 값은 ReservationsAllTab 안의 사본이었다. 그래서 **지금 운영에서 보이는 색**을
- * 정본으로 옮겨왔다(사본은 삭제). 'gray' 는 AntD 프리셋이 아니라 CSS 색으로 해석돼
- * 혼자만 진한 태그가 되므로 프리셋인 'default' 로 바꾼다.
+/*
+ * AntD 기본 프리셋을 사용하며 중립 상태는 CSS 색 gray 대신 default로 지정한다.
  */
 export const RESERVATION_STATUS_COLORS = {
     PENDING:   'orange',
@@ -60,12 +55,8 @@ export const RESERVATION_STATUS_ORDER = [
     'NO_SHOW',
 ];
 
-/**
- * 상태 필터 셀렉트용 옵션 — 내 예약 / 사장님 예약관리 / 관리자 전체예약이 같이 쓴다.
- *
- * 예전에는 세 화면이 각자 배열을 갖고 있었고 같은 상태를 서로 다르게 불렀다
- * (PENDING 이 '승인 대기' / '대기 중', CONFIRMED 가 '확정' / '승인됨' / '예약 확정').
- * 라벨은 RESERVATION_STATUS_LABELS 하나에서만 온다.
+/*
+ * 예약 필터는 공통 상태 라벨을 사용해 화면마다 다른 이름을 표시하지 않게 한다.
  */
 export const RESERVATION_STATUS_FILTER_OPTIONS = [
     { value: 'ALL', label: '전체 상태' },

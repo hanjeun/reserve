@@ -2,7 +2,7 @@ export const httpStatusOf = error => error?.status ?? error?.response?.status;
 
 export const isMissingRequestError = error => [404, 410].includes(httpStatusOf(error));
 
-/** 조회 실패 표면이 상태별 Ant Design 아이콘을 고를 때 쓰는 의미 값이다. */
+/* 오류 표면에서 상태에 맞는 아이콘을 선택하는 의미 값이다. */
 export const listRequestErrorKind = error => {
     const status = httpStatusOf(error);
     if (globalThis.navigator?.onLine === false) return 'offline';
@@ -23,9 +23,8 @@ const withObjectParticle = subject => {
     return `${subject}${hasFinalConsonant ? '을' : '를'}`;
 };
 
-/**
- * 빈 목록과 실제 조회 실패를 구분하고, 상세 조회는 요청한 항목의 부재를 안내한다.
- * 서버 내부 메시지는 화면에 그대로 노출하지 않는다.
+/*
+ * 빈 목록·항목 부재·조회 오류를 구분하고 서버 내부 메시지는 직접 노출하지 않는다.
  */
 export const listRequestErrorMessage = (error, subject = '목록', requestType = 'list') => {
     const status = httpStatusOf(error);

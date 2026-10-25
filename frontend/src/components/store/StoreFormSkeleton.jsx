@@ -12,11 +12,8 @@ import { STORE_FORM_SKELETON_HINTS, STORE_FORM_SKELETON_TOGGLES } from './storeF
 
 const { Text } = Typography;
 
-// 2026-09-29 재작성 — 실제 폼(StoreForm/StoreBasicInfo/StoreImages/StoreFormActions)과 같은 순서·배치로 그린다.
-// 예전 뼈대는 라벨 14px + 간격 10px 로 칸마다 24px(데스크톱 라벨 상자는 40 + 8), 안내 문구 줄,
-// '우리동네 배지'·'정기 휴무'·'운영 기간'·환불 3칸이 통째로 빠져 있어 로딩이 끝나면 폼 끝이 약 900px 아래로 늘어났다.
-// 라벨·안내 문구도 SkeletonText로 가리고, 실제 문구의 줄바꿈·크기는 유지한다.
-// 문구는 storeFormSkeletonCopy.js 에 있다. 예약 방식별로 달라지는 칸(회차 시각 등)은 로딩 시점에 알 수 없어 기본값(SLOT) 배치를 따른다.
+// 실제 폼과 같은 순서·배치·행 높이로 골격을 표시한다.
+
 const WEEKDAYS = ['월', '화', '수', '목', '금', '토', '일'];
 const hintStyle = { fontSize: fontSize.xs, color: colors.text.tertiary };
 

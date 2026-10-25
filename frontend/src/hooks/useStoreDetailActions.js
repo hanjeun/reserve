@@ -1,11 +1,5 @@
-/**
- * useStoreDetailActions — StoreDetail의 예약 제출 · 완료예약 조회 · 예약 수정(edit) 로직
- *
- * 분리 이유: StoreDetail Cognitive Complexity 30 → SonarCloud 임계값 15 초과
- * onFinish (분기 12개+), useEffect들을 여기로 옮겨 StoreDetail 본문을 낮춤.
- *
- * 2026-07 예약 수정: URL 쿼리 ?edit={reservationId}로 진입하면 그 예약을 불러와 폼을 prefill하고,
- * 제출 시 createReservation 대신 updateReservation을 호출한다. 폼 UI(TimeSlotPicker 등)를 그대로 재사용.
+/*
+ * 예약 생성과 수정을 공유한다. 수정 진입은 기존 예약을 조회해 폼에 채우고 생성 대신 수정 API로 제출한다.
  */
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
@@ -23,9 +17,6 @@ import { reservationRequestAttempt, completeReservationRequest } from '../utils/
 import { currentSession, assertCurrentSession } from '../api/sessionScope';
 import { prepareCoreWork } from '../services/serviceAdmissionService';
 
-// 에러 메시지 추출 — Error 객체면 message, 문자열이면 그대로, 그 외엔 null.
-// 예전엔 예약 수정/생성 두 곳에 똑같은 중첩 삼항이 복붙돼 있었다
-// (SonarCloud: 중첩 삼항 추출 — 겸사해서 중복도 같이 제거).
 const toErrorMessage = (err) => {
     if (err instanceof Error) return err.message;
     if (typeof err === 'string') return err;
@@ -42,22 +33,8 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
     const [reservationSubmitting, setReservationSubmitting] = useState(false);
     const [reservationEntry, setReservationEntry] = useState(null);
 
-    // 예약을 만들거나 고친 뒤 예약 목록 캐시를 무효화한다.
-    //
-    // 이게 없어서 "예약했는데 내 예약에 안 보이고 새로고침해야 나온다"가 났다. 경로가 이랬다:
-    //   createReservation은 useMutation이 아니라 그냥 await이라 invalidate가 없었고,
-    //   navigate('/my-reservations')도 state.refetch를 안 실어보냈다.
-    //   MyReservations는 location.state?.refetch일 때만 강제 refetch하고,
-    //   전역 staleTime이 3분이라 그 안에 들어가면 캐시가 그대로 나온다.
-    //
-    // invalidateQueries는 staleTime을 무시하고 즉시 stale로 표시하므로, 목록 페이지가
-    // 마운트되는 순간 자동으로 재조회된다 — 별도 이벤트 버스가 필요 없다.
-    // 이미 useReservations의 cancelMutation.onSettled가 쓰는 패턴과 같다.
-    //
-    // reservationKeys.all()로 넓게 지운다: 손님 목록(my)뿐 아니라, 사업자 계정이 자기 가게에
-    // 직접 예약을 넣는 경우의 관리 목록(manage)까지 한 번에 덮기 위해서다.
-    // (2026-09: 무효화 범위는 invalidateAfterWrite.js 로 모았다 — 달력·통계도 함께 지운다.)
-    // ※ 다른 사용자(가게 주인)의 화면은 이 방법으로 갱신할 수 없다 — 별도 논의 대상.
+    // 예약 변경 후 관련 달력·통계 캐시도 함께 무효화한다.
+
     const invalidateReservations = () => invalidateReservationData(queryClient);
 
     const stateOpenWrite    = location.state?.openWrite    ?? false;
@@ -100,7 +77,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
                 if (!stopped && run === generation) setReservationEntry(entry ? { scope: lookupScope,
                     slot: `${id}:${selectedDate}:${formatTime(selectedTime)}`, expiresAt: entry.expiresAt } : null);
             } catch {
-                // Unknown grants authorize no UI promise; submission still performs recovery and server admission.
+                // 확인되지 않은 입장권으로 가능 상태를 안내하지 않으며 제출 시 복구·서버 입장을 확인한다.
                 if (!stopped && run === generation) setReservationEntry(null);
             }
         };
@@ -109,8 +86,8 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
         return () => { stopped = true; ++generation; controller?.abort(); document.removeEventListener('visibilitychange', restore); };
     }, [editId, isLoggedIn, selectedDate, selectedTime, restoreEntry, id, lookupScope]);
     const [editingReservation, setEditingReservation] = useState(null);
-    // 수정 대상 조회가 네트워크·서버 오류로 실패하면 내 예약으로 튕겨내지 않고 이 자리에서 다시 불러온다.
-    // 재시도 중 표시는 effect 가 아니라 클릭 핸들러에서 켠다(effect 본문의 동기 setState 는 lint 규칙 위반).
+    // 수정 대상의 일시적 조회 오류는 현재 화면에서 재시도한다.
+
     const [editLoadError, setEditLoadError] = useState(null);
     const [editRetrying, setEditRetrying] = useState(false);
     const [editLoadAttempt, setEditLoadAttempt] = useState(0);
@@ -127,9 +104,9 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
         setEditLoadAttempt(attempt => attempt + 1);
     }, []);
 
-    // 이 가게에서 완료된 예약이 있는지 조회 (리뷰 작성 가능 여부 판단용).
-    // "완료 예약 없음"과 "조회 실패"를 같은 null로 두면 작성 가능한 손님의 리뷰 폼이 조용히
-    // 사라진다. 실패는 ReviewList에서 재시도 가능한 상태로 보여 준다.
+    // 완료 예약 조회로 리뷰 작성 가능 여부를 확인한다.
+    // 완료 예약 없음과 조회 오류를 구분해 리뷰 작성 가능 여부가 조용히 사라지지 않게 한다.
+
     useEffect(() => {
         if (!isLoggedIn) return;
         let cancelled = false;
@@ -301,7 +278,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
         const createForThisSession = async data => {
             assertCurrentSession(submissionSession.epoch);
             if (data.admissionTicket) {
-                // Recovery must retain the exact submitted key even if the campaign is later disabled or removed.
+                // 캠페인이 비활성·삭제돼도 결과 복구에는 최초 제출 키를 유지한다.
                 await reservationRequestAttempt(requestScope, data, data.requestId);
                 assertCurrentSession(submissionSession.epoch);
             }
@@ -332,7 +309,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
             let normalAttempt;
             let reservation;
             if (attempt) {
-                // Recovery never creates/claims a reservation and remains available without a live grant.
+                // 결과 복구는 예약 생성·선점을 수행하지 않으며 유효 입장권 없이도 조회한다.
                 reservation = await recoverForThisSession({ ...payload, admissionTicket: attempt.ticket, requestId: attempt.requestId });
             } else {
                 normalAttempt = await reservationRequestAttempt(requestScope, payload);
@@ -368,8 +345,8 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
             setReservationEntry(null);
             admission.complete(attempt || pendingAttempt || { requestId: normalAttempt.requestId });
             completeReservationRequest(requestScope);
-            // 최근 같은 가게 배너 클릭이 있으면 예약 ID와 함께 서버에 귀속을 요청한다.
-            // 서버가 현재 회원·가게·기간·중복을 다시 확인하고, 기록 실패는 예약 성공을 바꾸지 않는다.
+            // 배너 클릭 귀속은 같은 가게의 새 예약에만 요청한다.
+            // 현재 회원·가게·기간·중복은 서버가 재검증하며 기록 오류는 예약 성공을 바꾸지 않는다.
             const attributedAdId = consumeAdClickAttribution(Number(id));
             if (attributedAdId && reservation?.id) {
                 void adService.recordConversion(attributedAdId, reservation.id);

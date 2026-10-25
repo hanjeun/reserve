@@ -50,7 +50,7 @@ export function MessengerHomeView({
     );
 }
 
-// 이전 데이터가 있는데 최신 조회만 실패하면 목록 위에 compact 상태를 보인다.
+// 기존 데이터가 있으면 갱신 오류를 목록 위에 작게 표시한다.
 function StaleListError({ query, rows, title }) {
     if (!query.isError || rows.length === 0) return null;
     return (
@@ -75,7 +75,6 @@ function MoreButton({ query, children }) {
     );
 }
 
-// 목록 섹션 본문: 실패 → 로딩 → 빈 목록 → 목록 순으로 판정한다.
 function ListRows({ query, coldError, rows, subject, emptyText, children }) {
     if (coldError) {
         return (
@@ -236,7 +235,6 @@ function ThreadMessages({ messages, thread, selection, history, onLoadOlder, onR
     );
 }
 
-// 대화 본문: 로딩 → 실패 → 첫 안내 → 빈 대화 → 메시지 순으로 판정한다.
 function ThreadBody({ loading, loadError, openError, onReload, intro, emptyText, messageProps }) {
     if (loading) {
         return (

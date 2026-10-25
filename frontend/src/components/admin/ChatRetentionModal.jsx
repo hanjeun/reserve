@@ -74,7 +74,7 @@ export default function ChatRetentionModal({ reportId, onClose }) {
         try {
             const latest = await query.refetch(); assertCurrentSession(session);
             if (latest.isSuccess && Number.isSafeInteger(latest.data?.revision)) { setDraft(null); setValidation(null); setConflictId(null); }
-        } catch { /* 조회 실패에는 기존 설정 입력을 남긴다. */ }
+        } catch { /* 조회 오류 시 기존 설정 입력을 보존한다. */ }
         finally { if (isCurrentSession(session)) setReloading(false); }
     };
     const submit = () => {

@@ -54,7 +54,7 @@ describe('metadata update routing', () => {
         expect(liveUpdateMatches(query('feed', 'interactions', 'mine', {}), removed)).toBe(true);
         expect(liveUpdateMatches(query('feed', 'interactions', 'notifications', 'count'), removed)).toBe(true);
         expect(liveUpdateMatches(query('feed', 'interactions', 'comments', 9), removed)).toBe(false);
-        // Moderation hides content with UPDATED. Only a targetType signal is a harmless aggregate-count update.
+        // 검수의 UPDATED는 내용을 숨길 수 있으며 targetType만 있는 신호는 건수 갱신이다.
         for (const domain of ['FEED', 'COMMENT']) {
             const changed = signal({ domain });
             expect(liveUpdateMatches(query('feed', 'interactions', 'notifications', 'count'), changed)).toBe(true);
@@ -108,7 +108,7 @@ describe('read freshness and private-cache boundaries', () => {
                 expect(value.getQueryData(keys[index])).toEqual({ revision: 1 });
             }
 
-            // A real edit in the same batch as a periodic tick still refreshes the affected review.
+            // 주기 갱신과 같은 배치의 수정도 해당 리뷰를 갱신한다.
             refresh([signal()], true, { periodic: true });
             await vi.waitFor(() => expect(value.getQueryData(keys[2])).toEqual({ revision: 2 }));
             expect(reads[2]).toHaveBeenCalledTimes(1);

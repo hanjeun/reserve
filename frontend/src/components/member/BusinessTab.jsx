@@ -15,7 +15,6 @@ import { colors, radius, fontSize } from '../../styles/tokens';
 const { Text } = Typography;
 const PROFILE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
-
 const BusinessTab = ({ user }) => {
     const { message, confirm } = useMessage();
     const [status, setStatus]     = useState(/** @type {string | null} */ (null));
@@ -115,7 +114,7 @@ const BusinessTab = ({ user }) => {
         try {
             const current = await businessService.getMyStatus();
             if (!isCurrent()) return;
-            // 조회 실패·사라진 신청·불완전 응답으로 빈 수정 폼을 열지 않는다.
+            // 조회 오류·불완전 응답을 빈 수정 폼으로 표시하지 않는다.
             if (current?.status !== 'PENDING'
                 || typeof current.businessName !== 'string' || !current.businessName.trim()) {
                 throw new Error('Pending business verification is unavailable');
@@ -333,10 +332,8 @@ const BusinessTab = ({ user }) => {
     );
 };
 
-/**
- * 사업자 인증의 입력·필드 검증을 AntD Form으로 처리하고 제출 값은 부모 상태와 동기화한다.
- * onValuesChange는 제출에 필요한 필드만 전달해 등록증 검증용 보조 필드가 payload에 섞이지 않게 한다.
- * 수정 시작 시 새 값으로 마운트하므로 initialValues를 사용하고 타이핑 중 덮어쓰는 동기화는 두지 않는다.
+/*
+ * 새 수정 진입에만 초기값을 채우며 제출 값에서 등록증 검증용 보조 필드를 제외한다.
  */
 const BusinessForm = ({ form, setForm, fileList, onFileListChange, onPreview, onPreviewClickCapture, beforeUpload, onSubmit, loading, submitLabel = '사업자 인증 신청', licenseRequired = false, onCancel }) => {
     const [antdForm] = Form.useForm();
@@ -380,10 +377,9 @@ const BusinessForm = ({ form, setForm, fileList, onFileListChange, onPreview, on
                 <FormInput placeholder="추가 메모 (선택)" />
             </Form.Item>
 
-            {/* 사업자 등록증 — 가게 이미지 업로드(StoreImages)와 동일한 picture-card Upload + 공유 useImagePreview 재사용.
-                눈(미리보기)·휴지통(삭제) 아이콘까지 가게 폼과 완전히 동일하게 동작한다.
-                파일은 부모의 fileList 가 들고 있어 Form 의 값이 아니다 → validator 로만 검증한다.
-                수정 모드에서는 등록증 재업로드가 선택이라 licenseRequired 로 갈랐다. */}
+            {/*
+             * 등록증 파일은 부모 상태에서 보관·검증하고 수정 시 재업로드는 선택으로 둔다.
+             */}
             <Form.Item
                 name="license"
                 style={{ marginBottom: 12 }}

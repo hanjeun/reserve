@@ -75,7 +75,7 @@ test('three chat photos keep tools clear, animate after load and retry only the 
     await page.goto('/messages?storeId=81');
     const input = page.getByLabel('첨부할 사진 선택');
     await expect(page.getByRole('button', { name: '사진 첨부', exact: true })).toBeEnabled();
-    // Bounding boxes include ancestor transforms, so capture the baseline after the panel/route entrance settles.
+    // 부모 transform이 측정값에 섞이지 않도록 진입 애니메이션 뒤 기준값을 잰다.
     await expect.poll(() => page.locator('.reserve-chat-composer').evaluate(element => {
         for (let ancestor = element; ancestor; ancestor = ancestor.parentElement) {
             if (ancestor.getAnimations().some(animation => animation.playState === 'running')) return false;
@@ -105,7 +105,7 @@ test('three chat photos keep tools clear, animate after load and retry only the 
     await expect(page.getByRole('button', { name: '첨부 사진 크게 보기' })).toHaveCount(2);
     await input.setInputFiles([files[1]]);
     await expect(page.getByRole('button', { name: '첨부 사진 크게 보기' })).toHaveCount(3);
-    // Reopen starts with the selected order: first, third, second.
+    // 재첨부 순서는 first, third, second다.
     await page.getByRole('button', { name: '첨부 사진 제거: third.webp' }).click();
     await expect(page.getByRole('button', { name: '첨부 사진 크게 보기' })).toHaveCount(2);
     await input.setInputFiles([files[2]]);

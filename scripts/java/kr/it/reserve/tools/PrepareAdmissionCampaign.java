@@ -14,7 +14,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 
-/** Standalone operator tool, never an application startup hook or a remote dots action. */
+/** 운영자가 명시적으로 실행하며 앱 기동 시 자동으로 실행하지 않는 준비 도구. */
 public final class PrepareAdmissionCampaign {
     private PrepareAdmissionCampaign() { }
     public static final String INITIALIZE = """
@@ -60,7 +60,7 @@ public final class PrepareAdmissionCampaign {
         try {
             factory.afterPropertiesSet(); factory.start();
             var redis = new StringRedisTemplate(factory); redis.afterPropertiesSet();
-            // Queue state must not be individually evicted while a marker survives.
+            // 마커가 남아 있는 동안 대기 상태만 먼저 만료되면 안 된다.
             try (var connection = factory.getConnection()) {
                 var policy = connection.serverCommands().getConfig("maxmemory-policy");
                 if (policy == null || !"noeviction".equals(policy.getProperty("maxmemory-policy"))) throw new IllegalStateException("Admission Redis requires verified noeviction policy");

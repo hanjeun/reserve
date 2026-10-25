@@ -1,7 +1,5 @@
-/**
- * BrowserRouter의 POP 이벤트가 폼을 해제하기 전에 기존 history 항목으로 돌아온다.
- * 취소하면 URL·컴포넌트를 유지하고, 승인하면 원래 목적지로 한 번만 이동한다.
- * 새 문서로 나가는 이동은 브라우저 beforeunload가 보호한다.
+/*
+ * POP 이동을 확인하는 동안 현재 URL과 폼을 유지한다. 승인 시 목적지로 한 번만 이동하고 문서 이탈은 beforeunload가 보호한다.
  */
 export function installWorkspacePopGuard({ browser, shouldBlock, requestLeave }) {
     let acceptedIndex = browser.history.state?.idx;

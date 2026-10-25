@@ -4,12 +4,8 @@ import PortOne from '@portone/browser-sdk/v2';
 import paymentService from '../services/paymentService';
 import useMessage from './useMessage';
 
-/**
- * PortOne V2 예약금 결제를 준비하고 서버 검증 결과로 이동한다.
- * PC는 SDK 반환값을 검증하고, 모바일은 redirectUrl의 서버 검증 흐름으로 이어진다.
- * 리다이렉트 시 반환값이 없을 수 있으므로 null을 먼저 처리하고 code가 있으면 실패·취소로 구분한다.
- * SDK 응답만으로 결제 성공을 확정하지 않으며 창 포커스 복귀를 취소 근거로 사용하지 않는다.
- * 결제 식별자·금액·구매자 정보는 서버 prepare 응답을 사용한다.
+/*
+ * 예약금 결제는 서버 준비 값으로 요청하고 PC 검증·모바일 리다이렉트의 서버 검증으로 확정한다. SDK 응답이나 창 포커스 복귀만으로 성공·취소를 판단하지 않는다.
  */
 const usePayment = () => {
     const navigate  = useNavigate();
@@ -62,7 +58,7 @@ const usePayment = () => {
                 return { success: false, redirected: true };
             }
 
-            // 3. 실패·취소 — V2 는 성공 시 code 를 보내지 않는다
+            // V2는 성공 시 code를 보내지 않으므로 값이 있으면 실패·취소로 처리한다.
             if (payment.code !== undefined) {
                 const isCancelled = payment.code === 'Cancelled'
                     || (payment.message || '').includes('취소')

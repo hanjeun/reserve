@@ -1,8 +1,5 @@
-/**
- * RESERVE Design System - FormDatePicker
- *
- * AntD DatePicker의 필드 API(value/onChange)는 유지하되 달력 표면은 RESERVE가 직접 그린다.
- * 가게 설정·광고 신청·예약 화면이 서로 다른 달력 언어를 쓰지 않게 하는 공통 관문이다.
+/*
+ * AntD의 값 API를 유지하고 달력 표면을 공통으로 제공한다.
  */
 import React, { useId, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
@@ -34,7 +31,7 @@ const parseTypedDate = text => {
     const trimmed = text.trim();
     const separated = /^(\d{4})([-./])(\d{2})\2(\d{2})$/.exec(trimmed);
     const compact = /^(\d{4})(\d{2})(\d{2})$/.exec(trimmed);
-    // Also accept the previous calendar label's complete dotted form, including its final dot.
+    // 끝 마침표를 포함한 점 구분 날짜도 허용한다.
     const dottedLabel = /^(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.$/.exec(trimmed);
     const parts = separated ? [separated[1], separated[3], separated[4]] : (compact ?? dottedLabel)?.slice(1);
     if (!parts) return null;
@@ -273,8 +270,8 @@ const FormDatePickerBase = ({
     const { status } = Form.Item.useStatus();
     const [open, setOpen] = useState(false);
     const [month, setMonth] = useState(() => initialMonthFor(mode, value).startOf('month'));
-    // 공휴일(빨간날)은 서버 HolidayService 가 준다. 받기 전·실패 시에는 빈 집합이라 예전처럼 일요일만 빨갛다.
-    // 기본은 꺼 두고 호출부가 켠다 — 단위 테스트·미리보기에서 공통 입력이 네트워크를 부르지 않게.
+    // 공휴일은 서버에서 조회하며 응답 전·오류 시에는 일요일만 표시한다.
+    // 공휴일 조회는 호출부가 명시적으로 켠 경우에만 수행한다.
     const holidays = useHolidayDates(month.format('YYYY-MM'), open && highlightHolidays);
     const [draftSingle, setDraftSingle] = useState(() => validDay(value));
     const [draftMultiple, setDraftMultiple] = useState(() => validDays(value));

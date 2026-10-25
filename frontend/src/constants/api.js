@@ -76,7 +76,7 @@ export const API_ENDPOINTS = {
         ADMIN_ALL:      '/api/advertisements/admin/all',
         ADMIN_SUSPEND:  (id) => `/api/advertisements/admin/${id}/suspend`,
         CANCEL:         (id) => `/api/advertisements/${id}`,
-        // 종료상태 광고 목록에서 숨기기(소프트삭제) — 2026-07 추가
+        // 종료 광고는 소프트 삭제로 목록에서 숨긴다.
         REMOVE:         (id) => `/api/advertisements/${id}/remove`,
         UPDATE:         (id) => `/api/advertisements/${id}`,
         // 광고 성과 지표
@@ -150,7 +150,7 @@ export const API_ENDPOINTS = {
         NAVER:  '/oauth2/authorization/naver',
         KAKAO:  '/oauth2/authorization/kakao',
     },
-    // 통합 메시지. roomId를 받는 폴링·과거 내역·차단·신고는 모두 서버가 참가자를 다시 확인한다.
+    // 메시지의 조회·읽음·차단·신고는 서버에서 현재 참가자를 다시 확인한다.
     CHAT: {
         CONVERSATIONS: '/api/chat/conversations',
         SUPPORT:       '/api/chat/support',

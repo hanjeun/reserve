@@ -47,9 +47,7 @@ public class StoreUpdateRequest {
     private String existingMainImageUrl;
     private List<String> existingDetailImageUrls;
 
-    // 상세 이미지 최종 순서(선택, 2026-09-28 드래그 정렬). 비어 있으면 기존 이미지 → 새 이미지 순서다.
-    // 항목은 "e{i}"(existingDetailImageUrls 의 i번째) 또는 "n{j}"(detailImages 의 j번째 새 파일).
-    // 새 사진을 기존 사진 앞에 끼워 넣은 순서는 두 목록만으로 표현할 수 없어서 따로 받는다.
+    // 최종 순서는 기존 이미지 e{i}와 새 파일 n{j}의 인덱스로 지정한다. 순서가 없으면 기존 이미지 뒤에 새 이미지를 붙인다.
     private List<String> detailImageOrder;
 
     // 영업 시간
@@ -115,7 +113,7 @@ public class StoreUpdateRequest {
      */
     private List<Integer> closedDays;
 
-    /** 임시 휴무일 — ISO 날짜 문자열 목록("2026-09-15"). 지난 날짜는 저장 시 걸러진다. */
+    /** 임시 휴무일은 ISO 날짜 목록이며 지난 날짜는 저장 시 제외한다. */
     private List<String> closedDates;
 
     /**
@@ -130,14 +128,7 @@ public class StoreUpdateRequest {
     /** SESSION 전용 회차 시각 목록("11:00"). SLOT·DAY 에서는 무시된다. */
     private List<String> sessionTimes;
 
-    /**
-     * 운영 시작일 — ISO 날짜 문자열("2026-09-01"). null·빈 값 = 시작일 제한 없음.
-     *
-     * <p>{@code LocalDate} 가 아니라 {@code String} 인 이유 — 이 요청은 multipart 라
-     * {@code @ModelAttribute} 로 바인딩되는데, 날짜 타입은 별도 컨버터가 있어야 붙는다.
-     * 형식이 깨졌을 때 {@code BindException} 으로 새어나가면 기존 에러 규격과 달라진다.
-     * {@code closedDates} 가 같은 이유로 {@code List<String>} 이다.
-     */
+    /** 잘못된 날짜도 공통 오류 형식으로 처리하기 위해 문자열로 받아 직접 파싱한다. 빈 값은 시작일 제한이 없음을 뜻한다. */
     private String openDate;
 
     /** 운영 종료일 — 당일까지 영업. null·빈 값 = 무기한. */

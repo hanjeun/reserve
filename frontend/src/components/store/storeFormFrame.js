@@ -1,8 +1,7 @@
 import { heights, radius, spacing } from '../../styles/tokens';
 
-// 가게 등록·수정 폼의 바깥 틀(폭·여백·제목 간격·밀도 변수) 관문.
-// 실제 폼(StoreForm)과 로딩 뼈대(StoreFormSkeleton)가 같은 값을 쓰게 한 곳에서 정한다 —
-// 예전엔 뼈대가 자기 여백·폭을 따로 들고 있어 로딩이 끝나는 순간 제목·첫 칸이 수십 px 튀었다(2026-09-29 실측).
+// 실제 폼과 골격은 같은 바깥 틀·밀도 변수를 사용한다.
+
 export const STORE_FORM_MOBILE_MAX = 767;
 export const STORE_FORM_SINGLE_COLUMN_MAX = 899;
 

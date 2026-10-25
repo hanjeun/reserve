@@ -20,7 +20,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.util.concurrent.*;
 import static org.assertj.core.api.Assertions.*;
 
-/** Reuses only the explicitly fenced disposable login-method fixture; never development/restored/production data. */
+/** 명시적으로 격리한 일회성 로그인 시험 DB만 사용한다. */
 @EnabledIfEnvironmentVariable(named = "RESERVE_MYSQL_LOGIN_TEST_ISOLATED", matches = "1")
 class JwtSessionMySqlTest extends RefreshRotationPersistenceTest {
     @Autowired private JdbcTemplate jdbc;
@@ -72,7 +72,7 @@ class JwtSessionMySqlTest extends RefreshRotationPersistenceTest {
                 tx.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
                 tx.setTimeout(15);
                 return tx.execute(status -> {
-                    // A plain find/count would retain this four-row snapshot after the other login commits.
+                    // 일반 조회·건수 조회는 다른 로그인 커밋 뒤에도 기존 네 행의 읽기 스냅샷을 유지한다.
                     assertThat(sessions.findByMemberId(member.getId())).hasSize(4);
                     snapshots.countDown();
                     try {

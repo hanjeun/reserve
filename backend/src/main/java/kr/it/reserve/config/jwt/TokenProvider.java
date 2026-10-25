@@ -26,7 +26,7 @@ import java.time.Clock;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 
-/** JWT cryptography and the common member -> device-session issuance boundary. */
+/** JWT 검증과 회원→기기 세션 순서의 발급 경계를 관리한다. */
 @Slf4j
 @RequiredArgsConstructor
 @Service
@@ -49,7 +49,7 @@ public class TokenProvider {
     public record IssuedSession(String accessToken, String refreshToken, Duration refreshMaxAge) {
         @Override public String toString() { return "IssuedSession[credentials=redacted]"; }
     }
-    /** Contains verified context only. No raw bearer is retained in Spring's Authentication details. */
+    /** 검증된 문맥만 보관하고 인증 상세에 원문 토큰을 남기지 않는다. */
     public record VerifiedAuthentication(Member member, LocalDateTime oauthAuthenticatedAt, String loginMethod,
                                          String sessionId) { }
 
@@ -87,7 +87,7 @@ public class TokenProvider {
                 .sig().clear().add(Jwts.SIG.HS512).and().build();
     }
 
-    /** All browser logins issue their access and refresh from the same locked device session. */
+    /** 액세스·리프레시 토큰을 같은 잠금 세션에서 발급한다. */
     @Transactional
     public IssuedSession issueSession(Member authenticated, LocalDateTime oauthAuthenticatedAt) {
         oauthAuthenticatedAt = oauthAuthenticatedAt == null ? null : oauthAuthenticatedAt.truncatedTo(ChronoUnit.MILLIS);
@@ -125,10 +125,7 @@ public class TokenProvider {
     @Transactional
     public String generateRefreshToken(Member member, LocalDateTime at) { return issueSession(member, at).refreshToken(); }
 
-    /**
-     * Compatibility minting helpers create an UNREGISTERED token. A caller must use issueSession for login.
-     * A signature alone never registers or authorizes a device session.
-     */
+    /** 호환 발급 함수의 토큰은 세션을 등록하지 않는다. 로그인은 issueSession을 사용해야 한다. */
     public String generateAccessToken(Member member) { return generateAccessToken(member, oauthAuthenticationAt(member)); }
     public String generateAccessToken(Member member, LocalDateTime at) { return generateAccessToken(member, at, loginMethod(member, at)); }
     public String generateAccessToken(Member member, LocalDateTime at, String method) {
@@ -147,7 +144,7 @@ public class TokenProvider {
                 absolute, member.getAuthVersion(), at, method == null ? loginMethod(member, at) : method);
     }
 
-    /** Caller holds member -> session locks. Metadata is sufficient to reconstruct the exact current refresh. */
+    /** 호출부가 회원→세션 잠금을 보유해야 한다. 저장된 메타데이터로 현재 리프레시 토큰을 동일하게 재구성한다. */
     public IssuedSession rotateSession(RefreshToken row) {
         LocalDateTime now = utcNow().truncatedTo(ChronoUnit.SECONDS);
         LocalDateTime expires = earlier(now.plus(jwtProperties.getRefreshTokenExpiration()), row.getAbsoluteExpiresAt());
@@ -174,7 +171,7 @@ public class TokenProvider {
                 jwtProperties.getActiveKeyId(), null);
     }
 
-    /** Stable order and stable member-id subject: profile, email and role changes cannot change a grace response. */
+    /** 갱신 유예 응답이 프로필 변경에 흔들리지 않도록 회원 ID와 클레임 순서를 고정한다. */
     private String makeToken(RefreshToken row, Purpose purpose, String jti, LocalDateTime issuedAt,
                              LocalDateTime expires, String keyId, Long generation) {
         JwtBuilder builder = Jwts.builder().header().type("JWT").and();
@@ -218,7 +215,7 @@ public class TokenProvider {
         } catch (JwtException | IllegalArgumentException exception) { return invalidInspection(); }
     }
 
-    /** Exactly one JWT parse/signature verification and one joined current member/device-session read. */
+    /** 서명 검증과 현재 회원·세션 결합 조회를 한 번씩 수행한다. */
     @Transactional(readOnly = true)
     public VerifiedAuthentication verifyAuthentication(String token) {
         Claims claims = getClaims(token);
@@ -289,7 +286,7 @@ public class TokenProvider {
         if (token == null || token.length() > 8192) throw new JwtException("Invalid token length");
         try { return parser.parseSignedClaims(token).getPayload(); }
         catch (ExpiredJwtException exception) {
-            // ExpiredJwtException is raised before required-claim checks; never trust a foreign issuer.
+            // 만료 예외는 필수 클레임 검증보다 먼저 발생하므로 발급자를 별도로 확인한다.
             if (!jwtProperties.getIssuer().equals(exception.getClaims().getIssuer())) throw new JwtException("Invalid token issuer");
             throw exception;
         }

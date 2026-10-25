@@ -1,18 +1,4 @@
-/* Card 그림자·hover (2026-08-05: Card.jsx 에서 이관)
-   Button 과 같은 이유로 옮겼다 — JSX 안 <style> 은 인스턴스마다 렌더된다.
-   카드는 목록 화면에서 수십 개가 동시에 뜨므로 중복이 가장 심한 곳이었다.
-
-   hover 조건을 선택자에 박아두는 이유
-     `.ant-card-hoverable` 이 없는 카드까지 hover 효과가 걸리면, 클릭해도 아무 일이
-     일어나지 않는 **잘못된 어포던스**가 된다. 지금 사용처(StoreCard·MyStores)는 둘 다
-     hoverable 이지만, 비대화형 카드가 생기는 순간 조용히 어긋나므로 조건을 명시한다.
-
-   인라인 boxShadow 를 주지 말 것
-     Card 를 쓰는 쪽에서 style={{ boxShadow: ... }} 를 주면 인라인이 이 규칙을 이겨서
-     **hover 그림자가 통째로 죽는다.** 실제로 그렇게 회귀한 이력이 있다.
-
-   값의 출처는 tokens/spacing.js 의 shadows.card / shadows.cardHover 다.
-   CSS 에서는 JS 토큰을 참조할 수 없어 리터럴이 중복된다 — 한쪽을 고치면 다른 쪽도 고쳐야 한다. */
+/* 대화형 카드의 그림자는 공통 토큰과 함께 관리하고 인라인으로 덮지 않는다. */
 .reserve-card {
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);     /* = shadows.card */
     transition: box-shadow 0.2s ease;
@@ -30,7 +16,7 @@
     -webkit-tap-highlight-color: transparent;
 }
 .reserve-card-link:hover { color: inherit; }
-/* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
+
 .reserve-card-link:active { color: inherit; transform: scale(0.98); opacity: 0.88; }
 .reserve-card-link:focus { outline: none; }
 .reserve-card-link:focus-visible {
@@ -50,10 +36,7 @@
         transform: scale(1.05);
     }
 }
-/* "모션 줄이기"를 켠 사용자에게는 확대·그림자 전환을 끈다.
-   확대·이동 모션은 전정기관 장애가 있는 사용자에게 실제로 불편을 유발한다.
-   전역 * 리셋으로 한 번에 끄지 않는 이유: 이 프로젝트는 antd rc-motion 이 트랜지션
-   타이밍에 민감한 이력이 있어 대상을 좁혀서 끈다. */
+/* 모션 줄이기 설정은 카드 전환에만 적용한다. */
 @media (prefers-reduced-motion: reduce) {
     .reserve-card,
     .reserve-card:has(.reserve-store-card-hit),
@@ -62,18 +45,12 @@
     .reserve-card:has(.reserve-store-card-hit:active) { transform: none; }
     .reserve-card.ant-card-hoverable:hover .reserve-card-image { transform: none; }
 }
-/* Card actions(가게 카드 하단 수정·삭제 줄).
-   예전에 background 를 !important 흰색으로 박아둬서 다크에서 이 줄만 흰 띠로 남았고,
-   AntD 의 Card.actionsBg 토큰도 그 !important 에 밀려 무시됐다(2026-07-30).
-   이제 값이 CSS 변수라 다크가 자동으로 따라온다 — !important 도 필요 없다. */
+/* 카드 하단도 테마의 CSS 변수를 사용한다. */
 .reserve-card .ant-card-actions {
     background: var(--c-bg-paper, #ffffff);
     border-top: 1px solid var(--c-border-light, #f2f4f6);
 }
-/* margin 이 아니라 padding 이어야 한다.
-   margin 이면 그 12px 이 li 박스 바깥이라, 안쪽 버튼에 hover 배경을 깔아도 위아래 12px 이
-   칠해지지 않아 "일부만 회색으로 채워진" 모양이 됐다. padding 이면 li 박스가 셀 전체가 된다.
-   높이는 12+12 로 같아서 카드 크기는 변하지 않는다. */
+/* 셀 전체에 배경이 표시되도록 여백은 padding으로 둔다. */
 .reserve-card .ant-card-actions > li {
     margin: 0 !important;
     padding: 12px 0 !important;
@@ -98,14 +75,7 @@
     outline: var(--reserve-focus-ring);
     outline-offset: 2px;
 }
-/* Button 상호작용 상태 (2026-08-05: Button.jsx 에서 이관)
-   왜 옮겼나 — JSX 안의 <style> 은 **인스턴스마다 하나씩 렌더된다.**
-     React 19 는 precedence prop 이 없으면 style 태그를 호이스팅·중복 제거하지 않는다.
-     브라우저 실측: 마이페이지 한 화면에 Button 의 동일한 style 태그가 3개 있었다.
-     버튼이 많은 화면(가게 목록·관리자 테이블)에서는 수십 개가 된다.
-   전역 정책은 이 파일에, 컴포넌트에는 인스턴스 전용 인라인 style 만 — docs/technical/design-system.md.
-
-   변수 보간이 전혀 없는 정적 CSS 였으므로 내용은 그대로 옮겼다. */
+/* 버튼 상태는 컴포넌트 마운트 여부와 관계없이 적용한다. */
 .reserve-btn {
     -webkit-appearance: none;
     appearance: none;
@@ -153,10 +123,7 @@
 }
 .reserve-btn--ghost-sm.reserve-btn--icon-only:active:not(:disabled) { opacity: 1; }
 
-/* 조회 결과의 빈 상태 · 오류 상태
-   빈 결과와 통신 실패는 다르지만, 일반 조회 실패를 빨간 경고 배지로 쌓으면 같은 서버
-   장애가 화면에서 과장된다. DataState는 무채색 아이콘·본문·재시도로 통일하고,
-   role=alert로 실패 의미만 보존한다. 폼 검증·파괴적 작업 실패에는 쓰지 않는다. */
+/* 일반 조회 실패는 중립 상태와 role=alert로 알린다. 폼 검증·파괴적 작업 실패는 기존 오류 표시를 쓴다. */
 .reserve-data-state {
     width: 100%;
     min-height: 240px;
@@ -184,7 +151,7 @@
 .reserve-data-state__title { font-size: var(--data-state-title-size, 18px); font-weight: 600; line-height: 1.55; color: var(--c-text-primary, #1a1f27); word-break: keep-all; }
 .reserve-data-state__description { margin-top: 4px; font-size: var(--data-state-description-size, 15px); line-height: 1.5; color: var(--c-text-tertiary, #8b95a1); word-break: keep-all; }
 .reserve-data-state__retry { margin-top: 2px; }
-/* State illustrations share the established empty/error stylesheet. Dimensions also live on the instance. */
+/* 상태 그림은 각 인스턴스의 크기를 유지한다. */
 .reserve-state-illustration {
     --state-illustration-size: var(--state-illustration-mobile-size);
     position: relative;
@@ -196,7 +163,7 @@
 .reserve-state-illustration__fallback { color: var(--c-text-tertiary); line-height: 1; }
 .reserve-state-illustration[role="button"] { cursor: pointer; border-radius: 12px; }
 .reserve-rolling-form-input { position: relative; }
-/* Native text switches immediately; only the shared value layer animates. */
+/* 원문은 즉시 갱신하고 공통 값 레이어만 애니메이션한다. */
 .reserve-rolling-form-input > .reserve-form-field,
 .reserve-rolling-form-input > .reserve-form-field input {
     transition-property: background-color, border-color, box-shadow !important;
@@ -242,9 +209,7 @@
     .reserve-data-state--compact .reserve-data-state__retry { grid-column: 2; padding-inline: 0; }
 }
 
-/* 페이지 자체가 없거나 그리다 실패한 화면 (PageStatus)
-   404 페이지와 오류 경계 폴백이 쓴다. DataState 와 같은 무채색 아이콘·가운데 정렬을 쓰되,
-   화면의 유일한 내용이라 제목을 h1 크기로 올린다. 스켈레톤도 같은 틀을 쓴다. */
+/* PageStatus와 골격은 화면의 유일한 상태 안내로 같은 배치를 쓴다. */
 .reserve-page-status {
     display: flex;
     flex-direction: column;
@@ -262,7 +227,7 @@
     font-size: 40px;
     line-height: 1;
 }
-/* Page title/description typography is shared by pages and their loading placeholders. */
+/* 페이지 제목·설명과 로딩 골격은 같은 글자 기준을 쓴다. */
 .reserve-page-title.ant-typography {
     margin: var(--reserve-page-title-margin, 0 0 8px);
     color: var(--c-text-primary);
@@ -433,8 +398,7 @@
     .reserve-payment-result__summary-row { gap: 12px; padding: 0 15px; }
 }
 
-/* outline: hover 시 테두리만 진해지고 글자는 진한 색 그대로 유지
-   (예전엔 hover에서 color를 회색으로 바꿔서 더 흐릿해졌다) */
+/* 테두리 버튼은 hover에서 테두리만 진하게 한다. */
 .reserve-btn--outline:hover:not(:disabled)  { border-color: var(--c-outline-hover-border); background: var(--c-outline-hover-bg); }
 
 /* 정지 사유는 모바일에서도 툴팁 없이 읽을 수 있어야 한다. */
@@ -481,8 +445,7 @@
     outline-offset: 2px;
 }
 
-/* FormInput.WithButton도 일반 FormInput과 같은 .reserve-form-field 관문을 통과한다.
-   결합 버튼의 로딩·포커스·비활성 상태는 호출부가 아니라 여기서 일관되게 처리한다. */
+/* 결합 입력의 로딩·포커스·비활성 상태도 공통 필드에서 처리한다. */
 .reserve-form-field-with-button { width: 100%; }
 .reserve-form-field-button {
     cursor: pointer;
@@ -506,10 +469,7 @@
     font-size: 14px;
 }
 
-/* 스켈레톤은 뷰포트 기준 배경으로 하이라이트 위치를 공유한다.
-   fixed 배경을 지원하지 않는 환경에서도 폭은 vw 기준을 유지한다.
-   투명한 그라디언트 아래의 바탕색과 테마별 하이라이트 색을 분리한다.
-   모션 최소화 환경에서는 아래 규칙으로 애니메이션을 끈다. */
+/* 골격의 강조 위치는 뷰포트 기준으로 공유하고 테마별 바탕과 하이라이트를 분리한다. */
 @keyframes reserve-shimmer {
     0%   { background-position: -70vw 0; }
     100% { background-position: 170vw 0; }
@@ -528,12 +488,11 @@
     background-repeat: no-repeat;
     background-size: 70vw 100%;
     background-attachment: fixed;
-    /* linear 여야 한다. ease-in-out 은 "각 반복마다" 가속·감속을 적용하므로 무한 반복에서는
-       사이클 끝마다 속도가 0으로 떨어졌다가 다시 붙는다 — 띠가 주기적으로 멈칫하는 원인이었다. */
+    /* 반복 경계에서 속도가 달라지지 않도록 선형 전환을 쓴다. */
     animation: reserve-shimmer 1.8s linear infinite;
     border-radius: 6px;
 }
-/* Text skeletons keep each real line's footprint, including narrow mobile wrapping. */
+/* 텍스트 골격은 모바일 줄바꿈을 포함한 실제 글자 영역을 유지한다. */
 .reserve-skeleton-text {
     color: transparent !important;
     -webkit-text-fill-color: transparent;
@@ -543,13 +502,12 @@
     user-select: none;
 }
 .reserve-skeleton-text > * { visibility: hidden; }
-/* Native pictures retain their own dimensions, crop, transparency and eager/lazy priority. */
+/* 사진의 원래 비율·투명도·로딩 우선순위를 유지한다. */
 .reserve-loading-image {
     color: transparent;
     border-radius: inherit;
 }
-/* 모션 최소화를 켠 사용자에게는 흐르지 않는 평면 블록으로 보여준다.
-   로딩 중이라는 정보는 형태만으로 충분히 전달된다. */
+/* 모션 줄이기 설정에서는 골격을 정지된 블록으로 표시한다. */
 @media (prefers-reduced-motion: reduce) {
     .reserve-skeleton-block {
         animation: none;
@@ -557,10 +515,7 @@
     }
 }
 
-/* 폼 Select의 높이와 줄높이를 AntD 6 변수로 함께 지정해 세로 정렬을 유지한다.
-   루트 .ant-select에 적용하며 높이·반경은 디자인 토큰과 함께 관리한다.
-   배경과 테마별 색은 App.jsx의 ConfigProvider가 담당한다.
-   전역 규칙은 컴포넌트 마운트 여부에 의존하지 않도록 이 파일에 둔다. */
+/* AntD 6 변수로 높이와 줄높이를 함께 지정한다. 색은 ConfigProvider에서 관리한다. */
 .ant-select.reserve-form-select {
     --ant-select-height: 54px;          /* = heights.input. 바꿀 때 tokens/spacing.js 와 함께 고칠 것 */
     --ant-select-font-size: 16px;
@@ -722,12 +677,7 @@
     animation: reserve-ad-create-page-enter 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* 광고 결제 전 미리보기 (2026-09-23 개편)
-   1) 광고가 보일 모습은 실제 가게 목록과 **같은 컴포넌트**를 preview 로 그린다
-      (StoreCard·StoreListRow·AdBannerSurface). 예전엔 회색 판 안에 흰 카드를 한 겹 더 씌워서
-      실제 목록과 다르게 보였다. 이제 "화면" 테두리 하나만 두고, 그 안은 실제 목록과 같은 흰 바탕이다.
-   2) 결제 정보는 영수증 목록: 왼쪽 항목·오른쪽 값, 계산식(하루 금액 × 일수), 합계만 크게.
-      파란색은 결제 버튼 하나에만 둔다. */
+/* 광고 미리보기는 실제 목록 컴포넌트를 사용하고 결제 금액은 항목·계산 근거·합계로 구분한다. */
 .reserve-ad-create-preview {
     display: flex;
     flex-direction: column;
@@ -844,7 +794,7 @@
     font-size: 12px;
 }
 
-/* 결제 정보 — 토스 결제 확인 화면 방식: 금액이 먼저, 근거는 아래 목록 (2026-09-23) */
+/* 결제 금액과 계산 근거를 구분한다. */
 .reserve-ad-checkout {
     padding: 20px;
     border-radius: 16px;
@@ -946,26 +896,10 @@
     }
 }
 
-/* 폼 Select 는 색을 갖지 않는다
-   한때 값 글자를 500 으로 굵히고 꺾쇠·포커스 테두리에 브랜드 색을 넣어봤다가 **전부 되돌렸다.**
+/* 폼 Select는 입력과 같은 크기·중립색·굵기를 유지하며 높이와 모서리만 보정한다. */
 
-   되돌린 이유
-     1) 굵기 — 옆의 FormInput 은 400 이다. 셀렉트만 500 이면 같은 폼에서 셀렉트 줄만 무거워
-        보이고, 화면 전체가 "예전보다 굵어졌다"는 인상이 된다.
-     2) 색 — 채움형 입력은 옅은 면으로 "값을 넣는 칸"임을 암시하는 조용한 요소다.
-        FormInput·FormDatePicker·FormTimePicker 아이콘이 전부 무채색인데 셀렉트만 유채색이면
-        그 하나에 시선이 묶여 폼의 위계가 무너진다.
-     3) 포커스 테두리 색도 같은 이유로 뺐다 — 채움형은 테두리가 없는 게 규칙이고,
-        포커스는 AntD 기본 그림자(colorPrimary 기반)가 이미 표현한다.
+/* 두 필드 경로의 검증 메시지는 같은 배치를 쓰고 재검증으로 해제한다. */
 
-   글자 크기(16px)는 유지한다. FormInput 이 fontSize.lg(16px)를 명시적으로 고정하고 있어
-   이게 이 프로젝트 입력칸의 기준이다(iOS 자동 확대 방지 기준선과도 같다).
-
-   결론: 여기서 다루는 것은 **높이·모서리·글자 크기**뿐이다. 색과 굵기는 건드리지 않는다. */
-
-/* FormField와 AntD Form.Item의 검증 메시지는 같은 크기·줄높이·간격을 공유한다.
-   검증 오류는 값이 수정되어 재검증될 때 해제하며 타이머로 숨기지 않는다. */
-/* 같은 정책을 별도 인라인 값으로 복제하지 않도록 두 경로의 선택자를 함께 둔다. */
 .reserve-field-error,
 .ant-form-item-explain,
 .ant-form-item-explain-error,
@@ -977,19 +911,14 @@
 .ant-form-item-explain {
     margin-top: 6px;
 }
-/* FormField 경로는 AntD 컨테이너가 없으므로 블록화와 색을 직접 준다.
-   AntD 경로의 색은 ConfigProvider token.colorError 가 맡는다(아래 주석 참고). */
+/* AntD 밖의 FormField에만 오류색을 직접 적용한다. */
 .reserve-field-error {
     display: block;
     color: var(--c-error, #f04452);
 }
-/* 색은 App.jsx 의 ConfigProvider token.colorError 가 담당하는 게 정석이라 여기서 지정하지 않는다.
-   AntD 기본 에러색은 #ff4d4f 이고 이 프로젝트 색은 #f04452 라 그냥 두면 서로 다른 빨강이 섞인다.
-   theme.css 의 --c-error 는 다크에서 #ff6b76 으로 바뀌므로 리터럴로 박으면 다크가 어긋난다. */
+/* AntD 오류색은 ConfigProvider가 테마별로 관리한다. */
 
-/* WebKit의 비활성 입력은 text-fill-color도 적용하므로 color와 함께 지정한다.
-   AntD 6의 placeholder·content 클래스와 기본 입력을 모두 포함한다.
-   테마별 색은 CSS에서 관리하고 ConfigProvider의 색 계산에는 CSS var 문자열을 넘기지 않는다. */
+/* WebKit 비활성 입력은 color와 text-fill-color를 함께 지정한다. */
 .ant-picker-disabled input::placeholder,
 .ant-picker-disabled input,
 .ant-input-disabled::placeholder,
@@ -1023,8 +952,7 @@ input:disabled {
     box-shadow: inset 0 0 0 1px var(--c-gray-500, #8b95a1);
 }
 
-/* 사진 순서 바꾸기 (2026-09-28, SortableImageUpload) — 집은 칸은 떠오르고 나머지는 자리로 미끄러진다.
-   이동(translate)은 dnd-kit 이 바깥 칸에 주므로, 떠오르는 확대·그림자는 안쪽 AntD 칸에만 걸어 서로 덮지 않게 한다. */
+/* 이동은 바깥 칸, 확대·그림자는 안쪽 칸에 적용해 dnd-kit 변환을 덮지 않는다. */
 .reserve-sortable-upload-item {
     height: 100%;
     cursor: grab;
@@ -1049,20 +977,14 @@ input:disabled {
     }
 }
 
-/* 여러 개를 고르는 칸의 선택 칩 (2026-09-28) — 회차 시각처럼 값이 칩으로 쌓이는 칸.
-   AntD filled 변형은 칩을 흰 면 + 옅은 테두리로 그린다(date-picker/style/variants.js 의 &-filled).
-   포커스 때 칸이 흰색이 되면 흰 칩이 테두리로만 구분돼, 회색 면으로 구분하는 채움형 규칙과 결이 달랐다.
-   칩은 보조 버튼과 같은 회색 면(gray-100)·테두리 없음 한 가지로 통일한다.
-   AntD 선택자와 명시도가 같으면 런타임 주입 순서에 따라 지므로 .ant-picker/.ant-select 를 한 번 더 붙인다. */
+/* 선택 칩은 회색 면을 사용한다. AntD 주입 순서와 무관하도록 선택자 명시도를 확보한다. */
 .ant-picker.ant-picker-filled.ant-picker-multiple .ant-picker-selection-item,
 .ant-select.ant-select-filled.ant-select-multiple .ant-select-selection-item {
     background: var(--c-gray-100, #f2f4f6);
     border-color: transparent;
 }
-/* 날짜 선택은 입력칸처럼 보이는 버튼이다. 버튼 공통의 굵은 외곽선 대신 입력칸과 같은 표시만 쓴다.
-   오류 상태의 빨간 링은 인라인 스타일이라 위 규칙보다 우선해 그대로 남는다. */
+/* 날짜 선택 버튼은 입력 포커스를 사용하고 인라인 오류 링을 유지한다. */
 .reserve-form-date-trigger:focus-visible { outline: none; }
 
-/* 표의 코드 칸(주문번호처럼 글자 + 복사 아이콘): 아이콘이 다음 줄로 꺾이지 않게 한 줄로 둔다.
-   칸 폭은 호출부가 실측값으로 준다. 표는 모바일에서 가로로 스크롤한다(2026-09-21). */
+/* 코드와 복사 아이콘은 줄바꿈하지 않고 좁은 표는 가로로 스크롤한다. */
 .ant-table .reserve-table-code { white-space: nowrap; }

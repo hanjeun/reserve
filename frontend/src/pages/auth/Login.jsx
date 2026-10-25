@@ -78,18 +78,13 @@ const Login = () => {
         if (location.state?.prevented) {
             hasHandledRef.current = true;
             message.warning('로그인이 필요한 서비스예요.');
-            // 2026-07 버그 수정: 예전엔 여기서 state를 통째로 비웠다({}).
-            // 그런데 그 state 안엔 PrivateRoute가 넣어준 from(원래 가려던 페이지)도 같이 들어 있어서,
-            // 안내 메시지를 띄우는 순간 복귀 경로가 사라지고 로그인 성공 후 항상 '/'로 가버렸다.
-            // (아래 onLoginSubmit에 navigate(from) 복귀 코드가 이미 있었는데도 이 한 줄 때문에 무력화)
-            // -> 메시지를 한 번만 띄우기 위해 prevented 플래그만 지우고 from은 그대로 남긴다.
+            // 로그인 화면 상태에서 복귀 경로를 보존한다.
+
             navigate('/login', { replace: true, state: { from: location.state.from } });
             return;
         }
 
-        // OAuth2 소셜 로그인 시 정지 처리 (URL 파라미터)
-        // 소셜 로그인은 브라우저가 따라가는 리다이렉트 흐름이라 URL 파라미터로 정보 전달
-        // 구조: ?suspended=true&status=SUSPENDED&until=2026-08-15
+        // 정지 정보는 suspended·status·until 쿼리로 전달된다.
         const isSuspended = params.get('suspended') === 'true';
         const suspendStatus = params.get('status');    // 'SUSPENDED' | 'BANNED'
 

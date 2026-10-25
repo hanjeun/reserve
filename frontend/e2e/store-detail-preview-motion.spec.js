@@ -98,8 +98,8 @@ test('first store-detail photo preview animates its entrance after a fresh navig
     expect(firstBackdropFrame).toBeGreaterThanOrEqual(0);
     expect(firstBackdropFrame, JSON.stringify(frames)).toBeLessThanOrEqual(firstScaleFrame + 1);
     expect(frames.some(frame => frame.maskOpacity > 0.05 && frame.maskOpacity < 0.95), JSON.stringify(frames)).toBe(true);
-    // Reuse the intermediate frames already required above. Under CI load, consecutive
-    // samples can jump from 0.17 to 0.84 without entering a second, narrower interval.
+    // 프레임 간격이 넓어질 수 있어 앞서 확보한 중간 프레임을 재사용한다.
+
     const intermediateFrames = frames.filter(frame => {
         const scale = scaleAt(frame);
         return scale > 0.15 && scale < 0.85;

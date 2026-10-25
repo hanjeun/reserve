@@ -1,4 +1,4 @@
-/** RESERVE time fields share the calendar modal surface and keep Dayjs form values. */
+/* 시간 값은 Dayjs 형식을 유지한다. */
 import React, { useId, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Form, Modal } from 'antd';
@@ -158,11 +158,11 @@ const FormTimePickerBase = ({
                 setDraftRange(next);
                 setTypedRange(next.map(timeKey));
                 setRangePart(otherPart);
-                // This is only a visible wheel starting point; the other end still needs confirmation.
+                // 휠의 시작 위치이며 다른 끝값은 별도 확인한다.
                 setCursor(cursor.hour(Math.max(0, Math.min(23, cursor.hour() + (otherPart === 1 ? 1 : -1)))));
                 return;
             }
-            // Compare the time of day, not the date attached to a Dayjs value.
+            // Dayjs의 날짜를 제외하고 시각만 비교한다.
             if (rangeOrderError(mode, next)) {
                 setDraftRange(next);
                 setTypedRange(next.map(timeKey));

@@ -103,7 +103,7 @@ public class WaitingEventStream {
 
     private void complete(SseEmitter emitter) {
         try { emitter.complete(); }
-        catch (IllegalStateException disconnected) { /* Already closed by the Servlet container. */ }
+        catch (IllegalStateException disconnected) { /* 서블릿 컨테이너가 이미 연결을 닫았다. */ }
     }
 
     private boolean send(SseEmitter emitter, String name, Object data) {

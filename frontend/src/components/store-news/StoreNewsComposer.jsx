@@ -167,7 +167,7 @@ export default function StoreNewsComposer({ open, news, initialStoreId, stores, 
         if (busy || lock.current) return;
         if (preview) { setPreview(false); return; }
         try { const fields = await form.validateFields(); buildRequest(fields, false); setPreview(true); }
-        catch { /* Visible field errors stay beside the inputs. */ }
+        catch { /* 필드 오류는 입력 옆에 표시한다. */ }
     };
     const close = () => {
         if (busy || lock.current) return;
@@ -204,7 +204,7 @@ export default function StoreNewsComposer({ open, news, initialStoreId, stores, 
         id: news.storeId, name: news.storeName, address: news.storeAddress, category: news.storeCategory, mainImageUrl: news.mainImageUrl,
     } : null);
     let start = null, end = null;
-    try { if (timedStoreNews(values.newsType)) { start = fromKstInput(values.startsAt); end = fromKstInput(values.endsAt); } } catch { /* Preview validates before opening. */ }
+    try { if (timedStoreNews(values.newsType)) { start = fromKstInput(values.startsAt); end = fromKstInput(values.endsAt); } } catch { /* 검증을 통과한 뒤 미리보기를 연다. */ }
     const previewNews = { id: target?.id, storeId: values.storeId, storeName: store?.name || '선택한 가게', mainImageUrl: store?.mainImageUrl,
         title: values.title?.trim() || '', content: values.content?.trim() || '', excerpt: storeNewsExcerpt(values.content), newsType: values.newsType || 'NEWS',
         startsAt: start, endsAt: end, conditions: values.conditions?.trim() || '', periodStatus: previewStoreNewsPeriod(values.newsType, start, end),

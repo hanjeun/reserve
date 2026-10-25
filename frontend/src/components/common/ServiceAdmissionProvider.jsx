@@ -8,7 +8,7 @@ import { RouteErrorBoundary } from '../layout/AppErrorBoundary';
 
 const Controller = lazy(() => import('./ServiceAdmissionController'));
 
-/** Keep the page tree stable while the optional entry runtime loads independently. */
+/* 입장 기능이 지연 로드되는 동안 페이지 트리를 유지한다. */
 export default function ServiceAdmissionProvider({ children }) {
     const [active, setActive] = useState(false);
     useEffect(() => {
@@ -21,7 +21,7 @@ export default function ServiceAdmissionProvider({ children }) {
         const unsubscribe = subscribeServiceAdmission(session.epoch, activate);
         service.status(signal).then(value => {
             if (current() && serviceEntryStatus(value).mode !== 'OFF') activate();
-        }).catch(() => { /* Bootstrap failure stays quiet; a protected gate still loads the runtime. */ });
+        }).catch(() => { /* 초기 로드 오류는 화면을 막지 않으며 보호 관문에서 다시 로드한다. */ });
         return () => { stopped = true; controller.abort(); unsubscribe(); };
     }, []);
     return <>{children}{active && <RouteErrorBoundary><Suspense fallback={null}><Controller /></Suspense></RouteErrorBoundary>}</>;

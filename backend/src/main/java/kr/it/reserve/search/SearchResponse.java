@@ -2,7 +2,7 @@ package kr.it.reserve.search;
 
 import java.util.List;
 
-/** Search previews contain text and fixed internal paths only, never domain entities or image credentials. */
+/** 검색 미리보기에는 텍스트와 고정된 내부 경로만 담고 엔티티나 사진 자격정보를 포함하지 않는다. */
 public record SearchResponse(String keyword, List<Group> groups) {
     public record Item(Long id, String type, String title, String description, String path) { }
     public record GroupError(int status, String message) { }

@@ -4,7 +4,7 @@ import { Upload } from 'antd';
 import LoadingImage from './LoadingImage';
 import { DeleteOutlined, EyeOutlined, DownloadOutlined } from './icons';
 
-// AntD exposes the rendered item here. Replace only native pictures, keeping its DOM and actions.
+// AntD 항목의 DOM·실행 도구를 유지하고 기본 사진만 대체한다.
 function withLoadingPictures(node) {
     if (Array.isArray(node)) return node.map(withLoadingPictures);
     if (!isValidElement(node)) return node;

@@ -19,7 +19,7 @@ import java.util.Base64;
 import java.util.HexFormat;
 import java.util.function.Supplier;
 
-/** Offline recovery verification. Reads the key only from a person's hidden console input. */
+/** 외부 연결 없이 복구를 검사하며 키는 숨김 콘솔 입력으로만 읽는다. */
 public final class VerifyChatImageRecovery {
     private static final int MAX_BYTES = 8 * 1024 * 1024;
     private static final int IV_BYTES = 12;
@@ -80,7 +80,7 @@ public final class VerifyChatImageRecovery {
             }
             return 0;
         } catch (Exception failure) {
-            // Do not print exception messages: input or provider messages could contain a secret.
+            // 입력값이나 비밀이 포함될 수 있으므로 예외 메시지를 출력하지 않는다.
             System.err.printf("FAIL (%s): recovery verification did not complete. No plaintext was written.%n", failure.getClass().getSimpleName());
             return 1;
         }

@@ -14,7 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 
-/** Runs inside ReservationService's member -> request -> store transaction. */
+/** ReservationService의 회원→요청→가게 트랜잭션 안에서 실행한다. */
 @Service @RequiredArgsConstructor @Slf4j
 public class ReservationCreationGuard {
     private final ReservationRequestRepository requests;
@@ -39,7 +39,7 @@ public class ReservationCreationGuard {
                 @Override public void afterCompletion(int status) {
                     try { admission.finish(claim, status == STATUS_COMMITTED); }
                     catch (RuntimeException e) {
-                        // Commit is authoritative. The same request key recovers its DB result even if Redis is down.
+                        // 커밋된 DB 결과가 정본이다. Redis가 실패해도 같은 요청 키로 결과를 복구한다.
                         log.warn("Admission completion reconciliation deferred: committed={}, errorType={}", status == STATUS_COMMITTED, e.getClass().getSimpleName());
                     }
                 }
@@ -50,7 +50,7 @@ public class ReservationCreationGuard {
         return new Attempt(null, memberId, key, hash);
     }
 
-    /** A missing committed result authorizes no write; the final creation boundary still decides admission. */
+    /** 커밋 결과가 없다는 이유로 쓰기를 허용하지 않는다. 최종 생성 경계에서 입장을 다시 판단한다. */
     public Long recover(ReservationCreateRequest request, Long memberId) {
         String key = requestKey(request, true);
         var prior = requests.findCommittedByMemberIdAndRequestKey(memberId, key);

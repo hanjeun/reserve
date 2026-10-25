@@ -28,7 +28,6 @@ import java.util.List;
 public class PortoneWebhookService {
     private static final String REFUND_ISSUE_PREFIX = "REFUND:";
 
-
     private final ObjectMapper objectMapper;
     private final AdPaymentService adPaymentService;
     private final PortoneService portoneService;
@@ -194,12 +193,7 @@ public class PortoneWebhookService {
         }
     }
 
-    /**
-     * 콘솔에서 선택 가능한 두 본문 규격의 결제 식별자를 읽는다.
-     * 2024-04-25 규격은 data.paymentId, 2024-01-01 규격은 payment_id를 사용한다.
-     * 본문의 status는 적용하지 않고 추출한 식별자로 PG 권위 상태를 다시 조회한다.
-     * 구버전은 이벤트 type이 없어 경고를 남긴다.
-     */
+    /** 본문 규격별 결제 ID(2024-04-25: data.paymentId, 2024-01-01: payment_id)만 추출하고 PG의 상태를 재조회한다. */
     private static String extractPaymentId(JsonNode root) {
         String current = text(root.path("data"), "paymentId");
         if (current != null && !current.isBlank()) {
@@ -208,8 +202,7 @@ public class PortoneWebhookService {
 
         String legacy = text(root, "payment_id");
         if (legacy != null && !legacy.isBlank()) {
-            // 동작은 하지만 콘솔 설정을 바꾸는 게 맞다 — 구버전에는 type 이 없어서
-            // 어떤 이벤트로 깨어난 것인지 로그에서 구분할 수 없다.
+            // 구형 본문에는 이벤트 type이 없어 경고를 남긴다.
             log.warn("PortOne webhook is on the legacy 2024-01-01 format - "
                     + "change the console webhook version to 2024-04-25: merchantUid={}", legacy);
             return legacy;

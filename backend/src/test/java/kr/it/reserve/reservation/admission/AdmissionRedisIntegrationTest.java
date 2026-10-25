@@ -17,7 +17,7 @@ import java.util.UUID;
 import java.util.concurrent.*;
 import static org.assertj.core.api.Assertions.*;
 
-/** Owns one memory-only loopback Redis. Never flushes or opens the application's Redis. */
+/** 메모리 전용 일회성 로컬 Redis만 소유하며 앱 Redis를 열거나 비우지 않는다. */
 @EnabledIfEnvironmentVariable(named = "RESERVE_ADMISSION_REDIS_TEST", matches = "1")
 @Timeout(45)
 class AdmissionRedisIntegrationTest {

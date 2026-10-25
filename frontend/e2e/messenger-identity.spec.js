@@ -1,7 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 
-
 test('message actions center grouped short bubbles and keep tall bubbles bottom aligned', async ({ page }, testInfo) => {
     await mockApi(page, account, [{ roomId: 1, type: 'SUPPORT', viewerRole: 'MEMBER', lastMessagePreview: '감사합니다' }]);
     await page.route('**/api/chat/support/open', route => ok(route, {
@@ -53,7 +52,6 @@ test('message actions center grouped short bubbles and keep tall bubbles bottom 
         testInfo.project.name === 'chromium' ? 'hidden' : 'visible');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
-
 
 const account = { id: 41, name: '테스트 고객', email: 'identity@example.test', role: 'USER', termsAgreed: true };
 const pageOf = (rows) => ({ content: rows, page: { number: 0, totalElements: rows.length, totalPages: 1 } });
@@ -277,7 +275,7 @@ test('composer keeps neutral controls and scopes retraction and private deletion
     await expect(page.getByRole('menuitem', { name: '나에게만 삭제' })).toBeVisible();
     const retractMenuItem = page.getByRole('menuitem', { name: '전송 취소' });
     await expect(retractMenuItem).toBeVisible();
-    // AntD animates the popup ancestor, not the menu item Playwright checks for stability.
+    // 메뉴 항목 대신 팝업 부모의 AntD 애니메이션 완료를 기다린다.
     await expect.poll(() => retractMenuItem.evaluate(element => {
         const popup = element.closest('.ant-dropdown');
         return popup && getComputedStyle(popup).opacity === '1'

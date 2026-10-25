@@ -10,10 +10,8 @@ import { surfaceForWhiteText } from '../../utils/colorContrast';
 
 const { Text } = Typography;
 
-/**
- * 회원·가게 제재를 preset별 문구·기간 필드·액션으로 구성하는 공용 모달이다.
- * 입력 상태는 Modal 자식에 두고 destroyOnHidden으로 닫힘 모션 뒤 정리한다.
- * 입력 초기화를 위해 open에 따라 key를 바꾸면 닫힘 모션 전에 언마운트되므로 사용하지 않는다.
+/*
+ * 모달 자식의 입력은 destroyOnHidden으로 닫힘 뒤 정리하며 open에 따라 key를 바꾸지 않는다.
  */
 
 // 파일 내부 전용 상수 — export하면 react-refresh/only-export-components 위반(컴포넌트 외의 것을
@@ -63,9 +61,8 @@ const SANCTION_PRESETS = {
         maxLength: 200,
         okStyle: 'danger',
     },
-    // 2026-07 추가 — AdminAdsTab의 광고 강제 중단은 사유를 '운영 정책 위반'으로 하드코딩해두고
-    // 관리자가 직접 입력할 수 없었다. 회원/가게 제재와 동일한 "사유 입력 + 확인" 패턴이라
-    // 이 모달을 그대로 재사용한다.
+    // 광고 중단 사유는 공용 제재 모달에서 입력받는다.
+
     AD_SUSPEND: {
         title: '광고 중단',
         icon: 'danger',

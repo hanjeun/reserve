@@ -22,7 +22,7 @@ import java.util.function.LongSupplier;
 
 import static org.assertj.core.api.Assertions.*;
 
-/** Owns a disposable loopback Redis. It never opens or flushes the application's Redis. */
+/** 시험이 소유한 일회성 로컬 Redis만 사용하며 앱 Redis를 열거나 비우지 않는다. */
 @EnabledIfEnvironmentVariable(named = "RESERVE_ADMISSION_REDIS_TEST", matches = "1")
 @Timeout(45)
 class ServiceAdmissionRedisIntegrationTest {
@@ -358,7 +358,7 @@ class ServiceAdmissionRedisIntegrationTest {
         } catch (java.io.IOException unavailable) { throw new AssertionError(unavailable); }
         String authority = "local t = redis.call('TIME')\nlocal now = tonumber(t[1]) * 1000 + math.floor(tonumber(t[2]) / 1000)";
         assertThat(source).contains(authority);
-        // Only this disposable fixture clock is replaced; the production Lua body and Redis atomicity are unchanged.
+        // 일회성 시험 시계만 대체하며 운영 Lua 본문과 Redis 원자성은 유지한다.
         var script = new DefaultRedisScript<>(source.replace(authority, "local now = tonumber(ARGV[13])"), List.class);
         return redis.execute(script, SUFFIXES.stream().map(suffix -> prefix + suffix).toList(), "automatic", owner, signal,
                 ServiceAdmissionService.marker(properties), Integer.toString(properties.getCapacity()),

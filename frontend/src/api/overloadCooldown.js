@@ -34,7 +34,7 @@ function key(config) {
         ? `${(config.method || 'get').toUpperCase()} ${path}` : null;
 }
 
-/** A cooldown rejects another click locally; it never schedules or replays a request. */
+/* 대기 시간에는 요청을 새로 예약하거나 재실행하지 않는다. */
 export function assertOverloadCooldown(config) {
     const path = key(config);
     const until = entries.get(path);
@@ -52,7 +52,7 @@ export function observeOverloadCooldown(config, response) {
     const seconds = /^\d{1,3}$/.test(String(raw)) ? Math.min(60, Math.max(1, Number(raw))) : 10;
     const observed = now();
     for (const [saved, until] of entries) if (until <= observed) entries.delete(saved);
-    // An in-flight older response must not shorten a newer restriction.
+    // 늦은 이전 응답으로 더 최근의 제한 시간을 줄이지 않는다.
     const until = Math.max(entries.get(path) ?? 0, observed + seconds * 1000);
     entries.delete(path);
     if (entries.size >= MAX_ENTRIES) entries.delete(entries.keys().next().value);

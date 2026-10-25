@@ -1,7 +1,5 @@
-/**
- * 메신저와 관리자 화면이 공유하는 말풍선 목록이다. mine으로 내 메시지 역할을 구분한다.
- * 같은 발신자의 짧은 간격 메시지는 묶어 첫 말풍선의 모서리와 마지막 시각만 표시한다.
- * 묶음 안팎의 간격을 구분하고, pending 메시지는 시각 대신 전송 상태를 표시한다.
+/*
+ * 발신자·시간 간격별 묶음에서 마지막 시각만 표시하며 전송 대기는 시각과 구분한다.
  */
 import React from 'react';
 import { colors, fontSize, radius } from '../../styles/tokens';
@@ -97,8 +95,8 @@ const styles = {
         background: colors.background.paper, color: colors.text.primary,
         border: `1px solid ${colors.border.light}`,
     },
-    // 확정되지 않은 말풍선. 색을 바꾸지 않고 투명도만 낮춘다 — 색을 바꾸면
-    // "실패했다"로 읽히는데, 대부분은 곧 성공한다.
+    // 미확정 메시지는 색상을 유지하고 투명도로 구분한다.
+
     bubblePending: { opacity: 0.55 },
 };
 

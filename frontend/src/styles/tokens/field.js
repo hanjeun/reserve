@@ -17,7 +17,7 @@ export const field = {
     bgDisabled: colors.gray[100],
     /** 자리표시자 글자색 — AntD colorTextPlaceholder 와 같은 값. */
     placeholderColor: colors.text.placeholder,
-    /** Date and time placeholder text share one measured line box. */
+    /* 날짜·시간 자리표시자는 측정한 같은 높이의 줄 상자를 사용한다. */
     textStyle: { fontSize: fontSize.lg, fontWeight: fontWeight.regular, lineHeight: 1.5,
         fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums' },
     /**
@@ -26,14 +26,8 @@ export const field = {
      * 두 칸이 나란히 놓이므로 그 차이가 눈에 띈다("디자인이 미묘하게 다르다"의 정체).
      */
     iconSize: 16,
-    /**
-     * 에러 표시(관문) — 커스텀 입력칸이 "에러"를 말하는 유일한 방법.
-     *
-     * 이 앱 입력칸은 채움형이라 테두리가 없다. 그래서 에러도 border 가 아니라
-     * inset box-shadow 한 줄로 그린다(레이아웃이 1px도 안 움직인다).
-     * BookingCalendar 트리거와 TimeSlotPicker 자리표시자가 **같은 폼에 나란히** 놓이므로
-     * 한 곳에서만 정의한다 — 예전에 각자 정하다가 날짜 칸만 빨간 상자가 되고
-     * 시간 칸은 아이콘만 빨개져서 같은 폼에서 두 칸이 다른 말을 했다.
+    /*
+     * 채움형 입력 오류는 공통 안쪽 그림자로 표시해 필드 크기를 바꾸지 않는다.
      */
     errorRing: `inset 0 0 0 1px ${colors.error.main}`,
 };

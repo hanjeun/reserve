@@ -54,7 +54,6 @@ import java.util.List;
 public class MemberService {
     private static final String PROFILE_IMAGE_DELETION_SOURCE = "MEMBER_PROFILE_IMAGE";
 
-
     private final MemberRepository memberRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder bCryptPasswordEncoder;
@@ -114,7 +113,7 @@ public class MemberService {
         }
 
         String encodedPassword = bCryptPasswordEncoder.encode(signupRequest.getPassword());
-        // Recheck expiry under the same DB lock as code verification, after the external password lookup.
+        // 외부 비밀번호 확인 뒤 코드 검증과 같은 DB 잠금 안에서 만료를 다시 확인한다.
         emailVerificationService.consumeVerifiedEmail(signupRequest.getEmail(), signupRequest.getVerificationTicket());
         Member member = memberRepository.save(Member.builder()
                 .name(signupRequest.getName())
@@ -149,16 +148,7 @@ public class MemberService {
                 .orElseThrow(MemberException::notFound);
     }
 
-    /**
-     * 이메일로 회원을 찾되 <b>없으면 예외 대신 null</b>을 반환한다.
-     *
-     * <p>로그인처럼 "계정이 없다"는 사실 자체를 응답으로 드러내면 안 되는 경로에서 쓴다.
-     * {@link #findByEmail}은 미존재 시 404 {@code 회원을 찾을 수 없습니다.}를 던지는데,
-     * 로그인에서 그걸 쓰면 비밀번호를 모르는 사람도 이메일만 넣어보고 가입 여부를 확정할 수 있다
-     * (user enumeration). 호출측이 존재/부재를 구분하지 않고 같은 응답을 내도록 null 을 준다.
-     *
-     * @return 회원 또는 {@code null}
-     */
+    /** 가입 여부를 응답으로 드러내지 않는 호출부가 동일 응답을 만들 수 있도록 미존재 시 null을 반환한다. */
     public Member findByEmailOrNull(String email) {
         return memberRepository.findByEmailAndDeletedAtIsNull(email).orElse(null);
     }
@@ -269,17 +259,7 @@ public class MemberService {
      * Kakao 주소 검색 결과(latitude/longitude)를 그대로 저장.
      */
     @Transactional
-    /**
-     * 마이페이지 위치 등록.
-     *
-     * 2026-07 전수조사: 예전엔 좌표(latitude/longitude)만 저장했다. 저장 자체는 잘 동작했지만
-     * (거리순 정렬/우리동네 배지 모두 정상), 좌표로 주소를 역산할 수는 없으니 위치 탭을 다시 열면
-     * 화면이 항상 빈 상태로 보여서 사용자 입장에선 "저장이 안 됐다"고 느껴졌다.
-     * → AddressSearch가 다루는 3종(도로명/우편번호/상세주소)을 Store와 동일하게 모두 보관한다.
-     *
-     * 각 주소 필드는 null/blank면 기존 값을 덮어쓰지 않는다 — 좌표만 넘기는 호출
-     * (브라우저 Geolocation 기반 등)이 기존에 등록해둔 주소를 지워버리면 안 되기 때문.
-     */
+    /** 주소가 없거나 비어 있는 좌표 전용 요청은 기존 주소를 지우지 않는다. */
     public MemberResponse updateLocation(Long memberId, LocationUpdateRequest request) {
         Member member = findByIdForUpdate(memberId);
 
@@ -373,7 +353,7 @@ public class MemberService {
         passwordResetTokenRepository.deleteByEmail(originalEmail);
         emailVerificationRepository.deleteByEmail(originalEmail);
 
-        // Bulk cleanup queries clear the persistence context; mutate a managed, still-locked member.
+        // 일괄 정리로 영속성 문맥이 비워지므로 잠금이 유지된 회원을 다시 조회해 변경한다.
         findByIdForUpdate(memberId).withdraw("withdrawn-" + memberId + "@reserve.invalid");
         events.publishEvent(new MemberWithdrawn(memberId));
         log.info("Member withdrawal completed: memberId={}", memberId);

@@ -1,38 +1,5 @@
-/**
- * README 스크린샷을 **실제 서비스 화면·실제 가게 데이터**로 찍는다.
- *
- * API 를 막지 않고, 지정한 사이트(기본: 운영)에 실제로 접속해 찍는다.
- * 아키텍처 그림은 찍지 않는다 — README 는 피그마 원본(docs/images/RESERVE_Architecture.png)을 쓴다.
- * 모니터링(grafana.png)은 운영 Grafana(grafana.reserve.it.kr)의 "RESERVE 로그" 대시보드 요약 카드를 찍는다.
- * 로그 원문 패널은 접힌 상태 그대로 둔다 — 요청 경로·IP 같은 원문이 이미지에 들어가지 않게.
- *
- * 사용법 (frontend 폴더에서, PowerShell):
- *   공개 화면만(로그인 불필요)      npm run capture:readme
- *
- *   사업자·관리자 화면까지 — Google 로그인 계정은 이 방법을 쓴다:
- *     1) 캡처 전용 Chrome 을 연다(평소 Chrome 프로필과 분리된 새 프로필)
- *          & "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="$env:LOCALAPPDATA\RESERVE-README-Chrome"
- *     2) 그 창에서 평소처럼 reserve.it.kr 에 Google 로 로그인한다(사람이 직접 — 자동화하지 않는다)
- *        모니터링도 찍으려면 같은 창에서 grafana.reserve.it.kr 에도 로그인한다
- *     3) npm run capture:readme:auth    ← 그 창의 로그인 상태만 복사해 온다. 복사 후 그 Chrome 은 닫는다
- *     4) npm run capture:readme         ← 공개 + 사업자·관리자 화면
- *     5) 다 찍었으면 npm run capture:readme:clean  ← 저장한 로그인 상태 삭제
- *
- *   일부만 다시 찍기:  npm run capture:readme -- --only=monitoring   (쉼표로 여러 개: --only=business,admin)
- *
- *   이메일·비밀번호 계정이면 3) 대신 npm run capture:readme -- --login 으로 Playwright 창에서 로그인해도 된다.
- *   (Google 은 자동화 브라우저 로그인을 "안전하지 않은 브라우저"로 막는다. 이 스크립트는 그걸 우회하지 않는다)
- *
- *   옵션(환경변수):
- *     README_BASE_URL   찍을 사이트. 기본 https://reserve.it.kr  (로컬: http://localhost:5173)
- *     README_STORE_ID   가게 상세로 찍을 가게 id. 기본은 가게 목록 첫 번째
- *     README_CDP_PORT   캡처 전용 Chrome 의 디버깅 포트. 기본 9222
- *     README_GRAFANA_URL  모니터링 대시보드 주소. 기본 https://grafana.reserve.it.kr/d/reserve-logs
- *
- * 로그인 상태는 frontend/.readme-capture/auth.json 한 파일에만 둔다(.gitignore). 다시 찍을 때마다 로그인하지 않도록
- * --clean 전까지 유지하고, 찍을 때마다 최신 상태로 덮어쓴다 — RESERVE 는 리프레시 토큰을 회전시키고 옛 토큰 재사용을
- * 탈취로 보고 세션을 끊으므로, 캡처 중 회전된 토큰을 저장해 둬야 다음 실행이 옛 토큰을 쓰지 않는다.
- * 이메일·전화번호는 찍기 전에 화면에서 가린다. 이름 등은 남을 수 있으니 커밋 전에 이미지를 직접 확인할 것.
+/*
+ * 운영 사이트와 실제 공개 데이터에 접속하는 캡처 도구다. 로그인은 사용자가 별도 프로필에서 진행하며 저장한 인증 상태는 토큰 회전에 맞춰 갱신한다. 연락처·로그 원문은 노출하지 않고 결과 이미지의 개인정보를 직접 확인한다.
  */
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -184,7 +151,7 @@ async function capture(context, { name, pathname, url, auth, grafana }) {
         const image = await page.screenshot({ fullPage: false });
         return (await saveImage(name, image)) ? name : null;
     } catch (error) {
-        // 한 화면이 실패해도 나머지는 계속 찍는다(특히 로그인 화면의 회전된 토큰 저장까지 가야 한다).
+        // 개별 캡처가 실패해도 회전된 토큰의 상태 저장까지 진행한다.
         console.warn(`  ! ${name}: 찍지 못했습니다 — ${error.message.split('\n')[0]}`);
         return null;
     } finally {
@@ -198,9 +165,9 @@ async function landedOnLogin(page) {
     return (await page.locator('input[type="password"]').count()) > 0;
 }
 
-// Windows 에서는 이미지 뷰어·IDE 미리보기·탐색기 미리보기 창·백신이 PNG 를 잡고 있으면 덮어쓰기가
-// EBUSY/EPERM/UNKNOWN(-4094)으로 실패한다. 임시 파일에 쓴 뒤 바꿔치기하고, 잠겨 있으면 잠깐씩 다시 시도한다.
-// 끝내 안 되면 <이름>.new.png 로 남겨 찍은 결과를 잃지 않는다.
+// Windows 파일 잠금은 잠시 기다린 뒤 다시 시도한다.
+// 잠긴 파일은 임시 파일 교체로 저장하고 제한적으로 재시도한다.
+
 async function saveImage(name, image) {
     const filename = README_IMAGE_FILENAMES[name];
     const target = path.join(OUTPUT_DIR, filename);

@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Badge } from 'antd';
 import { CloseOutlined } from '../common/icons';
@@ -20,6 +20,20 @@ import { LoadingPresentationContext, createLoadingPresentation } from '../layout
 const MessengerContent = lazy(() => import('./MessengerContent'));
 const BADGE_POLL_MS = 60000;
 
+// A saved destination controls presentation only. Opening a room still rechecks its participant on the server.
+function searchMessageReturn(location, role) {
+    const saved = location.state?.searchReturn;
+    const keyword = new URLSearchParams(location.search).get('keyword')?.trim();
+    if (!keyword || keyword.length > 100 || saved?.keyword !== keyword) return null;
+    if (saved.path === '/messages') return { path: saved.path, kind: 'home' };
+    if (saved.path === '/messages?kind=support') return { path: saved.path, kind: 'support' };
+    const match = typeof saved.path === 'string' && /^\/messages\?(storeId|ownerRoomId)=([1-9]\d*)$/.exec(saved.path);
+    if (!match || !Number.isSafeInteger(Number(match[2])) || match[1] === 'ownerRoomId' && !['BUSINESS', 'ADMIN'].includes(role)) return null;
+    return { path: saved.path, kind: match[1] === 'storeId' ? 'store' : 'owner', id: Number(match[2]) };
+}
+const searchReturnElement = path => [...document.querySelectorAll('.reserve-search-content a')]
+    .find(link => link.getAttribute('href') === path);
+
 // 패널을 실제로 연 한 번의 이동만 기록한다. 뒤쪽 페이지와 골격 표시 기록을 공유하지 않는다.
 function MessengerPanelBody({ coverImageSrc }) {
     const identity = useMessengerStore(state => state.sessionIdentity);
@@ -38,7 +52,8 @@ MessengerPanelBody.propTypes = { coverImageSrc: PropTypes.string };
 
 /** 로그인 영역 전체의 단일 런처. PC는 패널, 모바일은 /messages 화면으로 진입한다. */
 const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
-    const { pathname } = useLocation();
+    const location = useLocation();
+    const { pathname } = location;
     const { openMessages } = useMessagesEntry();
     const width = useWindowWidth();
     const user = useAuthStore((state) => state.user);
@@ -48,9 +63,26 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
     const closePanel = useMessengerStore((state) => state.closePanel);
     const syncIdentity = useMessengerStore((state) => state.syncIdentity);
     const view = useMessengerStore((state) => state.view);
+    const selection = useMessengerStore((state) => state.selection);
+    const activeThread = useMessengerStore((state) => state.activeThread);
+    const settledSession = useAuthStore(state => state.isLoggedIn && !state.authRestoring && !state.isLoggingOut && state.user?.termsAgreed !== false);
     const identity = messengerIdentityOf({ user, sessionRevision });
     const isMobile = width < breakpoints.tablet;
     const isMessagesPage = /^\/messages\/?$/.test(pathname);
+    const isSearchPage = /^\/search\/?$/.test(pathname);
+    const searchReturn = isSearchPage ? searchMessageReturn(location, user?.role) : null;
+    const searchReturnPath = searchReturn?.path ?? null;
+    const selectedReturn = searchReturn?.kind === 'home' ? view === 'home'
+        : activeThread && selection.kind === searchReturn?.kind
+            && (searchReturn.kind === 'support' || (selection.storeId ?? selection.roomId) === searchReturn.id);
+    const capturedSearchPath = !isMobile && settledSession && open && selectedReturn ? searchReturnPath : null;
+    // Bind the explicit hint to this visit and account; an ordinary search entry cannot reveal an existing panel.
+    const [searchPanelVisit, setSearchPanelVisit] = useState(() => ({ key: location.key, identity, path: capturedSearchPath }));
+    if (searchPanelVisit.key !== location.key || searchPanelVisit.identity !== identity) {
+        setSearchPanelVisit({ key: location.key, identity, path: capturedSearchPath });
+    }
+    const searchPanelAllowed = settledSession && searchReturnPath && searchPanelVisit.key === location.key
+        && searchPanelVisit.identity === identity && searchPanelVisit.path === searchReturnPath;
     const panelRef = useRef(null);
     const launcherRef = useRef(null);
     const returnFocusRef = useRef(null);
@@ -110,6 +142,15 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
     if (open !== panelState.open) {
         setPanelState({ open, visible: open || panelState.visible });
     }
+    const panelVisible = Boolean(user) && !isMobile && !isMessagesPage && (!isSearchPage || searchPanelAllowed) && panelState.visible;
+    const panelOpen = panelVisible && open;
+    const restoreFocus = useCallback(() => {
+        const target = isSearchPage
+            ? searchReturnElement(searchReturnPath) ?? document.querySelector('.reserve-search-field input')
+            : returnFocusRef.current;
+        if (target?.isConnected) target.focus(isSearchPage ? { preventScroll: true } : undefined);
+        else launcherRef.current?.focus();
+    }, [isSearchPage, searchReturnPath]);
     useLayoutEffect(() => {
         const previousRevision = previousStoreOpenRevisionRef.current;
         previousStoreOpenRevisionRef.current = storeOpenRevision;
@@ -125,9 +166,7 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
     const handleAnimationEnd = (event) => {
         if (event.target === event.currentTarget && !open) {
             setPanelState({ open: false, visible: false });
-            const target = returnFocusRef.current;
-            if (target?.isConnected) target.focus();
-            else launcherRef.current?.focus();
+            restoreFocus();
         }
     };
     // 브라우저가 animationend를 생략하는 예외(탭 전환·스타일 재계산)에도 닫힌 DOM이 남지 않게 한다.
@@ -135,22 +174,20 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
         if (open || !panelState.visible) return undefined;
         const timer = setTimeout(() => {
             setPanelState({ open: false, visible: false });
-            const target = returnFocusRef.current;
-            if (target?.isConnected) target.focus();
-            else launcherRef.current?.focus();
+            if (panelVisible) restoreFocus();
         }, 360);
         return () => clearTimeout(timer);
-    }, [open, panelState.visible]);
+    }, [open, panelState.visible, panelVisible, restoreFocus]);
     useEffect(() => {
         const wasOpen = previousOpenRef.current;
-        previousOpenRef.current = open;
-        if (!open || wasOpen || isMobile || isMessagesPage) return undefined;
-        returnFocusRef.current = document.activeElement;
+        previousOpenRef.current = panelOpen;
+        if (!panelOpen || wasOpen) return undefined;
+        returnFocusRef.current = isSearchPage ? searchReturnElement(searchReturnPath) : document.activeElement;
         const frame = requestAnimationFrame(() => {
             panelRef.current?.querySelector('input:not(:disabled), textarea:not(:disabled), button:not(:disabled), [href]')?.focus();
         });
         return () => cancelAnimationFrame(frame);
-    }, [open, isMobile, isMessagesPage]);
+    }, [panelOpen, isSearchPage, searchReturnPath]);
 
     const keepFocusInside = (event) => {
         // 사진/신고 등 React 포털의 키 입력은 뒤쪽 패널을 닫거나 포커스를 가두지 않는다.
@@ -176,13 +213,13 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
         }
     };
 
-    if (!user || /^\/search\/?$/.test(pathname)) return null;
+    if (!user || isSearchPage && !searchPanelAllowed) return null;
 
     if (isMessagesPage) return null;
 
     return (
         <>
-            {!isMobile && panelState.visible && (
+            {panelVisible && (
                 <div
                     ref={panelRef}
                     className={`reserve-messenger-panel-shell reserve-chat-panel${view === 'home' ? ' is-home' : ''}${open ? '' : ' is-closing'}`}
@@ -203,7 +240,7 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
                     <MessengerPanelBody coverImageSrc={coverImageSrc} />
                 </div>
             )}
-            <div className="reserve-messenger-launcher-wrap"
+            {!isSearchPage && <div className="reserve-messenger-launcher-wrap"
                 style={isMobile && !open && launcherObstructed ? { visibility: 'hidden' } : undefined}>
                 <Badge count={!isMobile && open ? 0 : unreadCount} offset={[-4, 4]}
                     styles={{ indicator: { background: 'var(--reserve-messenger-unread-bg)', color: 'var(--c-error-fg)' } }}>
@@ -218,7 +255,7 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
                         <MessengerLauncherVisual isOpen={!isMobile && open} imageSrc={launcherImageSrc} />
                     </button></Tooltip>
                 </Badge>
-            </div>
+            </div>}
         </>
     );
 };

@@ -12,6 +12,7 @@ async function setup(page, signedIn = false) {
         const request = route.request();
         const url = new URL(request.url());
         const path = url.pathname;
+        if (!path.startsWith('/api/')) return route.fallback();
         requests.push({ path, method: request.method(), keyword: url.searchParams.get('keyword'), limit: url.searchParams.get('limit') });
         const ok = data => route.fulfill({ json: { success: true, data } });
         if (path === '/api/member/me' || path === '/api/auth/refresh') return signedIn ? ok(user)

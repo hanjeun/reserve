@@ -115,7 +115,9 @@ export default function SearchPage() {
         const frame = requestAnimationFrame(() => {
             if (restoreDisabledRef.current) return;
             window.scrollTo({ left: saved.left, top: saved.top, behavior: 'instant' });
-            [...document.querySelectorAll('.reserve-search-content a')].find(link => link.getAttribute('href') === saved.path)?.focus({ preventScroll: true });
+            if (!document.querySelector('.reserve-messenger-panel-shell:not(.is-closing)')) {
+                [...document.querySelectorAll('.reserve-search-content a')].find(link => link.getAttribute('href') === saved.path)?.focus({ preventScroll: true });
+            }
             restoredRef.current = location.key;
         });
         return () => cancelAnimationFrame(frame);

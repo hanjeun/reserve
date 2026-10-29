@@ -170,7 +170,7 @@ export default function LoginSecuritySection({ user, initialPasswordOpen = false
                 </div></div>
             </div>}
             {visibleProviders.map(([provider, label]) => <div key={provider} style={rowStyle}>
-                <div style={methodLabelStyle}><Text strong>{label}</Text><Text style={hintStyle}>{status.socialProvider === provider ? '연결됨' : '연결하지 않음'}</Text></div>
+                <div style={methodLabelStyle}><Text strong>소셜 로그인</Text><Text style={hintStyle}>{label} {status.socialProvider === provider ? '연결됨' : '연결하지 않음'}</Text></div>
                 <div style={methodActionsStyle}>
                 {status.socialProvider === provider
                     ? <IconTool label={`${label} 로그인 연결 해제`} icon={<DisconnectOutlined aria-hidden="true" />} disabled={busy}

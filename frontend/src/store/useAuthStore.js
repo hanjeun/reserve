@@ -62,7 +62,6 @@ const useAuthStore = create(
             logout: () => {
                 set({ authRestoring: false });
                 applyUser(set, get, null, true);
-                set({ isLoggingOut: true });
                 localStorage.removeItem('auth-storage');
             },
 

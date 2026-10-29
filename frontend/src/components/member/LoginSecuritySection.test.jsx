@@ -34,7 +34,7 @@ it('places passkey settings below social methods with the same icon control and 
     const passkeyRow = within(security).getByRole('group', { name: '패스키 및 인증 앱' });
     expect(passkey.className).toBe(screen.getByRole('button', { name: '비밀번호 변경' }).className);
     expect(passkeyRow.parentElement.style.display).toBe('grid');
-    expect(screen.getByText('네이버').compareDocumentPosition(passkeyRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText('소셜 로그인').compareDocumentPosition(passkeyRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(passkeyRow).queryByRole('heading')).toBeNull();
     expect(screen.queryByLabelText('현재 비밀번호')).toBeNull();
 });

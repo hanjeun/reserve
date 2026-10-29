@@ -296,7 +296,7 @@ describe('shared wordmark and result search header', () => {
             expect(leaving).toHaveClass('reserve-header-back--leaving');
             expect(leaving).toBeDisabled();
             expect(leaving.closest('.reserve-header-control-slot')).toHaveAttribute('aria-hidden', 'true');
-            act(() => { vi.advanceTimersByTime(180); });
+            act(() => { vi.advanceTimersByTime(220); });
             expect(document.querySelector('.reserve-header-back')).toBeNull();
         } finally {
             vi.useRealTimers();
@@ -323,7 +323,7 @@ describe('shared wordmark and result search header', () => {
             expect(document.querySelector('.reserve-header-back')).toBe(back);
             expect(back).toHaveClass('reserve-header-back--leaving');
             expect(back).toBeDisabled();
-            act(() => { vi.advanceTimersByTime(180); });
+            act(() => { vi.advanceTimersByTime(220); });
             expect(document.querySelector('.reserve-header-back')).toBeNull();
         } finally {
             vi.useRealTimers();

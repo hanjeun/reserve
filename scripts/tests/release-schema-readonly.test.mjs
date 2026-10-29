@@ -21,7 +21,8 @@ docker() {
         elif [[ "$#" != 2 || "$2" != mysql ]]; then return 98; fi
         return 0
     fi
-    [[ "$1" == exec && "$2" == -e && "$3" == MYSQL_PWD=synthetic-schema-test-only && "$4" == mysql && "$5" == mysql ]] || return 98
+    [[ "$1" == exec && "$2" == -e && "$3" == MYSQL_PWD && "$4" == mysql && "$5" == mysql ]] || return 98
+    [[ "$MYSQL_PWD" == synthetic-schema-test-only && "$*" != *synthetic-schema-test-only* ]] || return 98
     local query
     for query in "$@"; do :; done
     if [[ "$RESERVE_VERIFY_AUTH_ADMISSION_SCHEMA" == 1 || "$RESERVE_VERIFY_V11_SCHEMA" == 1 ]]; then

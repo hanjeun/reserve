@@ -72,8 +72,8 @@ const Header = () => {
     useLayoutEffect(() => { navigationLocationRef.current = { location, navigationType }; }, [location, navigationType]);
     // 뒤로가기 도구가 없어질 때도 접힘 모션이 끝날 때까지 DOM을 유지한다.
 
-    const { shouldRender: backMounted } = useExitAnimation(showBack, HEADER_ACTION_MOTION_MS);
-    const { shouldRender: workspaceMounted } = useExitAnimation(showWorkspaceMenu, HEADER_ACTION_MOTION_MS);
+    const { shouldRender: backMounted } = useExitAnimation(showBack, HEADER_ACTION_MOTION_MS, true);
+    const { shouldRender: workspaceMounted } = useExitAnimation(showWorkspaceMenu, HEADER_ACTION_MOTION_MS, true);
     // 모션 최소화에서는 애니메이션이 꺼져 있으므로 남겨 둘 이유가 없다 — 즉시 나타나고 사라진다.
     const renderBack = reducedMotion ? showBack : backMounted;
     const renderWorkspaceMenu = reducedMotion ? showWorkspaceMenu : workspaceMounted;

@@ -47,7 +47,7 @@ mysql_query() {
     if [[ "$AUTH_ADMISSION_SCHEMA" = "1" || "$V11_SCHEMA" = "1" ]]; then
         query="START TRANSACTION READ ONLY; ${query} ROLLBACK;"
     fi
-    docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER" \
+    MYSQL_PWD="$DB_PASSWORD" docker exec -e MYSQL_PWD "$MYSQL_CONTAINER" \
         mysql --connect-timeout=5 --user="$DB_USER" --batch --skip-column-names "$DB_NAME" -e "$query"
 }
 

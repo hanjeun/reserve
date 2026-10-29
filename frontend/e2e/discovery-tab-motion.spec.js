@@ -7,7 +7,8 @@ async function expectContentEntry(page, destination, direction, { cached = false
     const skeletonShown = await content.getAttribute('data-skeleton-shown') === 'true';
     if (cached) expect(skeletonShown).toBe(false);
     await expect(content).toHaveCSS('animation-name', 'none');
-    const entries = () => page.evaluate(() => window.__reservePageEntries.filter(entry => entry.pathname === location.pathname));
+    const entries = () => page.evaluate(() => window.__reservePageEntries.slice(window.__reservePageEntryCursor)
+        .filter(entry => entry.pathname === location.pathname));
     if (homeLogo) {
         await expect(content).toHaveAttribute('data-home-logo-entry', 'true');
         await expect(content).not.toHaveClass(/reserve-route-entry--/);
@@ -24,24 +25,25 @@ async function expectContentEntry(page, destination, direction, { cached = false
         const startedEntries = await entries();
         expect(startedEntries).toHaveLength(3);
         expect(startedEntries.every(entry => entry.directionClass === undefined)).toBe(true);
-    } else if (skeletonShown) {
-        await expect(content).not.toHaveClass(/reserve-route-entry--from-(right|left)/);
-        await expect(destination).toHaveCSS('animation-name', 'none');
-        expect(await entries()).toEqual([]);
     } else {
-        // 180ms 뒤 방향이 해제되므로 모션 시작 시점의 CSS와 클래스를 확인한다.
+        // 골격부터 본문까지 고정된 부모가 한 번만 진입하는지 확인해요.
         await expect.poll(entries).toContainEqual(expect.objectContaining({
             animationName: `reserve-discovery-page-${direction}`,
             destinationAnimation: `reserve-discovery-page-${direction}`,
-            contentAnimation: 'none',
+            contentAnimation: `reserve-discovery-page-${direction}`,
             directionClass: `reserve-route-entry--${direction}`,
+            targetIsContent: true,
         }));
+        expect(await entries()).toHaveLength(1);
+        await expect(destination).toHaveCSS('animation-name', 'none');
     }
+    await page.evaluate(() => { window.__reservePageEntryCursor = window.__reservePageEntries.length; });
 }
 
 test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
         window.__reservePageEntries = [];
+        window.__reservePageEntryCursor = 0;
         document.addEventListener('animationstart', event => {
             if (!event.animationName.startsWith('reserve-discovery-page-from-')) return;
             const content = event.target.closest('.ant-layout-content');
@@ -50,6 +52,7 @@ test.beforeEach(async ({ page }) => {
                 animationName: event.animationName,
                 destinationAnimation: getComputedStyle(event.target).animationName,
                 contentAnimation: getComputedStyle(content).animationName,
+                targetIsContent: event.target === content,
                 directionClass: [...content.classList].find(name => name.startsWith('reserve-route-entry--')),
                 homeLogoEntry: content.getAttribute('data-home-logo-entry'),
                 targetSection: [...event.target.classList].find(name => ['reserve-discovery-location', 'reserve-discovery-featured', 'reserve-discovery-shortcuts'].includes(name)),
@@ -113,12 +116,12 @@ test('top tabs move only their content in the selected direction, including brow
     await expect(waitingDestination).toHaveCSS('transform', 'none');
 
     // 피드 모듈을 먼저 불러온 뒤 캐시된 오른쪽 진입을 확인한다.
-    await page.evaluate(() => { window.__reservePageEntries = []; });
+    await page.evaluate(() => { window.__reservePageEntries = []; window.__reservePageEntryCursor = 0; });
     await feedTab.click();
     await expect(feedTab).toHaveAttribute('aria-current', 'page');
     await expect(page.getByText('피드를 준비하고 있어요.', { exact: true })).toBeVisible();
     await expectContentEntry(page, feedDestination, 'from-right', { cached: true });
-    await page.evaluate(() => { window.__reservePageEntries = []; });
+    await page.evaluate(() => { window.__reservePageEntries = []; window.__reservePageEntryCursor = 0; });
     await page.goBack();
     await expect(waitingTab).toHaveAttribute('aria-current', 'page');
     await expect(page.locator('.reserve-explore-page[aria-label="웨이팅 가게"]')).toBeVisible();

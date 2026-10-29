@@ -81,7 +81,7 @@ test('waiting reuses exploration geometry and refreshes an open information bubb
     const state = await setup(page);
     await page.goto('/stores?region=');
     await expect(page).toHaveURL(/region=all/);
-    const title = page.locator('.reserve-store-card-title-line');
+    const title = page.locator('.reserve-store-card-title-line:not(.reserve-store-card-skeleton-title-line)');
     await expect(title).toBeVisible();
     const cardHeight = (await title.boundingBox()).height;
     const toolbarTop = (await page.locator('.reserve-explore-filters').boundingBox()).y;

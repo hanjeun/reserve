@@ -75,9 +75,9 @@ class LoginMethodServiceTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"NAVER,auth_type,reauthenticate", "KAKAO,prompt,login", "GOOGLE,prompt,select_account"})
+    @CsvSource({"NAVER,auth_type,reauthenticate,false", "KAKAO,prompt,login,true", "GOOGLE,prompt,select_account,false"})
     void reauthenticationAddsTheSupportedProviderInteractionToTheActualRedirectUri(
-            AuthProvider provider, String parameter, String expected) {
+            AuthProvider provider, String parameter, String expected, boolean persistent) {
         member.setProvider(provider);
         member.setProviderId("existing-subject");
         var request = new MockHttpServletRequest();
@@ -94,7 +94,10 @@ class LoginMethodServiceTest {
                     if (provider != AuthProvider.NAVER) values.put("prompt", "none");
                     if (provider == AuthProvider.GOOGLE) values.put("login_hint", "owner@example.test");
                 }).build();
+        when(tokens.isPersistentLogin("test-session")).thenReturn(persistent);
+        request.setParameter("rememberMe", String.valueOf(!persistent));
         var bound = service.bindOAuth(request, original);
+        assertThat(bound.<Boolean>getAttribute(kr.it.reserve.config.oauth2.LoginAuthorizationRequestRepository.PERSISTENT)).isEqualTo(persistent);
         var query = UriComponentsBuilder.fromUriString(bound.getAuthorizationRequestUri()).build().getQueryParams();
         assertThat(bound.getAdditionalParameters()).containsEntry(parameter, expected);
         assertThat(query.get(parameter)).containsExactly(expected);

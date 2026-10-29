@@ -43,6 +43,8 @@ fixture_login_password=$(random_hex 32)
 fixture_admission_password=$(random_hex 32)
 fixture_capacity_password=$(random_hex 32)
 fixture_oauth_password=$(random_hex 32)
+fixture_mfa_password=$(random_hex 32)
+fixture_signup_password=$(random_hex 32)
 fixture_name="reserve-backend-isolated-$fixture_suffix"
 fixture_id=''
 cleanup() {
@@ -106,10 +108,14 @@ fixture_login_db="reserve_release_login_$fixture_suffix"
 fixture_admission_db="reserve_release_admission_$fixture_suffix"
 fixture_capacity_db="reserve_release_capacity_$fixture_suffix"
 fixture_oauth_db="reserve_release_oauth_$fixture_suffix"
+fixture_mfa_db="reserve_release_mfa_$fixture_suffix"
+fixture_signup_db="reserve_release_signup_$fixture_suffix"
 fixture_login_user="reserve_login_test$fixture_suffix"
 fixture_admission_user="reserve_admission_test$fixture_suffix"
 fixture_capacity_user="reserve_capacity_test$fixture_suffix"
 fixture_oauth_user="reserve_oauth_test$fixture_suffix"
+fixture_mfa_user="reserve_mfa_test$fixture_suffix"
+fixture_signup_user="reserve_signup_test$fixture_suffix"
 # 생성 값의 문자 범위를 제한하고 원문 SQL·자격증명은 출력하지 않는다.
 if ! docker --context default exec -i "$fixture_id" sh -c \
     'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql --protocol=socket --user=root --batch --silent' \
@@ -118,14 +124,20 @@ CREATE DATABASE $fixture_login_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_
 CREATE DATABASE $fixture_admission_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE DATABASE $fixture_capacity_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE DATABASE $fixture_oauth_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE $fixture_mfa_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE $fixture_signup_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER '$fixture_login_user'@'%' IDENTIFIED BY '$fixture_login_password';
 CREATE USER '$fixture_admission_user'@'%' IDENTIFIED BY '$fixture_admission_password';
 CREATE USER '$fixture_capacity_user'@'%' IDENTIFIED BY '$fixture_capacity_password';
 CREATE USER '$fixture_oauth_user'@'%' IDENTIFIED BY '$fixture_oauth_password';
+CREATE USER '$fixture_mfa_user'@'%' IDENTIFIED BY '$fixture_mfa_password';
+CREATE USER '$fixture_signup_user'@'%' IDENTIFIED BY '$fixture_signup_password';
 GRANT ALL PRIVILEGES ON $fixture_login_db.* TO '$fixture_login_user'@'%';
 GRANT ALL PRIVILEGES ON $fixture_admission_db.* TO '$fixture_admission_user'@'%';
 GRANT ALL PRIVILEGES ON $fixture_capacity_db.* TO '$fixture_capacity_user'@'%';
 GRANT ALL PRIVILEGES ON $fixture_oauth_db.* TO '$fixture_oauth_user'@'%';
+GRANT ALL PRIVILEGES ON $fixture_mfa_db.* TO '$fixture_mfa_user'@'%';
+GRANT ALL PRIVILEGES ON $fixture_signup_db.* TO '$fixture_signup_user'@'%';
 SQL
 then
     printf 'Synthetic MySQL account/schema preparation failed\n' >&2
@@ -138,7 +150,7 @@ if [[ "$measure_search" == true ]]; then
 GRANT SELECT ON performance_schema.events_statements_summary_by_digest TO '$fixture_login_user'@'%';
 SQL
 fi
-printf 'Owned MySQL fixture ready; backend checks use synthetic login/admission/capacity/OAuth databases\n'
+printf 'Owned MySQL fixture ready; backend checks use dedicated synthetic databases\n'
 # Bash의 변수 목록에 드러나지 않는 외부 환경변수도 env -i로 제거한다.
 runtime_environment=()
 for variable in PATH HOME USERPROFILE USERNAME APPDATA LOCALAPPDATA SYSTEMROOT SystemRoot WINDIR windir COMSPEC ComSpec PATHEXT TEMP TMP TMPDIR JAVA_HOME GRADLE_USER_HOME LANG LC_ALL LC_CTYPE MSYSTEM; do
@@ -148,6 +160,7 @@ fixture_environment=(
     "RESERVE_SEARCH_COST_TEST=$measure_search"
     "DOCKER_CONTEXT=default" "DOCKER_CONFIG=$HOME/.docker" "MSYS_NO_PATHCONV=1" "AWS_EC2_METADATA_DISABLED=true"
     "RESERVE_MYSQL_LOGIN_TEST_ISOLATED=1" "RESERVE_ADMISSION_MYSQL_TEST=1" "RESERVE_CAPACITY_MYSQL_TEST=1" "RESERVE_MYSQL_OAUTH_TEST_ISOLATED=1"
+    "RESERVE_MYSQL_MFA_TEST_ISOLATED=1" "RESERVE_MYSQL_SIGNUP_TEST_ISOLATED=1" "RESERVE_REDIS_INTEGRATION=true"
     "RESERVE_ADMISSION_REDIS_TEST=1" "RESERVE_SERVICE_ADMISSION_HELPER_REDIS_TEST=1" "RESERVE_ISOLATED_TEST_OWNER=$fixture_owner"
     "RESERVE_MYSQL_LOGIN_TEST_URL=jdbc:mysql://127.0.0.1:$fixture_port/$fixture_login_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
     "RESERVE_MYSQL_LOGIN_TEST_USER=$fixture_login_user" "RESERVE_MYSQL_LOGIN_TEST_PASSWORD=$fixture_login_password"
@@ -157,11 +170,15 @@ fixture_environment=(
     "RESERVE_CAPACITY_MYSQL_USER=$fixture_capacity_user" "RESERVE_CAPACITY_MYSQL_PASSWORD=$fixture_capacity_password"
     "RESERVE_MYSQL_OAUTH_TEST_URL=jdbc:mysql://127.0.0.1:$fixture_port/$fixture_oauth_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
     "RESERVE_MYSQL_OAUTH_TEST_USER=$fixture_oauth_user" "RESERVE_MYSQL_OAUTH_TEST_PASSWORD=$fixture_oauth_password"
+    "RESERVE_MYSQL_MFA_TEST_URL=jdbc:mysql://127.0.0.1:$fixture_port/$fixture_mfa_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+    "RESERVE_MYSQL_MFA_TEST_USER=$fixture_mfa_user" "RESERVE_MYSQL_MFA_TEST_PASSWORD=$fixture_mfa_password"
+    "RESERVE_MYSQL_SIGNUP_TEST_URL=jdbc:mysql://127.0.0.1:$fixture_port/$fixture_signup_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+    "RESERVE_MYSQL_SIGNUP_TEST_USER=$fixture_signup_user" "RESERVE_MYSQL_SIGNUP_TEST_PASSWORD=$fixture_signup_password"
 )
 (
     cd -- "$repo_root/backend"
     env -i "${runtime_environment[@]}" "${fixture_environment[@]}" bash ./gradlew test --rerun --no-daemon --console=plain "${gradle_filters[@]}"
 ) 2>&1 | env -i "${runtime_environment[@]}" \
-    RESERVE_ISOLATED_REDACT_SECRETS="$fixture_root_password:$fixture_login_password:$fixture_admission_password:$fixture_capacity_password:$fixture_oauth_password" \
+    RESERVE_ISOLATED_REDACT_SECRETS="$fixture_root_password:$fixture_login_password:$fixture_admission_password:$fixture_capacity_password:$fixture_oauth_password:$fixture_mfa_password:$fixture_signup_password" \
     awk 'BEGIN { n = split(ENVIRON["RESERVE_ISOLATED_REDACT_SECRETS"], secrets, ":") }
          { for (i = 1; i <= n; i++) gsub(secrets[i], "[redacted]"); print; fflush() }'

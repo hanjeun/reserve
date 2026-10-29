@@ -58,6 +58,8 @@ const StoreForm = ({
                 initialValues={mode === 'create' ? {
                     serviceDomain: undefined,
                     autoApprovalEnabled: false,
+                    autoCompletionEnabled: false,
+                    serviceDurationMinutes: 60,
                     allowLatePayment: false,
                     allowDuplicateReservation: false,
                     emailNotificationEnabled: true,

@@ -12,6 +12,7 @@ import { consumeAdClickAttribution } from '../utils/adAttribution';
 import { formatDate, formatTimeForApi, formatTime } from '../utils/date';
 import { httpStatusOf } from '../utils/listErrorMessage';
 import useAuthStore from '../store/useAuthStore';
+import useReducedMotion from './useReducedMotion';
 import useReservationAdmission from './useReservationAdmission';
 import { reservationRequestAttempt, completeReservationRequest } from '../utils/reservationRequest';
 import { currentSession, assertCurrentSession } from '../api/sessionScope';
@@ -40,6 +41,9 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
     const stateOpenWrite    = location.state?.openWrite    ?? false;
     const stateOpenReviewId = location.state?.openReviewId ?? null;
     const reviewSectionRef  = useRef(null);
+    const bookingSectionRef = useRef(null);
+    const scrolledEdit = useRef(null);
+    const reducedMotion = useReducedMotion();
 
     const sessionRevision = useAuthStore(state => state.sessionRevision);
     const lookupScope = `${id}:${isLoggedIn}:${user?.id ?? user?.email}:${user?.role}:${sessionRevision}`;
@@ -180,6 +184,18 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [editingReservation]);
 
+    useEffect(() => {
+        if (!store || !editingReservation) return undefined;
+        const key = lookupScope + ':' + editingReservation.id;
+        if (scrolledEdit.current === key) return undefined;
+        const frame = requestAnimationFrame(() => {
+            if (!bookingSectionRef.current) return;
+            scrolledEdit.current = key;
+            bookingSectionRef.current.scrollIntoView({ behavior: reducedMotion ? 'instant' : 'smooth', block: 'start' });
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [store, editingReservation, lookupScope, reducedMotion]);
+
     // 리뷰 섹션 자동 스크롤 (외부에서 상태를 통해 트리거)
     useEffect(() => {
         const shouldScroll = (stateOpenWrite || stateOpenReviewId) && reviewSectionRef.current;
@@ -190,14 +206,18 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
     }, [stateOpenWrite, stateOpenReviewId]);
 
     // 예약 결과 처리 (onFinish에서 분리해 중첩 제거)
-    const handleReservationResult = async (reservation) => {
+    const handleReservationResult = async (reservation, recovered = false) => {
         // 목록으로 넘어가기 전에 무효화한다 — 결제 분기로 빠지는 경우까지 포함해
         // 모든 경로가 한 번은 지나가는 지점이라 여기 한 곳에 두면 빠뜨릴 일이 없다.
         void invalidateReservations();
+        if (reservation?.depositPaid || ['CANCELLED', 'REJECTED', 'COMPLETED', 'NO_SHOW'].includes(reservation?.status)) {
+            navigate('/my-reservations');
+            return true;
+        }
         if ((Number(reservation?.depositAmount) || 0) <= 0) {
             message.success('예약이 완료됐어요.');
             navigate('/my-reservations');
-            return;
+            return true;
         }
         if (store?.allowLatePayment) {
             const amount = Number(reservation.depositAmount).toLocaleString('ko-KR');
@@ -206,13 +226,16 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
                 duration: 4,
             });
             navigate('/my-reservations');
-            return;
+            return true;
         }
-        message.info({ content: '예약이 접수됐어요. 노쇼 예약금을 결제해주세요.', duration: 3 });
-        await pay(
-            { id: reservation.id, storeName: store?.name, depositAmount: reservation.depositAmount },
+        message.info({ content: recovered ? '기존 미결제 예약의 결제를 이어가요.'
+            : '예약금 결제 대기 중이에요. 결제를 완료해주세요.', duration: 3 });
+        const result = await pay(
+            { ...reservation, storeName: store?.name || reservation.storeName },
             { name: user?.name, email: user?.email, phone: user?.phone }
         );
+        // 브라우저 이동·SDK 중단은 결제 완료가 아니므로 재시도 키를 유지해요.
+        return result?.success === true;
     };
 
     // 예약 수정 제출 (onFinish에서 분리)
@@ -288,9 +311,19 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
         };
         const recoverForThisSession = async data => {
             assertCurrentSession(submissionSession.epoch);
-            const reservation = await reservationService.recoverReservation(data, { signal: submissionSession.signal });
+            const result = await reservationService.recoverReservation(data, { signal: submissionSession.signal }).catch(error => {
+                if ([404, 410].includes(httpStatusOf(error))) {
+                    throw new Error('이전 예약 상태를 확인하지 못했어요. 내 예약에서 확인해주세요.');
+                }
+                throw error;
+            });
             assertCurrentSession(submissionSession.epoch);
-            return reservation;
+            if (!['NOT_SUBMITTED', 'RESERVED', 'CLOSED'].includes(result?.outcome)
+                || result.outcome === 'RESERVED' && (!Number.isSafeInteger(result.reservation?.id) || result.reservation.id <= 0)
+                || result.outcome !== 'RESERVED' && result.reservation != null) {
+                throw new Error('이전 예약 상태를 확인하지 못했어요. 내 예약에서 확인해주세요.');
+            }
+            return result;
         };
         try {
             const hasDeposit  = store?.noShowDeposit > 0;
@@ -305,16 +338,29 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
             const admissionScope = { storeId: payload.storeId, date: payload.reservationDate, time: payload.reservationTime };
             let attempt = await admission.getPendingAttempt(admissionScope);
             assertCurrentSession(submissionSession.epoch);
-            const pendingAttempt = attempt;
+            let pendingAttempt = attempt;
             let normalAttempt;
             let reservation;
+            let recovered;
             if (attempt) {
                 // 결과 복구는 예약 생성·선점을 수행하지 않으며 유효 입장권 없이도 조회한다.
-                reservation = await recoverForThisSession({ ...payload, admissionTicket: attempt.ticket, requestId: attempt.requestId });
+                recovered = await recoverForThisSession({ ...payload, admissionTicket: attempt.ticket, requestId: attempt.requestId });
             } else {
                 normalAttempt = await reservationRequestAttempt(requestScope, payload);
                 assertCurrentSession(submissionSession.epoch);
-                if (normalAttempt.reused) reservation = await recoverForThisSession({ ...payload, requestId: normalAttempt.requestId });
+                if (normalAttempt.reused) recovered = await recoverForThisSession({ ...payload, requestId: normalAttempt.requestId });
+            }
+            if (recovered?.outcome === 'CLOSED') {
+                // 종료가 확인된 신청만 새 키로 진행하며 이전 예약·결제 원장은 그대로 보존해요.
+                const closedAttempt = attempt || normalAttempt;
+                admission.complete(closedAttempt);
+                completeReservationRequest(requestScope, closedAttempt.requestId);
+                attempt = null;
+                pendingAttempt = null;
+                normalAttempt = await reservationRequestAttempt(requestScope, payload);
+                assertCurrentSession(submissionSession.epoch);
+            } else if (recovered?.outcome === 'RESERVED') {
+                reservation = recovered.reservation;
             }
             if (!reservation) {
                 const ready = await prepareCoreWork({ method: 'post', url: '/api/reservations',
@@ -343,17 +389,27 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
                 }
             }
             setReservationEntry(null);
+            if (pendingAttempt) {
+                await reservationRequestAttempt(requestScope, payload, pendingAttempt.requestId);
+                assertCurrentSession(submissionSession.epoch);
+            }
             admission.complete(attempt || pendingAttempt || { requestId: normalAttempt.requestId });
-            completeReservationRequest(requestScope);
             // 배너 클릭 귀속은 같은 가게의 새 예약에만 요청한다.
             // 현재 회원·가게·기간·중복은 서버가 재검증하며 기록 오류는 예약 성공을 바꾸지 않는다.
             const attributedAdId = consumeAdClickAttribution(Number(id));
             if (attributedAdId && reservation?.id) {
                 void adService.recordConversion(attributedAdId, reservation.id);
             }
-            await handleReservationResult(reservation);
+            const finished = await handleReservationResult(reservation, recovered?.outcome === 'RESERVED');
+            // 결제창 종료·준비 실패 뒤 같은 신청은 생성하지 않고 기존 예약부터 복구해요.
+            if (finished && currentSession().epoch === submissionSession.epoch) {
+                completeReservationRequest(requestScope, (attempt || pendingAttempt || normalAttempt).requestId);
+            }
         } catch (err) {
             const errMsg = toErrorMessage(err);
+            if (httpStatusOf(err) === 409 && errMsg?.includes('예약 안내가 변경')) {
+                void queryClient.invalidateQueries({ queryKey: ['reservation-consent', user?.id, useAuthStore.getState().sessionRevision, Number(id)] });
+            }
             message.error({ content: errMsg || '예약에 실패했어요. 다시 시도해주세요.', duration: 5 });
         } finally {
             submitting.current = false;
@@ -369,6 +425,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
         stateOpenWrite,
         stateOpenReviewId,
         reviewSectionRef,
+        bookingSectionRef,
         onFinish,
         isEditMode: !!editId,
         editingReservation,

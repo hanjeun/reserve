@@ -23,6 +23,7 @@ import { useWindowWidth } from '../../hooks';
 import ManagementListToolbar from '../common/ManagementListToolbar';
 import { BenefitApplicationsSkeleton } from './ManagementReviewSkeletons';
 import { BENEFIT_QUERY_DEFAULTS, BENEFIT_STATE_OPTIONS, reviewOption, reviewPage } from './managementReviewQuery';
+import { isMissingRequestError } from '../../utils/listErrorMessage';
 
 const PAGE_SIZE = 20;
 export default function BenefitApplicationsPanel() {
@@ -54,14 +55,18 @@ export default function BenefitApplicationsPanel() {
     const detail = useQuery({ queryKey: storeNewsKeys.application(selection.id), queryFn: ({ signal }) => storeNewsService.application(selection.id, signal),
         enabled: active && enabled && selection.open && Boolean(selection.id), staleTime: 0, retry: false });
     useListRefreshAnchor(listRef, `${state}:${page}`, list.isFetching, list.data);
-    const latestReady = selection.open && detail.isSuccess && !detail.isFetching && detail.data?.id === selection.id;
+    const unavailable = detail.isError && isMissingRequestError(detail.error) || detail.data?.state === 'DELETED';
+    const latestReady = selection.open && detail.isSuccess && !detail.isFetching && detail.data?.id === selection.id && !unavailable;
     const changedRevision = latestReady && selection.news && selection.news.revision !== detail.data.revision;
     if (latestReady && selection.news?.revision !== detail.data.revision) {
         if (selection.news) setConflict(true);
         setLoaded(new Set());
         setSelection({ ...selection, news: detail.data });
     }
-    const news = selection.news;
+    const news = unavailable ? null : selection.news;
+    useEffect(() => {
+        if (selection.open && unavailable) void client.invalidateQueries({ queryKey: ['store-news', 'applications'] });
+    }, [selection.open, unavailable, client]);
     const total = feedTotal(list.data);
     const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
     useEffect(() => { if (list.isSuccess && !list.isFetching && !list.isPlaceholderData && page > lastPage) setQuery({ benefitPage: String(lastPage) }); },
@@ -138,7 +143,8 @@ export default function BenefitApplicationsPanel() {
             footer={<ModalActionGroup>
                 <Button variant="outline" size="sm" onClick={() => decide(false)} disabled={!canReview || busy}>반려</Button>
                 <Button size="sm" onClick={() => decide(true)} loading={review.isPending} disabled={!canReview || !photosReady || busy}>승인</Button></ModalActionGroup>}>
-            {!news && detail.isPending || !news && detail.isFetching ? <StoreNewsSkeleton contentOnly />
+            {unavailable ? <DataState state="empty" kind="news" title="삭제되거나 철회된 소식이에요." />
+                : !news && detail.isPending || !news && detail.isFetching ? <StoreNewsSkeleton contentOnly />
                 : !news && detail.isError ? <DataState state="error" title="신청 내용을 불러오지 못했어요." error={detail.error} onRetry={reload} retrying={detail.isFetching} />
                     : detail.isError && isReadAccessDenied(detail.error) ? <DataState state="error" title="신청 내용을 더 이상 볼 수 없어요." error={detail.error} onRetry={reload} retrying={detail.isFetching} /> : news && <>
                         <div ref={previewRef} onLoadCapture={event => recordPhoto(event.target)}><BenefitDetailContent item={news} preview status={benefitReviewLabel(news.benefitState)} /></div>

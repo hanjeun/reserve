@@ -45,6 +45,7 @@ export const BUSINESS_WORKSPACE_GROUPS = [
     { key: 'growth', label: '광고·통계', items: [
         { key: 'ads', label: '광고 관리', icon: NotificationOutlined },
         { key: 'analytics', label: '통계 · 분석', icon: PartitionOutlined },
+        { key: 'settlements', label: 'TEST 가상 정산', icon: DollarOutlined },
     ] },
 ];
 

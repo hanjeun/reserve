@@ -61,6 +61,13 @@ blob-report/
 frontend/.env
 frontend/.env.local
 frontend/.env.production
+/backend/local.properties
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
 
 # 추적 중인 비밀 설정에는 환경변수 참조만 두고 실제 값은 배포 환경에서 주입한다.
 

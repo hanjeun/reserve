@@ -75,6 +75,15 @@ RUN for REQUIRED_CLASS in \
     BOOT-INF/classes/kr/it/reserve/member/service/LoginMethodService.class \
     BOOT-INF/classes/kr/it/reserve/member/entity/LoginMethodChallenge.class \
     BOOT-INF/classes/kr/it/reserve/member/service/MemberWithdrawalService.class \
+    BOOT-INF/classes/kr/it/reserve/member/mfa/MfaService.class \
+    BOOT-INF/classes/kr/it/reserve/member/mfa/MfaPasskeys.class \
+    BOOT-INF/classes/kr/it/reserve/member/mfa/MfaPolicy.class \
+    BOOT-INF/classes/kr/it/reserve/member/mfa/MfaController.class \
+    BOOT-INF/classes/kr/it/reserve/member/mfa/MfaCredential.class \
+    BOOT-INF/classes/kr/it/reserve/reservation/service/ReservationAutoCompletion.class \
+    BOOT-INF/classes/kr/it/reserve/payment/service/TestSettlementService.class \
+    BOOT-INF/classes/kr/it/reserve/payment/entity/TestSettlementPayout.class \
+    BOOT-INF/classes/db/manual/mfa-completion-settlement.sql \
     BOOT-INF/classes/kr/it/reserve/config/oauth2/OAuthProviderTokenCipher.class \
     BOOT-INF/classes/kr/it/reserve/config/oauth2/OAuthProviderTokenConverter.class \
     BOOT-INF/classes/kr/it/reserve/config/oauth2/OAuthSessionIssuer.class \

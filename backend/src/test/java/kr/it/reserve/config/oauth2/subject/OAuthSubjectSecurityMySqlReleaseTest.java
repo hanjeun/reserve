@@ -91,6 +91,9 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
         OAuthSessionIssuer.class, TokenProvider.class, OAuthSecurityEventTransaction.class,
         OAuthSecurityEventService.class, LoginMethodService.class, MemberService.class, MemberWithdrawalService.class,
         OAuthUnlinkOutboxService.class, OAuthUnlinkTokenCipher.class, FileDeletionOutboxService.class,
+        kr.it.reserve.member.mfa.MfaPolicy.class, kr.it.reserve.member.mfa.MfaService.class,
+        kr.it.reserve.member.mfa.MfaCrypto.class, kr.it.reserve.member.mfa.MfaPasskeys.class,
+        kr.it.reserve.member.mfa.PasskeyCredentials.class, kr.it.reserve.global.ratelimit.RateLimiter.class,
         OAuthSubjectSecurityMySqlReleaseTest.Fixture.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class OAuthSubjectSecurityMySqlReleaseTest {
@@ -123,7 +126,7 @@ class OAuthSubjectSecurityMySqlReleaseTest {
     private MockRestServiceServer provider;
 
     @TestConfiguration(proxyBeanMethods = false)
-    @EnableConfigurationProperties(JwtProperties.class)
+    @EnableConfigurationProperties({JwtProperties.class, kr.it.reserve.member.mfa.MfaProperties.class})
     static class Fixture {
         @Bean MutableClock oauthFixtureClock() { return new MutableClock(); }
         @Bean CoordinatedSubjects oauthFixtureSubjects(OAuthSubjectSecurityRepository repository, MutableClock clock) {

@@ -46,6 +46,7 @@ export const API_ENDPOINTS = {
         MY_RESERVATIONS:     '/api/reservations/my/page',
         MY_COMPLETED_FOR_STORE: (storeId) => `/api/reservations/my/store/${storeId}/completed`,
         STORE_RESERVATIONS:  '/api/reservations/store',
+        ADMIN_RESERVATIONS:  '/api/reservations/admin/page',
         STORE_RESERVATION_SUMMARY: '/api/reservations/store/status-summary',
         CREATE:              '/api/reservations',
         DETAIL:              (id) => `/api/reservations/${id}`,
@@ -118,6 +119,7 @@ export const API_ENDPOINTS = {
         ADMIN_REVOKE:   (memberId) => `/api/business-verification/admin/${memberId}/revoke`,
     },
     PAYMENT: {
+        CHECKOUT_RETURN: '/api/payment/checkout-return',
         STATUS:         '/api/payment/status',
         CONFIG:         '/api/payment/config',
         PREPARE:        '/api/payment/prepare',
@@ -221,6 +223,12 @@ export const API_ENDPOINTS = {
     },
     AUDIT_LOG: {
         LIST: '/api/admin/audit-logs',
+    },
+    RESERVATION_RETENTION: {
+        AVAILABILITY: '/api/admin/reservation-retention/availability',
+        EVIDENCE: id => `/api/admin/reservation-retention/${id}/evidence`,
+        HOLD: id => `/api/admin/reservation-retention/${id}/hold`,
+        RELEASE: id => `/api/admin/reservation-retention/${id}/release`,
     },
     ADMIN_MANAGE: {
         MEMBERS:              '/api/admin/manage/members',

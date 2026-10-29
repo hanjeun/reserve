@@ -4,11 +4,11 @@ export const rules = {
         meta: {
             type: 'suggestion',
             schema: [],
-            messages: { tone: '일반 사용자 안내는 해요체로 쓰세요. 버튼·상태는 짧은 명사형, 약관·개인정보처리방침은 격식체를 사용합니다.' },
+            messages: { tone: '일반 사용자 안내는 해요체로 쓰세요. 버튼·상태는 짧은 명사형, 약관·개인정보처리방침·콘텐츠 권리 고지는 격식체를 사용합니다.' },
         },
         create(context) {
             const file = context.filename.replaceAll('\\', '/');
-            if (/\/pages\/legal\/(Terms|Privacy)\.jsx$/.test(file)) return {};
+            if (/\/pages\/legal\/(Terms|Privacy|ContentSources|ReservationConsentNotice)\.jsx$/.test(file)) return {};
             const check = (node, text) => {
                 if (typeof text === 'string' && /[가-힣]*(?:니다|니까)(?![가-힣])/.test(text)) {
                     context.report({ node, messageId: 'tone' });

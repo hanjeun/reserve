@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useSkeletonShown } from './loadingPresentation';
+import { LockOutlined, UserOutlined } from '../common/icons';
+import { useDocumentEntry, useSkeletonShown } from './loadingPresentation';
 import StoreCardSkeleton from '../common/StoreCardSkeleton';
 import { PageStatusSkeleton } from '../common/PageStatus';
 import BenefitListSkeleton from '../common/BenefitListSkeleton';
@@ -86,11 +87,11 @@ AgreementRows.propTypes = { dividerFirst: PropTypes.bool, itemGap: PropTypes.num
 function LoginSkeleton() {
     return <PageContainer size="sm" paddingTop="80px" center>
         <div>
-            <PageTitle style={authTitle}>로그인</PageTitle>
-            <PageDescription style={{ ...authSubtitle, marginBottom: 48 }}>특별한 날을 위한 완벽한 예약</PageDescription>
+            <PageTitle aria-label="로그인" className="reserve-auth-title" style={authTitle}><LockOutlined aria-hidden="true" /></PageTitle>
+            <PageDescription style={{ ...authSubtitle, marginBottom: 48 }}>예약이 필요한 순간, RESERVE</PageDescription>
             <AuthInput /><AuthInput />
-            <div style={{ ...centerRow(18, { marginTop: -8, marginBottom: 16 }), justifyContent: 'flex-end' }}><Bone width={132} height={13} /></div>
-            {buttonBone}
+            <div style={{ ...centerRow(44, { marginTop: -8, marginBottom: 16 }), justifyContent: 'space-between' }}><Bone width={100} height={16} /><div style={{ display: 'flex', gap: 12 }}><Bone width={32} height={32} borderRadius={10} /><Bone width={32} height={32} borderRadius={10} /></div></div>
+            <div className="reserve-login-actions">{buttonBone}{buttonBone}</div>
             {/* '또는 소셜 로그인' 구분선 */}
             <div style={{ ...centerRow(22), gap: 16, margin: '32px 0' }}>
                 <span style={{ flex: 1, borderTop: `1px solid ${colors.border.light}` }} /><Bone width={92} height={12} /><span style={{ flex: 1, borderTop: `1px solid ${colors.border.light}` }} />
@@ -100,7 +101,6 @@ function LoginSkeleton() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, marginTop: 32 }}>
                 <div style={centerRow(24)}><Bone width={196} height={14} /></div>
-                <div style={centerRow(17)}><Bone width={250} height={12} /></div>
             </div>
         </div>
     </PageContainer>;
@@ -109,7 +109,7 @@ function LoginSkeleton() {
 function SignupSkeleton() {
     return <PageContainer size="sm" paddingTop="60px" center>
         <div style={{ textAlign: 'left' }}>
-            <PageTitle style={{ ...authTitle, textAlign: 'center' }}>회원가입</PageTitle>
+            <PageTitle aria-label="회원가입" className="reserve-auth-title" style={{ ...authTitle, textAlign: 'center' }}><UserOutlined aria-hidden="true" /></PageTitle>
             <PageDescription style={{ ...authSubtitle, marginBottom: 40, textAlign: 'center' }}>간편한 가입으로 예약을 시작하세요</PageDescription>
             {['name', 'email', 'password', 'confirm'].map(key => <AuthInput key={key} />)}
             <div style={{ marginTop: 32 }}><AgreementRows dividerFirst itemGap={8} /></div>
@@ -253,10 +253,6 @@ export function PaymentResultRouteSkeleton() {
                     <div style={{ height: '1.65em', display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'center' }}><Bone width="92%" height={14} /></div>
                     <div style={{ height: '1.65em', display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'center' }}><Bone width="60%" height={14} /></div>
                 </div>
-                <div className="reserve-payment-result__hint">
-                    <div style={{ height: '1.55em', display: 'flex', alignItems: 'center' }}><Bone width="90%" height={12} /></div>
-                    <div style={{ height: '1.55em', display: 'flex', alignItems: 'center' }}><Bone width="55%" height={12} /></div>
-                </div>
                 <div className="reserve-payment-result__recovery" style={{ height: 24, display: 'flex', alignItems: 'center' }}><Bone width={220} height={12} /></div>
             </div>
         </div>
@@ -304,12 +300,16 @@ BusinessRouteSkeleton.propTypes = { search: PropTypes.string };
 
 export function MessagesRouteSkeleton({ search = '' }) {
     const isWide = useWindowWidth() >= breakpoints.tablet;
+    const skeletonShown = useSkeletonShown();
+    const documentEntry = useDocumentEntry();
+    const [entering] = useState(() => !skeletonShown && !documentEntry);
+    const pageClass = `reserve-messages-page reserve-messages-route${entering ? ' is-opening' : ''}`;
     // PC 에서는 실제 페이지가 아무것도 그리지 않고 곧바로 돌아간다 — 빈 자리만 둔다.
     if (isWide) return <div style={{ minHeight: 'calc(100svh - 64px)' }} />;
     const storeId = Number(new URLSearchParams(search).get('storeId'));
     if (Number.isInteger(storeId) && storeId > 0) {
         // 가게 문의로 바로 들어오면 대화 화면이 열린다(MessengerContent 의 모바일 대화 배치).
-        return <div className="reserve-messages-page">
+        return <div className={pageClass}>
             <div className="reserve-messenger reserve-messenger--page has-thread has-mobile-thread">
                 <section className="reserve-messenger-thread">
                     <div className="reserve-messenger-thread-heading">
@@ -326,7 +326,7 @@ export function MessagesRouteSkeleton({ search = '' }) {
         </div>;
     }
     // 기본은 메신저 홈: 표지 200 → 고객지원 안내 카드 → 아래 탭 3개.
-    return <div className="reserve-messages-page">
+    return <div className={pageClass}>
         <div className="reserve-messenger reserve-messenger--page is-home">
             <section className="reserve-messenger-home">
                 <div className="reserve-messenger-brand-cover"><Bone height="100%" borderRadius={0} /></div>
@@ -432,8 +432,9 @@ const BenefitDetailRouteSkeleton = () => <BenefitDetailSkeleton />;
 
 function SearchSkeleton() {
     const skeletonShown = useSkeletonShown();
+    const documentEntry = useDocumentEntry();
     // 첫 골격의 모션은 표시 기록이 갱신돼도 유지하고, 부트 셸 교체 때 다시 시작하지 않는다.
-    const [entering] = useState(() => !skeletonShown);
+    const [entering] = useState(() => !skeletonShown && !documentEntry);
     return <div className={'reserve-search-page' + (entering ? ' reserve-search-page--entering' : '')}>
         <div className="reserve-search-header">
             <div className="reserve-search-field"><Bone width="65%" height={16} style={{ marginLeft: 16 }} /></div>

@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import chatService from './chatService';
 import api from '../api/axios';
+import { cachedChatImage, chatImageCacheScope, clearChatImageCache, rememberChatImage } from '../utils/chatImageCache';
 
-vi.mock('../api/axios', () => ({ default: { get: vi.fn(), post: vi.fn() } }));
+vi.mock('../api/axios', () => ({ default: { get: vi.fn(), post: vi.fn(), head: vi.fn() } }));
 describe('chat transport contracts', () => {
     it('sends the received cursor for each reader while preserving legacy read calls', () => {
         api.post.mockClear();
@@ -40,4 +41,23 @@ describe('chat transport contracts', () => {
         chatService.getImage('/api/chat/images/33');
         expect(api.get).toHaveBeenCalledWith('/api/chat/images/33', { responseType: 'blob', signal: undefined });
     });
+});
+
+it('revalidates a cached participant image with a body-free authenticated HEAD', async () => {
+    const signal = new AbortController().signal;
+    api.head.mockResolvedValueOnce(null);
+    expect(await chatService.checkImageAccess('/api/chat/images/33', signal)).toBeNull();
+    expect(api.head).toHaveBeenCalledWith('/api/chat/images/33', { signal });
+});
+
+it('keeps unrelated cached photos when a retraction poll returns historical deletions', async () => {
+    const first = chatImageCacheScope('/api/chat/images/11');
+    const second = chatImageCacheScope('/api/chat/images/12');
+    const blob = new Blob(['private']);
+    rememberChatImage('first', blob, first); rememberChatImage('second', blob, second);
+    api.get.mockResolvedValueOnce({ messages: [{ id: 11 }], hiddenMessageIds: [500] });
+    await chatService.pollRetractions(10);
+    expect(cachedChatImage('first')).toBeUndefined();
+    expect(cachedChatImage('second')).toBe(blob);
+    clearChatImageCache();
 });

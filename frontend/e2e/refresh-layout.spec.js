@@ -40,6 +40,7 @@ test('cold refresh preserves toolbar geometry across authentication, route and d
         if (!endpoint.startsWith('/api/')) return route.continue();
         requests.push(url);
         const ok = data => route.fulfill({ json: { success: true, data } });
+        if (endpoint === '/api/auth/session') { await auth; return route.fulfill({ json: { success: true, data: { member: user, refreshPossible: false } } }); }
         if (endpoint === '/api/member/me') { await auth; return ok(user); }
         if (endpoint.endsWith('/config')) return ok({ enabled: true, notificationsEnabled: true });
         if (endpoint === '/api/feed/me/profile') return ok({ publicId: 'review', nickname: '확인 사용자' });

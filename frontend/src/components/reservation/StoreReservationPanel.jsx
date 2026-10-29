@@ -12,19 +12,20 @@ import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import RollingFieldValue from '../../components/common/RollingFieldValue';
 import ReservationEntryNotice from './ReservationEntryNotice';
+import ReservationConsentField from './ReservationConsentField';
 import reservationService from '../../services/reservationService';
 
-const GuestCountInput = ({ value = 1, onChange, disabled = false }) => {
+const GuestCountInput = ({ id, value = 1, onChange, disabled = false, 'aria-labelledby': labelledBy, 'aria-describedby': describedBy, 'aria-invalid': invalid }) => {
     const dec = () => { if (value > 1) onChange?.(value - 1); };
     const inc = () => { if (value < 99) onChange?.(value + 1); };
     return (
-        <div style={inputStyles.wrapper}>
+        <div id={id} role="group" aria-labelledby={labelledBy} aria-describedby={describedBy} aria-invalid={invalid} style={inputStyles.wrapper}>
             <span style={inputStyles.count}><RollingFieldValue value={value}>{`${value}명`}</RollingFieldValue></span>
             <div style={inputStyles.btnGroup}>
-                <button type="button" className="rsv-tap-btn reserve-guest-count-step" onClick={dec} disabled={disabled || value <= 1} style={{ ...inputStyles.btn, opacity: value <= 1 ? 0.35 : undefined }}>
+                <button type="button" className="rsv-tap-btn reserve-guest-count-step" aria-label="인원 줄이기" onClick={dec} disabled={disabled || value <= 1} style={{ ...inputStyles.btn, opacity: value <= 1 ? 0.35 : undefined }}>
                     <MinusOutlined style={{ fontSize: 12 }} />
                 </button>
-                <button type="button" className="rsv-tap-btn reserve-guest-count-step" onClick={inc} disabled={disabled || value >= 99} style={{ ...inputStyles.btn, opacity: value >= 99 ? 0.35 : undefined }}>
+                <button type="button" className="rsv-tap-btn reserve-guest-count-step" aria-label="인원 늘리기" onClick={inc} disabled={disabled || value >= 99} style={{ ...inputStyles.btn, opacity: value >= 99 ? 0.35 : undefined }}>
                     <PlusOutlined style={{ fontSize: 12 }} />
                 </button>
             </div>
@@ -153,7 +154,10 @@ const useTimeSlotAvailability = ({ store, dateValue, form, onAvailabilityChange,
     return { dateKey, storeId, loading, slots, failed, retry };
 };
 
-export const TimeSlotPicker = ({ store, dateValue, value, onChange, form, onAvailabilityChange, editingReservation }) => {
+export const TimeSlotPicker = props => <div id={props.id} role="group" aria-labelledby={props['aria-labelledby']}
+    aria-describedby={props['aria-describedby']} aria-invalid={props['aria-invalid']}><TimeSlotPickerContent {...props} /></div>;
+
+const TimeSlotPickerContent = ({ store, dateValue, value, onChange, form, onAvailabilityChange, editingReservation }) => {
     const { dateKey, storeId, loading, slots, failed, retry } = useTimeSlotAvailability({
         store, dateValue, form, onAvailabilityChange, editingReservation,
     });
@@ -253,7 +257,7 @@ const TimeSlotPill = ({ slot, selected, selectable, onClick, delay }) => (
 /*
  * 기본 Picker가 아닌 표면은 Form.Item.useStatus로 필드 검증 상태를 반영한다.
  */
-const TimePlaceholder = ({ text }) => {
+const TimePlaceholderField = ({ text }) => {
     const { status } = Form.Item.useStatus();
     const isError = status === 'error';
     // 날짜 필드와 같은 오류 테두리·아이콘 규칙을 사용한다.
@@ -271,6 +275,8 @@ const TimePlaceholder = ({ text }) => {
         </div>
     );
 };
+
+const TimePlaceholder = props => <Form.Item noStyle><TimePlaceholderField {...props} /></Form.Item>;
 
 const timeSlotStyles = {
     placeholder: {
@@ -298,8 +304,9 @@ const timeSlotStyles = {
 export const ReservationPanel = ({
     store, form, onFinish, paying, isPC, isEditMode, editingReservation,
     reservationEntry = null,
-    editLoadError = null, editRetrying = false, onRetryEditLoad, preview = false,
+    editLoadError = null, editRetrying = false, onRetryEditLoad, preview = false, bookingSectionRef,
 }) => {
+    const labelPrefix = React.useId();
     const dateValue = Form.useWatch('reservationDate', form);
     const timeValue = Form.useWatch('reservationTime', form);
     const entry = reservationEntry?.slot === `${store?.id}:${dateValue?.format('YYYY-MM-DD')}:${formatTime(timeValue)}` ? reservationEntry : null;
@@ -311,7 +318,7 @@ export const ReservationPanel = ({
     let submitLabel = isEditMode ? '예약 변경하기' : '예약 신청하기';
     if (paying) submitLabel = '처리 중...';
     return (
-    <StoreActionPanel title={isEditMode ? '예약 변경하기' : '예약하기'} isPC={isPC}>
+    <StoreActionPanel sectionRef={bookingSectionRef} title={isEditMode ? '예약 변경하기' : '예약하기'} isPC={isPC}>
         <Form form={form} component={preview ? false : 'form'} layout="vertical" onFinish={preview ? undefined : onFinish}
             initialValues={{ guestCount: 1 }} requiredMark={false}
             style={{ fontWeight: fontWeight.medium }}>
@@ -332,7 +339,7 @@ export const ReservationPanel = ({
                     {/* 라벨·에러 문구가 예약 방식을 따라간다. DAY 는 시간을 고르는 게 아니라
                         "이 날 예약이 되는지"를 보는 칸이라, "시간을 선택해주세요"가 말이 안 된다. */}
                     <Form.Item
-                        label={reservationTimeLabel(store?.bookingType)}
+                        htmlFor={null} label={<span id={`${labelPrefix}-time`}>{reservationTimeLabel(store?.bookingType)}</span>}
                         name="reservationTime"
                         // 시간 필수 검증은 날짜를 고른 경우에만 적용한다.
 
@@ -358,14 +365,15 @@ export const ReservationPanel = ({
                                 return Promise.resolve();
                             },
                         })]}>
-                        <TimeSlotPicker store={reservationStore} dateValue={dateValue} form={form} onAvailabilityChange={handleAvailabilityChange} editingReservation={editingReservation} />
+                        <TimeSlotPicker aria-labelledby={`${labelPrefix}-time`} store={reservationStore} dateValue={dateValue} form={form} onAvailabilityChange={handleAvailabilityChange} editingReservation={editingReservation} />
                     </Form.Item>
-                    <Form.Item label="인원 수" name="guestCount" rules={VALIDATION_RULES.guestCount}>
-                        <GuestCountInput disabled={preview} />
+                    <Form.Item htmlFor={null} label={<span id={`${labelPrefix}-guests`}>인원 수</span>} name="guestCount" rules={VALIDATION_RULES.guestCount}>
+                        <GuestCountInput aria-labelledby={`${labelPrefix}-guests`} disabled={preview} />
                     </Form.Item>
                     <Form.Item label="요청 사항" name="specialRequest">
                         <FormTextArea rows={3} placeholder="요청 사항을 입력하세요." disabled={preview} />
                     </Form.Item>
+                    {!isEditMode && <ReservationConsentField storeId={store?.id} disabled={preview} />}
                     <div style={{ marginTop: 24 }}>
                         {entry && <ReservationEntryNotice expiresAt={entry.expiresAt} />}
                         <Button variant="primary" htmlType={preview ? 'button' : 'submit'} block loading={paying} disabled={preview}>

@@ -72,6 +72,15 @@ describe('OAuth pending presentation', () => {
         expect(replace).not.toHaveBeenCalled();
         expect(message.error).not.toHaveBeenCalled();
     });
+    it('keeps provider response details out of the console on authentication failure', async () => {
+        const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+        checkAuth.mockRejectedValueOnce(Object.assign(new Error('synthetic private detail'), { response: { data: 'synthetic response body' } }));
+        render(<MemoryRouter initialEntries={['/oauth2/callback']}><OAuthCallback /></MemoryRouter>);
+        await act(async () => {});
+        expect(log).toHaveBeenCalledExactlyOnceWith('OAuth sign-in could not be completed');
+        expect(message.error).toHaveBeenCalledWith('로그인 정보를 가져오지 못했어요.');
+        expect(navigate).toHaveBeenCalledWith('/login', { replace: true });
+    });
 
     it('returns to the onsite QR destination without exposing its token in a query', async () => {
         saveRedirect('/store/31#waiting-token=rw1.j.example');

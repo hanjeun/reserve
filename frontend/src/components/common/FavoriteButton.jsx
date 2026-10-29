@@ -153,7 +153,7 @@ const FavoriteButton = ({ storeId, initialStatus, appearance = 'overlay', style 
     const blocked = toggleMutation.isPending || (statusUnknown && (!statusFailed || statusFetching));
 
     return (
-        <Tooltip title={accessibleLabel}><button
+        <Tooltip title={statusUnknown ? accessibleLabel : undefined}><button
             type="button"
             onClick={handleToggle}
             disabled={blocked}

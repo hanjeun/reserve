@@ -2,10 +2,29 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import api from '../api/axios';
 import { advanceSession, currentSession, isCurrentSession } from '../api/sessionScope';
+import { refreshSessionOnce } from '../api/sessionRefresh';
 import useLocationStore from './useLocationStore';
 
 const STARTUP_AUTH_RETRY_DELAYS_MS = [400, 1200];
 let authRestoreRuns = 0;
+let sessionProbe;
+const readSession = (epoch, timeout) => {
+    if (sessionProbe?.epoch === epoch) return sessionProbe.promise;
+    const config = { skipAuthRefresh: true, ...(timeout ? { timeout } : {}) };
+    const flight = { epoch };
+    flight.promise = (async () => {
+        let result = await api.get('/api/auth/session', config);
+        if (!isCurrentSession(epoch)) return null;
+        if (!result?.member && result?.refreshPossible) {
+            await refreshSessionOnce(epoch, () => api.post('/api/auth/refresh', undefined, config));
+            if (!isCurrentSession(epoch)) return null;
+            result = await api.get('/api/auth/session', config);
+        }
+        return result?.member ?? null;
+    })().finally(() => { if (sessionProbe === flight) sessionProbe = undefined; });
+    sessionProbe = flight;
+    return flight.promise;
+};
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const isTransientAuthError = (error) => {
     if (error?.isSessionExpired || error?.isStaleSession) return false;
@@ -56,8 +75,8 @@ const useAuthStore = create(
                 const { rethrowTransient = false, timeout } = options;
                 const started = currentSession().epoch;
                 try {
-                    const userData = await api.get('/api/member/me', timeout ? { timeout } : undefined);
-                    if (!isCurrentSession(started)) return null;
+                    const userData = await readSession(started, timeout);
+                    if (!isCurrentSession(started)) return identity(get().user) === identity(userData) ? get().user : null;
                     if (userData?.email) {
                         applyUser(set, get, userData);
                         return userData;

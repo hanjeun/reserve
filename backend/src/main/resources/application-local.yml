@@ -19,7 +19,7 @@ spring:
     url: jdbc:mysql://localhost:3306/reserve?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: root
     # 로컬 전용 계정은 다른 환경에 재사용하지 않는다. 비밀번호는 DB_PASSWORD_LOCAL로 재정의한다.
-    password: ${DB_PASSWORD_LOCAL:1234}
+    password: ${DB_PASSWORD_LOCAL:}
 
   # 로컬 OAuth2 콜백 주소
   security:

@@ -82,11 +82,11 @@ describe('route entry lifetime', () => {
         expect(content).not.toHaveClass('reserve-route-entry--from-right');
     });
 
-    it('clears an entrance as soon as a full page skeleton appears', () => {
+    it('keeps the same entrance while a full page skeleton becomes the body', () => {
         const content = document.createElement('main');
         content.classList.add('reserve-route-entry--from-left');
         applyRouteEntryMotion(content, { pathnameChanged: false, direction: null, skeletonShown: true });
-        expect(content).not.toHaveClass('reserve-route-entry--from-left');
+        expect(content).toHaveClass('reserve-route-entry--from-left');
     });
 
     it('clears the old direction on a route with its own motion', () => {

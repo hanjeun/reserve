@@ -1,13 +1,14 @@
-import { createContext, useContext, useLayoutEffect, useSyncExternalStore } from 'react';
+import { createContext, useContext, useLayoutEffect, useState, useSyncExternalStore } from 'react';
 
 export const LoadingPresentationContext = createContext(null);
 
 // 한 번의 이동 안에서 실제로 커밋된 골격만 기록한다. 요청 여부나 캐시 유무를 추측하지 않는다.
-export function createLoadingPresentation(navigationKey) {
+export function createLoadingPresentation(navigationKey, { documentEntry = false } = {}) {
     let shown = false;
     const listeners = new Set();
     return {
         navigationKey,
+        documentEntry,
         getSnapshot: () => shown,
         subscribe: listener => {
             listeners.add(listener);
@@ -19,6 +20,24 @@ export function createLoadingPresentation(navigationKey) {
             listeners.forEach(listener => listener());
         },
     };
+}
+
+/** 새 문서 진입과 앱 안의 이동을 구분하고 같은 화면의 교체는 모션 이력을 유지해요. */
+export function useRouteLoadingPresentation({ pathname, key }, navigationType) {
+    const [entry, setEntry] = useState(() => ({
+        pathname, key, presentation: createLoadingPresentation(key, { documentEntry: true }),
+    }));
+    if (entry.key === key) return entry.presentation;
+    // URL 기본값·안내 상태 정리는 같은 화면의 로딩 이력을 유지해요.
+    const samePageReplacement = navigationType === 'REPLACE' && entry.pathname === pathname;
+    const next = { pathname, key, presentation: samePageReplacement
+        ? entry.presentation : createLoadingPresentation(key) };
+    setEntry(next);
+    return next.presentation;
+}
+
+export function useDocumentEntry() {
+    return useContext(LoadingPresentationContext)?.documentEntry ?? false;
 }
 
 const subscribeWithoutProvider = () => () => {};

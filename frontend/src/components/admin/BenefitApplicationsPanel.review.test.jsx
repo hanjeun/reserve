@@ -47,6 +47,23 @@ beforeEach(() => {
 });
 
 describe('benefit review snapshot boundary', () => {
+    it('removes a deleted application and its cached preview instead of retaining review actions', async () => {
+        const user = userEvent.setup(); const client = setup();
+        await user.click(await screen.findByRole('button', { name: '검토', exact: true }));
+        await screen.findByTestId('review-revision'); photoLoaded();
+        await user.type(screen.getByLabelText('혜택 심사 사유'), '삭제 전 검토 사유');
+        api.applications.mockResolvedValue({ content: [], page: { totalElements: 0 } });
+        api.application.mockRejectedValue(Object.assign(new Error('missing'), { status: 404 }));
+        await act(async () => client.invalidateQueries({ queryKey: ['store-news', 'application', 7] }));
+        await screen.findByText('삭제되거나 철회된 소식이에요.');
+        expect(screen.queryByTestId('review-revision')).toBeNull();
+        expect(screen.queryByAltText('검토 사진')).toBeNull();
+        expect(screen.queryByLabelText('혜택 심사 사유')).toBeNull();
+        expect(screen.getByRole('button', { name: '승인', exact: true })).toBeDisabled();
+        expect(screen.getByRole('button', { name: '반려', exact: true })).toBeDisabled();
+        await screen.findByText('해당 상태의 혜택 신청이 없어요.');
+        expect(api.review).not.toHaveBeenCalled();
+    });
     it('shows a changed snapshot automatically, retains the note and requires acknowledgement and new photos', async () => {
         const user = userEvent.setup(); const client = setup();
         await user.click(await screen.findByRole('button', { name: '검토', exact: true }));

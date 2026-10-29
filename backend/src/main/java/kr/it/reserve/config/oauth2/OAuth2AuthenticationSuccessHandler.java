@@ -36,6 +36,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
     @Value("#{siteUrls.frontendOrigin}")
     private String frontendUrl = kr.it.reserve.config.SiteUrls.DEFAULT_APP_ORIGIN;
     @Autowired private SiteUrls siteUrls;
+    @Autowired private kr.it.reserve.member.mfa.MfaService mfa;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
@@ -72,13 +73,23 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         // 1. 토큰 생성
         OAuthSessionIssuer.SessionTokens pair;
         try {
-            pair = sessionIssuer.issue(oAuth2User);
+            if (mfa != null) mfa.cancel(CookieUtil.getCookie(request, "mfa_ticket"));
+            pair = sessionIssuer.issue(oAuth2User, LoginAuthorizationRequestRepository.persistent(request));
         } catch (org.springframework.security.oauth2.core.OAuth2AuthenticationException exception) {
             org.springframework.security.core.context.SecurityContextHolder.clearContext();
             clearSessionAndCookies(request, response);
             failureHandler.onAuthenticationFailure(request, response, exception);
             return;
         }
+        if (pair.mfaTicket() != null) {
+            cookieUtil.deleteCookie(response, "access_token");
+            cookieUtil.deleteCookie(response, "refresh_token");
+            cookieUtil.addCookie(response, "mfa_ticket", pair.mfaTicket(), pair.persistent() ? 300 : -1);
+            clearSessionAndCookies(request, response);
+            getRedirectStrategy().sendRedirect(request, response, destination + "/login?mfa=1" + (oAuth2User.isLoginMethodAction() ? "&security=1" : ""));
+            return;
+        }
+        cookieUtil.deleteCookie(response, "mfa_ticket");
         String accessToken = pair.accessToken();
         String refreshToken = pair.refreshToken();
 
@@ -86,8 +97,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         int accessMaxAge = (int) jwtProperties.getAccessTokenExpiration().toSeconds();
         int refreshMaxAge = (int) (pair.refreshMaxAge() == null ? jwtProperties.getRefreshTokenExpiration() : pair.refreshMaxAge()).toSeconds();
 
-        cookieUtil.addCookie(response, "access_token", accessToken, accessMaxAge);
-        cookieUtil.addCookie(response, "refresh_token", refreshToken, refreshMaxAge);
+        cookieUtil.addAuthCookies(response, accessToken, refreshToken, accessMaxAge, refreshMaxAge, pair.persistent());
 
         // 3. 세션 및 기존 쿠키 정리
         clearSessionAndCookies(request, response);

@@ -39,17 +39,7 @@ Java 패키지의 시작점은 kr.it.reserve예요.
 | styles·assets | 디자인 토큰·CSS·이미지 |
 | utils | 날짜·사진·입력 처리 |
 
-주요 화면은 가게 탐색·상세, 예약·웨이팅, 메시지, 마이페이지, 사업자 패널, 관리자 패널이에요. 실제 주소와 접근 권한은 [App.jsx](../../frontend/src/App.jsx)에서 확인할 수 있어요.
-
-## 통합검색
-
-상단 돋보기는 통합검색을 열고, 탐색·웨이팅·사업자·관리자의 본문 검색은 해당 목록의 조건만 바꿔요. 입력 중 메뉴·별칭·오타 제안은 로컬에서 찾고, 확정한 입력만 서버로 보내요. 화면·캐시·필터 계약은 [검색 화면](search-ui.md)을 따라요.
-
-서버의 search 모듈은 공개 결과와 본인 결과를 조합해요. 개인 조회는 각 도메인의 ReservationSearchReader·WaitingSearchReader·ChatSearchReader가 소유하며, MemberSearchAccess로 현재 회원 상태를 확인해요. 각 조회는 독립 읽기 트랜잭션·3초 제한·최대 여섯 행을 사용해요.
-
-가게 FULLTEXT/ngram은 실제 색인·파서·컬럼을 확인하며 앱이 자동 생성하지 않아요. 통합검색의 `search.store.unified-fulltext-enabled`는 기본 `false`이고 `search.store.fulltext-enabled`도 켜져 있어야 해요. 선택 경로는 같은 스냅샷에서 누락 행을 최대 한 건 확인한 뒤 제한 조회하며, 누락 시 원문 조건으로 돌아가요. 기존 페이지 API는 전체 건수 계약을 유지해요.
-
-검색 시간·일치·무결과·오류는 고정 그룹의 reserve.search 지표로 집계해요. HTTP 200 부분 실패는 reserve.search.responses로 구분하며 검색어·회원·결과 ID는 지표에 넣지 않아요.
+주소와 접근 권한은 [App.jsx](../../frontend/src/App.jsx)에서 확인할 수 있어요.
 
 ## 설정
 

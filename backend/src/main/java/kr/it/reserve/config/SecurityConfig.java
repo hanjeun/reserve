@@ -21,7 +21,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizationRequestRepository;
+import kr.it.reserve.config.oauth2.LoginAuthorizationRequestRepository;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -100,6 +100,13 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.POST,
                                 ApiPaths.withV1Aliases("/api/auth/login", "/api/auth/signup", "/api/auth/refresh", "/api/auth/logout"))
                                 .permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                ApiPaths.withV1Aliases("/api/auth/login-policy", "/api/auth/session")).permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, ApiPaths.withV1Aliases(
+                                "/api/auth/mfa/status", "/api/auth/mfa/totp/setup", "/api/auth/mfa/totp/confirm",
+                                "/api/auth/mfa/passkey/login", "/api/auth/mfa/passkey/options", "/api/auth/mfa/passkey/confirm",
+                                "/api/auth/mfa/verify", "/api/auth/mfa/finish", "/api/auth/mfa/recovery",
+                                "/api/auth/mfa/remove", "/api/auth/mfa/disable", "/api/auth/mfa/cancel", "/api/auth/mfa/defer")).permitAll()
                         // 가입 전 이메일 인증에 필요한 두 요청만 공개한다. 인증 상태를 이메일로
                         // 조회하는 공개 API는 계정·인증 진행 여부를 추측하게 하므로 두지 않는다.
                         .requestMatchers(org.springframework.http.HttpMethod.POST,
@@ -174,6 +181,7 @@ public class SecurityConfig {
                         // 예약 - 공개 조회만 허용, 나머지는 인증 필요
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
                                 ApiPaths.withV1Aliases("/api/reservations/{id}")).authenticated()
+                        .requestMatchers(ApiPaths.withV1Aliases("/api/reservations/admin/**")).hasRole("ADMIN")
                         .requestMatchers(ApiPaths.withV1Aliases("/api/reservations/**")).authenticated()
 
                         // 서버 API 키와 호출 한도를 보호하기 위해 주소 검색은 로그인이 필요하다.
@@ -194,7 +202,7 @@ public class SecurityConfig {
                         // OAuth2 state 파라미터를 세션에 저장 (STATELESS 환경에서 필수)
                         .authorizationEndpoint(authorization -> authorization
                                 .authorizationRequestResolver(new TrustedOAuth2AuthorizationRequestResolver(registrations, siteUrls.oauthOrigins(browserOrigins()), loginMethods))
-                                .authorizationRequestRepository(new HttpSessionOAuth2AuthorizationRequestRepository()))
+                                .authorizationRequestRepository(new LoginAuthorizationRequestRepository()))
                         .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
                         .successHandler(oAuth2AuthenticationSuccessHandler)
                         .failureHandler(oAuth2AuthenticationFailureHandler))

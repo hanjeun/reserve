@@ -86,7 +86,7 @@ describe('public store news and benefit guidance', () => {
         expect(link).toHaveAttribute('href', '/benefits/1');
         fireEvent.click(link);
         expect(await screen.findByRole('heading', { name: '신메뉴 안내' })).toBeInTheDocument();
-        expect(screen.getByRole('link', { name: '가게 보기 →' })).toHaveAttribute('href', '/store/12');
+        expect(screen.getByRole('link', { name: '가게 보기' })).toHaveAttribute('href', '/store/12');
         expect(document.querySelector('.reserve-benefit-detail-content').textContent).toBe(item.content);
         expect(document.querySelector('.reserve-benefit-detail-content script, .reserve-benefit-detail-content img')).toBeNull();
         expect(screen.getByRole('img', { name: '가게 사진이 등록되지 않았어요' })).toHaveAttribute('src', BENEFIT_IMAGE_FALLBACK);

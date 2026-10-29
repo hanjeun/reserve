@@ -26,7 +26,7 @@ export const reservationKeys = {
     my:     () => ['reservations', 'my'],
     myPage: (params) => ['reservations', 'my', params],
     manage: () => ['reservations', 'manage'],
-    managePage: (params) => ['reservations', 'manage', params],
+    managePage: (params) => ['reservations', 'manage', 'owned', params],
     qrToken: (id) => ['reservations', 'qrToken', id],
     // 달력 — 달을 넘길 때마다 다른 응답이므로 month 가 키에 들어가야 한다.
     // 그래야 뒤로 갔을 때 캐시에서 즉시 그려지고, 같은 달을 두 번 안 부른다.

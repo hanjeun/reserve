@@ -1,5 +1,5 @@
 import { PageTitle } from '../../components/common/PageTypography';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Typography } from 'antd';
 import { PageContainer } from '../../components/common';
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
@@ -7,14 +7,20 @@ import useDocumentTitle from '../../hooks/useDocumentTitle';
 
 const { Title, Paragraph, Text } = Typography;
 
-const Section = ({ title, children }) => (
-    <div style={{ marginBottom: 32 }}>
+const Section = ({ id, title, children }) => (
+    <section id={id} style={{ marginBottom: 32, scrollMarginTop: 88 }}>
         <Title level={4} style={{ fontWeight: fontWeight.bold, color: colors.text.primary, marginBottom: 12 }}>{title}</Title>
         <div style={{ fontSize: fontSize.base, color: colors.text.secondary, lineHeight: 1.8 }}>{children}</div>
-    </div>
+    </section>
 );
 
 const Terms = () => {
+    useEffect(() => {
+        const reveal = () => { if (window.location.hash === '#payments') document.getElementById('payments')?.scrollIntoView({ block: 'start', behavior: 'instant' }); };
+        reveal();
+        window.addEventListener('hashchange', reveal);
+        return () => window.removeEventListener('hashchange', reveal);
+    }, []);
     // 색인 대상 경로다 — 설명을 비워두면 크롤러가 본문 DOM을 긁어 만든 문장이
     // 검색 결과에 실린다(네이버에서 실제로 그렇게 나왔다).
     useDocumentTitle('서비스 이용약관', 'RESERVE 서비스 이용약관 — 회원 자격, 예약과 결제, 취소·환불, 책임 범위를 안내합니다.');
@@ -22,7 +28,7 @@ const Terms = () => {
         <PageContainer size="md" paddingTop="60px">
             <div style={{ marginBottom: 40 }}>
                 <PageTitle>서비스 이용약관</PageTitle>
-                <Text style={{ color: colors.text.tertiary, fontSize: fontSize.sm }}>시행일: 2026년 1월 1일 · 최종 수정: 2026년 10월 7일</Text>
+                <Text style={{ color: colors.text.tertiary, fontSize: fontSize.sm }}>시행일: 2026년 1월 1일 · 최종 수정: 2026년 10월 27일</Text>
             </div>
 
             <Section title="제1조 (목적)">
@@ -49,9 +55,12 @@ const Terms = () => {
                 <Paragraph>노쇼(예약 후 미방문)가 반복될 경우 서비스 이용이 제한될 수 있습니다.</Paragraph>
             </Section>
 
-            <Section title="제4조 (결제 및 환불)">
-                <Paragraph>일부 가게는 예약 시 예약금(노쇼 방지금) 결제를 요구할 수 있습니다. 결제는 외부 전자결제대행사(PG)인 주식회사 카카오페이의 결제 창을 통해 안전하게 처리되며, 서비스는 이용자의 실제 카드 정보나 계좌 정보를 서버에 저장하지 않습니다.</Paragraph>
-                <Paragraph>가게 사정으로 인해 예약을 거절하거나 취소할 경우, 결제된 예약금은 카카오페이 시스템을 통해 전액 환불 처리됩니다. 환불 소요 시간은 카드사 정책에 따라 다를 수 있습니다.</Paragraph>
+            <Section id="payments" title="제4조 (예약·결제 및 취소·환불 안내)">
+                <Paragraph>가게가 예약금을 설정한 경우 결제가 필요하며, 0원인 경우 결제 없이 예약할 수 있습니다. 결제는 포트원 연동을 통해 토스페이먼츠·카카오페이 등 선택한 결제사에서 처리합니다. 서비스는 카드번호·CVC·결제 계좌 비밀번호를 입력받거나 저장하지 않습니다.</Paragraph>
+                <Paragraph>결제 전 가게·예약 일시·인원·금액과 가게에서 고지한 취소·환불 기준을 확인해야 합니다. 결제 성공과 가게의 예약 승인은 구분되며, 예약 확정 여부는 내 예약에서 확인할 수 있습니다.</Paragraph>
+                <Paragraph>정상 방문 환불이 적용되는 예약은 QR 체크인과 이용 완료를 확인한 뒤 보증금 전액의 환불을 요청합니다. 가게의 자동 완료 설정에 따라 이용 종료 후 처리하거나 사업자가 직접 완료 처리합니다. 기존 예약에 새 환불 정책을 일괄 적용하지 않습니다.</Paragraph>
+                <Paragraph>가게가 예약을 거절하거나 가게 사정으로 취소하면 결제된 예약금의 전액 환불을 요청합니다. 이용자 취소·노쇼는 예약 시 고지된 기준과 관련 법령을 따르며, 법령상 소비자의 권리를 제한하는 조건을 우선 적용하지 않습니다. 환불 요청·확정과 실제 입금 시점은 구분하며 처리 기간은 결제 수단에 따라 달라집니다.</Paragraph>
+                <Paragraph>광고의 신청 기간·금액·취소·환불 조건은 광고 신청 화면의 안내를 확인해야 합니다. TEST 가상 정산은 시험용 계산이며 실제 계좌로 지급하지 않습니다. 시험 결제의 처리 방법은 해당 결제사 화면의 안내를 따릅니다.</Paragraph>
             </Section>
 
             <Section title="제5조 (서비스 이용 제한 및 계정 정지)">
@@ -79,7 +88,7 @@ const Terms = () => {
             </Section>
 
             <Section title="제8조 (권리 귀속)">
-                <Paragraph>서비스 내 모든 콘텐츠, UI, 상표 등에 대한 권리는 서비스 개발자(한재은)에게 귀속됩니다. 단, 오픈소스 라이선스(MIT, Apache 2.0 등)가 적용된 구성 요소는 각 라이선스 조건을 따릅니다.</Paragraph>
+                <Paragraph>서비스가 직접 제작한 UI와 콘텐츠의 권리는 서비스 개발자(한재은)에게 귀속됩니다. 이용자가 작성한 콘텐츠와 외부 사진·서체·상표의 권리는 각 권리자에게 있으며, 오픈소스 구성 요소는 해당 라이선스 조건을 따릅니다.</Paragraph>
             </Section>
 
             <Section title="제9조 (문의)">

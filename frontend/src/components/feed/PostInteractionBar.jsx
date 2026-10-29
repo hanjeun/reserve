@@ -15,9 +15,9 @@ export default function PostInteractionBar({ type = 'POST', targetId, postId, on
     if (!enabled && !onShare) return null;
     return <div className="reserve-feed-interactions" data-discovery-swipe-ignore="true">
         {enabled && <ContentLikeButton type={type} targetId={targetId} />}
-        {enabled && postId && <Tooltip title="댓글 보기"><Link className="reserve-feed-interaction" to={`/feed/posts/${postId}#comments`} aria-label="댓글 보기">
+        {enabled && postId && <Link className="reserve-feed-interaction" to={`/feed/posts/${postId}#comments`} aria-label="댓글 보기">
             <InterfaceIcon name="comment" />{status.data?.commentCount > 0 && <span>{status.data.commentCount.toLocaleString('ko-KR')}</span>}
-        </Link></Tooltip>}
+        </Link>}
         {onShare && <Tooltip title="게시물 공유"><button type="button" className="reserve-feed-interaction" aria-label="게시물 공유" onClick={onShare}>
             <InterfaceIcon name="share" />
         </button></Tooltip>}

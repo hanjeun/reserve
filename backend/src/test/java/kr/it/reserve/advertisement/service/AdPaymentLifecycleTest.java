@@ -112,6 +112,118 @@ class AdPaymentLifecycleTest {
     private AdPaymentAttempt attempt() { return attempts.findByMerchantUid(uid).orElseThrow(); }
     private AdStatus adStatus() { return ads.findById(adId).orElseThrow().getStatus(); }
 
+    @ParameterizedTest @ValueSource(strings = {"FAILED", "CANCELLED"})
+    void lookupFailurePreservesConfirmedTerminalPaymentEvidence(String pgStatus) throws Exception {
+        long cancelled = "CANCELLED".equals(pgStatus) ? 1000 : 0;
+        reports(pgStatus, cancelled);
+        payments.reconcile(uid, ownerId);
+        var state = attempt().getState();
+        var status = adStatus();
+        when(pg.getPaymentInfo(uid)).thenThrow(new PaymentException("synthetic outage", HttpStatus.BAD_GATEWAY));
+        assertThat(payments.reconcile(uid, ownerId)).isFalse();
+        assertThat(attempt().getState()).isEqualTo(state);
+        assertThat(attempt().getPgStatus()).isEqualTo(pgStatus);
+        assertThat(attempt().getCancelledAmount()).isEqualTo(cancelled);
+        assertThat(attempt().getNextCheckAt()).isNull();
+        assertThat(adStatus()).isEqualTo(status);
+        verify(pg, never()).cancelPayment(anyString(), any(), anyString(), anyString());
+    }
+
+    @Test void confirmedFailedAttemptIsNotReopenedByRepeatedExpiry() throws Exception {
+        reports("FAILED", 0);
+        payments.reconcile(uid, ownerId);
+        var checkedAt = attempt().getLastCheckedAt();
+        tx.executeWithoutResult(ignored -> em.find(Advertisement.class, adId)
+                .setStartDate(ServiceTime.today().minusDays(1)));
+
+        advertisementService.cancelUnpaidOverdueAds();
+        ledger.expire(adId);
+        advertisementService.cancelUnpaidOverdueAds();
+
+        assertThat(adStatus()).isEqualTo(AdStatus.CANCELLED);
+        assertThat(attempt().getState()).isEqualTo(AdPaymentAttempt.State.FAILED);
+        assertThat(attempt().getIssueCode()).isNull();
+        assertThat(attempt().getNextCheckAt()).isNull();
+        assertThat(attempt().getLastCheckedAt()).isEqualTo(checkedAt);
+        verify(pg, times(1)).getPaymentInfo(uid);
+        verify(pg, never()).cancelPayment(anyString(), any(), anyString(), anyString());
+    }
+
+    @Test void failedPgResponseCannotRestoreAnExpiredCancelledAd() throws Exception {
+        tx.executeWithoutResult(ignored -> em.find(Advertisement.class, adId)
+                .setStartDate(ServiceTime.today().minusDays(1)));
+        ledger.expire(adId);
+        assertThat(attempt().getState()).isEqualTo(AdPaymentAttempt.State.REVIEW_REQUIRED);
+        assertThat(attempt().isCancelRequested()).isFalse();
+
+        reports("FAILED", 0);
+        payments.reconcile(uid, ownerId);
+        advertisementService.cancelUnpaidOverdueAds();
+        ledger.expire(adId);
+
+        assertThat(adStatus()).isEqualTo(AdStatus.CANCELLED);
+        assertThat(attempt().getState()).isEqualTo(AdPaymentAttempt.State.FAILED);
+        assertThat(attempt().getNextCheckAt()).isNull();
+        assertThat(lifecycle.inspectStore(storeId).canClose()).isTrue();
+        assertThatThrownBy(() -> ledger.prepare(adId, ownerId, "test-store"))
+                .isInstanceOf(AdvertisementException.class);
+        verify(pg, never()).cancelPayment(anyString(), any(), anyString(), anyString());
+    }
+
+    @Test void latePaidAfterExpiredFailureStillRequiresReviewWithoutAutomaticRefund() throws Exception {
+        reports("FAILED", 0);
+        payments.reconcile(uid, ownerId);
+        tx.executeWithoutResult(ignored -> em.find(Advertisement.class, adId)
+                .setStartDate(ServiceTime.today().minusDays(1)));
+        ledger.expire(adId);
+
+        reports("PAID", 0);
+        payments.reconcile(uid, null);
+
+        assertThat(adStatus()).isEqualTo(AdStatus.REVIEW_REQUIRED);
+        assertThat(attempt().getState()).isEqualTo(AdPaymentAttempt.State.REVIEW_REQUIRED);
+        assertThat(attempt().getIssueCode()).isEqualTo("PAID_WITHOUT_DELIVERABLE_AD");
+        assertThat(attempt().getNextCheckAt()).isNotNull();
+        assertThat(lifecycle.inspectStore(storeId).canClose()).isFalse();
+        verify(pg, never()).cancelPayment(anyString(), any(), anyString(), anyString());
+    }
+
+    @Test void unknownPgResultAfterExpiryRemainsUnresolved() {
+        tx.executeWithoutResult(ignored -> em.find(Advertisement.class, adId)
+                .setStartDate(ServiceTime.today().minusDays(1)));
+        ledger.expire(adId);
+        when(pg.getPaymentInfo(uid)).thenThrow(new PaymentException("test", HttpStatus.NOT_FOUND));
+
+        assertThat(payments.reconcile(uid, null)).isFalse();
+        ledger.expire(adId);
+
+        assertThat(adStatus()).isEqualTo(AdStatus.CANCELLED);
+        assertThat(attempt().getState()).isEqualTo(AdPaymentAttempt.State.REVIEW_REQUIRED);
+        assertThat(attempt().getIssueCode()).isEqualTo("PG_NOT_FOUND_NOT_TERMINAL");
+        assertThat(attempt().getNextCheckAt()).isNotNull();
+        assertThat(lifecycle.inspectStore(storeId).canClose()).isFalse();
+        verify(pg, never()).cancelPayment(anyString(), any(), anyString(), anyString());
+    }
+
+    @Test void localCapacityRejectionPreservesRefundKeyAndNeverReactivatesCancelledAd() throws Exception {
+        reports("PAID", 0);
+        payments.verify(uid, ownerId);
+        when(pg.cancelPayment(eq(uid), eq(1000), anyString(), anyString()))
+                .thenThrow(new PortoneService.RequestNotSentException()).thenReturn(new PortoneV2CancelResponse());
+        payments.cancel(adId, ownerId);
+        assertThat(adStatus()).isEqualTo(AdStatus.REFUND_PENDING);
+        assertThat(attempt().getRefundDispatchedAt()).isNull();
+        String originalKey = attempt().getRefundKey();
+        assertThat(originalKey).isNotBlank();
+        payments.reconcile(uid, ownerId);
+        assertThat(attempt().getRefundKey()).isEqualTo(originalKey);
+        assertThat(attempt().getRefundDispatchedAt()).isNotNull();
+        assertThat(adStatus()).isEqualTo(AdStatus.REFUND_PENDING);
+        verify(pg, times(2)).cancelPayment(eq(uid), eq(1000), anyString(), eq(originalKey));
+        payments.reconcile(uid, ownerId);
+        verify(pg, times(2)).cancelPayment(eq(uid), eq(1000), anyString(), eq(originalKey));
+    }
+
     @Test void readyReuseAndFailedRetryKeepEveryIssuedUid() throws Exception {
         reports("READY", 0);
         assertThat(payments.prepare(adId, ownerId).getMerchantUid()).isEqualTo(uid);
@@ -119,6 +231,7 @@ class AdPaymentLifecycleTest {
         reports("FAILED", 0);
         String nextUid = payments.prepare(adId, ownerId).getMerchantUid();
         assertThat(nextUid).isNotEqualTo(uid);
+        assertThat(nextUid).matches("[A-Za-z0-9]{1,40}");
         assertThat(attempts.findByAdIdOrderByIdAsc(adId)).hasSize(2);
         assertThat(attempt().getState()).isEqualTo(AdPaymentAttempt.State.FAILED);
         // 이전 UID의 늦은 PAID는 새 광고 활성화가 아니라 대사 사유가 된다.

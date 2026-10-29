@@ -1,5 +1,7 @@
 package kr.it.reserve.reservation;
 
+import kr.it.reserve.global.error.ReservationException;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
@@ -157,7 +159,8 @@ class ReservationRefundTransactionTest {
             default -> throw new IllegalArgumentException(action);
         }
 
-        assertThat(payments.findById(paymentId).orElseThrow().getStatus()).isEqualTo(Payment.PaymentStatus.REFUNDED);
+        org.awaitility.Awaitility.await().atMost(5, TimeUnit.SECONDS).untilAsserted(() ->
+                assertThat(payments.findById(paymentId).orElseThrow().getStatus()).isEqualTo(Payment.PaymentStatus.REFUNDED));
         assertThat(payments.findById(paymentId).orElseThrow().refundedSoFar()).isEqualTo(10_000);
         Reservation result = reservationRepository.findById(reservationId).orElseThrow();
         assertThat(result.getStatus()).isEqualTo(action.equals("store-reject")
@@ -170,9 +173,31 @@ class ReservationRefundTransactionTest {
     }
 
     @Test
+    void capacityRejectionRetainsUnsentIntentAndRetriesWithTheSameKey() throws Exception {
+        Long attemptId = prepareCancellationWithoutCallback();
+        String key = "reserve-refund-attempt-" + attemptId;
+        when(pg.cancelPayment(eq(uid), eq(10_000), anyString(), eq(key), eq(10_000)))
+                .thenThrow(new PortoneService.RequestNotSentException()).thenReturn(succeeded());
+        paymentService.dispatchPreparedRefund(attemptId);
+        assertThat(attempts.findById(attemptId).orElseThrow().isReadyToDispatch()).isTrue();
+        assertThat(payments.findById(paymentId).orElseThrow().getStatus()).isEqualTo(Payment.PaymentStatus.REFUND_PENDING);
+        paymentService.dispatchPreparedRefund(attemptId);
+        assertThat(attempts.findByPaymentIdOrderByCreatedAtAsc(paymentId)).singleElement()
+                .extracting(RefundAttempt::getStatus).isEqualTo(RefundAttempt.Status.SUCCEEDED);
+        assertThat(payments.findById(paymentId).orElseThrow().getStatus()).isEqualTo(Payment.PaymentStatus.REFUNDED);
+        verify(pg, times(2)).cancelPayment(eq(uid), eq(10_000), anyString(), eq(key), eq(10_000));
+    }
+
+    @Test
     void unknownPgOutcomeKeepsCancellationAndDepositForReadOnlyReconciliation() {
         when(pg.cancelPayment(eq(uid), anyInt(), anyString(), anyString(), eq(10_000))).thenThrow(new IllegalStateException("mock timeout"));
         reservations.cancelReservation(reservationId, customer);
+        org.awaitility.Awaitility.await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
+            verify(pg, times(1)).cancelPayment(eq(uid), eq(10_000), anyString(), anyString(), eq(10_000));
+            var executor = (org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor) org.springframework.test.util.ReflectionTestUtils.getField(dispatch, "executor");
+            assertThat(executor.getActiveCount()).isZero();
+            assertThat(executor.getQueueSize()).isZero();
+        });
 
         assertThat(reservationRepository.findById(reservationId).orElseThrow().getStatus())
                 .isEqualTo(Reservation.ReservationStatus.CANCELLED);
@@ -294,8 +319,13 @@ class ReservationRefundTransactionTest {
             return json.readValue("{\"status\":\"READY\",\"amount\":{\"total\":10000}}", PortoneV2PaymentResponse.class);
         });
 
+        Long storeId = tx.execute(ignored -> reservationRepository.findById(reservationId).orElseThrow().getStore().getId());
+        var day = ServiceTime.today().plusDays(7);
+        assertThat(reservationRepository.sumActiveGuestsGroupedByTime(storeId, day)).hasSize(1);
         assertThat(expiry.expireIfDue(reservationId, LocalDateTime.now().plusHours(1)))
                 .isEqualTo(ReservationExpiryProcessor.ExpiryResult.CANCELLED);
+        assertThat(reservationRepository.sumActiveGuestsGroupedByTime(storeId, day)).isEmpty();
+        verify(pg, never()).cancelPayment(anyString(), anyInt(), anyString(), anyString());
         assertThat(payments.findById(paymentId).orElseThrow().getStatus()).isEqualTo(Payment.PaymentStatus.FAILED);
         assertThat(reservationRepository.findById(reservationId).orElseThrow().getStatus()).isEqualTo(Reservation.ReservationStatus.CANCELLED);
     }
@@ -412,7 +442,8 @@ class ReservationRefundTransactionTest {
 
         assertThat(reservationRepository.findById(reservationId).orElseThrow().getStatus()).isEqualTo(Reservation.ReservationStatus.PENDING);
         assertThat(reservationRepository.findById(healthy[0]).orElseThrow().getStatus()).isEqualTo(Reservation.ReservationStatus.CANCELLED);
-        assertThat(payments.findById(healthy[1]).orElseThrow().getStatus()).isEqualTo(Payment.PaymentStatus.REFUNDED);
+        org.awaitility.Awaitility.await().atMost(5, TimeUnit.SECONDS).untilAsserted(() ->
+                assertThat(payments.findById(healthy[1]).orElseThrow().getStatus()).isEqualTo(Payment.PaymentStatus.REFUNDED));
         assertThat(attempts.findByPaymentIdOrderByCreatedAtAsc(healthy[1])).singleElement()
                 .extracting(RefundAttempt::getStatus).isEqualTo(RefundAttempt.Status.SUCCEEDED);
         verify(pg, times(1)).cancelPayment(eq(healthyUid), eq(10_000), anyString(), anyString(), eq(10_000));
@@ -606,14 +637,15 @@ class ReservationRefundTransactionTest {
             });
             var approval = executor.submit(() -> {
                 assertThat(financialMemberHeld.await(10, TimeUnit.SECONDS)).isTrue();
-                reservations.approveReservation(reservationId, owner);
+                assertThatThrownBy(() -> reservations.approveReservation(reservationId, owner))
+                        .isInstanceOf(ReservationException.class).hasMessageContaining("예약금 결제 후 승인");
                 return true;
             });
             preparation.get(15, TimeUnit.SECONDS);
             assertThat(approval.get(15, TimeUnit.SECONDS)).isTrue();
         }
         assertThat(reservationRepository.findById(reservationId).orElseThrow().getStatus())
-                .isEqualTo(Reservation.ReservationStatus.CONFIRMED);
+                .isEqualTo(Reservation.ReservationStatus.PENDING);
         assertThat(payments.findReadyByReservationId(reservationId)).hasSize(1);
         verify(pg, never()).getPaymentInfo(anyString());
         verify(pg, never()).cancelPayment(anyString(), anyInt(), anyString(), anyString(), anyInt());

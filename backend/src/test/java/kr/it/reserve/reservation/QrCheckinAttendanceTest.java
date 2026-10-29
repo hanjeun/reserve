@@ -52,7 +52,7 @@ class QrCheckinAttendanceTest {
                 mock(EmailService.class),
                 mock(MemberRepository.class),
                 mock(AuditLogService.class),
-                tokenProvider, mock(kr.it.reserve.reservation.admission.ReservationCreationGuard.class));
+                tokenProvider, mock(kr.it.reserve.reservation.admission.ReservationCreationGuard.class), org.mockito.Mockito.mock(kr.it.reserve.reservation.service.ReservationConsentService.class));
     }
 
     @Test

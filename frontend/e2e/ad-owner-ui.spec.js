@@ -22,6 +22,7 @@ async function mockOwnerAds(page) {
         const url = new URL(route.request().url());
         if (!url.pathname.startsWith('/api/')) return route.continue();
         let data = [];
+        if (url.pathname === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: owner, refreshPossible: false } } }); }
         if (url.pathname === '/api/member/me') data = owner;
         else if (url.pathname === '/api/stores/my') data = stores;
         else if (url.pathname === '/api/advertisements/my') {

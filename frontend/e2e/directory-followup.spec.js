@@ -48,6 +48,7 @@ async function setup(page, { holdInteractions = false } = {}) {
         requests.push({ endpoint, search: url.search, method: request.method() });
         const ok = data => route.fulfill({ json: { success: true, data } });
         if (/^\/api\/feed\/media\/\d+$/.test(endpoint)) return route.fulfill({ body: photo, contentType: 'image/webp' });
+        if (endpoint === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: user, refreshPossible: false } } }); }
         if (endpoint === '/api/member/me') return ok(user);
         if (endpoint === '/api/waiting/stores') return ok(pageOf([{ ...store, waitingTeams: teams }]));
         if (endpoint === '/api/stores') return ok(pageOf([store]));

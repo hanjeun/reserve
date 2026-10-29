@@ -33,6 +33,11 @@ class PaymentVerificationBoundaryTest {
     static class Config {
         @Bean PaymentService payments() { return mock(PaymentService.class); }
         @Bean PortoneService portone() { return mock(PortoneService.class); }
+        @Bean kr.it.reserve.payment.service.PaymentStatusService statuses() { return mock(kr.it.reserve.payment.service.PaymentStatusService.class); }
+        @Bean kr.it.reserve.payment.service.PaymentCheckoutReturnService returns(kr.it.reserve.payment.service.PaymentStatusService statuses,
+                PaymentService payments, PortoneService portone) {
+            return new kr.it.reserve.payment.service.PaymentCheckoutReturnService(statuses, payments, portone);
+        }
         @Bean PaymentVerificationService verification(PaymentService payments, PortoneService portone) {
             return new PaymentVerificationService(payments, portone);
         }
@@ -44,7 +49,22 @@ class PaymentVerificationBoundaryTest {
     @Autowired PortoneService portone;
     @Autowired PaymentVerificationService verification;
     @Autowired PlatformTransactionManager transactions;
+    @Autowired kr.it.reserve.payment.service.PaymentCheckoutReturnService returns;
+    @Autowired kr.it.reserve.payment.service.PaymentStatusService statuses;
     @BeforeEach void resetMocks() { reset(payments, portone); }
+
+    @Test void checkoutReturnDoesNotHoldTransactionDuringPgLookup() {
+        when(statuses.getStatus("reservation", "order-test", 12L)).thenReturn(
+                new kr.it.reserve.payment.dto.PaymentStatusResponse("reservation", "order-test", "READY", 10000, null, null, 0, null));
+        when(portone.getPaymentInfo("order-test")).thenAnswer(ignored -> {
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            return mock(PortoneV2PaymentResponse.class);
+        });
+        returns.check("order-test", 12L);
+        assertThatThrownBy(() -> new TransactionTemplate(transactions).execute(ignored -> returns.check("order-test", 12L)))
+                .isInstanceOf(IllegalTransactionStateException.class);
+        verify(portone, times(1)).getPaymentInfo("order-test");
+    }
 
     private PaymentVerifyDto request() {
         PaymentVerifyDto request = new PaymentVerifyDto(); request.setMerchantUid("order-test"); return request;
@@ -57,11 +77,20 @@ class PaymentVerificationBoundaryTest {
         when(portone.getPaymentInfo("order-test")).thenAnswer(ignored -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse(); return pg;
         });
-        verification.verifyByMember(request(), member);
+        var request = request(); request.setImpUid("untrusted-client-transaction");
+        verification.verifyByMember(request, member);
         var order = inOrder(payments, portone);
         order.verify(payments).prepareVerification("order-test", 12L);
         order.verify(portone).getPaymentInfo("order-test");
         order.verify(payments).completeReadyPaymentFromPg("order-test", pg, null);
+    }
+    @Test void rejectedPgIdentityNeverReachesPaymentCompletion() {
+        when(payments.prepareVerification("order-test", 12L))
+                .thenReturn(new PaymentService.VerificationSnapshot("order-test", null));
+        when(portone.getPaymentInfo("order-test")).thenThrow(new PaymentException("결제 정보 불일치", org.springframework.http.HttpStatus.CONFLICT));
+        assertThatThrownBy(() -> verification.verifyByMember(request(), Member.builder().id(12L).build()))
+                .isInstanceOf(PaymentException.class);
+        verify(payments, never()).completeReadyPaymentFromPg(anyString(), any(), any());
     }
     @Test void rejectsExistingTransactionBeforeAnyDatabaseOrPgWork() {
         assertThatThrownBy(() -> new TransactionTemplate(transactions).execute(status -> verification.verifyRedirect(request())))

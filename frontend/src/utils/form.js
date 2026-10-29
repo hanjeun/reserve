@@ -74,6 +74,8 @@ export const buildStoreFormData = (values) => {
     // 예약 슬롯 정책
     if (Object.hasOwn(values, 'maxCapacityPerSlot')) fd.append('maxCapacityPerSlot', optionalString(values.maxCapacityPerSlot));
     fd.append('autoApprovalEnabled',      boolString(values.autoApprovalEnabled));
+    if (values.autoCompletionEnabled != null) fd.append('autoCompletionEnabled', boolString(values.autoCompletionEnabled));
+    if (values.serviceDurationMinutes != null) fd.append('serviceDurationMinutes', values.serviceDurationMinutes);
     fd.append('allowLatePayment',          boolString(values.allowLatePayment));
     fd.append('allowDuplicateReservation', boolString(values.allowDuplicateReservation));
     fd.append('emailNotificationEnabled',  boolString(values.emailNotificationEnabled));

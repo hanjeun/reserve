@@ -18,6 +18,7 @@ import useMessage from '../../hooks/useMessage';
 import useAuthStore from '../../store/useAuthStore';
 import useViewModeParam from '../../hooks/useViewModeParam';
 import useDebounce from '../../hooks/useDebounce';
+import LoadingStatus from '../common/LoadingStatus';
 import { useWindowWidth } from '../../hooks/useWindowWidth';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import waitingService from '../../services/waitingService';
@@ -164,7 +165,7 @@ function MyWaitingSession({ revision, loggedIn, memberId }) {
             {mine.error && mine.data && !blockingError && <DataState compact state="error" subject="내 웨이팅 갱신" error={mine.error} onRetry={refresh} retrying={mine.isFetching} />}
         </>}>
         {blockingError ? <DataState state="error" subject="내 웨이팅" error={mine.error} onRetry={refresh} retrying={mine.isFetching} />
-                : mine.isPending ? <WaitingListSkeleton view={view} personal />
+                : mine.isPending || searchPending || mine.isPlaceholderData ? <LoadingStatus aria-label="내 웨이팅 목록을 불러오는 중"><WaitingListSkeleton view={view} personal /></LoadingStatus>
                     : rows.length ? <ul ref={listRef} className={`reserve-waiting-entries reserve-waiting-entries--${view}${view === 'cards' ? ' rsv-store-grid' : ''}`} aria-label="내 웨이팅 목록">{rows.map(render)}</ul>
                         : <DataState state="empty" kind="waiting"
                             title={status !== 'ALL' || debouncedKeyword.trim() ? '조건에 맞는 웨이팅이 없어요.' : '대기 중인 웨이팅이 없어요.'}

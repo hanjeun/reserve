@@ -14,6 +14,7 @@ test('ad payment queue separates reading, explicit processing, and refund comple
         const path = new URL(route.request().url()).pathname;
         if (!path.startsWith('/api/')) return route.continue();
         let data = { content: [], page: { totalElements: 0 } };
+        if (path === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: { id: 1, name: '검증 관리자', email: 'admin@example.test', role: 'ADMIN', termsAgreed: true }, refreshPossible: false } } }); }
         if (path === '/api/member/me') data = {
             id: 1, name: '검증 관리자', email: 'admin@example.test', role: 'ADMIN', termsAgreed: true,
         };

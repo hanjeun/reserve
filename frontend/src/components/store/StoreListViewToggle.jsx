@@ -1,12 +1,11 @@
 import PropTypes from 'prop-types';
 import { AppstoreOutlined, UnorderedListOutlined } from '../common/icons';
-import Tooltip from '../common/Tooltip';
 
 export default function StoreListViewToggle({ view, onChange, disabled = false }) {
     const isList = view === 'list';
     const label = isList ? '사진형 보기로 전환' : '목록형 보기로 전환';
     return (
-        <Tooltip title={label}><button
+        <button
             type="button"
             className="reserve-store-view-toggle"
             aria-label={label}
@@ -16,7 +15,7 @@ export default function StoreListViewToggle({ view, onChange, disabled = false }
             onClick={() => onChange(isList ? 'cards' : 'list')}
         >
             {isList ? <AppstoreOutlined aria-hidden="true" /> : <UnorderedListOutlined aria-hidden="true" />}
-        </button></Tooltip>
+        </button>
     );
 }
 

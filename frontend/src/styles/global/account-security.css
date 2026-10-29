@@ -1,0 +1,19 @@
+.reserve-auth-title .reserve-ui-icon { font-size: calc(2 * var(--reserve-icon-glyph-size, 20px)); }
+.reserve-login-tools { margin-top: -8px; margin-bottom: 16px; }
+.reserve-mfa-alternatives, .reserve-auth-secondary-actions { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 16px; margin-top: 24px; }
+.reserve-mfa-alternatives > button { min-height: 32px; }
+.reserve-mfa-verification-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
+.reserve-mfa-verification-actions > .reserve-mfa-alternatives { justify-content: flex-start; margin-top: 0; }
+.reserve-login-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.reserve-login-actions > button { min-width: 0; }
+#account-security { scroll-margin-top: 96px; }
+.reserve-mfa-flow { width: 100%; text-align: left; word-break: keep-all; }
+.reserve-mfa-flow .reserve-mfa-title { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; }
+.reserve-mfa-qr { display: flex; justify-content: center; margin: 24px 0; }
+.reserve-mfa-qr svg { display: block; width: 180px; height: 180px; max-width: 100%; background: #fff; }
+.reserve-mfa-manual-key { display: flex; flex-direction: column; gap: 8px; padding: 16px; margin-bottom: 24px; border-radius: 12px; background: var(--c-bg-subtle); }
+.reserve-mfa-manual-key > .reserve-copyable-text { align-self: flex-start; max-width: 100%; }
+.reserve-mfa-manual-key .reserve-copyable-text__value { overflow-wrap: anywhere; font-family: inherit; font-size: 14px; letter-spacing: .04em; }
+.reserve-mfa-recovery-codes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 16px; margin: 24px 0; list-style: none; border: 1px solid var(--c-border-default); border-radius: 12px; }
+.reserve-mfa-recovery-codes code { display: block; font-family: inherit; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+@media (max-width: 360px) { .reserve-login-actions { gap: 8px; } .reserve-login-actions > button { font-size: 14px; } .reserve-mfa-recovery-codes { grid-template-columns: minmax(0, 1fr); } }

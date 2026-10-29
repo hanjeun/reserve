@@ -133,6 +133,18 @@ waiting:
     customer-notice-published-at: ${WAITING_CUSTOMER_RETENTION_NOTICE_PUBLISHED_AT:}
 
 reserve:
+  reservation-retention:
+    enabled: ${RESERVE_RESERVATION_RETENTION_ENABLED:false}
+    purge-enabled: ${RESERVE_RESERVATION_RETENTION_PURGE_ENABLED:false}
+  mfa:
+    enabled: ${RESERVE_MFA_ENABLED:false}
+    rp-id: ${RESERVE_MFA_RP_ID:app.reserve.it.kr}
+    origins: ${RESERVE_MFA_ORIGINS:https://app.reserve.it.kr}
+    encryption-key: ${RESERVE_MFA_ENCRYPTION_KEY:}
+  reservation:
+    auto-completion-enabled: ${RESERVE_RESERVATION_AUTO_COMPLETION_ENABLED:false}
+  settlement:
+    test-enabled: ${RESERVE_SETTLEMENT_TEST_ENABLED:false}
   service-admission:
     # 방문 입장권 수이며 DB 연결 수나 실측 처리량이 아니다. Redis 수동 모드가 우선한다.
     enabled: ${RESERVE_SERVICE_ADMISSION_ENABLED:false}

@@ -22,12 +22,14 @@ import { advanceSession, currentSession } from '../../api/sessionScope';
 const attempt = { ticket: '22222222-2222-4222-8222-222222222222', requestId: '11111111-1111-4111-8111-111111111111', expiresAt: Date.now() + 180000 };
 const NORMAL_REQUEST = '33333333-3333-4333-8333-333333333333';
 const values = () => ({ reservationDate: dayjs().add(2, 'day'), reservationTime: '12:00', guestCount: 1 });
+const notSubmitted = { outcome: 'NOT_SUBMITTED', reservation: null };
+const reserved = reservation => ({ outcome: 'RESERVED', reservation });
 let message;
 beforeEach(() => {
     vi.clearAllMocks();
     mocks.getPendingAttempt.mockResolvedValue(null); mocks.enter.mockResolvedValue(null);
     mocks.restoreEntry.mockResolvedValue(null);
-    mocks.create.mockResolvedValue({ id: 20, depositAmount: 0 }); mocks.recover.mockResolvedValue(null);
+    mocks.create.mockResolvedValue({ id: 20, depositAmount: 0 }); mocks.recover.mockResolvedValue(notSubmitted);
     mocks.prepare.mockResolvedValue(true); mocks.requestAttempt.mockResolvedValue({ requestId: NORMAL_REQUEST, reused: false });
     message = { warning: vi.fn(), error: vi.fn(), info: vi.fn(), success: vi.fn() };
 });
@@ -36,6 +38,124 @@ function hook(initialProps = {}, path = '/store/10') {
     return renderHook(props => useStoreDetailActions({ id: '10', store: { id: 10 }, isLoggedIn: true, user: { id: 1, role: 'USER' },
         form: { setFields: vi.fn(), setFieldsValue: vi.fn() }, pay: vi.fn(), message, ...props }), { wrapper, initialProps });
 }
+
+it.each([{ success: false, cancelled: true }, { success: false }, { success: false, redirected: true },
+    { success: false, interrupted: true }])('결제를 마치지 못한 같은 신청은 기존 예약의 결제만 재시도해요 (%j)', async outcome => {
+    const reservation = { id: 20, depositAmount: 10000, depositPaid: false, status: 'PENDING' };
+    const pay = vi.fn().mockResolvedValueOnce(outcome).mockResolvedValueOnce({ success: true });
+    mocks.create.mockResolvedValue(reservation); mocks.recover.mockResolvedValue(reserved(reservation));
+    mocks.requestAttempt.mockResolvedValueOnce({ requestId: NORMAL_REQUEST, reused: false })
+        .mockResolvedValue({ requestId: NORMAL_REQUEST, reused: true });
+    const { result } = hook({ pay, store: { id: 10, noShowDeposit: 10000, allowLatePayment: false, allowDuplicateReservation: true } });
+    const selected = values();
+    await act(async () => { await result.current.onFinish(selected); });
+    expect(mocks.clearRequest).not.toHaveBeenCalled();
+    expect(message.info).toHaveBeenLastCalledWith(expect.objectContaining({ content: '예약금 결제 대기 중이에요. 결제를 완료해주세요.' }));
+    await act(async () => { await result.current.onFinish(selected); });
+    expect(mocks.create).toHaveBeenCalledOnce(); expect(mocks.prepare).toHaveBeenCalledOnce();
+    expect(mocks.recover).toHaveBeenCalledWith(expect.objectContaining({ requestId: NORMAL_REQUEST }), { signal: expect.any(AbortSignal) });
+    expect(pay).toHaveBeenCalledTimes(2);
+    expect(pay.mock.calls.map(([reservation]) => reservation.id)).toEqual([20, 20]);
+    expect(message.info).toHaveBeenLastCalledWith(expect.objectContaining({ content: '기존 미결제 예약의 결제를 이어가요.' }));
+    expect(message.success).not.toHaveBeenCalled();
+    expect(mocks.clearRequest).toHaveBeenCalledExactlyOnceWith('1:USER:10', NORMAL_REQUEST);
+});
+
+it('입장권으로 복구한 미결제 예약도 신청 키를 보존해요', async () => {
+    mocks.getPendingAttempt.mockResolvedValueOnce(attempt).mockResolvedValue(null);
+    mocks.recover.mockResolvedValue(reserved({ id: 20, depositAmount: 10000, depositPaid: false }));
+    mocks.requestAttempt.mockResolvedValue({ requestId: attempt.requestId, reused: true });
+    const pay = vi.fn().mockResolvedValue({ success: false, cancelled: true });
+    const { result } = hook({ pay, store: { id: 10, noShowDeposit: 10000, allowLatePayment: false } });
+    const selected = values();
+    await act(async () => { await result.current.onFinish(selected); await result.current.onFinish(selected); });
+    expect(mocks.requestAttempt).toHaveBeenCalledWith('1:USER:10', expect.any(Object), attempt.requestId);
+    expect(mocks.recover.mock.calls.map(([request]) => request.requestId)).toEqual([attempt.requestId, attempt.requestId]);
+    expect(mocks.clearRequest).not.toHaveBeenCalled(); expect(mocks.create).not.toHaveBeenCalled();
+    expect(pay).toHaveBeenCalledTimes(2);
+    expect(message.info).toHaveBeenLastCalledWith(expect.objectContaining({ content: '기존 미결제 예약의 결제를 이어가요.' }));
+});
+
+it.each([
+    { depositPaid: true, status: 'CONFIRMED' },
+    { depositPaid: false, status: 'CANCELLED' },
+    { depositPaid: false, status: 'REJECTED' },
+    { depositPaid: false, status: 'COMPLETED' },
+    { depositPaid: false, status: 'NO_SHOW' },
+])('결제 완료·종료 예약의 복구는 새 결제를 열지 않아요 (%j)', async prior => {
+    mocks.requestAttempt.mockResolvedValue({ requestId: NORMAL_REQUEST, reused: true });
+    mocks.recover.mockResolvedValue(reserved({ id: 20, depositAmount: 10000, ...prior }));
+    const pay = vi.fn(); const { result } = hook({ pay });
+    await act(async () => { await result.current.onFinish(values()); });
+    expect(pay).not.toHaveBeenCalled(); expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.clearRequest).toHaveBeenCalledWith('1:USER:10', NORMAL_REQUEST);
+    expect(mocks.navigate).toHaveBeenCalledWith('/my-reservations');
+});
+
+it.each([false, true])('종료가 확인된 신청은 새 키와 입장·정원 관문으로 재예약해요 (입장권=%s)', async campaign => {
+    const nextKey = '44444444-4444-4444-8444-444444444444';
+    if (campaign) mocks.getPendingAttempt.mockResolvedValue(attempt);
+    mocks.requestAttempt.mockResolvedValueOnce(campaign ? { requestId: nextKey, reused: false } : { requestId: NORMAL_REQUEST, reused: true })
+        .mockResolvedValue({ requestId: nextKey, reused: false });
+    mocks.recover.mockResolvedValue({ outcome: 'CLOSED', reservation: null });
+    const { result } = hook();
+    await act(async () => { await result.current.onFinish(values()); });
+    expect(mocks.clearRequest).toHaveBeenNthCalledWith(1, '1:USER:10', campaign ? attempt.requestId : NORMAL_REQUEST);
+    expect(mocks.complete).toHaveBeenCalledWith(expect.objectContaining({ requestId: campaign ? attempt.requestId : NORMAL_REQUEST }));
+    expect(mocks.prepare).toHaveBeenCalledOnce();
+    expect(mocks.enter).toHaveBeenCalledOnce();
+    expect(mocks.create).toHaveBeenCalledOnce();
+    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ requestId: nextKey }));
+    expect(mocks.create.mock.calls[0][0].admissionTicket).toBeUndefined();
+    expect(mocks.prepare.mock.invocationCallOrder[0]).toBeLessThan(mocks.create.mock.invocationCallOrder[0]);
+});
+
+it('종료된 신청 뒤 정원이 아직 없으면 새 예약을 전송하지 않아요', async () => {
+    mocks.requestAttempt.mockResolvedValue({ requestId: NORMAL_REQUEST, reused: true });
+    mocks.recover.mockResolvedValue({ outcome: 'CLOSED', reservation: null });
+    mocks.prepare.mockResolvedValue(false);
+    const { result } = hook();
+    await act(async () => { await result.current.onFinish(values()); });
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.enter).not.toHaveBeenCalled();
+});
+
+it.each([null, {}, { outcome: 'RESERVED', reservation: null }, { outcome: 'CLOSED', reservation: { id: 20 } }])(
+    '불명확한 복구 응답은 새 신청 근거로 사용하지 않아요 (%j)', async response => {
+        mocks.requestAttempt.mockResolvedValue({ requestId: NORMAL_REQUEST, reused: true });
+        mocks.recover.mockResolvedValue(response);
+        const { result } = hook();
+        await act(async () => { await result.current.onFinish(values()); });
+        expect(mocks.create).not.toHaveBeenCalled();
+        expect(mocks.prepare).not.toHaveBeenCalled();
+        expect(mocks.clearRequest).not.toHaveBeenCalled();
+        expect(message.error).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining('이전 예약 상태') }));
+    });
+
+it('일반 404는 종료된 신청으로 간주하지 않고 한국어로 안내해요', async () => {
+    mocks.requestAttempt.mockResolvedValue({ requestId: NORMAL_REQUEST, reused: true });
+    mocks.recover.mockRejectedValue(Object.assign(new Error('Not Found'), { status: 404 }));
+    const { result } = hook();
+    await act(async () => { await result.current.onFinish(values()); });
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.clearRequest).not.toHaveBeenCalled();
+    expect(message.error).toHaveBeenCalledWith(expect.objectContaining({ content: '이전 예약 상태를 확인하지 못했어요. 내 예약에서 확인해주세요.' }));
+});
+
+it('재예약 결과를 기다리는 중 연속 클릭해도 새 신청은 한 번만 전송해요', async () => {
+    let finish;
+    mocks.requestAttempt.mockResolvedValueOnce({ requestId: NORMAL_REQUEST, reused: true })
+        .mockResolvedValue({ requestId: '44444444-4444-4444-8444-444444444444', reused: false });
+    mocks.recover.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    const { result } = hook();
+    let first;
+    await act(async () => { first = result.current.onFinish(values()); });
+    await waitFor(() => expect(finish).toBeTypeOf('function'));
+    await act(async () => { await result.current.onFinish(values()); });
+    await act(async () => { finish({ outcome: 'CLOSED', reservation: null }); await first; });
+    expect(mocks.recover).toHaveBeenCalledOnce();
+    expect(mocks.create).toHaveBeenCalledOnce();
+});
 
 it('restores only the selected slot notice after returning without submitting or opening a queue', async () => {
     const selected = values();
@@ -95,7 +215,7 @@ it('does not book after queue cancellation or a failed campaign check', async ()
 });
 it('recovers a committed result with the original key before asking Redis for admission', async () => {
     mocks.getPendingAttempt.mockResolvedValue(attempt);
-    mocks.recover.mockResolvedValue({ id: 20, depositAmount: 0 });
+    mocks.recover.mockResolvedValue(reserved({ id: 20, depositAmount: 0 }));
     const { result } = hook();
     await act(async () => { await result.current.onFinish(values()); });
     expect(mocks.recover).toHaveBeenCalledWith(expect.objectContaining({ admissionTicket: attempt.ticket, requestId: attempt.requestId }), { signal: expect.any(AbortSignal) });
@@ -181,12 +301,12 @@ it('checks common capacity before campaign entry and preserves the form when com
 
 it('recovers a reused normal key without common admission or any new reservation write', async () => {
     mocks.requestAttempt.mockResolvedValue({ requestId: NORMAL_REQUEST, reused: true });
-    mocks.recover.mockResolvedValue({ id: 21, depositAmount: 0 });
+    mocks.recover.mockResolvedValue(reserved({ id: 21, depositAmount: 0 }));
     const { result } = hook();
     await act(async () => { await result.current.onFinish(values()); });
     expect(mocks.recover).toHaveBeenCalledWith(expect.objectContaining({ requestId: NORMAL_REQUEST }), { signal: expect.any(AbortSignal) });
     expect(mocks.prepare).not.toHaveBeenCalled(); expect(mocks.enter).not.toHaveBeenCalled();
-    expect(mocks.create).not.toHaveBeenCalled(); expect(mocks.clearRequest).toHaveBeenCalledWith('1:USER:10');
+    expect(mocks.create).not.toHaveBeenCalled(); expect(mocks.clearRequest).toHaveBeenCalledWith('1:USER:10', NORMAL_REQUEST);
     expect(mocks.navigate).toHaveBeenCalledWith('/my-reservations');
 });
 
@@ -267,7 +387,7 @@ it('preserves the original campaign key if admission is no longer configured aft
 
 it('recovers the committed campaign key after a lost response even if the campaign is later disabled', async () => {
     mocks.getPendingAttempt.mockResolvedValueOnce(attempt).mockResolvedValue(null);
-    mocks.recover.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 23, depositAmount: 0 });
+    mocks.recover.mockResolvedValueOnce(notSubmitted).mockResolvedValueOnce(reserved({ id: 23, depositAmount: 0 }));
     mocks.create.mockRejectedValueOnce(new Error('응답을 받지 못했어요.'));
     mocks.requestAttempt.mockImplementation(async (_scope, _payload, submitted) => ({ requestId: submitted ?? attempt.requestId, reused: submitted == null }));
     const { result } = hook();

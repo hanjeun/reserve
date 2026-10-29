@@ -28,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ReservationManagementPaginationTest {
     @Autowired private EntityManager entityManager;
     @Autowired private ReservationRepository repository;
+    @Autowired private kr.it.reserve.payment.repository.PaymentReconciliationIssueRepository issues;
 
     @ParameterizedTest
     @ValueSource(ints = {101, 201})
@@ -73,6 +74,37 @@ class ReservationManagementPaginationTest {
         var result = repository.searchForAdmin("창가검토", null, fixture.secondStore().getId(), PageRequest.of(0, 15));
         assertThat(result.getTotalElements()).isEqualTo(1);
         assertThat(result.getContent()).hasSize(1);
+    }
+
+    @Test
+    void expiredPersonalFieldsCannotBeUsedAsAManagementSearchOracle() {
+        Fixture fixture = fixture(1);
+        Reservation expired = repository.searchForStoreOwner(fixture.owner(), "", null, null, PageRequest.of(0, 20)).getContent().getFirst();
+        expired.setUsageEndsAt(kr.it.reserve.global.common.ServiceTime.now().minusDays(31));
+        expired.setReservationDate(kr.it.reserve.global.common.ServiceTime.today().minusDays(31));
+        expired.setReservationCode("SYNTHETIC-CODE");
+        entityManager.flush(); entityManager.clear();
+        for (String keyword : List.of("customer@example.test", "검토용", "창가검토")) {
+            assertThat(repository.searchForStoreOwner(fixture.owner(), keyword, null, null, PageRequest.of(0, 20))).isEmpty();
+            assertThat(repository.searchForAdmin(keyword, null, null, PageRequest.of(0, 20))).isEmpty();
+        }
+        assertThat(repository.searchForStoreOwner(fixture.owner(), "SYNTHETIC-CODE", null, null, PageRequest.of(0, 20)).getTotalElements()).isEqualTo(1);
+        assertThat(repository.searchForAdmin("SYNTHETIC-CODE", null, null, PageRequest.of(0, 20)).getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    void orderOnlyReconciliationStillProtectsTheLinkedReservation() {
+        Fixture fixture = fixture(1);
+        Reservation reservation = repository.searchForStoreOwner(fixture.owner(), "", null, null, PageRequest.of(0,20)).getContent().getFirst();
+        entityManager.persist(kr.it.reserve.payment.entity.Payment.builder().reservation(reservation).member(reservation.getMember())
+                .amount(1000).status(kr.it.reserve.payment.entity.Payment.PaymentStatus.REFUNDED).merchantUid("synthetic-issue-order").build());
+        var issue = kr.it.reserve.payment.entity.PaymentReconciliationIssue.open("SYNTHETIC:ORDER",
+                kr.it.reserve.payment.entity.PaymentReconciliationIssue.IssueType.PAID_STATE_CONFLICT,
+                null,null,"synthetic-issue-order","SYNTHETIC",LocalDateTime.now());
+        entityManager.persist(issue); entityManager.flush();
+        assertThat(issues.existsOpenForReservation(reservation.getId())).isTrue();
+        issue.resolve(LocalDateTime.now()); entityManager.flush();
+        assertThat(issues.existsOpenForReservation(reservation.getId())).isFalse();
     }
 
     private Fixture fixture(int count) {

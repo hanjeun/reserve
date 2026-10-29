@@ -4,7 +4,7 @@ import useReducedMotion from '../../hooks/useReducedMotion';
 import { IllustrationMotionScope } from '../../hooks/illustrationMotionScope';
 
 /** 표시할 결과가 바뀔 때만 전환한다. 같은 목록의 배경 재조회는 다시 흔들지 않는다. */
-export default function AnimatedContent({ motionKey, ready = true, direction = 'up', children, ...rest }) {
+export default function AnimatedContent({ motionKey, ready = true, direction = 'up', as: Component = 'div', children, ...rest }) {
     const node = useRef(null);
     const last = useRef(motionKey);
     const pending = useRef(false);
@@ -21,7 +21,7 @@ export default function AnimatedContent({ motionKey, ready = true, direction = '
             { duration: 220, easing: 'cubic-bezier(.22,.61,.36,1)' });
         return () => motion.cancel();
     }, [motionKey, ready, reduced, direction]);
-    return <div {...rest} ref={node}><IllustrationMotionScope.Provider value={ready ? motionKey : null}>{children}</IllustrationMotionScope.Provider></div>;
+    return <Component {...rest} ref={node}><IllustrationMotionScope.Provider value={ready ? motionKey : null}>{children}</IllustrationMotionScope.Provider></Component>;
 }
 AnimatedContent.propTypes = { motionKey: PropTypes.string.isRequired, ready: PropTypes.bool,
-    direction: PropTypes.oneOf(['up', 'down']), children: PropTypes.node };
+    as: PropTypes.elementType, direction: PropTypes.oneOf(['up', 'down']), children: PropTypes.node };

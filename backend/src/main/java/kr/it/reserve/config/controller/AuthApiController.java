@@ -25,6 +25,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -45,6 +46,7 @@ public class AuthApiController {
     private final CookieUtil cookieUtil;
     @org.springframework.beans.factory.annotation.Autowired
     private kr.it.reserve.member.service.LoginMethodService loginMethods;
+    @org.springframework.beans.factory.annotation.Autowired private kr.it.reserve.member.mfa.MfaService mfa;
     private static final String ACCESS_TOKEN_COOKIE = "access_token";
 
     /**
@@ -65,8 +67,27 @@ public class AuthApiController {
         return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
     }
 
+    public record SessionStatus(MemberResponse member, boolean refreshPossible) { }
+    @GetMapping("/session")
+    public ApiResponse<SessionStatus> session(@AuthenticationPrincipal Member member, HttpServletRequest request, HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store");
+        String refresh = CookieUtil.getCookie(request, REFRESH_TOKEN_COOKIE);
+        var inspected = member == null && refresh != null ? tokenProvider.inspectRefreshToken(refresh) : null;
+        // 갱신 가능성은 화면 복구용 힌트이며 실제 인증은 기존 refresh 관문에서 다시 확인한다.
+        boolean refreshPossible = inspected != null && inspected.state() == TokenProvider.RefreshTokenState.VALID;
+        return ApiResponse.success(new SessionStatus(member == null ? null : MemberResponse.fromEntity(member), refreshPossible), "로그인 상태예요.");
+    }
+
+    public record LoginPolicy(long idleSeconds, long absoluteSeconds) { }
+    @GetMapping("/login-policy")
+    public ApiResponse<LoginPolicy> loginPolicy(HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store");
+        return ApiResponse.success(new LoginPolicy(jwtProperties.getRefreshTokenExpiration().toSeconds(),
+                jwtProperties.getAbsoluteSessionLifetime().toSeconds()), "로그인 유지 정책이에요.");
+    }
+
     @PostMapping("/login")
-    public ApiResponse<MemberResponse> login(@RequestBody Map<String, String> loginRequest,
+    public ApiResponse<?> login(@RequestBody Map<String, String> loginRequest,
                                              HttpServletRequest request, HttpServletResponse response) {
         String ip = IpExtractor.extract(request);
         if (!rateLimiter.tryConsume(ip, RateLimiter.Policy.LOGIN)) {
@@ -123,7 +144,17 @@ public class AuthApiController {
             throw new MemberSuspendedException(message, status, until, member.getSuspendReason());
         }
 
-        handleTokenIssue(response, member);
+        if (mfa != null) mfa.cancel(CookieUtil.getCookie(request, "mfa_ticket"));
+        var ticket = mfa == null ? null : mfa.beginLogin(member, null, null, "true".equals(loginRequest.get("rememberMe")));
+        if (ticket != null) {
+            cookieUtil.deleteCookie(response, ACCESS_TOKEN_COOKIE);
+            cookieUtil.deleteCookie(response, REFRESH_TOKEN_COOKIE);
+            cookieUtil.addCookie(response, "mfa_ticket", ticket.value(), ticket.persistent() ? 300 : -1);
+            response.setHeader("Cache-Control", "no-store");
+            return ApiResponse.success(mfa.status(ticket.value(), null, null), "추가 인증이 필요해요.");
+        }
+        cookieUtil.deleteCookie(response, "mfa_ticket");
+        handleTokenIssue(response, member, "true".equals(loginRequest.get("rememberMe")));
         return ApiResponse.success(MemberResponse.fromEntity(member), "로그인 성공");
     }
 
@@ -148,14 +179,11 @@ public class AuthApiController {
             throw tokenService.rejectMissingCookie();
         }
 
-        // refresh도 매번 새로 받는다(회전). 쿠키 Max-Age도 함께 다시 잡아야 브라우저가
-        // 로그인 14일째에 쿠키를 지우지 않는다 — 토큰만 바꾸고 쿠키를 안 바꾸면 연장이 의미 없다.
+        // 갱신해도 최초 로그인에서 선택한 쿠키 수명을 유지한다.
         TokenService.RefreshResult result = tokenService.refresh(refreshToken);
 
-        cookieUtil.addCookie(response, ACCESS_TOKEN_COOKIE, result.accessToken(),
-                (int) jwtProperties.getAccessTokenExpiration().toSeconds());
-        cookieUtil.addCookie(response, REFRESH_TOKEN_COOKIE, result.refreshToken(),
-                (int) result.refreshMaxAge().toSeconds());
+        cookieUtil.addAuthCookies(response, result.accessToken(), result.refreshToken(),
+                (int) jwtProperties.getAccessTokenExpiration().toSeconds(), (int) result.refreshMaxAge().toSeconds(), result.persistent());
 
         // 토큰은 HttpOnly 쿠키로만 전달한다. 응답 본문에 복제하면 XSS 노출면만 넓어진다.
         return ApiResponse.success(null, "토큰 재발급 성공");
@@ -184,6 +212,7 @@ public class AuthApiController {
     public ApiResponse<Void> logout(HttpServletRequest request, HttpServletResponse response) {
         try {
         if (loginMethods != null) loginMethods.cancelOAuth(request);
+        if (mfa != null) mfa.cancel(CookieUtil.getCookie(request, "mfa_ticket"));
         for (String refreshToken : CookieUtil.getCookieValues(request, REFRESH_TOKEN_COOKIE)) {
             tokenService.revoke(refreshToken);
         }
@@ -194,6 +223,7 @@ public class AuthApiController {
         var session = request.getSession(false);
         if (session != null) session.invalidate();
         cookieUtil.deleteCookie(response, "JSESSIONID");
+        cookieUtil.deleteCookie(response, "mfa_ticket");
         }
 
         return ApiResponse.success(null, "로그아웃 성공");
@@ -202,7 +232,13 @@ public class AuthApiController {
     private void handleTokenIssue(HttpServletResponse response, Member member) {
         TokenProvider.IssuedSession pair = tokenProvider.issueSession(member, null);
 
-        cookieUtil.addCookie(response, ACCESS_TOKEN_COOKIE, pair.accessToken(), (int) jwtProperties.getAccessTokenExpiration().toSeconds());
-        cookieUtil.addCookie(response, REFRESH_TOKEN_COOKIE, pair.refreshToken(), (int) pair.refreshMaxAge().toSeconds());
+        authCookies(response, pair);
+    }
+    private void handleTokenIssue(HttpServletResponse response, Member member, boolean persistent) {
+        authCookies(response, tokenProvider.issueSession(member, null, persistent));
+    }
+    private void authCookies(HttpServletResponse response, TokenProvider.IssuedSession pair) {
+        cookieUtil.addAuthCookies(response, pair.accessToken(), pair.refreshToken(),
+                (int) jwtProperties.getAccessTokenExpiration().toSeconds(), (int) pair.refreshMaxAge().toSeconds(), pair.persistent());
     }
 }

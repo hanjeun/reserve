@@ -11,6 +11,7 @@ test('switching A to B in the same SPA cannot reuse A favorites', async ({ page 
         const path = new URL(route.request().url()).pathname;
         if (!path.startsWith('/api/')) return route.continue();
         let data = [];
+        if (path === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: account, refreshPossible: false } } }); }
         if (path === '/api/member/me') data = account;
         if (path === '/api/auth/logout') account = null;
         if (path === '/api/auth/login') {
@@ -50,6 +51,7 @@ test('an account change in another tab discards the first tab private cache', as
     await context.route('**/api/**', async route => {
         const path = new URL(route.request().url()).pathname;
         if (!path.startsWith('/api/')) return route.continue();
+        if (path === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: account, refreshPossible: false } } }); }
         let data = [];
         if (path === '/api/member/me') data = account;
         if (path === '/api/favorites/my') data = [{
@@ -82,6 +84,7 @@ test('logout reports a server failure but clears this device session without try
         const path = new URL(route.request().url()).pathname;
         if (!path.startsWith('/api/')) return route.continue();
         requestedPaths.push(path);
+        if (path === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: account, refreshPossible: false } } }); }
         if (path === '/api/member/me') {
             return route.fulfill({ json: { success: true, data: account } });
         }

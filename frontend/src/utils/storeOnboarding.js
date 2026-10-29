@@ -2,7 +2,7 @@ import { VALIDATION_RULES } from './validation';
 
 export const STORE_ONBOARDING_DEFAULTS = Object.freeze({
     reservationEnabled: true, bookingType: 'SLOT', reservationSlotMinutes: 30,
-    waitingIntakeMode: 'OFF', noShowDeposit: 0, autoApprovalEnabled: false,
+    waitingIntakeMode: 'OFF', noShowDeposit: 0, autoApprovalEnabled: false, autoCompletionEnabled: false, serviceDurationMinutes: 60,
     allowLatePayment: false, allowDuplicateReservation: false, emailNotificationEnabled: true,
     imageAutoplayEnabled: true, nearbyRadiusKm: 3, fullRefundDays: 3,
     partialRefundDays: 1, partialRefundRate: 50, paymentTimeoutMinutes: 30,
@@ -57,7 +57,7 @@ export const STORE_ONBOARDING_DOMAINS = Object.freeze([
         description: '예약 인원·승인·중복·예약 가능 기간과 마감을 바꿔요.', applies: reservationApplies,
         fields: [field('maxCapacityPerSlot', VALIDATION_RULES.maxCapacityPerSlot, reservationApplies),
             field('maxAdvanceBookingDays', VALIDATION_RULES.maxAdvanceBookingDays, reservationApplies),
-            field('bookingDeadlineHours', [], reservationApplies), field('autoApprovalEnabled'),
+            field('bookingDeadlineHours', [], reservationApplies), field('autoApprovalEnabled'), field('autoCompletionEnabled'), field('serviceDurationMinutes', [{ required: true, type: 'number', min: 1, max: 1440, message: '1~1,440분 사이로 입력해주세요.' }], values => reservationApplies(values) && values.bookingType !== 'DAY'),
             field('allowDuplicateReservation'), field('emailNotificationEnabled')] },
     { key: 'deposit', label: '노쇼 예약금·결제', title: '노쇼 예약금을 설정하실 건가요?', asset: 'edit-deposit',
         description: '예약금 사용 여부·금액과 결제 시점을 바꿔요.', applies: reservationApplies,
@@ -93,7 +93,7 @@ const previewFields = {
     '가게 이름': 'name', '연락처': 'phone', '주소': 'address', '가게 소개': 'description',
     '대표 이미지': 'mainImage', '상세 이미지': 'detailImages', '사진 자동 넘김': 'imageAutoplayEnabled',
     '영업 시간': 'times', '브레이크 타임': 'breakTimes', '정기 휴무': 'closedDays', '임시 휴무일': 'closedDates',
-    '운영 기간': 'operatingPeriod', '우리동네 배지 기준': 'nearbyRadiusKm', '예약 승인': 'autoApprovalEnabled',
+    '운영 기간': 'operatingPeriod', '우리동네 배지 기준': 'nearbyRadiusKm', '예약 승인': 'autoApprovalEnabled', '이용 완료': 'autoCompletionEnabled', '이용 시간': 'serviceDurationMinutes',
     '최대 인원': 'maxCapacityPerSlot', '중복 예약': 'allowDuplicateReservation', '예약 알림 메일': 'emailNotificationEnabled',
     '노쇼 예약금': 'noShowDeposit', '환불 정책': 'fullRefundDays', '결제 마감': 'paymentTimeoutMinutes',
     '나중 결제': 'allowLatePayment', '예약 범위': 'maxAdvanceBookingDays', '예약 마감': 'bookingDeadlineHours', '예약 단위': 'bookingType',

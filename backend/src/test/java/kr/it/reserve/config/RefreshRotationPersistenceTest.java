@@ -31,6 +31,7 @@ class RefreshRotationPersistenceTest {
     @Autowired private MemberRepository memberRepository;
     @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private EntityManagerFactory entityManagerFactory;
+    @Autowired private kr.it.reserve.member.mfa.MfaAccountRepository mfaAccounts;
     protected Member member;
     @BeforeEach void setUp() {
         member = memberRepository.save(Member.builder().name("회전 통합")
@@ -76,6 +77,28 @@ class RefreshRotationPersistenceTest {
         } finally {
             refreshTokenRepository.deleteById(sessionId);
             memberRepository.deleteById(other.getId());
+        }
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = Role.class, names = {"ADMIN", "BUSINESS", "USER"})
+    void enrolledMfaIsObservedInTheSameAuthenticationQueryAndOnlyRequiredForAdmin(Role role) {
+        var issued = tokenProvider.issueSession(member, null);
+        var account = new kr.it.reserve.member.mfa.MfaAccount(member.getId(), LocalDateTime.now());
+        account.enable(); mfaAccounts.saveAndFlush(account);
+        jdbcTemplate.update("UPDATE member SET role = ? WHERE member_id = ?", role.name(), member.getId());
+        var statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        boolean enabled = statistics.isStatisticsEnabled(); statistics.setStatisticsEnabled(true);
+        try {
+            long before = statistics.getPrepareStatementCount();
+            if (role == Role.ADMIN) {
+                assertThatThrownBy(() -> tokenProvider.verifyAuthentication(issued.accessToken())).isInstanceOf(AuthException.class);
+            } else {
+                assertThat(tokenProvider.verifyAuthentication(issued.accessToken()).member().getRole()).isEqualTo(role);
+            }
+            assertThat(statistics.getPrepareStatementCount() - before).isEqualTo(1);
+        } finally {
+            statistics.setStatisticsEnabled(enabled); mfaAccounts.deleteById(member.getId());
         }
     }
     @Test void rotationGraceAndReuseRevocationAreCommittedWithoutRawTokenStorage() {

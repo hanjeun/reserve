@@ -3,6 +3,9 @@ import { Typography } from 'antd';
 import Tooltip from '../common/Tooltip';
 import { FileTextOutlined, NumberOutlined, UserOutlined, TeamOutlined, CalendarOutlined, ClockCircleOutlined } from '../common/icons';
 import ReservationStatusBadge from './ReservationStatusBadge';
+import PaymentCountdown from './PaymentCountdown';
+import useReservationPaymentState from '../../hooks/useReservationPaymentState';
+import { filterReservationActions, reservationActionNotice } from './reservationActions';
 import { formatCurrency, formatTime, getThumbnailUrl } from '../../utils';
 import { colors, radius, fontSize, fontWeight } from '../../styles/tokens';
 import { useWindowWidth } from '../../hooks';
@@ -20,27 +23,25 @@ const ReservationRow = ({ reservation, onOpenDetail, renderActions, extraNote, s
     const {
         storeName, storeMainImageUrl, depositAmount, depositPaid, status, specialRequest,
         reservationCode, reservationDate, reservationTime, memberName, guestCount,
-        allowLatePayment, paymentTimeoutMinutes,
     } = reservation;
 
-    // 예약금이 있는데 아직 결제되지 않은 승인 대기 건.
     const unpaid = depositAmount > 0 && !depositPaid && status === 'PENDING';
-    // 나중 결제를 허용하지 않고 양수 제한 시간이 있는 미결제 대기 예약만 자동 취소 대상이다.
-    // "시각"이 아니라 "분"으로 적는다 — 서버 컨테이너에 TZ 설정이 없어 createdAt이 UTC로 내려올 수 있다.
-    const timeout = paymentTimeoutMinutes ?? 30;
-    const timeoutNote = unpaid && !allowLatePayment && timeout > 0
-        ? `${timeout}분 내 결제`
-        : null;
 
-    const actionsNode = renderActions ? renderActions(isWide) : null;
+    const paymentState = useReservationPaymentState(reservation);
+    const actionsNode = filterReservationActions(renderActions?.(isWide), paymentState.expired);
     const hasActions = actionsNode != null && (!Array.isArray(actionsNode) || actionsNode.length > 0);
+    const notice = reservationActionNotice(reservation, paymentState.expired, hasActions);
+    const noticeNode = notice && <span role="status" className="reserve-reservation-action-notice">
+        <ClockCircleOutlined aria-hidden="true" />{notice}
+    </span>;
 
     // 상세 진입은 가게명 버튼의 행 전체 오버레이로 공유하고 독립 액션은 그 위에 둔다.
 
     return (
-        <div className="reserve-tap-card" style={styles.row} data-list-item-id={`reservation:${reservation.id}`}>
+        <div className="reserve-tap-card reserve-reservation-row" style={styles.row} data-list-item-id={`reservation:${reservation.id}`}>
+            <div className="reserve-reservation-row__action-guard" aria-hidden="true" />
             <div style={styles.mainRow}>
-                <div style={isWide ? styles.imgWrapWide : styles.imgWrap}>
+                <div className="reserve-reservation-row-image" style={isWide ? styles.imgWrapWide : styles.imgWrap}>
                     <LoadingImage src={getThumbnailUrl(storeMainImageUrl)} alt="" style={styles.img} />
                 </div>
 
@@ -73,7 +74,7 @@ const ReservationRow = ({ reservation, onOpenDetail, renderActions, extraNote, s
                             <span style={styles.ellipsis}>{reservationCode || '눌러서 상세 보기'}</span>
                         </div>
                         <span style={styles.priceGroup}>
-                            {timeoutNote && <Text style={styles.timeout}>({timeoutNote})</Text>}
+                            <PaymentCountdown reservation={reservation} state={paymentState} style={styles.timeout} />
                             <Text strong style={styles.price}>{formatCurrency(depositAmount)}</Text>
                         </span>
                     </div>
@@ -86,7 +87,7 @@ const ReservationRow = ({ reservation, onOpenDetail, renderActions, extraNote, s
                             {showMemberInfo && isWide && (
                                 <>
                                     <UserOutlined style={styles.metaIcon} />
-                                    <span style={styles.ellipsis}>{memberName}</span>
+                                    <span style={styles.ellipsis}>{reservation.personalInfoHidden ? '조회 기간 만료' : memberName}</span>
                                     <span style={styles.dot}>·</span>
                                     <TeamOutlined style={styles.metaIcon} />
                                     <span style={styles.fixedText}>{guestCount}명</span>
@@ -100,14 +101,16 @@ const ReservationRow = ({ reservation, onOpenDetail, renderActions, extraNote, s
                             {isWide && <ClockCircleOutlined style={styles.metaIcon} />}
                             <span style={styles.fixedText}>{formatTime(reservationTime)}</span>
                         </div>
-                        {hasActions && (
+                        {(hasActions || notice) && (
                             // 상태 변경 도구를 눌러 상세까지 열리지 않게 한다.
 
                             // 실행 도구 영역은 interactions.css의 예약 행 규칙을 따른다.
                             <div
                                 className="reserve-reservation-actions"
                                 style={isWide ? styles.actionGroupWide : styles.actionGroup}
+                                onClick={event => event.stopPropagation()}
                             >
+                                {noticeNode}
                                 {actionsNode}
                             </div>
                         )}
@@ -182,17 +185,17 @@ const styles = {
     fixedText: { flexShrink: 0, whiteSpace: 'nowrap' },
 
     // 오른쪽 요소들 — 절대 줄어들지 않는다(줄어드는 건 왼쪽뿐)
-    priceGroup: { display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 },
+    priceGroup: { display: 'inline-flex', alignItems: 'baseline', gap: 6, flexShrink: 0 },
     price:      { fontSize: fontSize.base, lineHeight: 1, color: colors.text.primary, whiteSpace: 'nowrap' },
-    timeout:    { fontSize: fontSize.xs, lineHeight: 1, color: colors.warning.main, whiteSpace: 'nowrap' },
+    timeout:    { fontSize: fontSize.xs, lineHeight: 1, whiteSpace: 'nowrap' },
     // 액션을 한 줄로 유지해 카드 높이를 일정하게 한다.
 
     // 좁은 화면에서도 날짜·시간과 실행 도구가 겹치지 않을 간격을 둔다.
 
-    actionGroup: { display: 'flex', gap: 6, flexWrap: 'nowrap', justifyContent: 'flex-end', flexShrink: 0 },
+    actionGroup: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap', justifyContent: 'flex-end', flexShrink: 0 },
     // PC는 폭 제약이 전혀 없다 — 3줄 영역 1080px 중 버튼그룹이 198px뿐이라 874px이 남는다.
     // 모바일 때문에 좁힌 gap 6을 PC까지 끌고 갈 이유가 없어서 여기서만 넉넉하게 준다.
-    actionGroupWide: { display: 'flex', gap: 14, flexWrap: 'nowrap', justifyContent: 'flex-end', flexShrink: 0 },
+    actionGroupWide: { display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'nowrap', justifyContent: 'flex-end', flexShrink: 0 },
 
     noteRow: { display: 'flex', justifyContent: 'flex-end' },
 };

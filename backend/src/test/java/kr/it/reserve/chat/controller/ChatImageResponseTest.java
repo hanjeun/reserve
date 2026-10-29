@@ -2,12 +2,32 @@ package kr.it.reserve.chat.controller;
 
 import kr.it.reserve.chat.service.ChatImageService;
 import kr.it.reserve.chat.service.ChatImageFilename;
+import kr.it.reserve.config.util.SecurityUtil;
+import kr.it.reserve.global.ratelimit.RateLimiter;
+import kr.it.reserve.member.entity.Member;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ContentDisposition;
 import java.nio.charset.StandardCharsets;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ChatImageResponseTest {
+    @Test void headRechecksAccessWithoutDispatchingAnImageRead() throws Exception {
+        var images = mock(ChatImageService.class);
+        var member = Member.builder().id(1L).build();
+        try (var security = mockStatic(SecurityUtil.class)) {
+            security.when(() -> SecurityUtil.getCurrentMember("로그인이 필요해요.")).thenReturn(member);
+            var mvc = MockMvcBuilders.standaloneSetup(new ChatImageController(images, mock(RateLimiter.class))).build();
+            mvc.perform(head("/api/chat/images/33")).andExpect(status().isNoContent())
+                    .andExpect(header().string("Cache-Control", "no-store")).andExpect(content().bytes(new byte[0]));
+            verify(images).assertReadable(member, 33L);
+            verify(images, never()).read(any(), any());
+        }
+    }
+
     @Test void authenticatedPhotoNeverUsesPublicCachingAndHasSafeMimeHeaders() {
         var response = ChatImageController.imageResponse(new ChatImageService.ImageContent(new byte[]{1}, "image/png"));
         assertThat(response.getHeaders().getCacheControl()).isEqualTo("no-store");

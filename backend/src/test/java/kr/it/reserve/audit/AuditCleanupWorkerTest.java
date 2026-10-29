@@ -51,7 +51,6 @@ class AuditCleanupWorkerTest {
                 .expiresAt(now.minusSeconds(1))
                 .build();
         when(auditLogRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(softDelete));
-        when(paymentRepository.existsByReservationId(9L)).thenReturn(true);
 
         assertThat(worker.deleteOneItem(1L, now)).isTrue();
 
@@ -61,6 +60,7 @@ class AuditCleanupWorkerTest {
         verify(auditLogRepository).save(saved.capture());
         assertThat(saved.getValue().getAction()).isEqualTo("RETENTION_HOLD");
         assertThat(saved.getValue().getExpiresAt()).isEqualTo(now.plusDays(90));
+        verifyNoInteractions(paymentRepository);
     }
 
     @Test

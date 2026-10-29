@@ -27,6 +27,7 @@ const MessagesPage = () => {
     const skeletonShown = useSkeletonShown();
     const [animateEntry] = useState(() => !skeletonShown);
     const [closing, setClosing] = useState(false);
+    const pageRef = useRef(null);
     const completedRef = useRef(false);
     // 닫기 요청이 목적지를 주면(로고 → 홈) 닫힘 애니메이션 뒤 그곳으로 간다. 없으면 이전 화면.
     const closeTargetRef = useRef(null);
@@ -53,7 +54,11 @@ const MessagesPage = () => {
         else goBack();
     }, [goBack, navigate]);
     const requestClose = useCallback(() => {
-        if (!completedRef.current) setClosing(true);
+        if (completedRef.current) return;
+        // 닫히는 본문의 포커스를 해제한 뒤 상호작용을 막아요.
+        const focused = document.activeElement;
+        if (pageRef.current?.contains(focused)) focused.blur();
+        setClosing(true);
     }, []);
 
     useEffect(() => {
@@ -77,11 +82,12 @@ const MessagesPage = () => {
 
     return (
         <div
+            ref={pageRef}
             className={`reserve-messages-page reserve-messages-route${closing ? ' is-closing' : animateEntry ? ' is-opening' : ''}`}
             onAnimationEnd={(event) => {
                 if (event.target === event.currentTarget && closing) finishClose();
             }}
-            aria-hidden={closing || undefined}
+            inert={closing ? true : undefined}
         >
             <MessengerContent surface="page" initialSelection={initialSelection} onClose={requestClose} />
         </div>

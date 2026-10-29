@@ -1,17 +1,15 @@
 import { colors } from '../../styles/tokens';
 
 /**
- * Kakao CustomOverlay에 넣을 가게 링크를 안전한 DOM 노드로 만든다.
- * 사용자 입력을 HTML 또는 JavaScript 문자열에 합치지 않는 것이 이 함수의 보안 계약이다.
+ * 가게 이름은 HTML로 해석하지 않고 지도 복원 버튼에 표시한다.
  */
-export const createStoreOverlayContent = (storeName, mapUrl) => {
-    const link = document.createElement('a');
+export const createStoreOverlayContent = (storeName, onRestore) => {
+    const link = document.createElement('button');
     link.className = 'reserve-kakao-map-callout';
-    link.href = mapUrl;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
+    link.type = 'button';
+    link.addEventListener('click', event => { event.stopPropagation(); onRestore(); });
     link.textContent = storeName;
-    link.setAttribute('aria-label', `카카오맵에서 ${storeName} 보기`);
+    link.setAttribute('aria-label', `${storeName} 위치로 돌아가기`);
     Object.assign(link.style, {
         position: 'relative',
         display: 'inline-flex',

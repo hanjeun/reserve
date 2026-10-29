@@ -1,6 +1,4 @@
-/* 헤더와 탐색 탭은 정지하고, 도착한 화면만 짧게 들어온다.
-   코드 청크뿐 아니라 데이터 스켈레톤을 포함한 부모도 정지한다.
-   커밋된 골격은 이동 단위로 기억해서 데이터 도착 때 두 번째 등장 효과가 생기지 않는다. */
+/* 고정된 본문 부모가 골격부터 내용까지 한 번 진입해요. */
 @media (prefers-reduced-motion: no-preference) {
     /* 골격과 같은 클래스가 있어도 실제 홈의 준비된 영역만 한 번 들어온다. */
     [data-home-logo-entry='true'] [data-home-content='true'] .reserve-discovery-location,
@@ -8,19 +6,13 @@
     [data-home-logo-entry='true'] [data-home-content='true'] .reserve-discovery-shortcuts {
         animation: reserve-discovery-page-from-left 180ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
     }
-    .reserve-route-entry--from-right:not([data-skeleton-shown="true"]) > :not(.reserve-route-skeleton):not(.reserve-data-skeleton):not(:has(.reserve-skeleton-block:not(.reserve-skeleton-block--local))) {
+    .reserve-route-entry--from-right {
         animation: reserve-discovery-page-from-right 180ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
     }
-    .reserve-route-entry--from-left:not([data-skeleton-shown="true"]) > :not(.reserve-route-skeleton):not(.reserve-data-skeleton):not(:has(.reserve-skeleton-block:not(.reserve-skeleton-block--local))) {
+    .reserve-route-entry--from-left {
         animation: reserve-discovery-page-from-left 180ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
     }
 
-    .reserve-explore-page--banner-entry .reserve-explore-filters {
-        animation: reserve-discovery-page-rise 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
-    }
-    .reserve-explore-result--banner-entry {
-        animation: reserve-discovery-page-rise 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
-    }
     .reserve-explore-result--page-next {
         animation: reserve-discovery-page-from-right 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
     }
@@ -29,12 +21,9 @@
     }
 }
 
-/* 초기 데이터 표시만 생략한다. 검색·채팅의 전용 열림·닫힘, 메뉴·사진 교체는 유지한다. */
-[data-skeleton-shown="true"] .fade-in-up,
-[data-skeleton-shown="true"] .reserve-explore-page--banner-entry .reserve-explore-filters,
-[data-skeleton-shown="true"] .reserve-explore-result--banner-entry,
-[data-skeleton-shown="true"] .reserve-explore-result--page-next,
-[data-skeleton-shown="true"] .reserve-explore-result--page-previous { animation: none !important; }
+/* 초기 데이터 표시만 부모가 담당한다. 검색·채팅의 전용 열림·닫힘,
+   사용자가 누른 목록 페이지 전환, 메뉴·사진 교체는 유지한다. */
+.ant-layout-content .fade-in-up { animation: none !important; }
 
 @keyframes reserve-discovery-page-rise {
     from { opacity: 0.8; transform: translate3d(0, 10px, 0); }
@@ -50,10 +39,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .reserve-route-entry--from-right > :not(.reserve-route-skeleton):not(.reserve-data-skeleton):not(:has(.reserve-skeleton-block:not(.reserve-skeleton-block--local))),
-    .reserve-route-entry--from-left > :not(.reserve-route-skeleton):not(.reserve-data-skeleton):not(:has(.reserve-skeleton-block:not(.reserve-skeleton-block--local))),
-    .reserve-explore-page--banner-entry .reserve-explore-filters,
-    .reserve-explore-result--banner-entry,
+    .reserve-route-entry--from-right,
+    .reserve-route-entry--from-left,
     .reserve-explore-result--page-next,
     .reserve-explore-result--page-previous { animation: none !important; }
 }

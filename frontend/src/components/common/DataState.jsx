@@ -110,7 +110,7 @@ const DataState = ({
             </div>
             {action ?? (isMissingDetail ? missingAction : onRetry && (
                 <Button
-                    variant="ghost"
+                    variant={compact ? 'ghost-sm' : 'ghost'}
                     size="sm"
                     loading={retrying}
                     icon={<SyncOutlined />}

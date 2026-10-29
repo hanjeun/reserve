@@ -19,6 +19,7 @@ export const BUSINESS_TAB_QUERY_KEYS = Object.freeze({
         'statisticsStore',
         'statisticsRange',
     ]),
+    settlements: Object.freeze(['settlementStore', 'settlementPage']),
     'qr-checkin': Object.freeze([]),
     'chat-intro': Object.freeze(['chatIntroStore']),
     waiting: Object.freeze(['waitingStore', 'waitingSearch', 'waitingStatus', 'view']),

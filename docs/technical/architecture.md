@@ -1,19 +1,8 @@
 # 아키텍처
 
-RESERVE는 React 화면, Spring Boot 서버, MySQL 데이터베이스로 구성된 예약 플랫폼이에요.
-
 ## 서비스 구성
 
-~~~mermaid
-flowchart LR
-    U[사용자] --> N[Nginx]
-    N --> W[React 화면]
-    N --> A[Spring Boot API]
-    A --> D[(MySQL)]
-    A --> R[(Redis)]
-    A --> S[S3 파일 저장소]
-    S --> C[CloudFront 이미지 전송]
-~~~
+![RESERVE 아키텍처](../images/RESERVE_Architecture.png)
 
 - reserve.it.kr는 서비스 소개, app.reserve.it.kr는 예약·계정·관리 화면을 제공해요.
 - Nginx가 HTTPS 연결을 받고 화면 파일과 API 요청을 나눠 전달해요.
@@ -32,6 +21,10 @@ Redis 알림은 원본 데이터를 대신하지 않아요. 브라우저는 서�
 
 프로필·가게 사진은 공개 이미지예요. 사업자 서류와 채팅·피드 첨부파일은 권한을 확인한 뒤 제공해요.
 
+메신저 검색은 대화 상대·메시지·공개 가게를 구분해요. 개인 검색은 현재 회원·역할·대화 소유권을 매번 확인하고 숨김·차단·회수·보유기간을 적용해요. 관리자의 전체 대화 조회는 고객지원으로 한정해요. 검색어는 URL에 넣지 않고 읽기 전용 `POST /api/chat/search`로 전달하며 결과는 세션 메모리에서만 사용해요.
+
+검색한 메시지는 권한을 다시 확인해 이전 대화 위치로 열어요. 이때 새 대화 생성·읽음 처리를 하지 않으며 최신 대화로 이동하면 기존 읽음·답장 흐름을 사용해요.
+
 ## 배포
 
 GitHub Actions가 검사와 빌드를 수행해요. Lightsail의 Blue/Green 컨테이너 중 새 버전을 준비한 뒤, Nginx가 화면과 API를 함께 전환해요. 전환에 실패하면 호환성을 확인한 이전 버전으로 돌아가요.
@@ -46,5 +39,3 @@ GitHub Actions가 검사와 빌드를 수행해요. Lightsail의 Blue/Green 컨�
 | Resend | 이메일 발송 |
 | Google·Kakao·Naver | 소셜 로그인 |
 | Grafana·Loki·Alloy·Sentry | 서버 상태와 오류 관측 |
-
-코드 위치는 [코드 구조](structure.md), 검사와 배포 흐름은 [배포](deployments.md)를 보세요.

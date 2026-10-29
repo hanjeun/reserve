@@ -8,6 +8,7 @@ import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.payment.service.PaymentService;
 import kr.it.reserve.reservation.dto.ReservationCreateRequest;
+import kr.it.reserve.reservation.dto.ReservationRequestResult;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.reservation.service.ReservationService;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,7 +55,7 @@ class ReservationRecoveryTest {
         request = new ReservationCreateRequest(10L, LocalDate.now().plusDays(2), LocalTime.NOON, 1, null, false);
         request.setRequestId(KEY);
         var guard = new ReservationCreationGuard(requests, admission);
-        service = new ReservationService(reservations, stores, mock(HolidayService.class), payments, emails, members, audits, qr, guard);
+        service = new ReservationService(reservations, stores, mock(HolidayService.class), payments, emails, members, audits, qr, guard, org.mockito.Mockito.mock(kr.it.reserve.reservation.service.ReservationConsentService.class));
         reservation = Reservation.builder().id(50L).member(member).store(Store.builder().id(10L).name("synthetic").build())
                 .reservationDate(request.getReservationDate()).reservationTime(request.getReservationTime()).guestCount(1).build();
         when(members.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(member));
@@ -76,15 +78,16 @@ class ReservationRecoveryTest {
     void committedSameMemberAndPayloadRecoverWithoutAnyAdmissionTicket() {
         request.setAdmissionTicket("expired-or-unrelated-ticket");
         var result = service.recoverReservation(request, member);
-        assertThat(result.getId()).isEqualTo(50L);
-        assertThat(result.getMemberId()).isEqualTo(1L);
+        assertThat(result.outcome()).isEqualTo(ReservationRequestResult.Outcome.RESERVED);
+        assertThat(result.reservation().getId()).isEqualTo(50L);
+        assertThat(result.reservation().getMemberId()).isEqualTo(1L);
         verify(requests).findCommittedByMemberIdAndRequestKey(1L, KEY);
     }
 
     @Test
     void missingCommittedResultReturnsNullWithoutReadingOrCreatingAReservation() {
         when(requests.findCommittedByMemberIdAndRequestKey(1L, KEY)).thenReturn(Optional.empty());
-        assertThat(service.recoverReservation(request, member)).isNull();
+        assertThat(service.recoverReservation(request, member)).isEqualTo(ReservationRequestResult.notSubmitted());
         verifyNoInteractions(reservations);
     }
 
@@ -93,7 +96,7 @@ class ReservationRecoveryTest {
         var other = Member.builder().id(2L).build();
         when(members.findByIdAndDeletedAtIsNull(2L)).thenReturn(Optional.of(other));
         when(requests.findCommittedByMemberIdAndRequestKey(2L, KEY)).thenReturn(Optional.empty());
-        assertThat(service.recoverReservation(request, other)).isNull();
+        assertThat(service.recoverReservation(request, other)).isEqualTo(ReservationRequestResult.notSubmitted());
         verify(requests, never()).findCommittedByMemberIdAndRequestKey(1L, KEY);
         verifyNoInteractions(reservations);
     }
@@ -132,10 +135,46 @@ class ReservationRecoveryTest {
     }
 
     @Test
-    void aDeletedReservationCannotBeRecoveredOrRecreatedByARead() {
+    void aDeletedActiveReservationDoesNotPermitANewRequest() {
         reservation.softDelete();
         assertThatThrownBy(() -> service.recoverReservation(request, member)).isInstanceOfSatisfying(ReservationException.class,
-                error -> assertThat(error.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+                error -> assertThat(error.getStatus()).isEqualTo(HttpStatus.CONFLICT));
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = Reservation.ReservationStatus.class, names = {"CANCELLED", "REJECTED"})
+    void closedRequestsAllowANewSubmissionWithoutReturningDeletedContent(Reservation.ReservationStatus status) {
+        reservation.setStatus(status);
+        assertThat(service.recoverReservation(request, member)).isEqualTo(ReservationRequestResult.closed());
+        reservation.softDelete();
+        assertThat(service.recoverReservation(request, member)).isEqualTo(ReservationRequestResult.closed());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = Reservation.ReservationStatus.class, names = {"COMPLETED", "NO_SHOW"})
+    void aRemovedFinishedReservationEndsTheOldRequest(Reservation.ReservationStatus status) {
+        reservation.setStatus(status);
+        reservation.softDelete();
+        assertThat(service.recoverReservation(request, member)).isEqualTo(ReservationRequestResult.closed());
+    }
+
+    @Test
+    void anOverduePendingReservationStillRecoversTheSameRequestUntilCancellationIsCommitted() {
+        reservation.setDepositAmount(10000);
+        reservation.setCreatedAt(java.time.LocalDateTime.now().minusHours(1));
+        reservation.getStore().setAllowLatePayment(false);
+        var result = service.recoverReservation(request, member);
+        assertThat(result.outcome()).isEqualTo(ReservationRequestResult.Outcome.RESERVED);
+        assertThat(result.reservation().getId()).isEqualTo(50L);
+        reservation.setDepositPaid(true);
+        assertThat(service.recoverReservation(request, member).reservation().getDepositPaid()).isTrue();
+    }
+
+    @Test
+    void aMissingMappedReservationIsNotProofThatTheRequestNeverCommitted() {
+        when(reservations.findById(50L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.recoverReservation(request, member)).isInstanceOfSatisfying(ReservationException.class,
+                error -> assertThat(error.getStatus()).isEqualTo(HttpStatus.CONFLICT));
     }
 
     @Test

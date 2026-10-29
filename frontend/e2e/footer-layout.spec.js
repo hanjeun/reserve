@@ -11,6 +11,7 @@ async function mockAnonymousApi(page) {
     await page.route('**/api/**', async (route) => {
         const url = new URL(route.request().url());
         if (!url.pathname.startsWith('/api/')) return route.continue();
+        if (url.pathname === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: null, refreshPossible: false } } }); }
         if (url.pathname === '/api/member/me' || url.pathname === '/api/auth/refresh') {
             return route.fulfill({ status: 401, json: { success: false, message: '인증이 필요합니다.' } });
         }

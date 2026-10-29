@@ -57,8 +57,8 @@ public class AuditCleanupWorker {
 
     private boolean mustRetain(AuditLog item) {
         if ("RESERVATION".equalsIgnoreCase(item.getEntityType())) {
-            return paymentRepository.existsByReservationId(item.getEntityId())
-                    || reviewRepository.existsByReservationId(item.getEntityId());
+            // 예약 증거의 보유기간·분쟁·금전 관문은 예약 전용 파기 작업에서 확인해요.
+            return true;
         }
         // 과거에 덮어쓴 UID도 있어 로컬 취소/실패만으로 무결제임을 입증할 수 없다.
         return "ADVERTISEMENT".equalsIgnoreCase(item.getEntityType());

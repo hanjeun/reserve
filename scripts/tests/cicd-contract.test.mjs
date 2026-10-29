@@ -35,6 +35,31 @@ test('target app creation checks physical RAM immediately before compose and nev
     assert.equal(start['continue-on-error'], undefined);
 });
 
+
+test('v11 deployment forwards disabled feature flags and requires a dedicated MFA recovery key', () => {
+    const start = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
+    for (const name of ['RESERVE_MFA_ENABLED', 'RESERVE_MFA_RP_ID', 'RESERVE_MFA_ORIGINS', 'RESERVE_MFA_ENCRYPTION_KEY',
+        'RESERVE_RESERVATION_AUTO_COMPLETION_ENABLED', 'RESERVE_SETTLEMENT_TEST_ENABLED']) {
+        assert.ok(start.with.envs.split(',').includes(name));
+        for (const side of ['blue', 'green']) assert.ok(read('docker-compose-' + side + '.yml').includes(name + '='));
+    }
+    const source = start.with.script;
+    const beginning = source.indexOf(': "${RESERVE_MFA_ENCRYPTION_KEY:');
+    const ending = source.indexOf('# 빈 Actions', beginning);
+    assert.ok(beginning >= 0 && ending > beginning);
+    const guard = source.slice(beginning, ending);
+    const run = overrides => spawnSync(process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash',
+        ['-c', 'set -e\n' + guard], { encoding: 'utf8',
+            env: { ...process.env, RESERVE_MFA_ENCRYPTION_KEY: 'fixture-key', RESERVE_MFA_ENABLED: 'false',
+                RESERVE_RESERVATION_AUTO_COMPLETION_ENABLED: 'false', RESERVE_SETTLEMENT_TEST_ENABLED: 'false', ...overrides } });
+    assert.equal(run({}).status, 0);
+    assert.notEqual(run({ RESERVE_MFA_ENCRYPTION_KEY: '' }).status, 0);
+    for (const name of ['RESERVE_MFA_ENABLED','RESERVE_RESERVATION_AUTO_COMPLETION_ENABLED','RESERVE_SETTLEMENT_TEST_ENABLED']) {
+        assert.notEqual(run({[name]:'unknown'}).status, 0);
+        assert.match(start.env[name], /false/);
+    }
+});
+
 const bashPath = value => process.platform === 'win32'
     ? value.replaceAll('\\', '/').replace(/^([a-z]):/i, (_match, drive) => `/${drive.toLowerCase()}`) : value;
 const runDetection = overrides => {
@@ -70,7 +95,7 @@ esac`,
                     TASK_DETECTION_SCRIPT: bashPath(fileURLToPath(new URL('../detect-active-upstream.sh', import.meta.url))),
                     GITHUB_OUTPUT: bashPath(output), TASK_SSH_CALLED: bashPath(called),
                     RESERVE_SERVER_IP: 'reserve.test', EC2_SSH_KEY: 'fixture-key', RESERVE_SSH_FINGERPRINT: 'SHA256:fixture',
-                    MOCK_BLUE: '200', MOCK_GREEN: '000', MOCK_SCHEMA: 'v270-refund-v1', MOCK_FEATURE: 'waiting-signup-hidden-feed-oauth-login-session-admission-v10',
+                    MOCK_BLUE: '200', MOCK_GREEN: '000', MOCK_SCHEMA: 'v280-mfa-completion-settlement-v1', MOCK_FEATURE: 'waiting-signup-hidden-feed-oauth-login-session-admission-mfa-completion-test-settlement-v11',
                     MOCK_REMOTE_FAILURE: '0', MOCK_AMBIGUOUS: 'false', ...overrides },
             });
         assert.ifError(result.error);
@@ -455,19 +480,19 @@ test('public pages ship an indexable robots meta in the raw HTML', () => {
 });
 
 test('the live backend must be schema and refund compatible before deployment', () => {
-    assert.match(backend.steps.find(entry => entry.name === 'Build Docker image').run, /--label reserve\.schema-compat=v270-refund-v1/);
+    assert.match(backend.steps.find(entry => entry.name === 'Build Docker image').run, /--label reserve\.schema-compat=v280-mfa-completion-settlement-v1/);
     const detect = step(deployment, 'detect');
     assert.equal(detect.run, 'bash scripts/detect-active-upstream.sh');
     assert.match(detectionScript, /SCHEMA_COMPAT.*reserve\.schema-compat/);
-    assert.match(detectionScript, /"\$SCHEMA_COMPAT" != 'v270-refund-v1'/);
+    assert.match(detectionScript, /"\$SCHEMA_COMPAT" != 'v280-mfa-completion-settlement-v1'/);
 });
 
 test('automatic cutover requires recovery support for waiting, signup, private deletion, feed retention, benefit approval, interactions and managed login methods', () => {
     const build = backend.steps.find(entry => entry.name === 'Build Docker image');
     const detect = step(deployment, 'detect');
     const cutover = deployment.steps.find(entry => entry.name === 'Cut over frontend and backend');
-    assert.match(build.run, /--label reserve\.feature-compat=waiting-signup-hidden-feed-oauth-login-session-admission-v10/);
-    assert.match(detectionScript, /"\$FEATURE_COMPAT" != 'waiting-signup-hidden-feed-oauth-login-session-admission-v10'/);
+    assert.match(build.run, /--label reserve\.feature-compat=waiting-signup-hidden-feed-oauth-login-session-admission-mfa-completion-test-settlement-v11/);
+    assert.match(detectionScript, /"\$FEATURE_COMPAT" != 'waiting-signup-hidden-feed-oauth-login-session-admission-mfa-completion-test-settlement-v11'/);
     assert.ok(detectionScript.indexOf('"$FEATURE_COMPAT" !=') < detectionScript.indexOf('DETECTED_UPSTREAM='));
     assert.equal(cutover.env.CURRENT_UPSTREAM, '${{ env.CURRENT_UPSTREAM }}');
     assert.ok(cutover.with.envs.split(',').includes('CURRENT_UPSTREAM'));
@@ -475,7 +500,7 @@ test('automatic cutover requires recovery support for waiting, signup, private d
     assert.match(cutover.with.script, /for COMPATIBLE_UPSTREAM in "\$CURRENT_UPSTREAM" "\$TARGET_UPSTREAM"/);
     const compatibilityGuard = cutover.with.script.indexOf('"$FEATURE_COMPAT" !=');
     assert.ok(compatibilityGuard > 0);
-    assert.match(cutover.with.script, /"\$FEATURE_COMPAT" != 'waiting-signup-hidden-feed-oauth-login-session-admission-v10'/);
+    assert.match(cutover.with.script, /"\$FEATURE_COMPAT" != 'waiting-signup-hidden-feed-oauth-login-session-admission-mfa-completion-test-settlement-v11'/);
     assert.ok(compatibilityGuard < cutover.with.script.indexOf('trap rollback_cutover'));
     assert.ok(compatibilityGuard < cutover.with.script.indexOf('sudo touch "$ROLLBACK_DIR/cutover-started"'));
     assert.ok(deployment.steps.indexOf(detect) < deployment.steps.indexOf(cutover));
@@ -517,6 +542,12 @@ test('backend image compatibility requires private deletion, feed retention and 
     for (const entry of ['ReservationCreationGuard', 'ReservationRequest', 'AdmissionService']) {
         assert.ok(dockerfile.includes('BOOT-INF/classes/kr/it/reserve/reservation/admission/' + entry + '.class'));
     }
+    for (const entry of ['member/mfa/MfaService', 'member/mfa/MfaPasskeys', 'member/mfa/MfaPolicy',
+        'member/mfa/MfaController', 'member/mfa/MfaCredential', 'reservation/service/ReservationAutoCompletion',
+        'payment/service/TestSettlementService', 'payment/entity/TestSettlementPayout']) {
+        assert.ok(dockerfile.includes('BOOT-INF/classes/kr/it/reserve/' + entry + '.class'));
+    }
+    assert.ok(dockerfile.includes('BOOT-INF/classes/db/manual/mfa-completion-settlement.sql'));
     for (const entry of ['ServiceAdmissionService', 'ServiceAdmissionAutomaticPolicy', 'ServiceAdmissionLoadSampler']) {
         assert.ok(dockerfile.includes('BOOT-INF/classes/kr/it/reserve/global/admission/' + entry + '.class'));
     }

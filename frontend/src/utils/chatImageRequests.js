@@ -1,59 +1,96 @@
-import { getChatImageBlob } from './chatImageTransfer';
+import { assertChatImageAccess, getChatImageBlob } from './chatImageTransfer';
+import { cachedChatImage, chatImageCacheScope, forgetCachedChatImage, isChatImageScopeCurrent, rememberChatImage } from './chatImageCache';
 
 const MAX_ACTIVE = 2;
 const MAX_QUEUED = 32;
 const queue = [];
+const flights = new Map();
 let active = 0;
-
 const aborted = () => new DOMException('사진 요청을 중단했어요.', 'AbortError');
+const current = job => !job.signal.aborted && (!job.reusable || isChatImageScopeCurrent(job.scope))
+    && [...job.readers].some(reader => !reader.signal.aborted && reader.isCurrent());
 
 function drain() {
     while (active < MAX_ACTIVE && queue.length) start(queue.shift());
 }
-
-function start(job) {
-    if (job.signal.aborted || !job.isCurrent()) {
-        job.signal.removeEventListener('abort', job.cancel);
-        job.reject(aborted());
-        return;
+function remove(job) { if (flights.get(job.key) === job) flights.delete(job.key); }
+function finish(job, blob, error) {
+    remove(job);
+    for (const reader of job.readers) {
+        reader.signal.removeEventListener('abort', reader.cancel);
+        if (reader.signal.aborted || !reader.isCurrent() || job.scope.signal.aborted
+            || job.reusable && !isChatImageScopeCurrent(job.scope)) reader.reject(aborted());
+        else if (error) reader.reject(error);
+        else reader.resolve(blob);
     }
-    job.started = true;
+    job.readers.clear();
+}
+function abandon(job) {
+    if (job.readers.size) return;
+    job.controller.abort();
+    remove(job);
+    const index = queue.indexOf(job);
+    if (index !== -1) queue.splice(index, 1);
+}
+function start(job) {
+    if (!current(job)) { finish(job, null, aborted()); return; }
     active += 1;
-    // 대기 중 계정·방·가시성이 바뀌면 네트워크 요청 자체를 시작하지 않는다.
-    Promise.resolve().then(() => {
-        if (job.signal.aborted || !job.isCurrent()) throw aborted();
-        return getChatImageBlob(job.url, job.signal);
-    }).then(blob => {
-        if (job.signal.aborted || !job.isCurrent()) job.reject(aborted());
-        else job.resolve(blob);
-    }, job.reject).finally(() => {
-        active -= 1;
-        job.signal.removeEventListener('abort', job.cancel);
-        drain();
-    });
+    Promise.resolve().then(async () => {
+        if (!current(job)) throw aborted();
+        const cached = job.reusable && cachedChatImage(job.key);
+        if (cached) {
+            // 재사용 전에도 서버에서 현재 참가 권한·회수·개인 삭제 상태를 확인한다.
+            await assertChatImageAccess(job.url, job.signal);
+            const latest = chatImageCacheScope(job.url);
+            if (latest.generation !== job.scope.generation || latest.version !== job.scope.version) {
+                job.scope = latest;
+                if (!current(job)) throw aborted();
+                return getChatImageBlob(job.url, job.signal);
+            }
+            return cached;
+        }
+        const blob = await getChatImageBlob(job.url, job.signal);
+        if (job.reusable && current(job)) rememberChatImage(job.key, blob, job.scope);
+        return blob;
+    }).then(blob => finish(job, blob), error => {
+        if (job.reusable) forgetCachedChatImage(job.key);
+        finish(job, null, error);
+    }).finally(() => { active -= 1; drain(); });
 }
 
-/** 탭 안의 읽기만 두 개씩 수행한다. 대기 취소는 즉시 제거하고 실제 읽기 종료까지 슬롯을 유지한다. */
-export function requestChatImageBlob(url, signal, isCurrent) {
+/** 동시 읽기는 두 개로 제한하고 참가자 사진만 같은 세션·방 안에서 합친다. */
+export function requestChatImageBlob(url, signal, isCurrent, roomScope = '') {
     if (signal.aborted || !isCurrent()) return Promise.reject(aborted());
-    return new Promise((resolve, reject) => {
-        const job = { url, signal, isCurrent, resolve, reject, started: false };
-        job.cancel = () => {
-            if (!job.started) {
-                const index = queue.indexOf(job);
-                if (index !== -1) queue.splice(index, 1);
-                signal.removeEventListener('abort', job.cancel);
-            }
-            reject(aborted());
-        };
+    const scope = chatImageCacheScope(url);
+    const reusable = /^\/api\/(?:v1\/)?chat\/images\/[1-9]\d*$/.test(url);
+    const key = reusable ? JSON.stringify([scope.epoch, scope.generation, scope.version, roomScope, url.replace('/api/v1/', '/api/')]) : Symbol();
+    let job = flights.get(key);
+    if (!job) {
         if (active >= MAX_ACTIVE && queue.length >= MAX_QUEUED) {
             const error = new Error('사진 요청이 많아요. 잠시 후 다시 시도해주세요.');
             error.status = 429;
-            reject(error);
-            return;
+            return Promise.reject(error);
         }
-        signal.addEventListener('abort', job.cancel, { once: true });
+        const controller = new AbortController();
+        job = { key, url, scope, reusable, controller,
+            signal: AbortSignal.any([controller.signal, scope.signal]), readers: new Set() };
+        flights.set(key, job);
+    }
+    const shared = job.readers.size > 0;
+    const promise = new Promise((resolve, reject) => {
+        const reader = { signal, isCurrent, resolve, reject };
+        reader.cancel = () => {
+            signal.removeEventListener('abort', reader.cancel);
+            job.readers.delete(reader);
+            reject(aborted());
+            abandon(job);
+        };
+        job.readers.add(reader);
+        signal.addEventListener('abort', reader.cancel, { once: true });
+    });
+    if (!shared) {
         if (active < MAX_ACTIVE) start(job);
         else queue.push(job);
-    });
+    }
+    return promise;
 }

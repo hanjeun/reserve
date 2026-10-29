@@ -395,6 +395,8 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     cursor: pointer;
     font-size: 18px;
 }
+.reserve-messenger-panel-skeleton { width: 100%; }
+.reserve-messenger-panel-skeleton-copy { display: flex; flex-direction: column; gap: 18px; margin-top: 14px; }
 .reserve-messenger-shell-loading {
     height: 100%;
     display: flex;
@@ -499,7 +501,9 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     height: 64px;
     padding: 8px 16px;
 }
-.reserve-messenger-store-pagination { display: flex; justify-content: center; padding: 12px 16px; }
+.reserve-messenger-store-pagination { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 12px 16px; }
+.reserve-messenger-search-filters { flex: none; padding: 0 16px 12px; }
+.reserve-messenger-search-context { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 16px; border-bottom: 1px solid var(--c-border-light); color: var(--c-text-secondary); font-size: 13px; }
 .reserve-messenger-store-unavailable { display: block; margin-top: 4px; color: var(--c-text-secondary); font-size: 12px; }
 .reserve-messenger-store-search .reserve-messenger-row[aria-disabled='true'] { cursor: default; }
 .reserve-messenger--panel { grid-template-columns: minmax(0, 1fr); }
@@ -521,7 +525,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 .reserve-messenger-brand-cover::after { content: ''; position: absolute; inset: 48% 0 0; background: linear-gradient(transparent, var(--c-bg-paper, #fff)); pointer-events: none; }
 .reserve-messenger-avatar { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex-shrink: 0; overflow: hidden; border-radius: 50%; background: var(--c-bg-paper, #fff); color: var(--c-primary, #3182f6); font-size: 20px; }
 .reserve-messenger-avatar--store { background: var(--c-gray-100, #f2f4f6); color: var(--c-text-secondary, #4e5968); }
-.reserve-messenger-avatar--person { border-radius: 50%; background: var(--c-gray-100, #f2f4f6); color: var(--c-text-secondary, #4e5968); }
+.reserve-messenger-avatar--person, .reserve-messenger-avatar--person.reserve-messenger-thread-avatar { border-radius: 50%; background: transparent; color: var(--c-text-secondary, #4e5968); }
 .reserve-messenger-avatar img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .reserve-messenger-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .reserve-chat-sender-avatar-slot { width: 28px; min-width: 28px; align-self: flex-start; padding-top: 16px; }
@@ -1440,9 +1444,9 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 
 .reserve-store-list-row-link:active { color: var(--c-text-primary); }
 /* 링크 안의 사진·본문이 함께 눌린다. 하트·관리 액션과 미리보기 span은 제외한다. */
-a.reserve-store-list-row-link[href] { transition: transform 0.12s ease, opacity 0.12s ease; transform-origin: left center; -webkit-tap-highlight-color: transparent; }
-a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.88; }
-.reserve-store-list-row-link:hover .reserve-store-list-row-image img { opacity: 0.88; }
+a.reserve-store-list-row-link[href], .reserve-reservation-row { transition: transform 0.12s ease, opacity 0.12s ease; transform-origin: left center; -webkit-tap-highlight-color: transparent; }
+a.reserve-store-list-row-link[href]:active, .reserve-reservation-row:has(.reserve-tap-card__trigger:active) { transform: scale(0.98); opacity: 0.88; }
+.reserve-store-list-row-link:hover .reserve-store-list-row-image img, .reserve-reservation-row:has(.reserve-tap-card__trigger:hover) .reserve-reservation-row-image img { opacity: 0.88; }
 .reserve-store-list-row-image {
     display: block;
     flex: 0 0 var(--reserve-store-list-image-size);
@@ -1490,9 +1494,15 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 .reserve-info-hint-popup { --reserve-info-hint-background: #1a1f27; --reserve-info-hint-foreground: #ffffff; }
 [data-theme='dark'] .reserve-info-hint-popup { --reserve-info-hint-background: #ffffff; --reserve-info-hint-foreground: #1a1f27; }
 .reserve-info-hint-content { display: flex; flex-direction: column; gap: 2px; max-width: min(240px, calc(100vw - 48px)); color: inherit; font-size: 12px; font-weight: 400; line-height: 20px; overflow-wrap: anywhere; }
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+    .reserve-reservation-row { transform-origin: center center; }
+}
+@media (min-width: 768px) {
+    .reserve-reservation-row:has(.reserve-tap-card__trigger:active) { transform: scale(0.995); }
+}
 @media (prefers-reduced-motion: reduce) {
-    a.reserve-store-list-row-link[href] { transition: none; }
-    a.reserve-store-list-row-link[href]:active { transform: none; }
+    a.reserve-store-list-row-link[href], .reserve-reservation-row { transition: none; }
+    a.reserve-store-list-row-link[href]:active, .reserve-reservation-row:has(.reserve-tap-card__trigger:active) { transform: none; }
 }
 @media (min-width: 768px) {
     .reserve-store-list-rows { --reserve-store-list-image-size: 96px; --reserve-store-list-row-spacing: 20px; }
@@ -2391,8 +2401,9 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 /* 포스터·물체·추천 행만 미세하게 뜬다. 클릭 영역/헤더/열린 메뉴는 움직이지 않는다. */
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
     .reserve-discovery-shortcut:hover img { transform: translateY(-2px); }
-    .reserve-explore-page .reserve-card.ant-card-hoverable { transition: box-shadow 0.2s ease, transform 0.16s ease; }
-    .reserve-explore-page .reserve-card.ant-card-hoverable:hover:not(:has(.reserve-store-card-hit:active)) { transform: translateY(-2px); }
+    .reserve-explore-page .reserve-card.ant-card-hoverable, .reserve-reservation-summary-card.ant-card-hoverable { transition: box-shadow 0.2s ease, transform 0.16s ease, opacity 0.12s ease; }
+    .reserve-explore-page .reserve-card.ant-card-hoverable:hover:not(:has(.reserve-store-card-hit:active)),
+    .reserve-reservation-summary-card.ant-card-hoverable:has(.reserve-tap-card__trigger:hover):not(:has(.reserve-tap-card__trigger:active)) { transform: translateY(-2px); }
     .reserve-explore-page .reserve-card.ant-card-hoverable:active:not(:has(.reserve-store-card-hit:active)) { transform: none; }
 }
 /* 검색 전용 화면

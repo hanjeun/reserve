@@ -28,6 +28,7 @@ test('keeps the data skeleton still and moves schedule copy into store informati
     await page.route('**/api/**', async route => {
         const path = new URL(route.request().url()).pathname;
         if (!path.startsWith('/api/')) return route.continue();
+        if (path === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: null, refreshPossible: false } } }); }
         if (path === '/api/member/me' || path === '/api/auth/refresh') {
             return route.fulfill({ status: 401, json: { success: false, message: '로그인이 필요합니다.' } });
         }

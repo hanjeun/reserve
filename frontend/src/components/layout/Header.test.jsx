@@ -65,7 +65,7 @@ describe('shared wordmark and result search header', () => {
         expect(screen.getByRole('link', { name: '통합 검색' }).textContent).toBe('');
         expect(screen.queryByRole('textbox')).toBeNull();
         expect(screen.getByRole('button', { name: '로그인' })).toBeTruthy();
-        expect(screen.getByRole('button', { name: '시작하기' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: '회원가입' })).toBeTruthy();
         expect(screen.queryByRole('button', { name: '내 계정 메뉴 열기' })).toBeNull();
         expect(screen.queryByText('관심 가게')).toBeNull();
         expect(screen.queryByText('내 예약 확인')).toBeNull();
@@ -77,7 +77,7 @@ describe('shared wordmark and result search header', () => {
         expect(screen.getByLabelText('현재 경로').textContent).toBe('/login');
         unmount();
         renderHeader('/store/12');
-        fireEvent.click(screen.getByRole('button', { name: '시작하기' }));
+        fireEvent.click(screen.getByRole('button', { name: '회원가입' }));
         expect(screen.getByLabelText('현재 경로').textContent).toBe('/signup');
     });
 
@@ -86,7 +86,7 @@ describe('shared wordmark and result search header', () => {
         renderHeader('/stores');
         expect(await screen.findByRole('button', { name: '내 계정 메뉴 열기' })).toBeTruthy();
         expect(screen.queryByRole('button', { name: '로그인' })).toBeNull();
-        expect(screen.queryByRole('button', { name: '시작하기' })).toBeNull();
+        expect(screen.queryByRole('button', { name: '회원가입' })).toBeNull();
     });
 
     it.each(['/stores', '/waiting'])('edits only the current list and leaves the separate global entry blank at %s', async path => {
@@ -295,7 +295,7 @@ describe('shared wordmark and result search header', () => {
             const leaving = document.querySelector('.reserve-header-back');
             expect(leaving).toHaveClass('reserve-header-back--leaving');
             expect(leaving).toBeDisabled();
-            expect(leaving).toHaveAttribute('aria-hidden', 'true');
+            expect(leaving.closest('.reserve-header-control-slot')).toHaveAttribute('aria-hidden', 'true');
             act(() => { vi.advanceTimersByTime(180); });
             expect(document.querySelector('.reserve-header-back')).toBeNull();
         } finally {
@@ -387,4 +387,16 @@ describe('shared wordmark and result search header', () => {
         expect(logo).not.toHaveClass('reserve-header-logo--home-motion');
         scroll.mockRestore();
     });
+});
+
+it('moves focus before hiding a leaving back control and retains its closing DOM', () => {
+    reducedMotionState.value = false;
+    const { container } = renderHeader('/terms');
+    screen.getByRole('button', { name: '이전 화면으로 돌아가기' }).focus();
+    fireEvent.click(screen.getByRole('button', { name: '이동 완료' }));
+    expect(screen.getByRole('link', { name: 'RESERVE 홈' })).toHaveFocus();
+    const slot = container.querySelector('.reserve-header-back-slot');
+    expect(slot).toHaveAttribute('aria-hidden', 'true');
+    expect(slot).toHaveAttribute('inert');
+    expect(slot.querySelector('button')).toBeDisabled();
 });

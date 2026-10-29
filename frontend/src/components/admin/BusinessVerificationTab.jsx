@@ -335,7 +335,7 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
             <DataState state="error" kind="member" subject="사업자 인증 신청" error={error}
                 onRetry={refetch} retrying={isFetching} />
         );
-    } else if (isLoading || isPlaceholderData) {
+    } else if (isLoading || isPlaceholderData || search.trim() !== debouncedSearch.trim()) {
         tableBody = (
             <AdminTableSkeleton
                 rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}

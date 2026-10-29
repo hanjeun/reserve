@@ -15,6 +15,8 @@ vi.mock('../../services/storeService', () => ({ default: { getStores: vi.fn() } 
 
 vi.mock('../../services', () => ({
     chatService: {
+        search: vi.fn(),
+        getSearchContext: vi.fn(),
         listConversations: vi.fn(),
         listStoreInbox: vi.fn(),
         getSupport: vi.fn(),
@@ -71,6 +73,7 @@ describe('MessengerContent', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         storeService.getStores.mockReset().mockResolvedValue(page());
+        chatService.search.mockResolvedValue({ conversations: [], messages: [], moreConversations: false, moreMessages: false, page: 0 });
         Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1200 });
         Element.prototype.scrollIntoView = vi.fn();
         useAuthStore.setState({
@@ -124,8 +127,8 @@ describe('MessengerContent', () => {
         const { container } = renderMessenger({ surface: 'panel' });
         expect(screen.queryByRole('button', { name: '가게에 문의' })).not.toBeInTheDocument();
         await user.click(screen.getByRole('button', { name: '대화', exact: true }));
-        await user.click(screen.getByRole('button', { name: '가게 찾기' }));
-        const input = screen.getByRole('searchbox', { name: '가게 이름 또는 주소' });
+        await user.click(screen.getByRole('button', { name: '채팅 검색' }));
+        const input = screen.getByRole('searchbox', { name: '대화 상대, 메시지, 가게 검색' });
         expect(storeService.getStores).not.toHaveBeenCalled();
         expect(chatService.getStore).not.toHaveBeenCalled();
         expect(chatService.getSupport).not.toHaveBeenCalled();
@@ -144,16 +147,16 @@ describe('MessengerContent', () => {
         const thread = container.querySelector('.reserve-messenger-thread');
         finishThreadAnimation(thread);
         expect(container.querySelector('.reserve-messenger')).not.toHaveClass('is-opening-thread');
-        fireEvent.click(screen.getByRole('button', { name: '가게 검색으로 돌아가기' }));
+        fireEvent.click(screen.getByRole('button', { name: '검색 결과로 돌아가기' }));
         expect(container.querySelector('.reserve-messenger')).toHaveClass('is-returning-to-list');
         finishThreadAnimation(thread);
         expect(useMessengerStore.getState()).toMatchObject({ activeThread: false, storeSearch: { visible: true } });
-        expect(await screen.findByRole('searchbox', { name: '가게 이름 또는 주소' })).toHaveValue('공방');
+        expect(await screen.findByRole('searchbox', { name: '대화 상대, 메시지, 가게 검색' })).toHaveValue('공방');
         await waitFor(() => expect(screen.getByRole('button', { name: '이웃 공방, 문의 시작' })).toHaveFocus());
         expect(container.querySelector('.reserve-messenger-store-search .reserve-messenger-list-scroll').scrollTop).toBe(88);
         expect(chatService.sendStore).not.toHaveBeenCalled();
         await user.click(screen.getByRole('button', { name: '취소' }));
-        expect(await screen.findByRole('button', { name: '가게 찾기' })).toBeInTheDocument();
+        expect(await screen.findByRole('button', { name: '채팅 검색' })).toBeInTheDocument();
         expect(useMessengerStore.getState().storeSearch).toBeNull();
     });
 
@@ -166,17 +169,40 @@ describe('MessengerContent', () => {
         storeService.getStores.mockResolvedValue(page([{ id: 42, name: '이웃 공방', ownerId: 8, status: 'ACTIVE' }]));
         chatService.getStore.mockRejectedValue(Object.assign(new Error('store unavailable'), { status }));
         const { container } = renderMessenger({ surface: 'panel' });
-        await user.click(screen.getByRole('button', { name: '가게 찾기' }));
-        await user.type(screen.getByRole('searchbox', { name: '가게 이름 또는 주소' }), '공방');
+        await user.click(screen.getByRole('button', { name: '채팅 검색' }));
+        await user.type(screen.getByRole('searchbox', { name: '대화 상대, 메시지, 가게 검색' }), '공방');
         fireEvent.click(await screen.findByRole('button', { name: '이웃 공방, 문의 시작' }));
         expect(await screen.findByText(title)).toBeInTheDocument();
         const thread = container.querySelector('.reserve-messenger-thread');
         finishThreadAnimation(thread);
-        fireEvent.click(screen.getByRole('button', { name: '가게 검색으로 돌아가기' }));
+        fireEvent.click(screen.getByRole('button', { name: '검색 결과로 돌아가기' }));
         finishThreadAnimation(thread);
-        expect(await screen.findByRole('searchbox', { name: '가게 이름 또는 주소' })).toHaveValue('공방');
+        expect(await screen.findByRole('searchbox', { name: '대화 상대, 메시지, 가게 검색' })).toHaveValue('공방');
         await user.click(screen.getByRole('button', { name: '대화 목록으로 돌아가기' }));
-        expect(await screen.findByRole('button', { name: '가게 찾기' })).toBeInTheDocument();
+        expect(await screen.findByRole('button', { name: '채팅 검색' })).toBeInTheDocument();
+        expect(chatService.sendStore).not.toHaveBeenCalled();
+    });
+
+    it('opens a searched message without creating a room or marking unseen messages read', async () => {
+        const user = userEvent.setup();
+        useMessengerStore.getState().showConversations();
+        chatService.search.mockResolvedValue({ conversations: [], messages: [
+            { type: 'MESSAGE', id: 81, messageId: 81, roomId: 12, storeId: 42, kind: 'store', title: '이웃 공방', description: '도자기 문의' },
+        ], moreConversations: false, moreMessages: false, page: 0 });
+        chatService.getSearchContext.mockResolvedValue({ roomId: 12, storeId: 42, type: 'STORE', title: '이웃 공방',
+            viewerRole: 'MEMBER', canSend: true, hasOlderMessages: false,
+            messages: [{ id: 81, senderRole: 'OWNER', content: '도자기 문의', createdAt: '2026-10-20T10:00:00' }] });
+        const { container } = renderMessenger({ surface: 'panel' });
+        await user.click(screen.getByRole('button', { name: '채팅 검색' }));
+        await user.type(screen.getByRole('searchbox', { name: '대화 상대, 메시지, 가게 검색' }), '도자기');
+        fireEvent.click(await screen.findByRole('button', { name: '이웃 공방, 메시지 보기' }));
+        await waitFor(() => expect(chatService.getSearchContext).toHaveBeenCalledWith(12, 81));
+        expect(await screen.findByText('도자기 문의')).toBeInTheDocument();
+        expect(container.querySelector('[data-message-id="81"]')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '최신 대화로 이동' })).toBeInTheDocument();
+        expect(chatService.getStore).not.toHaveBeenCalled();
+        expect(chatService.getSupport).not.toHaveBeenCalled();
+        expect(chatService.markRead).not.toHaveBeenCalled();
         expect(chatService.sendStore).not.toHaveBeenCalled();
     });
 
@@ -187,13 +213,13 @@ describe('MessengerContent', () => {
             .mockResolvedValue(page([]));
         renderMessenger({ surface: 'panel' });
         await user.click(screen.getByRole('button', { name: '대화', exact: true }));
-        await user.click(screen.getByRole('button', { name: '가게 찾기' }));
-        await user.type(screen.getByRole('searchbox', { name: '가게 이름 또는 주소' }), '공방');
+        await user.click(screen.getByRole('button', { name: '채팅 검색' }));
+        await user.type(screen.getByRole('searchbox', { name: '대화 상대, 메시지, 가게 검색' }), '공방');
         expect(await screen.findByRole('alert')).toHaveTextContent('가게 검색');
-        expect(screen.queryByText('검색한 가게가 없어요.')).not.toBeInTheDocument();
+        expect(screen.queryByText('검색 결과가 없어요.')).not.toBeInTheDocument();
         await user.click(screen.getByRole('button', { name: '다시 불러오기' }));
-        expect(await screen.findByText('검색한 가게가 없어요.')).toBeInTheDocument();
-        expect(screen.getByRole('searchbox', { name: '가게 이름 또는 주소' })).toHaveValue('공방');
+        expect(await screen.findByText('검색 결과가 없어요.')).toBeInTheDocument();
+        expect(screen.getByRole('searchbox', { name: '대화 상대, 메시지, 가게 검색' })).toHaveValue('공방');
         expect(chatService.getStore).not.toHaveBeenCalled();
     });
 

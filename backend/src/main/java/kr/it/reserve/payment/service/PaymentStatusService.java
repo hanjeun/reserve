@@ -5,6 +5,8 @@ import kr.it.reserve.advertisement.repository.AdPaymentAttemptRepository;
 import kr.it.reserve.global.error.PaymentException;
 import kr.it.reserve.payment.dto.PaymentStatusResponse;
 import kr.it.reserve.payment.repository.PaymentRepository;
+import kr.it.reserve.reservation.entity.Reservation;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -30,7 +32,7 @@ public class PaymentStatusService {
                     .filter(value -> value.getMember() != null && value.getMember().getId().equals(memberId))
                     .orElseThrow(PaymentException::notFound);
             return new PaymentStatusResponse(type, payment.getMerchantUid(), payment.getStatus().name(),
-                    payment.getAmount(), payment.getPayMethod());
+                    payment.getAmount(), payment.getPayMethod(), payment.getPgProvider(), payment.refundedSoFar(), reservationSummary(payment.getReservation(), memberId));
         }
         if ("ad".equals(type)) {
             var attempt = adPaymentAttempts.findByMerchantUid(merchantUid).orElse(null);
@@ -47,11 +49,25 @@ public class PaymentStatusService {
                     case REFUNDED -> "REFUNDED";
                     case REFUND_PENDING -> "REFUND_PENDING";
                     case REVIEW_REQUIRED -> REVIEW_REQUIRED_STATUS;
-                    case PAID -> merchantUid.equals(ad.getMerchantUid()) ? ad.getStatus().name() : REVIEW_REQUIRED_STATUS;
+                    case PAID -> merchantUid.equals(ad.getMerchantUid()) ? switch (ad.getStatus()) {
+                        case ACTIVE, EXPIRED, SUSPENDED -> ad.getStatus().name();
+                        default -> REVIEW_REQUIRED_STATUS;
+                    } : REVIEW_REQUIRED_STATUS;
                 };
             }
-            return new PaymentStatusResponse(type, merchantUid, status, attempt == null ? ad.getAmount() : attempt.getAmount(), null);
+            return new PaymentStatusResponse(type, merchantUid, status, attempt == null ? ad.getAmount() : attempt.getAmount(), null, null, null, null);
         }
         throw new PaymentException("결제 유형을 확인해주세요.", HttpStatus.BAD_REQUEST);
+    }
+
+    private PaymentStatusResponse.ReservationSummary reservationSummary(Reservation reservation, Long memberId) {
+        if (reservation == null) return null;
+        if (reservation.getMember() == null || !Objects.equals(reservation.getMember().getId(), memberId)) {
+            throw PaymentException.notFound();
+        }
+        return new PaymentStatusResponse.ReservationSummary(
+                reservation.getStore() == null ? null : reservation.getStore().getName(), reservation.getReservationCode(),
+                reservation.getReservationDate(), reservation.getReservationTime(), reservation.getGuestCount(),
+                reservation.getMember().getName());
     }
 }

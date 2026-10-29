@@ -1,6 +1,7 @@
 import PersonalSearchHandoff from '../Search/PersonalSearchHandoff';
 import { PageTitle, PageDescription } from '../../components/common/PageTypography';
 import LoadingStatus from '../../components/common/LoadingStatus';
+import TextLink from '../../components/common/TextLink';
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { Typography } from 'antd';
@@ -24,7 +25,9 @@ import { useWindowWidth } from '../../hooks/useWindowWidth';
 import { isBlockingListReadError, queryErrorStatus } from '../../hooks/liveUpdateQueries';
 import useDebounce from '../../hooks/useDebounce';
 import useAuthStore from '../../store/useAuthStore';
+import usePaymentIncompleteNotice from '../../hooks/usePaymentIncompleteNotice.jsx';
 import paymentService from '../../services/paymentService';
+import { handleApiError } from '../../utils/errorHandler';
 import api from '../../api/axios';
 import { formatCurrency } from '../../utils';
 import { API_ENDPOINTS, RESERVATION_STATUS_FILTER_OPTIONS, RESERVATION_SORT_OPTIONS } from '../../constants';
@@ -131,13 +134,16 @@ const withToolbarParam = (current, key, value) => {
 };
 
 // 목록 결과 — 빈 안내 또는 카드/목록형 항목들.
-const ReservationResults = ({ filtered, view, filtersActive, renderItem }) => {
+const ReservationResults = ({ filtered, view, filtersActive, renderItem, onResetFilters }) => {
     if (filtered.length === 0) {
         return (
             <DataState state="empty" kind="reservation"
                 title={filtersActive
                     ? '조건에 맞는 예약이 없어요.'
-                    : '예약 내역이 없어요.'} />
+                    : '예약 내역이 없어요.'}
+                action={filtersActive
+                    ? <Button variant="ghost" onClick={onResetFilters}>검색 조건 초기화</Button>
+                    : <TextLink to="/stores">예약할 가게 찾기</TextLink>} />
         );
     }
     return (
@@ -158,7 +164,8 @@ const ReservationHistory = () => {
     const [urlSearchParams, setUrlSearchParams] = useSearchParams();
     const { message, confirm } = useMessage();
     const { user } = useAuthStore();
-    const { pay, paying } = usePayment();
+    const { pay, paying, paymentDialog } = usePayment();
+    usePaymentIncompleteNotice();
     useDocumentTitle('내 예약');
 
     const statusFilter = resolveOptionParam(urlSearchParams, 'status', STATUS_OPTIONS, 'ALL');
@@ -210,7 +217,7 @@ const ReservationHistory = () => {
 
     const handlePay = async (res) => {
         await pay(
-            { id: res.id, storeName: res.storeName, depositAmount: res.depositAmount },
+            res,
             { name: user?.name, email: user?.email, phone: user?.phone }
         );
     };
@@ -226,7 +233,7 @@ const ReservationHistory = () => {
                     await api.delete(API_ENDPOINTS.RESERVATION.REMOVE(res.id));
                     message.success('목록에서 제거됐어요.');
                     void refetch();
-                } catch { message.error('제거에 실패했어요.'); }
+                } catch (error) { handleApiError(error, message, '제거에 실패했어요.'); }
             },
         });
     };
@@ -304,8 +311,9 @@ const ReservationHistory = () => {
         return <ReservationRow {...itemProps} renderActions={() => actions} />;
     };
 
+    const resultsLoading = loading || keyword.trim() !== debouncedKeyword.trim();
     let listBody;
-    if (loading) {
+    if (resultsLoading) {
         listBody = (
             <LoadingStatus aria-label="예약 목록을 불러오는 중"><div aria-hidden="true">
                 {view === 'cards'
@@ -323,12 +331,17 @@ const ReservationHistory = () => {
         listBody = (
             <ReservationResults filtered={reservations} view={view}
                 filtersActive={statusFilter !== 'ALL' || Boolean(debouncedKeyword.trim())}
+                onResetFilters={() => {
+                    setKeyword('');
+                    setUrlSearchParams(current => withToolbarParam(current, 'status', 'ALL'));
+                }}
                 renderItem={renderReservationItem} />
         );
     }
 
     return (
-        <section ref={listRef} aria-label="내 예약 목록" aria-busy={loading || refetching}>
+        <section ref={listRef} aria-label="내 예약 목록" aria-busy={resultsLoading || refetching}>
+            {paymentDialog}
             <ReservationListingToolbar view={view}
                 initialLoading={loading}
                 onViewChange={setView}
@@ -338,7 +351,7 @@ const ReservationHistory = () => {
                 count={loading || !hasData || blockingError ? undefined : total} disabled={loading} />
             <FilterToolbar
                 autoRefreshDomain="RESERVATION"
-                search={{ value: keyword, onChange: e => { setKeyword(e.target.value); setToolbarParam('page', 1); }, placeholder: '가게명, 예약번호로 검색', disabled: loading }}
+                search={{ value: keyword, onChange: e => { setKeyword(e.target.value); setToolbarParam('page', 1); }, placeholder: '가게명, 예약번호로 검색' }}
                 onReload={refetch}
                 loading={loading || refetching}
                 initialLoading={loading}
@@ -391,8 +404,8 @@ const MyReservations = () => {
                 next.set('tab', value);
                 return next;
             })} /></div>
-        <PersonalSearchHandoff key={revision} />
-        {waiting ? <MyWaiting key={revision} /> : <ReservationHistory key={revision} />}
+        <PersonalSearchHandoff key={`search:${revision}`} />
+        {waiting ? <MyWaiting key={`waiting:${revision}`} /> : <ReservationHistory key={`history:${revision}`} />}
     </PageContainer>;
 };
 

@@ -19,6 +19,38 @@ class SecurityConfigAuthorizationTest {
     private MockMvc mockMvc;
 
     @Test
+    void neutralSessionReadIsPublicWhilePersonalDetailsAndWritesStayProtected() throws Exception {
+        for (String prefix : new String[]{"/api", "/api/v1"}) {
+            mockMvc.perform(get(prefix + "/auth/session")).andExpect(status().isOk())
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.refreshPossible").value(false));
+            mockMvc.perform(post(prefix + "/auth/session")).andExpect(status().isUnauthorized());
+            mockMvc.perform(get(prefix + "/member/me")).andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Test
+    void onlyReadOnlyLoginPolicyIsPublicIncludingVersionedAliases() throws Exception {
+        for (String prefix : new String[]{"/api", "/api/v1"}) {
+            mockMvc.perform(get(prefix + "/auth/login-policy"))
+                    .andExpect(status().isOk())
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.idleSeconds").isNumber());
+            mockMvc.perform(post(prefix + "/auth/login-policy")).andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Test
+    void globalReservationReadRejectsNonAdminRolesIncludingAliases() throws Exception {
+        for (String prefix : new String[]{"/api", "/api/v1"}) {
+            mockMvc.perform(get(prefix + "/reservations/admin/page")).andExpect(status().isUnauthorized());
+            for (String role : new String[]{"USER", "BUSINESS"}) {
+                mockMvc.perform(get(prefix + "/reservations/admin/page")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("fixture").roles(role)))
+                        .andExpect(status().isForbidden());
+            }
+        }
+    }
+
+    @Test
     void authenticatedCookieWithoutBrowserOriginProofIsForbidden() throws Exception {
         mockMvc.perform(post("/api/chat/support/open")
                         .cookie(new jakarta.servlet.http.Cookie("access_token", "invalid-test-token")))

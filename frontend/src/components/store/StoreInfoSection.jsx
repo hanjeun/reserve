@@ -1,11 +1,12 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import TextLink from '../common/TextLink';
+import DetailInfoRows from '../common/DetailInfoRows';
 import {
     CalendarOutlined, ClockCircleOutlined, CreditCardOutlined, EnvironmentOutlined,
     FieldTimeOutlined, HourglassOutlined, RollbackOutlined, TeamOutlined, ThunderboltOutlined,
 } from '../common/icons';
-import { colors, fontSize, fontWeight } from '../../styles/tokens';
+import { colors } from '../../styles/tokens';
 
 const hasPositiveNumber = value => Number.isFinite(Number(value)) && Number(value) > 0;
 
@@ -102,7 +103,6 @@ const buildCapacityRow = (store) => {
     return { Icon: TeamOutlined, label: '최대 인원', value: `${store.maxCapacityPerSlot}명` };
 };
 
-/** 행 값 렌더러 — IIFE를 컴포넌트로 대체해 StoreInfoSection 복잡도 감소 */
 const RowValue = ({ row }) => {
     if (row.isMultiLine) {
         const last = row.value[row.value.length - 1];
@@ -129,40 +129,13 @@ const buildStoreInfoRows = store => [
         buildDeadlineRow(store), buildPaymentTimeoutRow(store), buildSlotRow(store), buildCapacityRow(store)]),
 ].filter(Boolean);
 
-// 가게 상세 정보 섹션 — Cognitive Complexity: 30 → ~5
 const StoreInfoSection = ({ store, extraRows = [], transformRows, renderAction }) => {
     const defaultRows = [...extraRows, ...buildStoreInfoRows(store)].filter(Boolean);
     const rows = transformRows ? transformRows(defaultRows) : defaultRows;
 
     if (rows.length === 0) return null;
 
-    return (
-        <div style={infoStyles.card}>
-            {rows.map((row, i) => (
-                <React.Fragment key={row.label}>
-                    <div style={infoStyles.row}>
-                        <row.Icon style={infoStyles.icon} />
-                        <span style={infoStyles.label}>{row.label}</span>
-                        <div style={{ ...infoStyles.value, ...(row.highlight ? infoStyles.highlight : {}) }}>
-                            <RowValue row={row} />
-                        </div>
-                        {renderAction?.(row)}
-                    </div>
-                    {i < rows.length - 1 && <div style={infoStyles.divider} />}
-                </React.Fragment>
-            ))}
-        </div>
-    );
-};
-
-const infoStyles = {
-    card: { padding: '4px 0' },
-    row:  { display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 0' },
-    icon: { fontSize: 14, color: colors.text.tertiary, flexShrink: 0, marginTop: 3 },
-    label: { fontSize: fontSize.sm, color: colors.text.tertiary, flexShrink: 0, width: 'var(--reserve-store-info-label-width, 80px)', lineHeight: '22px' },
-    value: { fontSize: fontSize.sm, color: colors.text.secondary, flex: 1, minWidth: 0, overflowWrap: 'anywhere', lineHeight: '22px' },
-    highlight: { color: colors.primary.main, fontWeight: fontWeight.medium },
-    divider: { height: 1, background: colors.border.light },
+    return <DetailInfoRows rows={rows} renderValue={row => <RowValue row={row} />} renderAction={renderAction} />;
 };
 
 StoreInfoSection.propTypes = {

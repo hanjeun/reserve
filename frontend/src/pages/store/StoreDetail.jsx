@@ -13,6 +13,7 @@ import StoreInfoSection from '../../components/store/StoreInfoSection';
 import { ReviewList } from '../../components/review';
 import { useStoreData, useMessage, usePayment, useWindowWidth, useStoreDetailActions } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
+import usePaymentIncompleteNotice from '../../hooks/usePaymentIncompleteNotice.jsx';
 import { rememberImageHints, forgetImageHint } from '../../utils/imageHintCache';
 import { storeGalleryImages } from '../../utils/storeImages';
 import { httpStatusOf } from '../../utils/listErrorMessage';
@@ -185,6 +186,7 @@ export const StoreDetailMobileLayout = ({ sliderImages, identityProps, panelProp
 };
 
 const StoreDetail = () => {
+    usePaymentIncompleteNotice();
     const { id } = useParams();
     const [searchParams] = useSearchParams();
     // /store/abc 처럼 숫자가 아닌 id 는 API 에 보내지 않는다 — 보내면 400 이 와서
@@ -193,7 +195,7 @@ const StoreDetail = () => {
     const navigate = useNavigate();
     const { message } = useMessage();
     const { isLoggedIn, user } = useAuthStore();
-    const { pay, paying } = usePayment();
+    const { pay, paying, paymentDialog } = usePayment();
     const { store, loading, error, refetch } = useStoreData(validId ? id : null, { reservationId: searchParams.get('edit') });
     // 사진 순서·메타데이터 변경은 문서·브라우저 힌트보다 새 공개 응답을 우선한다.
     useEffect(() => {
@@ -237,6 +239,7 @@ const StoreDetail = () => {
         isEditMode,
         editingReservation,
         editLoadError,
+        bookingSectionRef,
         editRetrying,
         retryEditLoad,
     } = useStoreDetailActions({ id, store, isLoggedIn, user, form, pay, message, reservationDate, reservationTime });
@@ -264,7 +267,7 @@ const StoreDetail = () => {
     const identityProps = { store, nearby, canContact: user?.id !== store.ownerId, onContact: handleStoreContact };
     const panelProps = {
         store, form, onFinish, paying: paying || reservationSubmitting, reservationEntry, isEditMode, editingReservation,
-        editLoadError, editRetrying, onRetryEditLoad: retryEditLoad,
+        editLoadError, editRetrying, onRetryEditLoad: retryEditLoad, bookingSectionRef,
     };
     const reviewProps = {
         sectionRef: reviewSectionRef,
@@ -280,6 +283,7 @@ const StoreDetail = () => {
     return (
         <PageContainer className="reserve-store-detail" size={containerSize} paddingTop={paddingTop}>
             <AdmissionModal {...admissionModalProps} />
+            {paymentDialog}
 
             {isPC ? (
                 <StoreDetailPCLayout sliderImages={sliderImages} identityProps={identityProps}

@@ -51,13 +51,23 @@ public class ChatImageService {
 
     @Transactional(readOnly = true)
     public ImageContent read(Member member, Long messageId) {
+        return readContent(readableImage(member, messageId));
+    }
+
+    @Transactional(readOnly = true)
+    public void assertReadable(Member member, Long messageId) {
+        cipher.requireKey();
+        readableImage(member, messageId);
+    }
+
+    private ChatMessage readableImage(Member member, Long messageId) {
         var message = messages.findById(messageId)
                 .orElseThrow(() -> new ChatException("사진을 찾을 수 없어요.", HttpStatus.NOT_FOUND));
         chatService.assertImageReader(message.getRoom().getId(), member);
-        if (message.isRetracted() || chatService.isMessageHidden(member.getId(), messageId)) {
+        if (message.isRetracted() || message.getImageKey() == null || chatService.isMessageHidden(member.getId(), messageId)) {
             throw new ChatException("사진을 찾을 수 없어요.", HttpStatus.NOT_FOUND);
         }
-        return readContent(message);
+        return message;
     }
 
     /** 관리자 가게 사진 접근은 신고 검토에 반환된 메시지로만 한정한다. */

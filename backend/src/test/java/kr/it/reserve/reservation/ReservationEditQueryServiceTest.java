@@ -148,6 +148,17 @@ class ReservationEditQueryServiceTest {
         verifyNoInteractions(reservationService);
     }
 
+    @Test
+    void expiredAdvancePaymentCannotEditThroughReadContextOrPatch() {
+        reservation.setDepositAmount(10000);
+        store.setAllowLatePayment(false);
+        store.setPaymentTimeoutMinutes(1);
+        org.springframework.test.util.ReflectionTestUtils.setField(reservation, "createdAt", LocalDateTime.now().minusHours(1));
+        givenReservation();
+        denyEveryRead(member, store.getId(), HttpStatus.BAD_REQUEST);
+        assertPatchGuardRejects();
+    }
+
     private void givenReservation() {
         when(reservations.findById(23L)).thenReturn(Optional.of(reservation));
     }
@@ -165,7 +176,7 @@ class ReservationEditQueryServiceTest {
         PaymentService payments = mock(PaymentService.class);
         ReservationService mutations = new ReservationService(reservations, stores, mock(HolidayService.class), payments,
                 mock(EmailService.class), mock(MemberRepository.class), mock(AuditLogService.class),
-                mock(QrCheckinTokenProvider.class), mock(ReservationCreationGuard.class));
+                mock(QrCheckinTokenProvider.class), mock(ReservationCreationGuard.class), org.mockito.Mockito.mock(kr.it.reserve.reservation.service.ReservationConsentService.class));
         when(reservations.findByIdForUpdate(23L)).thenReturn(Optional.of(reservation));
         assertThatThrownBy(() -> mutations.updateReservation(23L, new ReservationUpdateRequest(), member))
                 .isInstanceOfSatisfying(ReservationException.class, error -> assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));

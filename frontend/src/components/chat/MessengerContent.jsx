@@ -101,7 +101,8 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
     const isSettings = storedView === 'settings' && !inRoute;
     const isStoreSearch = Boolean(storeSearch?.visible) && !inRoute;
     const isConversations = !isHome && !isSettings && !isStoreSearch;
-    const searchBackAvailable = !inRoute && selection.kind === 'store' && storeSearch?.selectedStoreId === selection.storeId;
+    const searchBackAvailable = !inRoute && storeSearch && !storeSearch.visible && (storeSearch.selectedThreadKey
+        ? storeSearch.selectedThreadKey === selectionKeyOf(selection) : selection.kind === 'store' && storeSearch.selectedStoreId === selection.storeId);
 
     const lists = useConversationLists({ showHidden, canOwnStores, canAdminSupport });
     const { memberRows, ownerRows, adminRows, customerRows } = lists;
@@ -119,7 +120,8 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
     });
     const mobileThreadVisible = isConversations && (mobileThreadOpen || inRoute);
     const showThread = isConversations && ((isWide && activeThread) || mobileThreadVisible);
-    const threadKey = showThread ? selectionKey : null;
+    const focusedMessageId = Number.isSafeInteger(selection.messageId) && selection.messageId > 0 ? selection.messageId : null;
+    const threadKey = showThread ? selectionKey + (focusedMessageId ? ':message:' + focusedMessageId : '') : null;
     const imageDraft = useChatImageDraft(threadKey);
     const batchRef = useRef(null);
     const [batchScope, setBatchScope] = useState(null);
@@ -141,6 +143,8 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
     const notify = notifications.notify;
 
     const load = useCallback(() => {
+        if (focusedMessageId && Number.isSafeInteger(selection.roomId) && selection.roomId > 0)
+            return chatService.getSearchContext(selection.roomId, focusedMessageId);
         if (selection.kind === 'admin') {
             return chatService.getAdminSupportRoom(selection.roomId).then(messages => ({
                 roomId: selection.roomId,
@@ -168,12 +172,12 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
         }
         if (selection.kind === 'owner') return chatService.getStoreInboxRoom(selection.roomId);
         return chatService.getSupport();
-    }, [selectedRow?.counterpartName, selectedRow?.counterpartProfileImage, selection.kind, selection.roomId, selection.storeId, sessionIdentity]);
+    }, [selectedRow?.counterpartName, selectedRow?.counterpartProfileImage, selection.kind, selection.roomId, selection.storeId, sessionIdentity, focusedMessageId]);
     const poll = useCallback(
-        (roomId, afterId) => selection.kind === 'admin'
+        (roomId, afterId) => focusedMessageId ? Promise.resolve([]) : selection.kind === 'admin'
             ? chatService.pollAdminSupportRoom(roomId, afterId)
             : chatService.pollRoom(roomId, afterId),
-        [selection.kind],
+        [selection.kind, focusedMessageId],
     );
     const sendFn = useCallback((_roomId, content, clientMessageId, file, config) => {
         if (file) return chatService.sendImage(_roomId, file, content, clientMessageId, config);
@@ -211,16 +215,17 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
         void queryClient.invalidateQueries({ queryKey: chatKeys.unread() });
     }, [queryClient, selection]);
     const onLoaded = useCallback((loadedThread) => {
-        const readCount = selectedUnreadRef.current;
-        selectedUnreadRef.current = 0;
         setHistory({
             key: selectionKey,
             hasMore: Boolean(loadedThread?.hasOlderMessages),
             nextBeforeId: loadedThread?.nextBeforeId ?? null,
             loading: false,
         });
+        if (focusedMessageId) return;
+        const readCount = selectedUnreadRef.current;
+        selectedUnreadRef.current = 0;
         clearUnreadCaches(readCount);
-    }, [clearUnreadCaches, selectionKey]);
+    }, [clearUnreadCaches, selectionKey, focusedMessageId]);
     const onSent = useCallback(() => {
         void queryClient.invalidateQueries({ queryKey: chatKeys.conversations() });
         void queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
@@ -233,6 +238,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
     }, [dismissRetentionNotice, onSent]);
     const onError = useCallback((text) => message.error(text), [message]);
     const onPolled = useCallback((roomId, fresh, { caughtUp = true, readThroughId } = {}) => {
+        if (focusedMessageId) return false;
         const readScope = readScopeRef.current;
         if (!readScope || readScope.threadKey !== threadKey || readScope.loading || readScope.roomId !== roomId
             || readScope.identity !== messengerIdentityOf(useAuthStore.getState())) return;
@@ -255,7 +261,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
                 return true;
             })
             .catch(() => false); // 현재 수신 커서를 보관해 다음 성공 조회에서 다시 읽음 처리한다.
-    }, [isWide, notify, onSent, selection, threadKey]);
+    }, [isWide, notify, onSent, selection, threadKey, focusedMessageId]);
 
     const {
         messages, thread, loading, loadError, sending: messageSending, send, reload, captureHistory, prepend, cancelSend, updateMessage,
@@ -289,12 +295,14 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
     const draft = useMessengerStore((state) => state.drafts[selectionKey] ?? '');
     const threadBodyRef = useRef(null);
     const historyScrollRef = useRef(null);
+    const focusedScrollRef = useRef(null);
     const historyScopeRef = useRef(/** @type {{threadKey: string | null, roomId: number | null} | null} */ (null));
     useLayoutEffect(() => {
         // 같은 방으로 돌아와도 이전 과거 조회·스크롤 상태는 재사용하지 않는다.
         const scope = { threadKey, roomId: thread?.roomId ?? null };
         historyScopeRef.current = scope;
         historyScrollRef.current = null;
+        focusedScrollRef.current = null;
         return () => {
             if (historyScopeRef.current === scope) historyScopeRef.current = null;
         };
@@ -308,8 +316,16 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
             return;
         }
         // scrollIntoView는 전환 중 바깥 페이지/패널까지 움직인다. 본문만 스크롤한다.
+        if (focusedMessageId) {
+            const target = body?.querySelector('[data-message-id="' + focusedMessageId + '"]');
+            if (showThread && target && focusedScrollRef.current !== threadKey) {
+                body.scrollTop += target.getBoundingClientRect().top - body.getBoundingClientRect().top - body.clientHeight / 2 + target.clientHeight / 2;
+                focusedScrollRef.current = threadKey;
+            }
+            return;
+        }
         if (showThread && body) body.scrollTop = body.scrollHeight;
-    }, [messages, showThread]);
+    }, [messages, showThread, focusedMessageId, threadKey]);
 
     const currentHistory = history.key === selectionKey ? history : EMPTY_HISTORY;
     const loadOlderMessages = async () => {
@@ -355,6 +371,11 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
         setMobileThreadOpen(true);
         // 한 화면에 목록·대화가 같이 보이는 넓은 메시지 페이지는 자리만 바뀌므로 애니메이션이 없다.
         if (!(surface === 'page' && isWide)) setOpeningThread(true);
+    };
+    const leaveMessageContext = () => {
+        const next = { ...selection };
+        delete next.messageId;
+        select(next, { fromStoreSearch: Boolean(searchBackAvailable) });
     };
     const finishConversationList = useCallback(() => {
         if (routeSelection) navigate('/messages', { replace: true });
@@ -450,7 +471,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
         cancelAnimationFrame(searchFocusFrame.current);
         searchFocusFrame.current = requestAnimationFrame(() => {
             if (useMessengerStore.getState().sessionIdentity !== sessionIdentity) return;
-            const selector = origin === 'home' ? '.reserve-messenger-footer [aria-label="홈"]' : '.reserve-messenger-list-actions [aria-label="가게 찾기"]';
+            const selector = origin === 'home' ? '.reserve-messenger-footer [aria-label="홈"]' : '.reserve-messenger-list-actions [aria-label="채팅 검색"]';
             document.querySelector(selector)?.focus();
         });
     };
@@ -527,7 +548,8 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
                 <ThreadPanel
                     onAnimationEnd={handleThreadAnimationEnd}
                     onBack={showConversationList}
-                    backLabel={searchBackAvailable ? '가게 검색으로 돌아가기' : undefined}
+                    backLabel={searchBackAvailable ? '검색 결과로 돌아가기' : undefined}
+                    searchContext={focusedMessageId ? { onLatest: leaveMessageContext } : null}
                     returningToList={returningToList}
                     avatarProps={{ selection, thread, selectedRow }}
                     title={title}
@@ -564,14 +586,15 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
                             messages,
                             thread,
                             selection,
+                            searchMessageId: focusedMessageId,
                             history: currentHistory,
                             onLoadOlder: loadOlderMessages,
                             onRetracted: updateMessage,
                         },
                     }}
                     composerAreaProps={{
-                        closed: !loading && !loadError && thread?.canSend === false,
-                        disabledMessage: disabledMessageOf(thread?.sendDisabledReason),
+                        closed: Boolean(focusedMessageId) || !loading && !loadError && thread?.canSend === false,
+                        disabledMessage: focusedMessageId ? '최신 대화로 이동하면 답장할 수 있어요.' : disabledMessageOf(thread?.sendDisabledReason),
                         showOwnerReplies: selection.kind === 'owner' && thread?.viewerRole === 'OWNER',
                         draft,
                         sending,

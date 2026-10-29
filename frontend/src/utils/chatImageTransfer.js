@@ -33,6 +33,11 @@ function downloadFilename(originalFilename, contentType, messageId) {
 }
 
 /* 미리보기·다운로드 모두 참가자·증거 권한을 확인하는 사진 경로를 사용한다. */
+export async function assertChatImageAccess(url, signal) {
+    if (!/^\/api\/(?:v1\/)?chat\/images\/[1-9]\d*$/.test(url)) throw new Error('사진 주소를 확인할 수 없어요.');
+    await chatService.checkImageAccess(url, signal);
+}
+
 export async function getChatImageBlob(url, signal) {
     if (typeof url !== 'string' || !CHAT_IMAGE_PATH.test(url)) {
         const error = new Error('사진 주소를 확인할 수 없어요.');

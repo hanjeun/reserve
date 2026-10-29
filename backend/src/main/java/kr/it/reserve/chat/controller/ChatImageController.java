@@ -50,6 +50,13 @@ public class ChatImageController {
         return ResponseEntity.ok(ApiResponse.success(images.send(member, roomId, image, request), "전송 완료"));
     }
 
+    @RequestMapping(value = "/images/{messageId:[0-9]+}", method = RequestMethod.HEAD)
+    public ResponseEntity<Void> checkRead(@PathVariable Long messageId) {
+        images.assertReadable(SecurityUtil.getCurrentMember("로그인이 필요해요."), messageId);
+        return ResponseEntity.noContent().cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.PRAGMA, "no-cache").build();
+    }
+
     @GetMapping("/images/{messageId:[0-9]+}")
     public ResponseEntity<byte[]> read(@PathVariable Long messageId) {
         var image = images.read(SecurityUtil.getCurrentMember("로그인이 필요해요."), messageId);

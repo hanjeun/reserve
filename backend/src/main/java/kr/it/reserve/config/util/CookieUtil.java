@@ -22,7 +22,7 @@ public class CookieUtil {
     /** Cookie 헤더에는 Path가 없어 값이 다른 동명 쿠키는 구분할 수 없다. */
     public static String getCookie(HttpServletRequest request, String name) {
         List<String> values = getCookieValues(request, name);
-        if (values.size() > 1 && ("access_token".equals(name) || REFRESH.equals(name))) {
+        if (values.size() > 1 && ("access_token".equals(name) || REFRESH.equals(name) || "mfa_ticket".equals(name))) {
             throw new AuthException("로그인 정보를 확인할 수 없어요. 다시 로그인해주세요.");
         }
         return values.isEmpty() ? null : values.getFirst();
@@ -45,13 +45,18 @@ public class CookieUtil {
         }
     }
 
+    public void addAuthCookies(HttpServletResponse response, String access, String refresh, int accessMaxAge, int refreshMaxAge, boolean persistent) {
+        addCookie(response, "access_token", access, persistent ? accessMaxAge : -1);
+        addCookie(response, REFRESH, refresh, persistent ? refreshMaxAge : -1);
+    }
+
     public void deleteCookie(HttpServletResponse response, String name) {
         if (REFRESH.equals(name)) for (String path : REFRESH_PATHS) write(response, name, "", 0, path);
         write(response, name, "", 0, "/");
     }
 
     private void write(HttpServletResponse response, String name, String value, int maxAge, String path) {
-        response.addHeader("Set-Cookie", name + "=" + value + "; Path=" + path + "; Max-Age=" + maxAge
+        response.addHeader("Set-Cookie", name + "=" + value + "; Path=" + path + (maxAge < 0 ? "" : "; Max-Age=" + maxAge)
                 + "; HttpOnly; " + (secureCookie ? "Secure; " : "") + "SameSite=Lax");
     }
 }

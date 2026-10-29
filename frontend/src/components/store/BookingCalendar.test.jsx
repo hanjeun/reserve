@@ -23,6 +23,12 @@ describe('booking calendar loading boundary', () => {
             vi.useRealTimers();
         }
     });
+    it('connects the booking label to its actual date button', () => {
+        render(<Form name="booking-test"><Form.Item name="date" label="예약 날짜"><BookingCalendar storeId={12} /></Form.Item></Form>);
+        const button = screen.getByLabelText('예약 날짜');
+        expect(button.tagName).toBe('BUTTON');
+        expect(button.id).toBe('booking-test_date');
+    });
     it('keeps the trigger but never offers selectable dates while data is pending', () => {
         render(<Form><Form.Item name="date"><BookingCalendar storeId={12} /></Form.Item></Form>);
         fireEvent.click(screen.getByRole('button', { name: '날짜 선택' }));

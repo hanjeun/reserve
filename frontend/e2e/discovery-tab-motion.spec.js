@@ -56,6 +56,7 @@ test.beforeEach(async ({ page }) => {
             });
         });
     });
+    await page.route('**/api/auth/session', route => route.fulfill({ json: { success: true, data: { member: null, refreshPossible: false } } }));
     await page.route('**/api/member/me', route => route.fulfill({
         status: 401,
         json: { success: false, message: '인증이 필요합니다.' },

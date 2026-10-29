@@ -9,6 +9,9 @@ import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.reservation.dto.ReservationCreateRequest;
 import kr.it.reserve.reservation.dto.ReservationResponse;
+import kr.it.reserve.reservation.dto.ReservationRequestResult;
+import kr.it.reserve.reservation.scheduler.ReservationExpiryProcessor;
+import kr.it.reserve.payment.service.PortoneService;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.reservation.service.ReservationService;
@@ -39,6 +42,8 @@ class ReservationAdmissionPersistenceTest {
     @Autowired StoreRepository stores;
     @Autowired PlatformTransactionManager transactions;
     @Autowired JdbcTemplate jdbc;
+    @Autowired ReservationExpiryProcessor expiry;
+    @MockitoBean PortoneService pg;
     @MockitoBean EmailService emails;
     @MockitoBean AuditLogService audits;
     Member owner;
@@ -69,6 +74,35 @@ class ReservationAdmissionPersistenceTest {
     private ReservationCreateRequest request() {
         var r = new ReservationCreateRequest(store.getId(), date, LocalTime.NOON, 1, null, false);
         r.setRequestId(UUID.randomUUID().toString()); return r;
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void expiredUnpaidRequestCanRebookOnceWithoutReusingItsOldReservation(boolean removed) throws Exception {
+        store.setNoShowDeposit(10000);
+        store.setAllowLatePayment(false);
+        store.setPaymentTimeoutMinutes(10);
+        stores.saveAndFlush(store);
+        var oldRequest = request();
+        var customer = customers.getFirst();
+        var old = service.createReservation(oldRequest, customer);
+        var now = reservations.findById(old.getId()).orElseThrow().getCreatedAt().plusMinutes(11);
+        assertThat(expiry.expireIfDue(old.getId(), now)).isEqualTo(ReservationExpiryProcessor.ExpiryResult.CANCELLED);
+        assertThat(expiry.expireIfDue(old.getId(), now)).isEqualTo(ReservationExpiryProcessor.ExpiryResult.SKIPPED);
+        if (removed) service.removeReservation(old.getId(), customer);
+        assertThat(service.recoverReservation(oldRequest, customer)).isEqualTo(ReservationRequestResult.closed());
+        assertThat(service.getAvailability(store.getId(), date)).filteredOn(slot -> slot.getTime().equals("12:00"))
+                .singleElement().satisfies(slot -> assertThat(slot.isAvailable()).isTrue());
+
+        var fresh = request();
+        var results = parallel(6, i -> service.createReservation(fresh, customer));
+        assertThat(results.stream().map(ReservationResponse::getId).distinct().count()).isEqualTo(1);
+        assertThat(results.getFirst().getId()).isNotEqualTo(old.getId());
+        assertThat(service.recoverReservation(fresh, customer).outcome()).isEqualTo(ReservationRequestResult.Outcome.RESERVED);
+        assertThat(service.createReservation(oldRequest, customer).getId()).isEqualTo(old.getId());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM reservation WHERE store_id = ?", Integer.class, store.getId())).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT SUM(guest_count) FROM reservation WHERE store_id = ? AND status IN ('PENDING','CONFIRMED')", Integer.class, store.getId())).isEqualTo(1);
+        org.mockito.Mockito.verifyNoInteractions(pg);
     }
 
     @Test void concurrentResponseRetriesReturnOneReservation() throws Exception {

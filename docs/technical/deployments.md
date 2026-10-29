@@ -10,7 +10,7 @@ RESERVE는 GitHub Actions와 Docker Blue/Green 방식으로 배포해요.
 | dev | 변경 통합 |
 | main | 운영 배포 |
 
-dev 대상 PR은 merge commit, main 대상 릴리스 PR은 squash를 사용해요. main 릴리스 뒤에는 dev에 main의 계보를 연결해요. 자세한 규칙은 [Git 워크플로](../rules/git-workflow.md)를 보세요.
+dev 대상 PR은 merge commit, main 대상 릴리스 PR은 squash를 사용해요. main 릴리스 뒤에는 dev에 main의 계보를 연결해요.
 
 ## 배포 흐름
 
@@ -30,8 +30,10 @@ dev 대상 PR은 merge commit, main 대상 릴리스 PR은 squash를 사용해�
 - 데이터 구조가 바뀌면 기존 데이터와 복구 버전의 호환성을 확인해요.
 - 운영 전환과 데이터·결제·권한 변경은 승인된 범위에서 진행해요.
 - 기기 세션과 입장 대기를 포함하는 이미지는 같은 계약의 복구 이미지를 요구해요. 이전 이미지를 호환 버전으로 다시 표시해서 통과시키지 않아요.
-- 자동 비상 입장 정책을 포함하는 후보와 복구 이미지는 모두 `waiting-signup-hidden-feed-oauth-login-session-admission-v10` 계약과 실제 구현을 갖춰야 해요.
-- 새 세션·예약 요청 테이블을 준비한 뒤 실제 릴리스 JAR로 스키마를 확인해요. 세션 계약 전환 후에는 한 번 다시 로그인해야 해요.
+- 자동 비상 입장 정책을 포함하는 후보와 복구 이미지는 모두 `waiting-signup-hidden-feed-oauth-login-session-admission-mfa-completion-test-settlement-v11` 계약과 실제 구현을 갖춰야 해요.
+- 새 세션·예약 요청·MFA·가상 정산 테이블과 예약 종료 컬럼을 준비한 뒤 실제 후보와 복구 JAR의 제한 계정 validate를 확인해요.
+- MFA 등록 전에는 후보·복구 이미지 모두 v11 계약과 같은 MFA 암호화 키를 갖춰야 해요. v10 이미지에 새 라벨만 붙여 복구에 사용하지 않아요.
+- MFA 필수 정책·자동 완료 작업·TEST 정산은 각 설정으로 활성화해요. DDL 준비와 운영 활성화는 별도예요.
 - 인기 예약 입장 대기는 기본으로 꺼져 있어요. 운영 Redis·행사 설정·상태 marker를 별도로 준비해야 켤 수 있어요.
 
 현재 실행 버전이 새 데이터 계약을 읽지 못하면 일반 자동 배포는 시작 단계에서 거부돼요. 첫 계약 전환은 검증된 새 계약의 복구 묶음과 직전 백업을 준비하고, 승인된 쓰기 중지·DDL·실제 JAR 검사·수동 전환을 거쳐요. 새 세션이 발급된 뒤에는 이전 계약 이미지나 테이블 삭제로 단순 복귀하지 않아요.
@@ -41,4 +43,3 @@ dev 대상 PR은 merge commit, main 대상 릴리스 PR은 squash를 사용해�
 - [GitHub Actions](../../.github/workflows/CICD.yml)
 - [Nginx 설정](../../nginx)
 - [화면 전환 도구](../../scripts/domain-release.sh)
-- [백업과 복구](backup.md)

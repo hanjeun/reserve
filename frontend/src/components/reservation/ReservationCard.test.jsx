@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
 import ReservationCard from './ReservationCard';
 
@@ -31,4 +31,34 @@ it.each([
     expect(callback === 'onReject' ? onReject : onStoreCancel).toHaveBeenCalledWith(91, '시험 사유');
     expect(callback === 'onReject' ? onStoreCancel : onReject).not.toHaveBeenCalled();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+it.each(['list', 'cards'])('선결제 예약은 결제 전 승인 도구를 숨겨요 (%s)', view => {
+    const { rerender } = render(<ReservationCard view={view} reservation={{ id: 91, status: 'PENDING', depositAmount: 10000, depositPaid: false, allowLatePayment: false }} />);
+    expect(screen.queryByRole('button', { name: /승인$/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /거절$/ })).toBeInTheDocument();
+    rerender(<ReservationCard view={view} reservation={{ id: 91, status: 'PENDING', depositAmount: 10000, depositPaid: false, allowLatePayment: true }} />);
+    expect(screen.getByRole('button', { name: /승인$/ })).toBeInTheDocument();
+});
+
+it.each(['list', 'cards'])('사업자 삭제와 미확인 예약의 완료·노쇼·취소 도구를 유지해요 (%s)', view => {
+    const removable = ['COMPLETED', 'CANCELLED', 'REJECTED', 'NO_SHOW'];
+    const statuses = [...removable, 'PENDING', 'CONFIRMED', 'UNCONFIRMED'];
+    const remove = vi.fn();
+    render(<>{statuses.map((status, index) => <section key={status} data-testid={status}>
+        <ReservationCard view={view} reservation={{ id: index + 1, status }} onRemove={remove} />
+    </section>)}</>);
+    for (const [index, status] of statuses.entries()) {
+        const item = within(screen.getByTestId(status));
+        const button = item.queryByRole('button', { name: /삭제$/ });
+        if (removable.includes(status)) {
+            expect(button.querySelector('svg')).not.toBeNull();
+            fireEvent.click(button);
+            expect(remove).toHaveBeenLastCalledWith(index + 1);
+        } else expect(button).toBeNull();
+    }
+    const unresolved = within(screen.getByTestId('UNCONFIRMED'));
+    for (const name of ['완료', '노쇼', '취소']) {
+        expect(unresolved.getByRole('button', { name: new RegExp(name + '$') })).toBeInTheDocument();
+    }
 });

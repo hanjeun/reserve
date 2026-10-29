@@ -32,6 +32,7 @@ async function mockUiApi(page, initialRead = {}) {
             return route.fulfill({ status: 409, json: { success: false, message: 'UI 검사는 데이터를 변경하지 않습니다.' } });
         }
         if (path === initialRead.path) await initialRead.ready;
+        if (path === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: account, refreshPossible: false } } }); }
         if (path === '/api/member/me') return ok(route, account);
         if (path === '/api/favorites/my') {
             requests.favorites += 1;

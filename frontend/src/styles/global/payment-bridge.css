@@ -1,0 +1,75 @@
+.reserve-payment-bridge { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 24px; color: var(--c-text-primary); }
+.reserve-payment-section { min-width: 0; }
+.reserve-payment-bridge h3 { margin: 0 0 16px; font-size: 16px; font-weight: 700; line-height: 1.5; overflow-wrap: anywhere; }
+.reserve-payment-overview { --reserve-info-label-width: 72px; }
+.reserve-payment-selection { grid-column: 1 / -1; border-top: 1px solid var(--c-border-light); padding-top: 24px; }
+.reserve-payment-methods, .reserve-payment-card-companies { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.reserve-payment-methods .reserve-payment-method { min-width: 0; min-height: 72px; height: auto; flex-direction: column; padding: 12px 8px; gap: 8px; white-space: normal; border: 1px solid transparent; }
+.reserve-payment-method-heading { display: inline-flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; }
+.reserve-payment-brand-mark { display: inline-flex; align-items: center; justify-content: center; height: 30px; flex-shrink: 0; color: inherit; }
+.reserve-payment-brand-mark .reserve-ui-icon { font-size: 24px; }
+.reserve-payment-brand-icon { display: block; flex: none; max-width: 56px; max-height: 30px; object-fit: contain; }
+.reserve-payment-method small { font-size: 10px; color: var(--c-primary); }
+.reserve-payment-methods .reserve-payment-method[aria-pressed="true"], .reserve-payment-card-companies .reserve-payment-card-company[aria-pressed="true"] { --reserve-payment-choice-border: var(--c-primary); --reserve-payment-choice-text: var(--c-text-primary); }
+.reserve-payment-card-picker { margin-top: 24px; }
+.reserve-payment-card-picker h4 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 12px; font-size: 14px; font-weight: 600; }
+.reserve-payment-card-picker h4 span { color: var(--c-text-tertiary); font-size: 13px; font-weight: 400; }
+.reserve-payment-card-companies .reserve-payment-card-company { border: 1px solid transparent; min-height: 44px; height: auto; padding: 8px; }
+.reserve-payment-more-wrap { display: flex; justify-content: center; padding-top: 8px; }
+.reserve-payment-more { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; }
+.reserve-payment-more[aria-expanded="true"] .reserve-filter-menu-chevron { transform: rotate(180deg); }
+.reserve-payment-method-note { margin: 12px 0 0 !important; font-size: 13px; line-height: 1.6; }
+.reserve-payment-total { min-width: 0; align-self: start; border: 1px solid var(--c-border-light); border-radius: 16px; padding: 20px; --reserve-info-label-width: 64px; }
+.reserve-payment-amount { display: flex; align-items: baseline; flex-wrap: wrap; justify-content: space-between; gap: 12px; border-top: 1px solid var(--c-border-light); margin-top: 16px; padding-top: 16px; font-size: 14px; }
+.reserve-payment-amount strong { color: var(--c-primary); font-size: 22px; font-variant-numeric: tabular-nums; }
+.reserve-payment-policy { display: flex; align-items: flex-start; gap: 8px; color: var(--c-text-secondary); font-size: 13px; line-height: 1.7; margin: 16px 0 0; }
+.reserve-payment-policy .reserve-ui-icon { flex-shrink: 0; margin-top: 3px; }
+@media (max-width: 575px) {
+    .reserve-payment-bridge { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+    .reserve-payment-total { padding: 16px; }
+    .reserve-payment-methods { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .reserve-payment-method-heading { gap: 6px; }
+    .reserve-payment-brand-mark { height: 26px; }
+    .reserve-payment-brand-icon { max-width: 40px; max-height: 26px; }
+}
+
+.reserve-payment-method-anchor { display: flex; min-width: 0; }
+.reserve-payment-method-anchor:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; border-radius: 20px; }
+.reserve-payment-method-anchor .reserve-payment-method { width: 100%; }
+.reserve-payment-method:disabled { pointer-events: none; }
+.reserve-payment-method-anchor[aria-disabled="true"] { cursor: not-allowed; }
+:root[data-theme="dark"] .reserve-payment-brand-icon--monochrome { filter: invert(1); }
+.reserve-payment-expand { display: grid; grid-template-rows: 0fr; opacity: 0; visibility: hidden; transition: grid-template-rows .2s ease, opacity .2s ease, visibility 0s .2s; }
+.reserve-payment-expand.is-open { grid-template-rows: 1fr; opacity: 1; visibility: visible; transition-delay: 0s; }
+.reserve-payment-expand-inner { min-height: 0; overflow: hidden; }
+.reserve-payment-card-extra { padding-top: 10px; }
+.reserve-payment-selection { overflow-anchor: none; }
+.reserve-payment-modal .ant-modal-container { height: min(86svh, var(--reserve-ad-modal-available-height)); }
+.reserve-payment-modal .ant-modal-body { flex: 1 1 auto; scrollbar-gutter: stable; overflow-anchor: none; }
+.reserve-payment-countdown { --reserve-countdown-color: var(--c-warning); display: inline-flex; align-items: center; gap: 4px; color: var(--reserve-countdown-color); white-space: nowrap; font-variant-numeric: tabular-nums; transition: color .2s ease; }
+.reserve-payment-countdown-label, .reserve-payment-countdown-value { display: inline-flex; align-items: center; line-height: 1; }
+.reserve-payment-countdown-value { min-width: 5ch; }
+.reserve-payment-countdown[data-state="urgent"] { --reserve-countdown-color: var(--c-error); }
+.reserve-payment-countdown[data-state="expired"] { --reserve-countdown-color: var(--c-text-tertiary); }
+.reserve-payment-countdown[data-state="expired"] .reserve-payment-countdown-value { min-width: 0; }
+.reserve-payment-countdown-digits { display: inline-flex; align-items: center; min-width: 5ch; }
+.reserve-payment-countdown-digits .reserve-rolling-field-value { width: 1ch; }
+/* 움직이지 않는 자리와 전환 레이어도 같은 마감 상태의 색을 사용해요. */
+.reserve-payment-countdown-digits .reserve-rolling-field-value,
+.reserve-payment-countdown-digits .reserve-rolling-field-value > span { color: var(--reserve-countdown-color); transition: color .2s ease; }
+@media (prefers-reduced-motion: reduce) {
+    .reserve-payment-expand, .reserve-payment-countdown,
+    .reserve-payment-countdown-digits .reserve-rolling-field-value,
+    .reserve-payment-countdown-digits .reserve-rolling-field-value > span { transition: none; }
+}
+
+.reserve-payment-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; text-align: left; }
+.reserve-payment-footer .ant-checkbox-wrapper { min-width: 0; color: var(--c-text-secondary); font-size: 13px; line-height: 1.6; }
+.reserve-payment-footer > .reserve-btn { flex-shrink: 0; }
+@media (max-width: 575px) { .reserve-payment-footer { align-items: flex-start; flex-direction: column; gap: 12px; } .reserve-payment-footer > .reserve-btn { align-self: flex-end; } }
+
+.reserve-reservation-consent { display: flex; flex-direction: column; gap: 12px; }
+.reserve-reservation-consent .ant-checkbox-wrapper { color: var(--c-text-secondary); font-size: 13px; line-height: 1.6; }
+.reserve-reservation-consent .reserve-auth-secondary-actions { margin-top: 0; }
+.reserve-reservation-consent-status { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.reserve-reservation-consent-notice { --reserve-info-label-width: 84px; }

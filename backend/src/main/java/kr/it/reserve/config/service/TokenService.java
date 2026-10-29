@@ -36,7 +36,8 @@ public class TokenService {
     @PersistenceContext private EntityManager entityManager;
     private Clock clock = Clock.systemUTC();
 
-    public record RefreshResult(String accessToken, String refreshToken, Duration refreshMaxAge) {
+    public record RefreshResult(String accessToken, String refreshToken, Duration refreshMaxAge, boolean persistent) {
+        public RefreshResult(String access, String refresh, Duration maxAge) { this(access, refresh, maxAge, true); }
         @Override public String toString() { return "RefreshResult[credentials=redacted]"; }
     }
 
@@ -72,14 +73,14 @@ public class TokenService {
             if (!row.rotatedWithin(PREVIOUS_TOKEN_GRACE, now)) return removeAndReject(row, Reason.REUSED_TOKEN);
             if (proof.state() == TokenProvider.RefreshTokenState.EXPIRED) throw reject(Reason.EXPIRED_JWT, proof.memberId());
             liftExpiredSuspension(member);
-            try { return result(tokenProvider.currentSessionTokens(row)); }
+            try { return result(tokenProvider.currentSessionTokens(row, proof.persistence())); }
             catch (JwtException inconsistent) { return removeAndReject(row, Reason.SESSION_INCONSISTENT); }
         }
         if (generation != currentGeneration || !row.isCurrentToken(presentedToken)
                 || !Objects.equals(proof.jti(), row.getRefreshJti())) throw reject(Reason.UNKNOWN_TOKEN, proof.memberId());
         if (proof.state() == TokenProvider.RefreshTokenState.EXPIRED) return removeAndReject(row, Reason.EXPIRED_JWT);
         liftExpiredSuspension(member);
-        return result(tokenProvider.rotateSession(row));
+        return result(tokenProvider.rotateSession(row, proof.persistence()));
     }
 
     /** 회전 뒤 늦게 도착한 로그아웃도 검증된 세션 식별자로 해당 기기만 폐기한다. */
@@ -108,7 +109,7 @@ public class TokenService {
         throw reject(reason, row.getMemberId());
     }
     private static RefreshResult result(TokenProvider.IssuedSession pair) {
-        return new RefreshResult(pair.accessToken(), pair.refreshToken(), pair.refreshMaxAge());
+        return new RefreshResult(pair.accessToken(), pair.refreshToken(), pair.refreshMaxAge(), pair.persistent());
     }
     private void liftExpiredSuspension(Member member) {
         // 정지 중에도 세션은 유지할 수 있지만 액세스 인증은 정지를 거부한다.

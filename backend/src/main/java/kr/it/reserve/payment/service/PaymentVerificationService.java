@@ -29,6 +29,7 @@ public class PaymentVerificationService {
         if (snapshot.completed() != null) return snapshot.completed();
         var payment = portone.getPaymentInfo(snapshot.merchantUid());
         // 재조회 중 웹훅·환불이 먼저 반영됐을 수 있어 새 트랜잭션에서 다시 잠금·상태 검사한다.
-        return payments.completeReadyPaymentFromPg(snapshot.merchantUid(), payment, request.getImpUid());
+        // 클라이언트가 보낸 거래번호를 PG 증거가 없는 원장 값으로 저장하지 않아요.
+        return payments.completeReadyPaymentFromPg(snapshot.merchantUid(), payment, null);
     }
 }

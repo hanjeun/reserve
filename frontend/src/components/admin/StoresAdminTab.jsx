@@ -174,7 +174,7 @@ const StoresAdminTab = () => {
                     onRetry={refetch} retrying={isFetching} />
             );
         }
-        if (storeLoading || isPlaceholderData) {
+        if (storeLoading || isPlaceholderData || storeSearch.trim() !== debouncedStoreSearch.trim()) {
             return (
                 <AdminTableSkeleton
                     rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}

@@ -30,6 +30,7 @@ async function setup(page, role) {
         const path = new URL(request.url()).pathname;
         if (!path.startsWith('/api/')) return route.continue();
         let data = [];
+        if (path === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: { id: 9, name: '비공개 계정 이름', email: 'local@example.test', role, termsAgreed: true }, refreshPossible: false } } }); }
         if (path === '/api/member/me')
             data = { id: 9, name: '비공개 계정 이름', email: 'local@example.test', role, termsAgreed: true };
         else if (path === '/api/feed/config' || path === '/api/store-news/config') data = config;

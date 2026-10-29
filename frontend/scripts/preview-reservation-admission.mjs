@@ -438,6 +438,7 @@ async function installSearchPreview(context, fixture) {
         const chatRead = request.method() === 'POST' && (/^\/api\/chat\/stores\/81\/open$/.test(path) || /^\/api\/chat\/rooms\/\d+\/read$/.test(path));
         if (!['GET', 'HEAD'].includes(request.method()) && !chatRead) return route.fulfill({ status: 405, headers: searchPreviewHeaders(route),
             json: { success: false, message: '검색 프리뷰에서는 합성 조회만 확인할 수 있어요.' } });
+        if (path === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: account, refreshPossible: false } } }); }
         if (path === '/api/member/me') return ok(route, account);
         if (path === '/api/search' || path === '/api/search/me') {
             const keyword = (url.searchParams.get('keyword') || '').trim();

@@ -6,10 +6,11 @@ import dayjs from 'dayjs';
 import FormTimePicker from '../FormTimePicker';
 import { buildStoreFormData } from '../../../utils/form';
 
-vi.mock('antd', async () => {
+vi.mock('antd', async importOriginal => {
+    const actual = await importOriginal();
     const ReactModule = await import('react');
     return {
-        Form: { Item: { useStatus: () => ({ status: undefined }) } },
+        ...actual,
         Modal: ({ open, children, title }) => open ? ReactModule.createElement(
             'div', { role: 'dialog', 'aria-label': title.props.children }, children,
         ) : null,

@@ -10,16 +10,13 @@ import LoadingImage from './LoadingImage';
 
 const accountImageSource = src => (src?.startsWith('blob:') || src?.startsWith('data:')) ? src : getImageUrl(src, null);
 
-const Avatar = ({ src, size = 36, style, draggable, referrerPolicy, fallback, resolveSource = accountImageSource }) => {
+const Avatar = ({ src, size = 36, iconSize = size * 0.5, style, draggable, referrerPolicy, fallback, resolveSource = accountImageSource }) => {
     const [imgError, setImgError] = useState(false);
 
-    // src 변경 시 에러 상태 초기화
     useEffect(() => {
         if (imgError) setImgError(false); // eslint-disable-line react-hooks/set-state-in-effect
     }, [src]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // blob: / data: URL은 그대로, 서버 상대경로만 절대경로로 변환
-    // 소셜 로그인 시 https:// 시작하는 외부 URL이 올 수 있음 → getImageUrl이 그대로 반환
     const imgUrl = resolveSource(src, null);
     const showImg = imgUrl && !imgError;
 
@@ -28,7 +25,7 @@ const Avatar = ({ src, size = 36, style, draggable, referrerPolicy, fallback, re
             width: size,
             height: size,
             borderRadius: '50%',
-            backgroundColor: colors.primary.light,
+            backgroundColor: 'transparent',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -39,11 +36,10 @@ const Avatar = ({ src, size = 36, style, draggable, referrerPolicy, fallback, re
         }}>
             {/* 기본 아이콘은 사진 뒤에 두고 지정한 대체 노드는 실패 뒤에 표시한다. */}
             {fallback === undefined ? <UserOutlined style={{
-                fontSize: size * 0.44,
-                color: colors.primary.main,
+                fontSize: iconSize,
+                color: colors.text.secondary,
                 position: 'absolute',
             }} /> : !showImg && fallback}
-            {}
             {showImg && (
                 <LoadingImage
                     src={imgUrl}
@@ -61,6 +57,7 @@ const Avatar = ({ src, size = 36, style, draggable, referrerPolicy, fallback, re
 Avatar.propTypes = {
     src: PropTypes.string,
     size: PropTypes.number,
+    iconSize: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
     style: PropTypes.object,
     draggable: PropTypes.bool,
     referrerPolicy: PropTypes.string,

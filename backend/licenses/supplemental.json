@@ -184,6 +184,31 @@
       "file": "upstream/sentry-8.59.0.txt",
       "source": "https://raw.githubusercontent.com/getsentry/sentry-java/8.61.0/LICENSE",
       "sha256": "c90147c075a17f4aecfea27a56510ddf7c76508c8488df533623402008b9d052"
+    },
+    "datautilities-source-notices": {
+      "file": "upstream/datautilities-source-notices.txt",
+      "source": "https://repo.maven.apache.org/maven2/com/github/peteroupc/datautilities/1.1.0/datautilities-1.1.0-sources.jar",
+      "sha256": "226b2f887df987aaba2a23c856478c8ccf8adc7ed7abb86b313ba3496dee0026"
+    },
+    "numbers": {
+      "file": "upstream/numbers.txt",
+      "source": "https://raw.githubusercontent.com/peteroupc/numbers-java/7e49b7b3e992724d30bde619c49785eea3ab4ad4/LICENSE.md",
+      "sha256": "845f5ff764d899c09fc88be34d307d94cc75dbcad1a78940fd8fd7939663618a"
+    },
+    "j2objc-3.1": {
+      "file": "upstream/j2objc-3.1.txt",
+      "source": "https://raw.githubusercontent.com/google/j2objc/1671e9afb72a16126d448f468db3e582358fba47/LICENSE",
+      "sha256": "22418fba3d2030cc22690f1c0c38ae423d5540110e9d61519027e3210ac29726"
+    },
+    "cc0-1.0": {
+      "file": "upstream/cc0-1.0.txt",
+      "source": "https://creativecommons.org/publicdomain/zero/1.0/legalcode.txt",
+      "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499"
+    },
+    "unlicense": {
+      "file": "upstream/unlicense.txt",
+      "source": "https://raw.githubusercontent.com/peteroupc/CBOR-Java/e61997127fa2b7955265ba6f4b7ff5469089f9ec/LICENSE.md",
+      "sha256": "328f7a29fe35eabd6a9f68bc244257f6fd82d00c2b81e9b77546c06a5c325305"
     }
   },
   "packages": {
@@ -529,6 +554,50 @@
       "jarSha256": "6f216e48f46146bad58091a77b740791cd793bff6e6cb3e42b719bcb82631f27",
       "documents": [
         "sentry-8.61.0"
+      ]
+    },
+    "com.github.peteroupc:datautilities:1.1.0": {
+      "jarSha256": "9afa371db3083782216e63e706d83a50d19c7e8db74af47e7339c419380f82bb",
+      "documents": [
+        "datautilities-source-notices",
+        "cc0-1.0"
+      ]
+    },
+    "com.github.peteroupc:numbers:1.8.2": {
+      "jarSha256": "ed894dcb68b9aa22320d6813950d8321d4f82c2c78e68770a443df33e36bdd4e",
+      "documents": [
+        "numbers",
+        "cc0-1.0"
+      ]
+    },
+    "com.upokecenter:cbor:4.5.6": {
+      "jarSha256": "415630df447588834ac747800a6b7fac67ff8b8092862f4e3f5283f568bfc2ec",
+      "documents": [
+        "unlicense"
+      ]
+    },
+    "com.google.errorprone:error_prone_annotations:2.50.0": {
+      "jarSha256": "4667724877f1d37a689202da191e23efa7657c62eef93ccdac406eccfe5cdd0a",
+      "documents": [
+        "apache-2.0"
+      ]
+    },
+    "com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava": {
+      "jarSha256": "b372a037d4230aa57fbeffdef30fd6123f9c0c2db85d0aced00c91b974f33f99",
+      "documents": [
+        "apache-2.0"
+      ]
+    },
+    "com.google.j2objc:j2objc-annotations:3.1": {
+      "jarSha256": "84d3a150518485f8140ea99b8a985656749629f6433c92b80c75b36aba3b099b",
+      "documents": [
+        "j2objc-3.1"
+      ]
+    },
+    "org.jspecify:jspecify:1.0.1": {
+      "jarSha256": "070d75f261fe4c5b8202508366715f7f2d4660f88c8ef7e6d3575e48c9683b66",
+      "documents": [
+        "apache-2.0"
       ]
     }
   }

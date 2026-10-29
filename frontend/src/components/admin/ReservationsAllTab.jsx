@@ -11,6 +11,8 @@ import ListingContent from '../common/ListingContent';
 import ReservationListingToolbar from '../reservation/ReservationListingToolbar';
 import ReservationSummaryCard from '../reservation/ReservationSummaryCard';
 import ReservationDetailModal from '../reservation/ReservationDetailModal';
+import ReservationRetentionTools from './ReservationRetentionTools';
+import { handleApiError } from '../../utils/errorHandler';
 import { useMessage, useQueryParamsState } from '../../hooks';
 import useDebounce from '../../hooks/useDebounce';
 import { adminKeys } from '../../hooks/queryKeys';
@@ -53,7 +55,7 @@ const ReservationsAllTab = () => {
     const { data, isLoading: resLoading, isFetching, isPlaceholderData, error: resError, refetch: loadReservations } = useQuery({
         queryKey: [...adminKeys.reservations(), page, debouncedResSearch, resStatusFilter, sortValue],
         queryFn: async () => {
-            const result = await api.get(API_ENDPOINTS.RESERVATION.STORE_RESERVATIONS, {
+            const result = await api.get(API_ENDPOINTS.RESERVATION.ADMIN_RESERVATIONS, {
                 params: {
                     page: page - 1,
                     size: PAGE_SIZE,
@@ -82,7 +84,7 @@ const ReservationsAllTab = () => {
             void invalidateAdminData(queryClient);
             void invalidateReservationData(queryClient);
         },
-        onError: () => message.error('삭제에 실패했어요.'),
+        onError: error => handleApiError(error, message, '삭제에 실패했어요.'),
     });
 
     const handleSoftDeleteReservation = (r) => confirm({
@@ -98,7 +100,7 @@ const ReservationsAllTab = () => {
 
     const reservationColumns = [
         { title: '가게',  dataIndex: 'storeName',       key: 'storeName',       width: 130, render: v => <Text style={{ fontSize: fontSize.sm }}>{v}</Text> },
-        { title: '예약자', dataIndex: 'memberName',      key: 'memberName',      width: 100, render: v => <Text style={{ fontSize: fontSize.sm }}>{v}</Text> },
+        { title: '예약자', dataIndex: 'memberName',      key: 'memberName',      width: 100, render: (v, r) => <Text style={{ fontSize: fontSize.sm }}>{r.personalInfoHidden ? '조회 기간 만료' : v}</Text> },
         { title: '날짜',  dataIndex: 'reservationDate', key: 'reservationDate', width: 110, render: v => <Text style={{ fontSize: fontSize.sm }}>{v}</Text> },
         { title: '시간',  dataIndex: 'reservationTime', key: 'reservationTime', width: 80,  render: v => <Text style={{ fontSize: fontSize.sm }}>{formatTime(v)}</Text> },
         { title: '인원',  dataIndex: 'guestCount',      key: 'guestCount',      width: 60,  render: v => <Text style={{ fontSize: fontSize.sm }}>{v}명</Text> },
@@ -118,7 +120,7 @@ const ReservationsAllTab = () => {
             <DataState state="error" kind="reservation" subject="예약 목록" error={resError}
                 onRetry={loadReservations} retrying={isFetching} />
         );
-    } else if (resLoading || isPlaceholderData) {
+    } else if (resLoading || isPlaceholderData || resSearch.trim() !== debouncedResSearch.trim()) {
         if (viewMode === 'cards') {
             listContent = (
                 <ReservationSummaryCardSkeleton count={Math.min(PAGE_SIZE, Math.max(totalElements, 4))} />
@@ -200,7 +202,7 @@ const ReservationsAllTab = () => {
                 label="관리자 예약 목록 필터"
             />
             <FilterToolbar
-                search={{ value: resSearch, onChange: handleSearchChange, placeholder: '가게명, 예약자로 검색', disabled: resLoading }}
+                search={{ value: resSearch, onChange: handleSearchChange, placeholder: '가게명, 예약자로 검색' }}
                 onReload={loadReservations}
                 loading={resLoading || isFetching}
                 initialLoading={resLoading}
@@ -212,6 +214,7 @@ const ReservationsAllTab = () => {
                 reservation={detailReservation}
                 open={detailReservation != null}
                 onClose={() => setDetailReservation(null)}
+                tools={(reservation, open) => <ReservationRetentionTools reservationId={reservation.id} open={open} />}
             />
         </>
     );

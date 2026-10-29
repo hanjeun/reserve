@@ -18,6 +18,11 @@ import java.util.Optional;
 
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
+    @Query("SELECT p FROM Payment p JOIN FETCH p.reservation r WHERE r.store.id = :storeId "
+            + "AND (p.verifiedChannelType = 'TEST' OR EXISTS (SELECT s.requestKey FROM TestSettlementPayout s WHERE s.paymentId = p.id)) "
+            + "ORDER BY p.id DESC")
+    org.springframework.data.domain.Slice<Payment> findTestSettlementPage(@Param("storeId") Long storeId, Pageable pageable);
+
 
     String CONFIRMED_DEPOSIT_PAYMENT = """
             p.paidAt IS NOT NULL

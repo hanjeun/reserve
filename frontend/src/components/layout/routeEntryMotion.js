@@ -11,10 +11,15 @@ export const clearRouteEntryMotion = content => {
 };
 
 // 같은 화면의 view 정규화·필터 변경은 새 진입이 아니며, 진행 중인 진입을 취소하지도 않는다.
-export const applyRouteEntryMotion = (content, { pathnameChanged, direction, skeletonShown }) => {
-    if (!content || (!pathnameChanged && !skeletonShown)) return;
+export const applyRouteEntryMotion = (content, { pathnameChanged, direction, skeletonShown, documentEntry = false }) => {
+    if (!content) return;
+    // 자식 골격의 커밋이 부모의 구독 갱신보다 먼저 끝날 수 있어요.
+    if (skeletonShown) content.setAttribute('data-skeleton-shown', 'true');
+    else content.removeAttribute('data-skeleton-shown');
+    // 고정된 부모가 골격부터 본문까지 한 번 진입하며 중간 교체로 취소하거나 재시작하지 않아요.
+    if (!pathnameChanged && !documentEntry) return;
     clearRouteEntryMotion(content);
-    if (direction && !skeletonShown) {
+    if (direction && !documentEntry) {
         content.getBoundingClientRect();
         content.classList.add('reserve-route-entry--' + direction);
     }

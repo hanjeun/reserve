@@ -24,8 +24,9 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
     Optional<RefreshToken> findBySessionIdAndMemberId(String sessionId, Long memberId);
 
     /** 액세스 인증은 잠금 없이 조회한다. 발급·갱신·폐기는 회원→세션 순서로 잠근다. */
-    @Query("SELECT new kr.it.reserve.config.jwt.repository.LoginSessionAuthentication(m, r) "
+    @Query("SELECT new kr.it.reserve.config.jwt.repository.LoginSessionAuthentication(m, r, COALESCE(a.enabled, false)) "
             + "FROM RefreshToken r JOIN Member m ON m.id = r.memberId "
+            + "LEFT JOIN MfaAccount a ON a.memberId = m.id "
             + "WHERE r.sessionId = :sid AND r.memberId = :memberId AND m.deletedAt IS NULL")
     Optional<LoginSessionAuthentication> findAuthenticationBySessionIdAndMemberId(
             @Param("sid") String sessionId, @Param("memberId") Long memberId);

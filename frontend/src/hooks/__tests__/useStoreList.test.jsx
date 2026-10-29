@@ -55,7 +55,7 @@ describe('공개 가게 서버 페이지네이션', () => {
         await waitFor(() => expect(result.current.loading).toBe(false));
         expect(storeService.getStores).toHaveBeenLastCalledWith({
             keyword: '카페', domain: 'FOOD', sort: 'recommended', page: 1, size: 12,
-        });
+        }, expect.any(AbortSignal));
         expect(result.current.page).toBe(2);
         expect(result.current.totalElements).toBe(25);
         expect(result.current.stores.map(store => store.id)).toEqual(Array.from({ length: 12 }, (_, i) => i + 13));
@@ -82,7 +82,7 @@ describe('공개 가게 서버 페이지네이션', () => {
         expect(storeService.getStores).toHaveBeenLastCalledWith({
             keyword: '공방', page: 1, size: 12, sort: 'distance', lat: '37.321', lng: '126.813',
             domain: 'OTHER', region: '경기 안산시',
-        });
+        }, expect.any(AbortSignal));
         expect(result.current.searchParams.region).toBe('경기 안산시');
         expect(routeParams().get('page')).toBe('2');
         expect(routeParams().get('keyword')).toBe('공방');

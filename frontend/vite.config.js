@@ -34,8 +34,9 @@ return {
                     // Replay는 기본 오류 수집 SDK와 분리해 첫 화면 뒤에 로드한다.
                     if (/\/node_modules\/@sentry\/(?!replay\/)/.test(module)
                         || /\/node_modules\/web-vitals\//.test(module)) return 'vendor-sentry';
-                    if (module.includes('commonjsHelpers.js') || /\/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//.test(module)) return 'vendor-react';
-                    if (/\/node_modules\/(axios|@tanstack\/react-query|@tanstack\/query-core|zustand)\//.test(module)) return 'vendor-state';
+                    // 첫 화면에서 함께 쓰는 런타임은 한 청크로 압축해 중복 압축·요청 비용을 줄여요.
+                    if (module.includes('commonjsHelpers.js')
+                        || /\/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler|axios|@tanstack\/react-query|@tanstack\/query-core|zustand)\//.test(module)) return 'vendor-runtime';
                 },
             },
         },

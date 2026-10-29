@@ -41,4 +41,6 @@
 
 v11 DDL을 준비한 뒤 `RESERVE_VERIFY_V11_SCHEMA=1`로 읽기 전용 점검 도구의 추가 검사를 실행해요. 제한된 백업 역할에서 MFA·완료·결제 확인 컬럼과 동의·파기 보류 표의 타입·인덱스·외래 키를 확인해요. 실제 릴리스 JAR의 제한 계정 validate와 앱 계정 권한 확인은 별도로 유지해요.
 
+예약 가림·동의·파기는 기본 비활성이에요. 검증과 활성화 승인 후 `RESERVE_RESERVATION_RETENTION_ENABLED`로 가림을 켜고, 동의는 `RESERVE_RESERVATION_CONSENT_ENABLED`와 승인된 보유기간 안내인 `RESERVE_RESERVATION_CONSENT_RECIPIENT_RETENTION`을 함께 설정해요. 자동 파기는 `RESERVE_RESERVATION_RETENTION_PURGE_ENABLED`로 별도 활성화해요. 가림이 꺼진 상태에서 동의나 파기만 켜는 배포는 거부해요.
+
 스키마 확인 결과와 실제 운영 적용은 구분해요.

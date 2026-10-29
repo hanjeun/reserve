@@ -136,6 +136,9 @@ waiting:
     customer-notice-published-at: ${WAITING_CUSTOMER_RETENTION_NOTICE_PUBLISHED_AT:}
 
 reserve:
+  reservation-consent:
+    enabled: ${RESERVE_RESERVATION_CONSENT_ENABLED:false}
+    recipient-retention: ${RESERVE_RESERVATION_CONSENT_RECIPIENT_RETENTION:}
   reservation-retention:
     enabled: ${RESERVE_RESERVATION_RETENTION_ENABLED:false}
     purge-enabled: ${RESERVE_RESERVATION_RETENTION_PURGE_ENABLED:false}

@@ -39,7 +39,9 @@ test('target app creation checks physical RAM immediately before compose and nev
 test('v11 deployment forwards disabled feature flags and requires a dedicated MFA recovery key', () => {
     const start = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
     for (const name of ['RESERVE_MFA_ENABLED', 'RESERVE_MFA_RP_ID', 'RESERVE_MFA_ORIGINS', 'RESERVE_MFA_ENCRYPTION_KEY',
-        'RESERVE_RESERVATION_AUTO_COMPLETION_ENABLED', 'RESERVE_SETTLEMENT_TEST_ENABLED']) {
+        'RESERVE_RESERVATION_AUTO_COMPLETION_ENABLED', 'RESERVE_SETTLEMENT_TEST_ENABLED',
+        'RESERVE_RESERVATION_RETENTION_ENABLED', 'RESERVE_RESERVATION_RETENTION_PURGE_ENABLED',
+        'RESERVE_RESERVATION_CONSENT_ENABLED', 'RESERVE_RESERVATION_CONSENT_RECIPIENT_RETENTION']) {
         assert.ok(start.with.envs.split(',').includes(name));
         for (const side of ['blue', 'green']) assert.ok(read('docker-compose-' + side + '.yml').includes(name + '='));
     }
@@ -51,13 +53,26 @@ test('v11 deployment forwards disabled feature flags and requires a dedicated MF
     const run = overrides => spawnSync(process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash',
         ['-c', 'set -e\n' + guard], { encoding: 'utf8',
             env: { ...process.env, RESERVE_MFA_ENCRYPTION_KEY: 'fixture-key', RESERVE_MFA_ENABLED: 'false',
-                RESERVE_RESERVATION_AUTO_COMPLETION_ENABLED: 'false', RESERVE_SETTLEMENT_TEST_ENABLED: 'false', ...overrides } });
+                RESERVE_RESERVATION_AUTO_COMPLETION_ENABLED: 'false', RESERVE_SETTLEMENT_TEST_ENABLED: 'false',
+                RESERVE_RESERVATION_RETENTION_ENABLED: 'false', RESERVE_RESERVATION_RETENTION_PURGE_ENABLED: 'false',
+                RESERVE_RESERVATION_CONSENT_ENABLED: 'false', RESERVE_RESERVATION_CONSENT_RECIPIENT_RETENTION: '', ...overrides } });
     assert.equal(run({}).status, 0);
     assert.notEqual(run({ RESERVE_MFA_ENCRYPTION_KEY: '' }).status, 0);
-    for (const name of ['RESERVE_MFA_ENABLED','RESERVE_RESERVATION_AUTO_COMPLETION_ENABLED','RESERVE_SETTLEMENT_TEST_ENABLED']) {
+    for (const name of ['RESERVE_MFA_ENABLED','RESERVE_RESERVATION_AUTO_COMPLETION_ENABLED','RESERVE_SETTLEMENT_TEST_ENABLED',
+        'RESERVE_RESERVATION_RETENTION_ENABLED','RESERVE_RESERVATION_RETENTION_PURGE_ENABLED','RESERVE_RESERVATION_CONSENT_ENABLED']) {
         assert.notEqual(run({[name]:'unknown'}).status, 0);
         assert.match(start.env[name], /false/);
     }
+    assert.notEqual(run({ RESERVE_RESERVATION_RETENTION_PURGE_ENABLED: 'true' }).status, 0);
+    assert.notEqual(run({ RESERVE_RESERVATION_CONSENT_ENABLED: 'true',
+        RESERVE_RESERVATION_CONSENT_RECIPIENT_RETENTION: 'fixture-approved-retention' }).status, 0);
+    assert.notEqual(run({ RESERVE_RESERVATION_RETENTION_ENABLED: 'true', RESERVE_RESERVATION_CONSENT_ENABLED: 'true' }).status, 0);
+    assert.equal(run({ RESERVE_RESERVATION_RETENTION_ENABLED: 'true', RESERVE_RESERVATION_CONSENT_ENABLED: 'true',
+        RESERVE_RESERVATION_CONSENT_RECIPIENT_RETENTION: 'fixture-approved-retention' }).status, 0);
+    assert.equal(run({ RESERVE_RESERVATION_RETENTION_ENABLED: 'true', RESERVE_RESERVATION_RETENTION_PURGE_ENABLED: 'true' }).status, 0);
+    const common = require('js-yaml').load(read('backend/src/main/resources/application-common.yml')).reserve;
+    assert.equal(common['reservation-consent'].enabled, '${RESERVE_RESERVATION_CONSENT_ENABLED:false}');
+    assert.equal(common['reservation-consent']['recipient-retention'], '${RESERVE_RESERVATION_CONSENT_RECIPIENT_RETENTION:}');
 });
 
 const bashPath = value => process.platform === 'win32'

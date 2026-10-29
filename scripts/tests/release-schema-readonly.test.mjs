@@ -24,7 +24,7 @@ docker() {
     [[ "$1" == exec && "$2" == -e && "$3" == MYSQL_PWD=synthetic-schema-test-only && "$4" == mysql && "$5" == mysql ]] || return 98
     local query
     for query in "$@"; do :; done
-    if [[ "$RESERVE_VERIFY_AUTH_ADMISSION_SCHEMA" == 1 ]]; then
+    if [[ "$RESERVE_VERIFY_AUTH_ADMISSION_SCHEMA" == 1 || "$RESERVE_VERIFY_V11_SCHEMA" == 1 ]]; then
         [[ "$query" == 'START TRANSACTION READ ONLY; '* && "$query" == *' ROLLBACK;' ]] || return 97
     fi
     printf 'SQL %s\n' "$query" >&3
@@ -33,6 +33,8 @@ docker() {
     case "$query" in
         *"SELECT IF(SUBSTRING_INDEX(CURRENT_USER(),'@',1) = 'reserve_backup', 1, 0);"*) printf '%s\n' "$MOCK_AUTHENTICATED_ROLE" ;;
         *"SELECT COUNT(*) FROM information_schema.tables"*"table_name IN ('member','reservation','login_method_challenge','login_session','reservation_request')"*) printf '5\n' ;;
+        *"SELECT COUNT(*) FROM information_schema.tables"*"table_name IN ('mfa_account','mfa_credential','mfa_challenge','mfa_recovery_code','test_settlement_payout','reservation_consent','reservation_retention_hold')"*) printf '7\n' ;;
+        *"SELECT COUNT(*) FROM information_schema.columns"*"table_name = 'mfa_credential' AND column_name IN"*) printf '6\n' ;;
         *"SELECT COUNT(*) FROM information_schema.columns"*"character_set_name = 'ascii'"*) printf '2\n' ;;
         *'FROM information_schema.'*)
             if [[ "$query" != *'SELECT CONCAT(table_name'* ]]; then printf '1\n'; fi ;;
@@ -46,11 +48,12 @@ function run(overrides = {}) {
     const result = spawnSync(bash, ['--noprofile', '--norc', '-s'], {
         input: `${mocks}\n${source}`,
         encoding: 'utf8',
-        timeout: 5000,
+        timeout: process.platform === 'win32' ? 30000 : 5000,
         env: {
             ...process.env, BASH_ENV: '', ENV: '',
             RESERVE_VERIFY_ENV: '/reserve-schema-test-missing-config',
             RESERVE_VERIFY_AUTH_ADMISSION_SCHEMA: '1', RESERVE_VERIFY_WAITING_SIGNUP_SCHEMA: '0',
+            RESERVE_VERIFY_V11_SCHEMA: '0',
             RESERVE_VERIFY_PREVIEW_SCHEMA: '0', MYSQL_CONTAINER: 'mysql', DB_NAME: 'reserve',
             DB_USER: 'reserve_backup', DB_PASSWORD: 'synthetic-schema-test-only', STALE_READY_DAYS: '7',
             MOCK_AUTHENTICATED_ROLE: '1', MOCK_FAIL_SQL: '', MOCK_QUERY_FAILURE: '', ...overrides,
@@ -128,4 +131,35 @@ test('an unsuccessful metadata query cannot be reported as an empty healthy resu
     const result = run({ MOCK_QUERY_FAILURE: "table_name = 'login_session' AND column_name = 'refresh_token_hash'" });
     assert.notEqual(result.status, 0);
     assert.doesNotMatch(result.stdout, /PASS:|auth\/admission schema: contract matches/);
+});
+
+test('v11 opt-in checks JDBC evidence contracts with the backup role and read-only transactions', () => {
+    const result = run({ RESERVE_VERIFY_AUTH_ADMISSION_SCHEMA: '0', RESERVE_VERIFY_V11_SCHEMA: '1' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /v11\/JDBC schema: contract matches/);
+    for (const contract of ['mfa_credential', 'uk_mfa_credential_slot', 'verified_disputed',
+        'notice_snapshot', 'fk_reservation_consent_reservation', 'released_at', 'fk_reservation_retention_hold'])
+        assert.ok(result.stderr.includes(contract), contract);
+    for (const query of result.stderr.split('\n').filter(line => line.startsWith('SQL '))) {
+        assert.ok(query.startsWith('SQL START TRANSACTION READ ONLY; SELECT '), query);
+        assert.ok(query.endsWith(' ROLLBACK;'), query);
+    }
+    for (const overrides of [{ DB_USER: 'root' }, { MOCK_AUTHENTICATED_ROLE: '0' }, { RESERVE_VERIFY_V11_SCHEMA: 'true' }]) {
+        const failure = run({ RESERVE_VERIFY_AUTH_ADMISSION_SCHEMA: '0', RESERVE_VERIFY_V11_SCHEMA: '1', ...overrides });
+        assert.notEqual(failure.status, 0);
+        assert.doesNotMatch(failure.stderr, /FROM information_schema|FROM payment /);
+    }
+});
+
+test('v11 missing evidence columns, weakened holds and failed queries stop verification', () => {
+    for (const fault of ["table_name = 'reservation_consent' AND column_name = 'notice_snapshot'",
+        "k.constraint_name = 'fk_reservation_retention_hold'", "index_name = 'uk_mfa_credential_slot'",
+        "table_name = 'mfa_credential' AND column_name IN"]) {
+        const result = run({ RESERVE_VERIFY_V11_SCHEMA: '1', MOCK_FAIL_SQL: fault });
+        assert.notEqual(result.status, 0);
+        assert.doesNotMatch(result.stdout, /v11\/JDBC schema: contract matches|PASS:/);
+    }
+    const result = run({ RESERVE_VERIFY_V11_SCHEMA: '1', MOCK_QUERY_FAILURE: "table_name = 'reservation_consent'" });
+    assert.notEqual(result.status, 0);
+    assert.doesNotMatch(result.stdout, /v11\/JDBC schema: contract matches|PASS:/);
 });

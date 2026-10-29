@@ -22,7 +22,7 @@
     },
     "content-type": {
       "file": "upstream/content-type.txt",
-      "source": "https://bitbucket.org/connect2id/nimbus-content-type/raw/2.2/LICENSE.txt",
+      "source": "https://bitbucket.org/connect2id/nimbus-content-type/raw/2.3/LICENSE.txt",
       "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
     },
     "epl-2.0": {
@@ -37,7 +37,7 @@
     },
     "h2": {
       "file": "upstream/h2.txt",
-      "source": "https://raw.githubusercontent.com/h2database/h2database/version-2.3.232/LICENSE.txt",
+      "source": "https://raw.githubusercontent.com/h2database/h2database/version-2.5.252/LICENSE.txt",
       "sha256": "827b84bb8f84dbd60d1a8955cefab142d65cc17d267e32996db400138a1e0fcf"
     },
     "hibernate": {
@@ -57,7 +57,7 @@
     },
     "hikari": {
       "file": "upstream/hikari.txt",
-      "source": "https://raw.githubusercontent.com/brettwooldridge/HikariCP/HikariCP-6.3.3/LICENSE",
+      "source": "https://raw.githubusercontent.com/brettwooldridge/HikariCP/HikariCP-7.0.2/LICENSE",
       "sha256": "73ba74dfaa520b49a401b5d21459a8523a146f3b7518a833eea5efa85130bf68"
     },
     "istack": {
@@ -92,7 +92,7 @@
     },
     "json-smart": {
       "file": "upstream/json-smart.txt",
-      "source": "https://raw.githubusercontent.com/netplex/json-smart-v2/2.5.2/LICENSE",
+      "source": "https://raw.githubusercontent.com/netplex/json-smart-v2/v2.6.0/LICENSE",
       "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08"
     },
     "lang-tag": {
@@ -107,32 +107,32 @@
     },
     "logback-classic": {
       "file": "upstream/logback-classic.txt",
-      "source": "https://raw.githubusercontent.com/qos-ch/logback/v_1.5.34/logback-classic/LICENSE.txt",
+      "source": "https://raw.githubusercontent.com/qos-ch/logback/v_1.5.38/logback-classic/LICENSE.txt",
       "sha256": "9224b901579a551596e2a6f0b3488ce833f557bd1c83179858081a0f16a19209"
     },
     "logback-core": {
       "file": "upstream/logback-core.txt",
-      "source": "https://raw.githubusercontent.com/qos-ch/logback/v_1.5.34/logback-core/LICENSE.txt",
+      "source": "https://raw.githubusercontent.com/qos-ch/logback/v_1.5.38/logback-core/LICENSE.txt",
       "sha256": "9224b901579a551596e2a6f0b3488ce833f557bd1c83179858081a0f16a19209"
     },
     "netty": {
       "file": "upstream/netty.txt",
-      "source": "https://raw.githubusercontent.com/netty/netty/netty-4.1.139.Final/LICENSE.txt",
+      "source": "https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/LICENSE.txt",
       "sha256": "aac73b3148f6d1d7111dbca32099f68d26c644c6813ae1e4f05f6579aa2663fe"
     },
     "netty-notice": {
       "file": "upstream/netty-notice.txt",
-      "source": "https://raw.githubusercontent.com/netty/netty/netty-4.1.139.Final/NOTICE.txt",
-      "sha256": "64e368e79be71463922ebb102b33088667cf975edeed8df7f68efe9f89835ca1"
+      "source": "https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/NOTICE.txt",
+      "sha256": "1775b0d91666fcb82493a5198f761b59a6d4d050bae6a4d26ecc377354068571"
     },
     "nimbus-jwt": {
       "file": "upstream/nimbus-jwt.txt",
-      "source": "https://bitbucket.org/connect2id/nimbus-jose-jwt/raw/9.37.4/LICENSE.txt",
+      "source": "https://bitbucket.org/connect2id/nimbus-jose-jwt/raw/10.9.1/LICENSE.txt",
       "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
     },
     "oauth2": {
       "file": "upstream/oauth2.txt",
-      "source": "https://bitbucket.org/connect2id/oauth-2.0-sdk-with-openid-connect-extensions/raw/9.43.6/LICENSE.txt",
+      "source": "https://bitbucket.org/connect2id/oauth-2.0-sdk-with-openid-connect-extensions/raw/11.38.2/LICENSE.txt",
       "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
     },
     "reactive-streams": {
@@ -152,23 +152,23 @@
     },
     "snakeyaml": {
       "file": "upstream/snakeyaml.txt",
-      "source": "https://bitbucket.org/snakeyaml/snakeyaml/raw/snakeyaml-2.4/LICENSE.txt",
+      "source": "https://bitbucket.org/snakeyaml/snakeyaml/raw/snakeyaml-2.6/LICENSE.txt",
       "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9"
     },
     "validation": {
       "file": "upstream/validation.txt",
-      "source": "https://raw.githubusercontent.com/jakartaee/validation/3.0.2/license.txt",
+      "source": "https://raw.githubusercontent.com/jakartaee/validation/3.1.1/license.txt",
       "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
     },
     "validation-copyright": {
       "file": "upstream/validation-copyright.txt",
-      "source": "https://raw.githubusercontent.com/jakartaee/validation/3.0.2/copyright.txt",
+      "source": "https://raw.githubusercontent.com/jakartaee/validation/3.1.1/copyright.txt",
       "sha256": "3305389ff5d7f6cc7e9af04be67d3085b0a9b92cc3faeaefa00336128cf8f85c"
     },
     "validation-notice": {
       "file": "upstream/validation-notice.txt",
-      "source": "https://raw.githubusercontent.com/jakartaee/validation/3.0.2/NOTICE.md",
-      "sha256": "43bb7eb743c48765f9f12635faa0c4ca2fde72b7740c1b85cf2c49d9dbaaee4f"
+      "source": "https://raw.githubusercontent.com/jakartaee/validation/3.1.1/NOTICE.md",
+      "sha256": "ec537c7af98d652c6cd2da2d67b344f37c1bab1fb8ee98600b7d072856015d8d"
     },
     "redis-authx": {
       "source": "https://raw.githubusercontent.com/redis/jvm-redis-authx-entraid/1e6cb85fbd376db092fed18f079dfa7594156b6c/LICENSE",
@@ -212,16 +212,16 @@
     }
   },
   "packages": {
-    "ch.qos.logback:logback-classic:1.5.34": {
-      "jarSha256": "b65e05076a5c1aadb659b4fe4bc5fee31cb26cd70390292eb03e4a7a24cff10f",
+    "ch.qos.logback:logback-classic:1.5.38": {
+      "jarSha256": "afb439c61fa287c9e1925523b13baab03617e724406a389d48b61c2c3e46b700",
       "documents": [
         "logback-classic",
         "epl-2.0",
         "hibernate"
       ]
     },
-    "ch.qos.logback:logback-core:1.5.34": {
-      "jarSha256": "42eda264c0c650c2bec59e66151a88b708a8663dc1b49d788202d53e78b8caae",
+    "ch.qos.logback:logback-core:1.5.38": {
+      "jarSha256": "a855a0fc97b1d06f4efb1c3bba5ebd0eb508d8b58e68e89e4bbc23a85135c883",
       "documents": [
         "logback-core",
         "epl-2.0",
@@ -235,20 +235,52 @@
         "apache-2.0"
       ]
     },
+    "com.github.peteroupc:datautilities:1.1.0": {
+      "jarSha256": "9afa371db3083782216e63e706d83a50d19c7e8db74af47e7339c419380f82bb",
+      "documents": [
+        "datautilities-source-notices",
+        "cc0-1.0"
+      ]
+    },
+    "com.github.peteroupc:numbers:1.8.2": {
+      "jarSha256": "ed894dcb68b9aa22320d6813950d8321d4f82c2c78e68770a443df33e36bdd4e",
+      "documents": [
+        "numbers",
+        "cc0-1.0"
+      ]
+    },
     "com.github.stephenc.jcip:jcip-annotations:1.0-1": {
       "jarSha256": "4fccff8382aafc589962c4edb262f6aa595e34f1e11e61057d1c6a96e8fc7323",
       "documents": [
         "jcip"
       ]
     },
-    "com.h2database:h2:2.3.232": {
-      "jarSha256": "8dae62d22db8982c3dcb3826edb9c727c5d302063a67eef7d63d82de401f07d3",
+    "com.google.errorprone:error_prone_annotations:2.50.0": {
+      "jarSha256": "4667724877f1d37a689202da191e23efa7657c62eef93ccdac406eccfe5cdd0a",
+      "documents": [
+        "apache-2.0"
+      ]
+    },
+    "com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava": {
+      "jarSha256": "b372a037d4230aa57fbeffdef30fd6123f9c0c2db85d0aced00c91b974f33f99",
+      "documents": [
+        "apache-2.0"
+      ]
+    },
+    "com.google.j2objc:j2objc-annotations:3.1": {
+      "jarSha256": "84d3a150518485f8140ea99b8a985656749629f6433c92b80c75b36aba3b099b",
+      "documents": [
+        "j2objc-3.1"
+      ]
+    },
+    "com.h2database:h2:2.5.252": {
+      "jarSha256": "90b11dc413da82070ef15fc943282c1408e6ffd34fa68998335fea8603b5ff20",
       "documents": [
         "h2"
       ]
     },
-    "com.nimbusds:content-type:2.2": {
-      "jarSha256": "730f1816196145e88275093c147f2e6da3c3e541207acd3503a1b06129b9bea9",
+    "com.nimbusds:content-type:2.3": {
+      "jarSha256": "60349793e006fba96b532cb0c21e10e969fe0db8d87f91c3b9eaf82ba2998895",
       "documents": [
         "content-type"
       ]
@@ -259,14 +291,14 @@
         "lang-tag"
       ]
     },
-    "com.nimbusds:nimbus-jose-jwt:9.37.4": {
-      "jarSha256": "8fcf4a978bbee7548e8dee6e0528bc85b0ffa84c0f8517c94dd29e590e459449",
+    "com.nimbusds:nimbus-jose-jwt:10.9.1": {
+      "jarSha256": "33152ea83ec50d22706fdaf3b07acbcd716f9a68edcabdd7c4d02843cbdcdcf6",
       "documents": [
         "nimbus-jwt"
       ]
     },
-    "com.nimbusds:oauth2-oidc-sdk:9.43.6": {
-      "jarSha256": "fee94eae5c4388e1de7fba84e3ada2b92d17bbbb28c630d4258a6f0615c1f303",
+    "com.nimbusds:oauth2-oidc-sdk:11.38.2": {
+      "jarSha256": "30e63220c15bd93006c557bd0d614bb57a5f00232188693577c222383ea4bbe7",
       "documents": [
         "oauth2"
       ]
@@ -278,8 +310,14 @@
         "istack-notice"
       ]
     },
-    "com.zaxxer:HikariCP:6.3.3": {
-      "jarSha256": "709f378c05756280939ce50fc1b1f1a53bb8e1899dc1b249f21f12703640b48b",
+    "com.upokecenter:cbor:4.5.6": {
+      "jarSha256": "415630df447588834ac747800a6b7fac67ff8b8092862f4e3f5283f568bfc2ec",
+      "documents": [
+        "unlicense"
+      ]
+    },
+    "com.zaxxer:HikariCP:7.0.2": {
+      "jarSha256": "f1e612fa27345be3107a85431e8a8aeb205c15364ab2f2d411e40a9d7bb08095",
       "documents": [
         "hikari"
       ]
@@ -302,158 +340,164 @@
         "jjwt"
       ]
     },
-    "io.netty:netty-buffer:4.1.139.Final": {
-      "jarSha256": "48d805b74e56dc5f92b1f288858185abc86db16d293e8da183542df6243427f2",
+    "io.netty:netty-buffer:4.2.19.Final": {
+      "jarSha256": "863f09b46cfe7d83872c9499086b9681cd9878c30a319d9f1f3a681bbfb0b12f",
       "documents": [
         "netty",
         "netty-notice"
       ]
     },
-    "io.netty:netty-codec-http2:4.1.139.Final": {
-      "jarSha256": "4cb8bc95386112f3a9da935272781d577d9e70ca4c56cf0eef603a45e9526e02",
+    "io.netty:netty-codec-base:4.2.19.Final": {
+      "jarSha256": "5702c8097cc81e939dd12e5b39ac2e81f83737c320f6f4d88553577842f9ceb6",
       "documents": [
         "netty",
         "netty-notice"
       ]
     },
-    "io.netty:netty-codec-http:4.1.139.Final": {
-      "jarSha256": "627cfdac2cd5dbd8a33af85977fb81fa6b46f0c00389ab4c8677a415f0f85480",
+    "io.netty:netty-codec-compression:4.2.19.Final": {
+      "jarSha256": "8935c51c7217780ae56d178c938b50ea5729b1e088cf3c2568674e331665554c",
       "documents": [
         "netty",
         "netty-notice"
       ]
     },
-    "io.netty:netty-codec:4.1.139.Final": {
-      "jarSha256": "ad43f07219dfb757a87b9c2b4765002be478c5401971379954e3d182f285fe6b",
+    "io.netty:netty-codec-dns:4.2.19.Final": {
+      "jarSha256": "d8177c55f0864807f6ab02d0af7c72a6b88dd6bfd1a39f3a17e5954e0942fcad",
       "documents": [
         "netty",
         "netty-notice"
       ]
     },
-    "io.netty:netty-common:4.1.139.Final": {
-      "jarSha256": "50372d86e27b4b1cf0810d75eb534795966a199049a1e85a0c41bbd2bb97f519",
+    "io.netty:netty-codec-http2:4.2.19.Final": {
+      "jarSha256": "f45756b12a75b907e98cd0158dc947308ca463cd3d27b9035d11a025a4fdbc4d",
       "documents": [
         "netty",
         "netty-notice"
       ]
     },
-    "io.netty:netty-handler:4.1.139.Final": {
-      "jarSha256": "ff85f00781b956d618b20f33da076c839a5e43e0084108b07bab0c19737168ec",
+    "io.netty:netty-codec-http:4.2.19.Final": {
+      "jarSha256": "7c28809a4f527746fbce2369f5ac5d5fcef45cfe9da21aa3dd9d3f6bdf00cbe0",
       "documents": [
         "netty",
         "netty-notice"
       ]
     },
-    "io.netty:netty-resolver:4.1.139.Final": {
-      "jarSha256": "562a5388c88325b7d6ed05e8168736871ce0e64ab01e0ce52ea7710760b9b457",
+    "io.netty:netty-codec-marshalling:4.2.19.Final": {
+      "jarSha256": "5b24976fda31fd52a85fb7f79f2a5867a0416f68f7b03a9d6ea062b2959d50f7",
       "documents": [
         "netty",
         "netty-notice"
       ]
     },
-    "io.netty:netty-transport-classes-epoll:4.1.139.Final": {
-      "jarSha256": "99ea06d67e3e2792cc93521b686223c78da2561bfdf98533ebb29fed1729cce4",
+    "io.netty:netty-codec-protobuf:4.2.19.Final": {
+      "jarSha256": "f4d10c51f9237d4cffe78978dee2d2473c0eacdb021f0c04a0cc4f123e01f15d",
       "documents": [
         "netty",
         "netty-notice"
       ]
     },
-    "io.netty:netty-transport-native-unix-common:4.1.139.Final": {
-      "jarSha256": "8e660ac8a485fc8d8b47d87d04ea33d19902dc6fc5a113e9353b762188b3f333",
+    "io.netty:netty-codec:4.2.19.Final": {
+      "jarSha256": "9da978357522895ed6141e14c81f776173206f6cdd72e92b637c60e6e624735b",
       "documents": [
         "netty",
         "netty-notice"
       ]
     },
-    "io.netty:netty-transport:4.1.139.Final": {
-      "jarSha256": "be7bff8b6274e7fae12bbad3c565777539e9b069517e0b3acc06d9ac2cd6ec05",
+    "io.netty:netty-common:4.2.19.Final": {
+      "jarSha256": "22fa74761f6e35c8c88972f35cf65664566b922dd73d3424528e97c34278fa79",
       "documents": [
         "netty",
         "netty-notice"
       ]
     },
-    "io.sentry:sentry-reactor:8.58.0": {
-      "jarSha256": "b066e81c5c7ed54845f4ef587b1ccf812a9111220014f1e2e6b978e908697eec",
+    "io.netty:netty-handler:4.2.19.Final": {
+      "jarSha256": "8b469cf23ddf21ba84291f4dff470d2277a28deac95e7084b0ff2ce853e58276",
       "documents": [
-        "sentry"
+        "netty",
+        "netty-notice"
       ]
     },
-    "io.sentry:sentry-spring-boot-jakarta:8.58.0": {
-      "jarSha256": "7e42169f98ab1bdab39a0fcaacf0d11e7e8b3c3f6632e7e764ae68e9bebc42d3",
+    "io.netty:netty-resolver-dns:4.2.19.Final": {
+      "jarSha256": "417aaf5cf25cd07865ea91d2e08916b6974995c54aa83730264fc0e06dd4ea90",
       "documents": [
-        "sentry"
+        "netty",
+        "netty-notice"
       ]
     },
-    "io.sentry:sentry-spring-boot-starter-jakarta:8.58.0": {
-      "jarSha256": "1153c042344620a46d0fbda03b258d7e41b16e861104ed73b1e386761eb17c31",
+    "io.netty:netty-resolver:4.2.19.Final": {
+      "jarSha256": "3ded47536faeb3c4c544a84871d82f461511589afb2a892a180ca425f281363e",
       "documents": [
-        "sentry"
+        "netty",
+        "netty-notice"
       ]
     },
-    "io.sentry:sentry-spring-jakarta:8.58.0": {
-      "jarSha256": "ca85e7bc9939efcd703036377631db748001cdd6a01d944e0e4c8b1e0137be2c",
+    "io.netty:netty-transport-classes-epoll:4.2.19.Final": {
+      "jarSha256": "4d96ba8dd98ace998f6ae7bfe53ae9e581bd92ad2f7ebe5bd994d1a24306db7e",
       "documents": [
-        "sentry"
+        "netty",
+        "netty-notice"
       ]
     },
-    "io.sentry:sentry:8.58.0": {
-      "jarSha256": "f3dd31c01bb478378c038bd85ac2625371e4b5b27b5e1ea65a071f1dcf57f13a",
+    "io.netty:netty-transport-native-unix-common:4.2.19.Final": {
+      "jarSha256": "341e91b8e69e6b7d92c353c845ffd91f34e921b7186254c176a64c7089b3e721",
       "documents": [
-        "sentry"
+        "netty",
+        "netty-notice"
       ]
     },
-    "io.sentry:sentry-reactor:8.59.0": {
-      "jarSha256": "1b0e2fe7eec77b92e95f62c207799edb4a25ab3c4f5a22832a538cf0d3a7aed8",
+    "io.netty:netty-transport:4.2.19.Final": {
+      "jarSha256": "d82d4e200456b8c5d8a1647a3724603f80616e5b35b9ada6e7a20d048f175075",
       "documents": [
-        "sentry-8.59.0"
+        "netty",
+        "netty-notice"
       ]
     },
-    "io.sentry:sentry-spring-boot-jakarta:8.59.0": {
-      "jarSha256": "d3e886d4f433c3467e4dcee7af91df1dac34a3e8dfb77fa6eeb59c42cae0bbac",
+    "io.sentry:sentry-reactor:8.61.0": {
+      "jarSha256": "5effd4bdddf13c02e91bb909b512475a3a630e36e40517fa9a35168cd798561d",
       "documents": [
-        "sentry-8.59.0"
+        "sentry-8.61.0"
       ]
     },
-    "io.sentry:sentry-spring-boot-starter-jakarta:8.59.0": {
-      "jarSha256": "6b12e1bcc12ad426685391e20276b5bc79bd2432187c062d368cca7ebc60f85c",
+    "io.sentry:sentry-spring-7:8.61.0": {
+      "jarSha256": "9a8e81eaf687c616c0a73324873e31432a9e8e40cd33822b116eff43a10c363e",
       "documents": [
-        "sentry-8.59.0"
+        "sentry-8.61.0"
       ]
     },
-    "io.sentry:sentry-spring-jakarta:8.59.0": {
-      "jarSha256": "83bf999a5751ecdff60ac4fb4de04c321eba0e1abc84b4b47bfe301d50deadfe",
+    "io.sentry:sentry-spring-boot-4-starter:8.61.0": {
+      "jarSha256": "276ad3ec8fc14a48e1c73109911a870ee372953e38ed36c0b6a7154fe0d0ae9f",
       "documents": [
-        "sentry-8.59.0"
+        "sentry-8.61.0"
       ]
     },
-    "io.sentry:sentry:8.59.0": {
-      "jarSha256": "2cc8d326c199df031499d44ca72f72dc6ad9a1768e911808b40a65c2435dd6eb",
+    "io.sentry:sentry-spring-boot-4:8.61.0": {
+      "jarSha256": "ec29e164ea990d1afbbf6ea91fb3aec00e77175dc971bdf65236a2d108d5e8c3",
       "documents": [
-        "sentry-8.59.0"
+        "sentry-8.61.0"
       ]
     },
-    "io.smallrye:jandex:3.2.0": {
-      "jarSha256": "6da3e9ce8d0c0a433f3e7ce610a3c66accb00c71fee67aa0ff3e5a841395ac15",
+    "io.sentry:sentry:8.61.0": {
+      "jarSha256": "6f216e48f46146bad58091a77b740791cd793bff6e6cb3e42b719bcb82631f27",
       "documents": [
-        "jandex"
+        "sentry-8.61.0"
       ]
     },
-    "jakarta.validation:jakarta.validation-api:3.0.2": {
-      "jarSha256": "291c25e6910cc6a7ebd96d4c6baebf6d7c37676c5482c2d96146e901b62c1fc9",
+    "jakarta.validation:jakarta.validation-api:3.1.1": {
+      "jarSha256": "63ce00156388c365f3ac1be71fcfaf114682fc0c452020b5df6e7ec236e142ab",
       "documents": [
         "validation",
         "validation-notice",
         "validation-copyright"
       ]
     },
-    "net.minidev:accessors-smart:2.5.2": {
-      "jarSha256": "9b8a7bc43861d6156c021166d941fb7dddbe4463e2fa5ee88077e4b01452a836",
+    "net.minidev:accessors-smart:2.6.0": {
+      "jarSha256": "222c9f547bb20a99fc486403a398352d1306fb671b38abd7ecab6401df170e61",
       "documents": [
         "json-smart"
       ]
     },
-    "net.minidev:json-smart:2.5.2": {
-      "jarSha256": "4fbdedb0105cedc7f766b95c297d2e88fb6a560da48f3bbaa0cc538ea8b7bf71",
+    "net.minidev:json-smart:2.6.0": {
+      "jarSha256": "1ae4b561458afb540be8ec5c6dbb4f2e715a319a7ae64854998aaf924770d61b",
       "documents": [
         "json-smart"
       ]
@@ -464,34 +508,16 @@
         "antlr"
       ]
     },
-    "org.hibernate.common:hibernate-commons-annotations:7.0.3.Final": {
-      "jarSha256": "0db2fd57d5e43688ac6ed5cdf36deaf05d84340dcc24c2dd2a2114de38e5175d",
-      "documents": [
-        "hibernate-annotations"
-      ]
-    },
-    "org.hibernate.orm:hibernate-core:6.6.53.Final": {
-      "jarSha256": "8df110bacf8f4fe72be585cc7fa0a1687c8d360210826bdd35b0fbcaa3e9c09a",
-      "documents": [
-        "hibernate"
-      ]
-    },
-    "org.hibernate.validator:hibernate-validator:8.0.3.Final": {
-      "jarSha256": "2ad24670fd08e21d3f43d3105d5326bd5ef6b01e819c5cd103823866b954517e",
-      "documents": [
-        "hibernate-validator"
-      ]
-    },
     "org.jboss.logging:jboss-logging:3.6.3.Final": {
       "jarSha256": "7c12ee575508f81e22b1db9334b969d0ec54ef0fd1dcba24eeab1a44235fc366",
       "documents": [
         "jboss-logging"
       ]
     },
-    "org.latencyutils:LatencyUtils:2.0.3": {
-      "jarSha256": "a32a9ffa06b2f4e01c5360f8f9df7bc5d9454a5d373cd8f361347fa5a57165ec",
+    "org.jspecify:jspecify:1.0.1": {
+      "jarSha256": "070d75f261fe4c5b8202508366715f7f2d4660f88c8ef7e6d3575e48c9683b66",
       "documents": [
-        "latency"
+        "apache-2.0"
       ]
     },
     "org.ow2.asm:asm:9.7.1": {
@@ -506,17 +532,10 @@
         "reactive-streams"
       ]
     },
-    "org.yaml:snakeyaml:2.4": {
-      "jarSha256": "ef779af5d29a9dde8cc70ce0341f5c6f7735e23edff9685ceaa9d35359b7bb7f",
+    "org.yaml:snakeyaml:2.6": {
+      "jarSha256": "c8f7a98e7394adda02f6317249710e4d1b4c7a25aa8c7eace0c2eea52eb8bf85",
       "documents": [
         "snakeyaml"
-      ]
-    },
-    "software.amazon.eventstream:eventstream:1.0.1": {
-      "jarSha256": "0c37d8e696117f02c302191b8110b0d0eb20fa412fce34c3a269ec73c16ce822",
-      "documents": [
-        "eventstream-source-notices",
-        "apache-2.0"
       ]
     },
     "redis.clients.authentication:redis-authx-core:0.1.1-beta2": {
@@ -526,77 +545,10 @@
         "redis-authx-source-notices"
       ]
     },
-    "io.sentry:sentry-reactor:8.61.0": {
-      "jarSha256": "5effd4bdddf13c02e91bb909b512475a3a630e36e40517fa9a35168cd798561d",
+    "software.amazon.eventstream:eventstream:1.0.1": {
+      "jarSha256": "0c37d8e696117f02c302191b8110b0d0eb20fa412fce34c3a269ec73c16ce822",
       "documents": [
-        "sentry-8.61.0"
-      ]
-    },
-    "io.sentry:sentry-spring-boot-jakarta:8.61.0": {
-      "jarSha256": "8a370552f6fb5ce304917389dac861a20136e0f9686793ca6db479a9eaefd860",
-      "documents": [
-        "sentry-8.61.0"
-      ]
-    },
-    "io.sentry:sentry-spring-boot-starter-jakarta:8.61.0": {
-      "jarSha256": "d20920fb55f21c4ba7e5415c3b8ea036e1f0d838c1a79fbbd6dfbaa2fcf8019b",
-      "documents": [
-        "sentry-8.61.0"
-      ]
-    },
-    "io.sentry:sentry-spring-jakarta:8.61.0": {
-      "jarSha256": "3f5c328982bc633b6b94db419a10801bb6017acb7dcdff31dcc40ea96aaf5702",
-      "documents": [
-        "sentry-8.61.0"
-      ]
-    },
-    "io.sentry:sentry:8.61.0": {
-      "jarSha256": "6f216e48f46146bad58091a77b740791cd793bff6e6cb3e42b719bcb82631f27",
-      "documents": [
-        "sentry-8.61.0"
-      ]
-    },
-    "com.github.peteroupc:datautilities:1.1.0": {
-      "jarSha256": "9afa371db3083782216e63e706d83a50d19c7e8db74af47e7339c419380f82bb",
-      "documents": [
-        "datautilities-source-notices",
-        "cc0-1.0"
-      ]
-    },
-    "com.github.peteroupc:numbers:1.8.2": {
-      "jarSha256": "ed894dcb68b9aa22320d6813950d8321d4f82c2c78e68770a443df33e36bdd4e",
-      "documents": [
-        "numbers",
-        "cc0-1.0"
-      ]
-    },
-    "com.upokecenter:cbor:4.5.6": {
-      "jarSha256": "415630df447588834ac747800a6b7fac67ff8b8092862f4e3f5283f568bfc2ec",
-      "documents": [
-        "unlicense"
-      ]
-    },
-    "com.google.errorprone:error_prone_annotations:2.50.0": {
-      "jarSha256": "4667724877f1d37a689202da191e23efa7657c62eef93ccdac406eccfe5cdd0a",
-      "documents": [
-        "apache-2.0"
-      ]
-    },
-    "com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava": {
-      "jarSha256": "b372a037d4230aa57fbeffdef30fd6123f9c0c2db85d0aced00c91b974f33f99",
-      "documents": [
-        "apache-2.0"
-      ]
-    },
-    "com.google.j2objc:j2objc-annotations:3.1": {
-      "jarSha256": "84d3a150518485f8140ea99b8a985656749629f6433c92b80c75b36aba3b099b",
-      "documents": [
-        "j2objc-3.1"
-      ]
-    },
-    "org.jspecify:jspecify:1.0.1": {
-      "jarSha256": "070d75f261fe4c5b8202508366715f7f2d4660f88c8ef7e6d3575e48c9683b66",
-      "documents": [
+        "eventstream-source-notices",
         "apache-2.0"
       ]
     }

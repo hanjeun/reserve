@@ -11,6 +11,9 @@ advertisement:
     reconciliation-enabled: false
 
 spring:
+  http:
+    converters:
+      preferred-json-mapper: jackson2
   application:
     name: reserve-test
 

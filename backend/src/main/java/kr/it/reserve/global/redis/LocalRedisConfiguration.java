@@ -113,7 +113,8 @@ public class LocalRedisConfiguration {
         return executor;
     }
 
-    @Bean
+    // Spring의 기본 리스너 이름도 같은 인스턴스를 가리켜 중복 구독을 막는다.
+    @Bean({"waitingRedisContainer", "redisMessageListenerContainer"})
     RedisMessageListenerContainer waitingRedisContainer(LettuceConnectionFactory factory,
             @Qualifier("waitingRedisExecutor") ThreadPoolTaskExecutor executor,
             @Qualifier("waitingRedisSubscriptionExecutor") ThreadPoolTaskExecutor subscription,

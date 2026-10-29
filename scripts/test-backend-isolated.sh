@@ -132,12 +132,14 @@ CREATE USER '$fixture_capacity_user'@'%' IDENTIFIED BY '$fixture_capacity_passwo
 CREATE USER '$fixture_oauth_user'@'%' IDENTIFIED BY '$fixture_oauth_password';
 CREATE USER '$fixture_mfa_user'@'%' IDENTIFIED BY '$fixture_mfa_password';
 CREATE USER '$fixture_signup_user'@'%' IDENTIFIED BY '$fixture_signup_password';
+CREATE USER 'reserve_app'@'%' IDENTIFIED BY '$fixture_mfa_password';
 GRANT ALL PRIVILEGES ON $fixture_login_db.* TO '$fixture_login_user'@'%';
 GRANT ALL PRIVILEGES ON $fixture_admission_db.* TO '$fixture_admission_user'@'%';
 GRANT ALL PRIVILEGES ON $fixture_capacity_db.* TO '$fixture_capacity_user'@'%';
 GRANT ALL PRIVILEGES ON $fixture_oauth_db.* TO '$fixture_oauth_user'@'%';
 GRANT ALL PRIVILEGES ON $fixture_mfa_db.* TO '$fixture_mfa_user'@'%';
 GRANT ALL PRIVILEGES ON $fixture_signup_db.* TO '$fixture_signup_user'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON $fixture_mfa_db.* TO 'reserve_app'@'%';
 SQL
 then
     printf 'Synthetic MySQL account/schema preparation failed\n' >&2

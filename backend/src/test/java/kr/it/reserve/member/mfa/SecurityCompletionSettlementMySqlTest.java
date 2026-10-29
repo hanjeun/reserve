@@ -12,6 +12,7 @@ import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 // 기존 DB와 연결되지 않는 합성 스키마만 허용해요.
 @EnabledIfEnvironmentVariable(named = "RESERVE_MYSQL_MFA_TEST_ISOLATED", matches = "1")
@@ -58,6 +59,51 @@ class SecurityCompletionSettlementMySqlTest extends SecurityCompletionSettlement
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM reservation WHERE auto_completion_enabled <> FALSE OR attendance_refund_enabled <> FALSE", Integer.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment WHERE verified_channel_type IS NOT NULL", Integer.class)).isZero();
         factory.unwrap(SessionFactory.class).getSchemaManager().validateMappedObjects();
+        verifyJdbcEvidenceWithRestrictedRole();
+    }
+
+    private void verifyJdbcEvidenceWithRestrictedRole() {
+        jdbc.execute((ConnectionCallback<Void>) connection -> {
+            ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/manual/reservation-consent.sql"));
+            ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/manual/reservation-retention.sql"));
+            return null;
+        });
+        var restricted = new org.springframework.jdbc.datasource.DriverManagerDataSource(
+                required("RESERVE_MYSQL_MFA_TEST_URL"), "reserve_app", required("RESERVE_MYSQL_MFA_TEST_PASSWORD"));
+        var app = new JdbcTemplate(restricted);
+        try {
+            var grants = app.queryForList("SHOW GRANTS", String.class);
+            assertThat(grants).allSatisfy(grant -> assertThat(grant).doesNotContain(
+                    "ALL PRIVILEGES", "CREATE", "ALTER", "DROP", "GRANT OPTION", "SUPER", "FILE"));
+            assertThatThrownBy(() -> app.execute("CREATE TABLE forbidden_fixture(id BIGINT)"))
+                    .isInstanceOf(org.springframework.dao.DataAccessException.class);
+            var transaction = new org.springframework.transaction.support.TransactionTemplate(
+                    new org.springframework.jdbc.datasource.DataSourceTransactionManager(restricted));
+            long reservation = jdbc.queryForObject("SELECT MIN(reservation_id) FROM reservation", Long.class);
+            transaction.executeWithoutResult(status -> {
+                assertThat(app.update("""
+                        INSERT INTO reservation_consent(reservation_id,member_id,store_id,recipient_id,notice_version,
+                            notice_hash,notice_snapshot,privacy_accepted,conditions_accepted,accepted_at,expires_at)
+                        VALUES (?,1,1,1,'fixture',REPEAT('a',64),'{}',TRUE,TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))
+                        """, reservation)).isEqualTo(1);
+                assertThat(app.update("""
+                        INSERT INTO reservation_retention_hold(reservation_id,case_reference,purpose,held_by,held_at)
+                        VALUES (?,'CASE_FIXTURE','DISPUTE',1,UTC_TIMESTAMP(6))
+                        """, reservation)).isEqualTo(1);
+                assertThat(app.queryForObject("SELECT notice_snapshot FROM reservation_consent WHERE reservation_id=?",
+                        String.class, reservation)).isEqualTo("{}");
+                assertThat(app.update("UPDATE reservation_retention_hold SET released_by=1,released_at=UTC_TIMESTAMP(6) WHERE reservation_id=?",
+                        reservation)).isEqualTo(1);
+                assertThat(app.update("DELETE FROM reservation_retention_hold WHERE reservation_id=?", reservation)).isEqualTo(1);
+                assertThat(app.update("DELETE FROM reservation_consent WHERE reservation_id=?", reservation)).isEqualTo(1);
+                status.setRollbackOnly();
+            });
+            assertThat(app.queryForObject("SELECT COUNT(*) FROM reservation_consent", Integer.class)).isZero();
+            assertThat(app.queryForObject("SELECT COUNT(*) FROM reservation_retention_hold", Integer.class)).isZero();
+        } finally {
+            jdbc.execute("DROP TABLE reservation_retention_hold");
+            jdbc.execute("DROP TABLE reservation_consent");
+        }
     }
 
     private static String required(String name) {

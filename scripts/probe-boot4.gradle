@@ -25,7 +25,7 @@ dependencies {
     annotationProcessor platform('org.springframework.boot:spring-boot-dependencies:' + targetBoot)
     implementation platform('software.amazon.awssdk:bom:' + awsVersion)
     if (providers.gradleProperty('legacyJackson').getOrElse('false') == 'true') {
-        def patchedJackson = (current =~ /ext\['jackson-bom.version'\]\s*=\s*'([^']+)'/)
+        def patchedJackson = (current =~ /ext\['jackson(?:-2)?-bom.version'\]\s*=\s*'([^']+)'/)
         if (!patchedJackson.find()) throw new GradleException('Keep the current patched Jackson 2 BOM')
         implementation 'org.springframework.boot:spring-boot-jackson2'
         implementation enforcedPlatform('com.fasterxml.jackson:jackson-bom:' + patchedJackson.group(1))

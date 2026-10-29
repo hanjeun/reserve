@@ -208,7 +208,10 @@ public class MfaService {
             if (value == null) throw rejected(bound.challenge());
             long step = crypto.match(crypto.decrypt(value.getSecretCiphertext(), member.getId()), proof, clock.instant(), value.getLastAcceptedStep());
             if (step < 0) throw rejected(bound.challenge());
-            value.usedTotp(step, now());
+            // 잠금 조회의 스냅샷과 별개로 DB에서 인증 구간을 한 번만 소비한다.
+            if (credentials.consumeTotp(value.getId(), member.getId(), step, now()) != 1)
+                throw rejected(bound.challenge());
+            entityManager.refresh(value, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
         } else if ("BACKUP".equals(kind)) {
             if (bound.challenge().getPurpose() == MfaChallenge.Purpose.PASSKEY_LOGIN || proof == null || proof.length() > 128)
                 throw rejected(bound.challenge());

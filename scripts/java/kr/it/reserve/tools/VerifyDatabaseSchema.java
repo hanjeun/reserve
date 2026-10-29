@@ -23,7 +23,7 @@ class VerifyDatabaseSchema {
         settings.put("hibernate.connection.password", required("DB_PASSWORD"));
         settings.put("hibernate.connection.pool_size", "1");
         settings.put("hibernate.hbm2ddl.auto", "validate");
-        settings.put("hibernate.implicit_naming_strategy", "org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy");
+        settings.put("hibernate.implicit_naming_strategy", "org.springframework.boot.hibernate.SpringImplicitNamingStrategy");
         settings.put("hibernate.physical_naming_strategy", "org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy");
         var registry = new StandardServiceRegistryBuilder().applySettings(settings).build();
         try {

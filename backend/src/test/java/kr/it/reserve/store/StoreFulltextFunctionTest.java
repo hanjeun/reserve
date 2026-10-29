@@ -4,7 +4,7 @@ import kr.it.reserve.store.search.StoreFulltextFunctionContributor;
 import org.hibernate.boot.model.FunctionContributions;
 import org.hibernate.boot.model.FunctionContributor;
 import org.hibernate.dialect.MySQLDialect;
-import org.hibernate.query.ReturnableType;
+import org.hibernate.metamodel.model.domain.ReturnableType;
 import org.hibernate.query.sqm.function.FunctionRenderer;
 import org.hibernate.query.sqm.function.SqmFunctionRegistry;
 import org.hibernate.sql.ast.SqlAstNodeRenderingMode;

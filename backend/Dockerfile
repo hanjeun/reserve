@@ -1,8 +1,8 @@
 FROM amazoncorretto:21-alpine-jdk
 
 # 기반 이미지와 별개로 보안 패치가 적용된 Corretto 패키지 버전을 고정한다.
-# https://github.com/corretto/corretto-21/releases/tag/21.0.13.0.10
-RUN apk add --no-cache amazon-corretto-21=21.0.13.0.10-r0
+# https://github.com/corretto/corretto-21/releases/tag/21.0.13.0.11
+RUN apk add --no-cache amazon-corretto-21=21.0.13.0.11-r0
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
     mkdir -p /var/log/reserve && chown -R appuser:appgroup /var/log/reserve

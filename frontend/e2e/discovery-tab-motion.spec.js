@@ -196,7 +196,7 @@ test('ordinary routes and the password return use the same content-only directio
     await expectContentEntry(page, page.locator('.reserve-discovery-home'), 'from-left', { cached: true });
 
     await page.goto('/login');
-    await page.getByRole('button', { name: '비밀번호를 잊으셨나요?' }).click();
+    await page.getByRole('button', { name: '비밀번호 찾기', exact: true }).click();
     await expect(page).toHaveURL(/\/forgot-password$/);
     await expect(page.getByRole('heading', { name: '비밀번호 찾기', exact: true })).toBeVisible();
     await expectContentEntry(page, content.locator(':scope > div').first(), 'from-right');

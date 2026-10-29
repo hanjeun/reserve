@@ -1,26 +1,22 @@
 import { PageTitle } from '../../components/common/PageTypography';
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Typography } from 'antd';
 import { PageContainer } from '../../components/common';
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
+import useTermsAnchorScroll from './useTermsAnchorScroll';
 
 const { Title, Paragraph, Text } = Typography;
 
 const Section = ({ id, title, children }) => (
-    <section id={id} style={{ marginBottom: 32, scrollMarginTop: 88 }}>
+    <section id={id} tabIndex={id ? -1 : undefined} style={{ marginBottom: 32, scrollMarginTop: 88 }}>
         <Title level={4} style={{ fontWeight: fontWeight.bold, color: colors.text.primary, marginBottom: 12 }}>{title}</Title>
         <div style={{ fontSize: fontSize.base, color: colors.text.secondary, lineHeight: 1.8 }}>{children}</div>
     </section>
 );
 
 const Terms = () => {
-    useEffect(() => {
-        const reveal = () => { if (window.location.hash === '#payments') document.getElementById('payments')?.scrollIntoView({ block: 'start', behavior: 'instant' }); };
-        reveal();
-        window.addEventListener('hashchange', reveal);
-        return () => window.removeEventListener('hashchange', reveal);
-    }, []);
+    useTermsAnchorScroll();
     // 색인 대상 경로다 — 설명을 비워두면 크롤러가 본문 DOM을 긁어 만든 문장이
     // 검색 결과에 실린다(네이버에서 실제로 그렇게 나왔다).
     useDocumentTitle('서비스 이용약관', 'RESERVE 서비스 이용약관 — 회원 자격, 예약과 결제, 취소·환불, 책임 범위를 안내합니다.');

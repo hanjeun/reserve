@@ -86,7 +86,7 @@ export default function PaymentMethodDialog({ open, prepared, summary = {}, meth
         onSubmit={confirm} submitText={amount + ' 결제하기'} submitDisabled={!ready} width={820}
         footer={<div className="reserve-payment-footer">
             <Checkbox checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)}>
-                [필수] {reservation ? '예약' : '주문'} 내용과 <TextLink to="/terms#payments" target="_blank" rel="noopener noreferrer">결제·취소·환불 안내</TextLink>를 확인했어요.
+                [필수] {reservation ? '예약' : '주문'} 내용과 <TextLink to="/terms#payments" onClick={event => event.stopPropagation()}>결제·취소·환불 안내</TextLink>를 확인했어요.
             </Checkbox>
             <Button variant="primary" size="sm" disabled={!ready} onClick={confirm}>{amount} 결제하기</Button>
         </div>}>

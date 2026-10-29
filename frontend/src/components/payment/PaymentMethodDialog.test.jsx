@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { fireEvent, render as renderTesting, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 const render = ui => renderTesting(ui, { wrapper: MemoryRouter });
 const acknowledge = () => fireEvent.click(screen.getByRole('checkbox', { name: /필수/ }));
 import { expect, it, vi } from 'vitest';
@@ -9,12 +9,36 @@ vi.mock('../common/FormModal', () => ({ default: ({ children, footer, onSubmit, 
     <div role="dialog">{children}{footer ?? <button disabled={submitDisabled} onClick={onSubmit}>{submitText}</button>}</div> }));
 const methods = [{ id: 'CARD', label: '카드결제', payMethod: 'CARD' }, { id: 'TOSS_NAVERPAY', brand: 'NAVERPAY', label: '네이버페이', payMethod: 'EASY_PAY', testOnly: true }];
 const prepared = { amount: 10000, productName: '합성 보증금', buyerName: '합성 회원' };
+function TermsReturn() {
+    const navigate = useNavigate();
+    return <><h1>서비스 이용약관</h1><button onClick={() => navigate(-1)}>결제 화면으로</button></>;
+}
 function Checkout({ confirm, availableMethods = methods, paymentDevice }) {
     const [selected, setSelected] = useState('CARD');
     return <PaymentMethodDialog prepared={prepared} methods={availableMethods} selectedId={selected} onChange={setSelected} onConfirm={confirm}
         paymentDevice={paymentDevice} onClose={() => {}} open summary={{ kind: 'RESERVATION', storeName: '합성 가게', reservationCode: 'R-SYNTHETIC',
             reservationDate: '2026-11-01', reservationTime: '14:00:00', guestCount: 2, attendanceRefundEnabled: true }} />;
 }
+it('약관은 현재 탭에서 열고 결제나 동의를 실행하지 않으며 뒤로 돌아올 수 있어요', () => {
+    const confirm = vi.fn();
+    const popup = vi.spyOn(window, 'open');
+    renderTesting(<MemoryRouter initialEntries={['/my-reservations']}><Routes>
+        <Route path="/my-reservations" element={<Checkout confirm={confirm} />} />
+        <Route path="/terms" element={<TermsReturn />} />
+    </Routes></MemoryRouter>);
+    const link = screen.getByRole('link', { name: '결제·취소·환불 안내' });
+    expect(link).toHaveAttribute('href', '/terms#payments');
+    expect(link).not.toHaveAttribute('target');
+    fireEvent.click(link);
+    expect(screen.getByRole('heading', { name: '서비스 이용약관' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(confirm).not.toHaveBeenCalled();
+    expect(popup).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '결제 화면으로' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /필수/ })).not.toBeChecked();
+    popup.mockRestore();
+});
 it('KCP에서는 확인되지 않은 카드사의 직접 호출을 비활성화해요', () => {
     render(<Checkout confirm={vi.fn()} availableMethods={[{ ...methods[0], pgProvider: 'kcp_v2', testOnly: true }]} />);
     fireEvent.click(screen.getByRole('button', { name: '카드사 더 보기' }));

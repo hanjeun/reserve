@@ -1,5 +1,8 @@
 .reserve-auth-title .reserve-ui-icon { font-size: calc(2 * var(--reserve-icon-glyph-size, 20px)); }
 .reserve-login-tools { margin-top: -8px; margin-bottom: 16px; }
+.reserve-login-setup-icon { transform: rotate(0deg); transition: transform 0.2s ease; }
+.reserve-login-setup-icon.is-open { transform: rotate(45deg); }
+@media (prefers-reduced-motion: reduce) { .reserve-login-setup-icon { transition: none; } }
 .reserve-mfa-alternatives, .reserve-auth-secondary-actions { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 16px; margin-top: 24px; }
 .reserve-mfa-alternatives > button { min-height: 32px; }
 .reserve-mfa-verification-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }

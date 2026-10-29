@@ -126,6 +126,7 @@ export default function LoginSecuritySection({ user, initialPasswordOpen = false
     const needsSocialProof = Boolean(status?.socialProvider && !status.socialProofFresh);
     const proofOpen = Boolean(ready && needsSocialProof && proofPanel?.key === loadKey && proofPanel.open);
     const { shouldRender: renderProof, isClosing: proofClosing } = useExitAnimation(proofOpen, reducedMotion ? 0 : 200);
+    const setupOpen = proofOpen || panelOpen && panel?.kind === 'setup-password';
     const toggleProof = () => setProofPanel({ key: loadKey, open: !proofOpen });
     const togglePasswordSetup = () => {
         if (needsSocialProof) toggleProof();
@@ -149,8 +150,8 @@ export default function LoginSecuritySection({ user, initialPasswordOpen = false
                         {status.socialProvider && <IconTool label="이메일 로그인 해제" icon={<DisconnectOutlined aria-hidden="true" />}
                             disabled={busy} active={proofOpen} expanded={needsSocialProof ? proofOpen : undefined}
                             controls={needsSocialProof ? proofPanelId : undefined} onClick={needsSocialProof ? toggleProof : removePassword} />}
-                    </> : <IconTool label="이메일 로그인 설정" icon={<PlusOutlined aria-hidden="true" />} disabled={busy}
-                        active={proofOpen || panelOpen && panel?.kind === 'setup-password'} expanded={needsSocialProof ? proofOpen : undefined}
+                    </> : <IconTool label="이메일 로그인 설정" icon={<PlusOutlined aria-hidden="true" className={`reserve-login-setup-icon${setupOpen ? ' is-open' : ''}`} />} disabled={busy}
+                        active={setupOpen} expanded={needsSocialProof ? proofOpen : undefined}
                         controls={needsSocialProof ? proofPanelId : undefined} onClick={togglePasswordSetup} />}
                 </div>
             </div>

@@ -1,18 +1,12 @@
-/* 고정된 본문 부모가 골격부터 내용까지 한 번 진입해요. */
+/* 헤더와 탐색 탭은 정지하고, 본문 부모가 스켈레톤을 포함해 한 번 들어온다.
+   자식 교체는 부모의 애니메이션을 다시 시작하지 않는다. */
 @media (prefers-reduced-motion: no-preference) {
-    /* 골격과 같은 클래스가 있어도 실제 홈의 준비된 영역만 한 번 들어온다. */
-    [data-home-logo-entry='true'] [data-home-content='true'] .reserve-discovery-location,
-    [data-home-logo-entry='true'] [data-home-content='true'] .reserve-discovery-featured,
-    [data-home-logo-entry='true'] [data-home-content='true'] .reserve-discovery-shortcuts {
-        animation: reserve-discovery-page-from-left 180ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
-    }
     .reserve-route-entry--from-right {
         animation: reserve-discovery-page-from-right 180ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
     }
     .reserve-route-entry--from-left {
         animation: reserve-discovery-page-from-left 180ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
     }
-
     .reserve-explore-result--page-next {
         animation: reserve-discovery-page-from-right 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
     }

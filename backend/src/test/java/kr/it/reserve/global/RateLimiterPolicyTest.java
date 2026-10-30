@@ -11,6 +11,25 @@ class RateLimiterPolicyTest {
 
     private static final String IP = "203.0.113.9";
 
+    @Test
+    void oversizedSubjectsAreRejectedWithoutRetainingRequestText() {
+        RateLimiter limiter = new RateLimiter();
+        String oversizedEmail = "a".repeat(1024 * 1024) + "@example.com";
+
+        assertThat(limiter.tryConsume(oversizedEmail, RateLimiter.Policy.LOGIN_ACCOUNT)).isFalse();
+        assertThat(limiter.tryConsume(oversizedEmail, RateLimiter.Policy.CODE_VERIFY_ACCOUNT)).isFalse();
+        assertThat(limiter.tryConsume(null, RateLimiter.Policy.LOGIN_ACCOUNT)).isFalse();
+        limiter.refund(oversizedEmail, RateLimiter.Policy.LOGIN_ACCOUNT);
+        limiter.refund(null, RateLimiter.Policy.LOGIN_ACCOUNT);
+        assertThat((java.util.Map<?, ?>) org.springframework.test.util.ReflectionTestUtils.getField(limiter, "buckets"))
+                .isEmpty();
+
+        String validEmail = "a".repeat(64) + "@" + "b".repeat(63) + "." + "c".repeat(63) + "." + "d".repeat(61);
+        assertThat(validEmail).hasSize(254);
+        assertThat(limiter.tryConsume(validEmail, RateLimiter.Policy.LOGIN_ACCOUNT)).isTrue();
+        assertThat(limiter.tryConsume(IP, RateLimiter.Policy.LOGIN)).isTrue();
+    }
+
     /** 정책 한도만큼 연속 소비하고, 마지막에 한 번 더 시도한 결과를 돌려준다. */
     private static boolean drainThenTryOnceMore(RateLimiter limiter, RateLimiter.Policy policy, String key) {
         for (int i = 0; i < policy.capacity(); i++) {

@@ -7,6 +7,7 @@ import kr.it.reserve.store.dto.StoreResponse;
 import kr.it.reserve.store.dto.StoreRegionGroup;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.entity.ServiceDomain;
+import kr.it.reserve.store.entity.WaitingIntakeMode;
 import kr.it.reserve.store.repository.StoreRepository;
 import kr.it.reserve.store.repository.StoreSearchSpecification;
 import kr.it.reserve.store.search.StoreFulltextSearch;
@@ -27,11 +28,13 @@ final class StoreDirectory {
     private final StoreRepository storeRepository;
     private final StoreFulltextSearch storeFulltextSearch;
     private final boolean fulltextEnabled;
+    private final StoreWaitingCounts waitingCounts;
 
-    StoreDirectory(StoreRepository stores, StoreFulltextSearch fulltext, boolean enabled) {
+    StoreDirectory(StoreRepository stores, StoreFulltextSearch fulltext, boolean enabled, StoreWaitingCounts waitingCounts) {
         storeRepository = stores;
         storeFulltextSearch = fulltext;
         fulltextEnabled = enabled;
+        this.waitingCounts = waitingCounts;
     }
 
     List<StoreResponse> getMyStores(Member member) {
@@ -61,6 +64,9 @@ final class StoreDirectory {
                 .orElseThrow(StoreException::notFound);
         if (store.getDeletedAt() != null || store.isSuspended()) {
             throw StoreException.notFound();
+        }
+        if (store.resolveWaitingIntakeMode() != WaitingIntakeMode.OFF) {
+            return StoreResponse.fromWaitingDirectory(store, waitingCounts.activeTeams(id));
         }
         return StoreResponse.fromEntity(store);
     }

@@ -49,7 +49,6 @@ export const styles = {
 
     section: {
         minHeight: `calc(100svh - ${heights.header})`,
-        scrollMarginTop: heights.header,
         padding: '0 24px',
         display: 'flex',
         flexDirection: 'column',
@@ -79,7 +78,6 @@ export const styles = {
     sectionMobile: {
 
         minHeight: `calc(100svh - ${heights.header})`,
-        scrollMarginTop: heights.header,
         padding: '60px 20px',
         display: 'flex',
         flexDirection: 'column',

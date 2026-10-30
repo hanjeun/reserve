@@ -3,6 +3,7 @@ import process from 'node:process';
 
 export default defineConfig({
     testDir: './e2e',
+    outputDir: './test-results/playwright',
     fullyParallel: false,
     forbidOnly: Boolean(process.env.CI),
     retries: process.env.CI ? 1 : 0,

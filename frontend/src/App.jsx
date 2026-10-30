@@ -288,7 +288,6 @@ function AppRoutes() {
     const documentEntry = useDocumentEntry();
     const navigationType = useNavigationType();
     const isSearchPage = isSearchPath(pathname);
-    const homeLogoEntry = pathname === '/' && locationState?.reserveHomeEntry === true;
     const routeContentRef = useRef(null);
     const mobileDiscovery = useWindowWidth() <= 767 && discoveryRoot && !isOAuthCallback;
     const previousPathnameRef = useRef(/** @type {string | null} */ (null));
@@ -315,8 +314,8 @@ function AppRoutes() {
             navigationType,
             explicitDirection: locationState?.reserveRouteMotion,
         });
-        // 검색의 헤더/본문 전환과 복원은 전용 모션을 사용해 가로 페이지 전환을 겹치지 않는다.
-        const routeMotion = isSearchPage || homeLogoEntry ? null : resolvedRouteMotion;
+        // 자체 진입 효과가 있는 화면에는 공통 가로 전환을 겹치지 않는다.
+        const routeMotion = isSearchPage ? null : resolvedRouteMotion;
 
         // 검색 뒤 복원되는 헤더와 본문에 같은 진입 표식을 둔다. 쿼리 정규화에서는 유지한다.
         if (previousPathname !== pathname) {
@@ -333,7 +332,7 @@ function AppRoutes() {
         previousPathnameRef.current = pathname;
         previousDiscoveryTabRef.current = currentTabIndex;
         previousHistoryIndexRef.current = historyIndex;
-    }, [pathname, search, locationKey, locationState, navigationType, isSearchPage, homeLogoEntry, skeletonShown, presentation, documentEntry]);
+    }, [pathname, search, locationKey, locationState, navigationType, isSearchPage, skeletonShown, presentation, documentEntry]);
 
     return (
         <TooltipScopeContext.Provider value={locationKey}>
@@ -345,9 +344,9 @@ function AppRoutes() {
             {discoveryRoot && <DiscoveryNav pendingPathname={isOAuthCallback ? displayLocation.pathname : undefined} />}
             <Content ref={routeContentRef} data-skeleton-shown={skeletonShown ? 'true' : undefined}
                 data-document-entry={documentEntry ? 'true' : undefined}
-                data-home-logo-entry={homeLogoEntry ? 'true' : undefined}
                 onAnimationEnd={event => {
-                    if (['reserve-discovery-page-from-right', 'reserve-discovery-page-from-left'].includes(event.animationName)) {
+                    if (event.target === event.currentTarget
+                        && ['reserve-discovery-page-from-right', 'reserve-discovery-page-from-left'].includes(event.animationName)) {
                         clearRouteEntryMotion(routeContentRef.current);
                     }
                 }}>
@@ -366,16 +365,16 @@ function AppRoutes() {
                     <Route path="/feed/posts/:id" element={<FeedDetail />} />
                     <Route path="/feed/u/:publicId" element={<FeedAuthor />} />
                     <Route path="/login" element={<Login />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
+                    <Route path="/oauth2/callback" element={<OAuthCallback />} />
+                    <Route path="/stores" element={<StoreList />} />
+                    <Route path="/store/:id" element={<StoreDetail />} />
                     <Route element={<SignupLegalLayout signup={<Signup />} socialAgreement={<SocialAgreement />} />}>
                         <Route path="/signup" element={null} />
                         <Route path="/signup/social" element={null} />
                         <Route path="/terms" element={<Terms />} />
                         <Route path="/privacy" element={<Privacy />} />
                     </Route>
-                    <Route path="/forgot-password" element={<ForgotPassword />} />
-                    <Route path="/oauth2/callback" element={<OAuthCallback />} />
-                    <Route path="/stores" element={<StoreList />} />
-                    <Route path="/store/:id" element={<StoreDetail />} />
                     <Route path="/content-sources" element={<ContentSources />} />
                     <Route path="/operation-guide" element={<OperationGuide />} />
                     <Route path="/guide/user" element={<UserGuide />} />

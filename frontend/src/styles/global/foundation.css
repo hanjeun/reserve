@@ -76,18 +76,18 @@ button, input, textarea, select {
     width: auto !important;
 }
 
-/* Ant Design v6: Select open 상태 화살표 회전 */
-.ant-select-suffix {
+/* AntD의 suffix 전환(opacity/color)과 겹치지 않게 꺾쇠 자체를 회전한다. */
+.ant-select .ant-select-suffix > .anticon-down {
     transform: rotate(0deg);
     transform-origin: center;
     transition: transform 0.2s;
 }
-.ant-select-open .ant-select-suffix {
+.ant-select-open .ant-select-suffix > .anticon-down {
     transform: rotate(180deg);
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .ant-select-suffix { transition: none; }
+    .ant-select .ant-select-suffix > .anticon-down { transition: none; }
 }
 
 /* 넘친 패널 탭은 AntD의 더보기 버튼으로 접근한다. */

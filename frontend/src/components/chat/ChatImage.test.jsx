@@ -13,6 +13,7 @@ vi.mock('../../store/useAuthStore', () => ({ default: Object.assign(
 ) }));
 vi.mock('../../services/chatService', () => ({ default: { getImage: vi.fn() } }));
 vi.mock('antd', () => ({ Image: props => <button aria-label={props['aria-label']}
+    className={props.classNames?.root} data-preview-cover={props.preview.cover}
     aria-hidden={props['aria-hidden']} aria-expanded={props.preview.open} onKeyDown={props.onKeyDown}
     onClick={() => props.preview.onOpenChange(true)}><img src={props.src} alt={props.alt} style={props.style}
         onLoad={props.onLoad} onError={props.onError} /></button> }));
@@ -71,6 +72,8 @@ it('keeps the supplied photo ratio while fetching and decoding without showing a
     fireEvent.load(screen.getByAltText('대화에 첨부한 사진'));
     expect(screen.queryByLabelText('사진을 불러오는 중')).toBeNull();
     expect(screen.getByRole('button', { name: '사진 크게 보기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '사진 크게 보기' })).toHaveAttribute('data-preview-cover', 'false');
+    expect(screen.getByRole('button', { name: '사진 크게 보기' })).toHaveClass('reserve-chat-photo', 'reserve-photo-preview-trigger');
     expect(frame).toHaveStyle({ aspectRatio: '600 / 200' });
     expect(screen.getByRole('img')).toHaveStyle({ objectFit: 'contain', opacity: '1' });
 });

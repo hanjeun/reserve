@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
+import { withPhotoPreviewHint } from '../../utils/photoPreview';
 import { Image } from 'antd';
 import { requestChatImageBlob } from '../../utils/chatImageRequests';
 import useChatImageVisibility from '../../hooks/useChatImageVisibility';
@@ -78,7 +79,7 @@ export default function ChatImage({ url, roomId, width, height }) {
             <Bone width="100%" height="100%" borderRadius={10} />
         </output>}
         {!current?.error && current?.src && <Image src={current.src} alt="대화에 첨부한 사진" style={style}
-        classNames={{ root: 'reserve-chat-photo', image: 'reserve-chat-photo-image', popup: { root: 'reserve-image-preview' } }}
+        classNames={{ root: 'reserve-chat-photo reserve-photo-preview-trigger', image: 'reserve-chat-photo-image', popup: { root: 'reserve-image-preview' } }}
         styles={{ root: { width: '100%', height: '100%' } }}
         onLoad={() => settle()} onError={() => settle(true)}
         role={loaded ? 'button' : undefined} tabIndex={loaded ? 0 : -1} aria-hidden={!loaded}
@@ -96,9 +97,9 @@ export default function ChatImage({ url, roomId, width, height }) {
                 setPreviewScope(scope);
             }
         }}
-        preview={{ cover: false,
+        preview={withPhotoPreviewHint({ cover: false,
             open: loaded && previewScope === scope,
-            onOpenChange: open => setPreviewScope(open && loaded ? scope : null) }} />}
+            onOpenChange: open => setPreviewScope(open && loaded ? scope : null) })} />}
     </div>;
 }
 ChatImage.propTypes = { url: PropTypes.string.isRequired, roomId: PropTypes.number, width: PropTypes.number, height: PropTypes.number };

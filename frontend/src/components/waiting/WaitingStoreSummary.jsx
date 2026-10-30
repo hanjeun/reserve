@@ -3,23 +3,28 @@ import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import InfoHint from '../common/InfoHint';
 import useLiveUpdatesStatus from '../../hooks/useLiveUpdatesStatus';
+import { storeKeys } from '../../hooks/queryKeys';
 
-export default function WaitingStoreSummary({ store }) {
+export default function WaitingStoreSummary({ store, detail = false }) {
     const client = useQueryClient();
     const live = useLiveUpdatesStatus();
     const [open, setOpen] = useState(false);
+    const storeId = store.id;
+    const refresh = useCallback(() => client.invalidateQueries(detail
+        ? { queryKey: storeKeys.detail(String(storeId)), exact: true }
+        : { queryKey: ['waiting-stores'] }, { cancelRefetch: false }), [client, detail, storeId]);
     const refreshOnOpen = useCallback(open => {
         setOpen(open);
-        if (open) void client.invalidateQueries({ queryKey: ['waiting-stores'] }, { cancelRefetch: false });
-    }, [client]);
-    const liveWaiting = live.connected && live.domains.includes('WAITING');
+        if (open) void refresh();
+    }, [refresh]);
+    const liveWaiting = live.connected && live.domains.includes(detail ? 'STORE' : 'WAITING');
     useEffect(() => {
         if (!open || liveWaiting) return undefined;
         const timer = window.setInterval(() => {
-            if (!document.hidden) void client.invalidateQueries({ queryKey: ['waiting-stores'] }, { cancelRefetch: false });
+            if (!document.hidden) void refresh();
         }, 5000);
         return () => window.clearInterval(timer);
-    }, [client, open, liveWaiting]);
+    }, [refresh, open, liveWaiting]);
     const mode = store.waitingIntakeMode;
     const state = store.waitingPaused ? 'paused' : mode === 'ONSITE' ? 'onsite' : 'open';
     const label = state === 'paused' ? '접수 중지' : state === 'onsite' ? '현장 접수만 가능' : '접수 가능';
@@ -35,8 +40,10 @@ export default function WaitingStoreSummary({ store }) {
 }
 WaitingStoreSummary.propTypes = {
     store: PropTypes.shape({
+        id: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
         waitingIntakeMode: PropTypes.string,
         waitingPaused: PropTypes.bool,
         waitingTeams: PropTypes.number,
     }).isRequired,
+    detail: PropTypes.bool,
 };

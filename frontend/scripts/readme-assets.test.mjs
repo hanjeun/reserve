@@ -2,21 +2,22 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { README_IMAGE_FILENAMES } from './readme-image-paths.mjs';
+import { README_IMAGE_FILENAMES, readmeImageDimensions } from './readme-image-paths.mjs';
 
 const repositoryUrl = new URL('../../', import.meta.url);
 const readText = relativePath => readFileSync(new URL(relativePath, repositoryUrl), 'utf8');
 
-test('README screenshots match their flat manifest and PNG viewport', () => {
+test('README screenshots match their manifest, image format and actual viewport', () => {
     const manifest = JSON.parse(readText('docs/images/screenshots.json'));
     assert.deepEqual(manifest.files.map(file => file.path).sort(), Object.values(README_IMAGE_FILENAMES).sort());
     for (const file of manifest.files) {
         const image = readFileSync(new URL(`docs/images/${file.path}`, repositoryUrl));
         assert.equal(image.byteLength, file.bytes, file.path);
         assert.equal(createHash('sha256').update(image).digest('hex'), file.sha256, file.path);
-        assert.equal(image.subarray(0, 8).toString('hex'), '89504e470d0a1a0a', file.path);
-        assert.equal(image.readUInt32BE(16), manifest.viewport.width, file.path);
-        assert.equal(image.readUInt32BE(20), manifest.viewport.height, file.path);
+        if (file.mimeType === 'image/png') assert.equal(image.subarray(0, 8).toString('hex'), '89504e470d0a1a0a', file.path);
+        else { assert.equal(file.mimeType, 'image/jpeg'); assert.equal(image.readUInt16BE(0), 0xffd8, file.path); }
+        assert.deepEqual(readmeImageDimensions(image), file.viewport, file.path);
+        assert.ok(file.viewport.width >= 1280 && file.viewport.height >= 700, file.path);
     }
 });
 
@@ -39,5 +40,5 @@ test('the capture tool uses the shared filename mapping and no deleted generator
     assert.ok(source.includes("from './readme-image-paths.mjs'"));
     assert.ok(source.includes('README_IMAGE_FILENAMES[name]'));
     assert.ok(!source.includes('readme-v2.6'));
-    assert.equal(README_IMAGE_FILENAMES.monitoring, 'grafana.png');
+    assert.equal(README_IMAGE_FILENAMES.monitoring, 'grafana.jpg');
 });

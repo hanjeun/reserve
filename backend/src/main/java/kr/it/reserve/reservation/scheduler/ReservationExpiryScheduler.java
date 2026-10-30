@@ -1,9 +1,9 @@
 package kr.it.reserve.reservation.scheduler;
 
-import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -29,12 +29,16 @@ public class ReservationExpiryScheduler {
 
     // 조회 범위 버퍼: 최소 timeout(1분)보다 오래된 것만 조회
     private static final int QUERY_BUFFER_MINUTES = 1;
+    private static final int BATCH_SIZE = 100;
+    private final ReservationCandidateCursor cursor = new ReservationCandidateCursor(BATCH_SIZE);
 
     @Scheduled(fixedDelay = 5 * 60 * 1000) // 5분마다 실행
-    public void expireUnpaidReservations() {
+    public synchronized void expireUnpaidReservations() {
         LocalDateTime cutoff = LocalDateTime.now(Clock.systemDefaultZone()).minusMinutes(QUERY_BUFFER_MINUTES);
 
-        List<Reservation> candidates = reservationRepository.findExpiredUnpaidReservations(cutoff);
+        List<Long> candidates = cursor.next(reservationRepository::findMaximumReservationId,
+                (afterId, throughId) -> reservationRepository.findExpiredUnpaidReservationIds(
+                        cutoff, afterId, throughId, PageRequest.of(0, BATCH_SIZE)));
 
         if (candidates.isEmpty()) {
             return;
@@ -45,10 +49,10 @@ public class ReservationExpiryScheduler {
         int recoveredCount = 0;
         int deferredCount = 0;
 
-        for (Reservation candidate : candidates) {
+        for (Long reservationId : candidates) {
             try {
                 ReservationExpiryProcessor.ExpiryResult result =
-                        expiryProcessor.expireIfDue(candidate.getId(), now);
+                        expiryProcessor.expireIfDue(reservationId, now);
                 switch (result) {
                     case CANCELLED -> expiredCount++;
                     case PAYMENT_RECOVERED -> recoveredCount++;
@@ -61,7 +65,7 @@ public class ReservationExpiryScheduler {
                 // 한 예약의 예외가 배치 전체를 중단하거나 다른 결제의 잠금을 오래 잡게 하지 않는다.
                 deferredCount++;
                 log.error("[ExpiryScheduler] Candidate processing failed: reservationId={}, errorType={}",
-                        candidate.getId(), e.getClass().getSimpleName());
+                        reservationId, e.getClass().getSimpleName());
             }
         }
 

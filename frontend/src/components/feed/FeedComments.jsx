@@ -4,6 +4,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Avatar, Bone, Button, DataState } from '../common';
 import IconTool from '../common/IconTool';
+import RetryButton from '../common/RetryButton';
 import { CloseOutlined, CommentOutlined } from '../common/icons';
 import FeedItemMenu from './FeedItemMenu';
 import ChatComposer from '../chat/ChatComposer';
@@ -107,6 +108,7 @@ function FeedCommentsSession({ postId }) {
     const { message, confirm } = useMessage();
     const navigate = useNavigate();
     const location = useLocation();
+    const reducedMotion = useReducedMotion();
     const [content, setContent] = useState(returningDraft?.content || '');
     const [images, setImages] = useState([]);
     const [preparing, setPreparing] = useState(false);
@@ -168,6 +170,17 @@ function FeedCommentsSession({ postId }) {
     }, [focusedComment, focusedRoot, focusedId, postId, location.key]);
     const comments = useInfiniteQuery({ queryKey: interactionKeys.comments(postId), initialPageParam: 0,
         queryFn: ({ pageParam, signal }) => service.comments(postId, { ...requestPage, page: pageParam }, signal), enabled, getNextPageParam: nextPage });
+    const commentsReady = enabled && !comments.isPending;
+    useEffect(() => {
+        const key = `${postId}:comments:${location.key}`;
+        if (location.hash !== '#comments' || !commentsReady || returningDraft || scrolledAnchor.current === key) return undefined;
+        const frame = requestAnimationFrame(() => {
+            if (!listRef.current) return;
+            scrolledAnchor.current = key;
+            listRef.current.scrollIntoView({ block: 'start', behavior: reducedMotion ? 'auto' : 'smooth' });
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [postId, location.key, location.hash, commentsReady, reducedMotion, returningDraft]);
     const unavailable = [config, comments].some(query => [401, 403].includes(httpStatusOf(query.error))) || isMissingRequestError(comments.error);
     const failure = config.isError && [401, 403].includes(httpStatusOf(config.error)) ? config : comments;
     const profileUnavailable = [401, 403].includes(httpStatusOf(profile.error));
@@ -295,7 +308,7 @@ function FeedCommentsSession({ postId }) {
                     onRemove={uid => { setPhotoError(''); setImages(current => current.filter(image => { if (image.uid !== uid) return true;
                         if (objectUrls.current.has(image.url)) { URL.revokeObjectURL(image.url); objectUrls.current.delete(image.url); } return false; })); }} />} />
             {error && <p className="reserve-field-error" role="alert">{error}</p>}
-            {profile.isError && <Button variant="ghost-sm" onClick={() => profile.refetch()}>공개 프로필 다시 불러오기</Button>}
+            {profile.isError && <RetryButton variant="ghost-sm" onRetry={profile.refetch} loading={profile.isFetching}>공개 프로필 다시 불러오기</RetryButton>}
         </form>
         <Suspense fallback={null}>{reportMounted && <FeedReportModal commentId={reportId} onClose={() => setReportId(null)} />}</Suspense>
     </section>;

@@ -160,6 +160,7 @@ public final class ImageFileValidator {
         }
 
         Dimensions dimensions = null;
+        Dimensions canvas = null;
         boolean hasImagePayload = false;
         int offset = 12;
         while (offset < bytes.length) {
@@ -177,8 +178,22 @@ public final class ImageFileValidator {
                 case "ANMF" -> dimensionsAnmf(bytes, data, chunkSize);
                 default -> null;
             };
-            if (chunkDimensions != null && dimensions == null) {
-                dimensions = chunkDimensions;
+            if (chunkDimensions != null) {
+                // 작은 캔버스 헤더 뒤에 큰 프레임을 숨겨도 동일한 크기 제한을 적용한다.
+                validateDimensions(chunkDimensions);
+                if ("VP8X".equals(type)) {
+                    if (dimensions != null) throw unsupported("중복되거나 순서가 잘못된 WebP 캔버스예요.");
+                    canvas = chunkDimensions;
+                } else if ("ANMF".equals(type)) {
+                    if (canvas == null
+                            || 2L * unsigned24Le(bytes, data) + chunkDimensions.width > canvas.width
+                            || 2L * unsigned24Le(bytes, data + 3) + chunkDimensions.height > canvas.height) {
+                        throw unsupported("WebP 프레임이 캔버스 범위를 벗어났어요.");
+                    }
+                } else if (canvas != null && !canvas.equals(chunkDimensions)) {
+                    throw unsupported("WebP 캔버스와 이미지 크기가 일치하지 않아요.");
+                }
+                if (dimensions == null) dimensions = chunkDimensions;
             }
             if ("VP8L".equals(type) || "VP8 ".equals(type) || "ANMF".equals(type)) {
                 hasImagePayload = true;
@@ -227,6 +242,7 @@ public final class ImageFileValidator {
         Dimensions frameDimensions = new Dimensions(
                 1 + unsigned24Le(bytes, data + 6),
                 1 + unsigned24Le(bytes, data + 9));
+        validateDimensions(frameDimensions);
 
         boolean hasFramePayload = false;
         int offset = data + 16;
@@ -241,11 +257,16 @@ public final class ImageFileValidator {
             long next = (long) payload + chunkSize + (chunkSize & 1);
             if (next > end) throw unsupported("잘린 ANMF 하위 chunk예요.");
 
-            if ("VP8L".equals(type)) {
-                dimensionsVp8l(bytes, payload, chunkSize);
-                hasFramePayload = true;
-            } else if ("VP8 ".equals(type)) {
-                dimensionsVp8(bytes, payload, chunkSize);
+            Dimensions payloadDimensions = switch (type) {
+                case "VP8L" -> dimensionsVp8l(bytes, payload, chunkSize);
+                case "VP8 " -> dimensionsVp8(bytes, payload, chunkSize);
+                default -> null;
+            };
+            if (payloadDimensions != null) {
+                validateDimensions(payloadDimensions);
+                if (hasFramePayload || !frameDimensions.equals(payloadDimensions)) {
+                    throw unsupported("WebP 프레임과 이미지 크기가 일치하지 않아요.");
+                }
                 hasFramePayload = true;
             }
             offset = (int) next;

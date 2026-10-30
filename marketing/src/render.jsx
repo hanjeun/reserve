@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import Home, { homeAnimationStyles } from './home';
-import Footer, { FOOTER_STYLES } from './Footer';
+import Footer from './Footer';
 import { faqCollapseStyles } from './home/sections/FaqSection';
 import Button from '../../frontend/src/components/common/Button';
 import { LockOutlined, UserOutlined } from '../../frontend/src/components/common/icons';
@@ -12,7 +12,7 @@ function Header() {
         justifyContent: 'space-between', alignItems: 'center', padding: '0 24px', position: 'sticky',
         top: 0, zIndex: 1000, borderBottom: `1px solid ${colors.border.light}`, height: heights.header,
     }}>
-        <a href="/" style={{ fontSize: 22, fontWeight: fontWeight.heavy, color: colors.primary.main,
+        <a href="/" data-scroll-top style={{ fontSize: 22, fontWeight: fontWeight.heavy, color: colors.primary.main,
             letterSpacing: '-0.8px', textDecoration: 'none' }}>RESERVE</a>
         <nav aria-label="계정" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Button variant="ghost" size="md" icon={<LockOutlined />} data-app-path="/login" style={{ fontWeight: fontWeight.semibold,
@@ -29,6 +29,6 @@ export function renderPage() {
         mobile: renderToStaticMarkup(<Home isMobile />),
         header: renderToStaticMarkup(<Header />),
         footer: renderToStaticMarkup(<Footer />),
-        css: [homeAnimationStyles, faqCollapseStyles, FOOTER_STYLES].join('\n'),
+        css: [`:root { --marketing-header-height: ${heights.header}; }`, homeAnimationStyles, faqCollapseStyles].join('\n'),
     };
 }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { applyRouteEntryMotion, clearRouteEntryMotion, resolveRouteEntryMotion } from './routeEntryMotion';
 
 const base = {
@@ -82,11 +82,24 @@ describe('route entry lifetime', () => {
         expect(content).not.toHaveClass('reserve-route-entry--from-right');
     });
 
-    it('keeps the same entrance while a full page skeleton becomes the body', () => {
+    it('keeps one entrance on the stable parent through skeleton appearance and replacement', () => {
         const content = document.createElement('main');
-        content.classList.add('reserve-route-entry--from-left');
+        const measure = vi.spyOn(content, 'getBoundingClientRect');
+        applyRouteEntryMotion(content, { pathnameChanged: true, direction: 'from-left', skeletonShown: true });
+        expect(content).toHaveClass('reserve-route-entry--from-left');
         applyRouteEntryMotion(content, { pathnameChanged: false, direction: null, skeletonShown: true });
         expect(content).toHaveClass('reserve-route-entry--from-left');
+        content.replaceChildren(document.createElement('p'));
+        expect(measure).toHaveBeenCalledTimes(1);
+        clearRouteEntryMotion(content);
+        applyRouteEntryMotion(content, { pathnameChanged: false, direction: null, skeletonShown: true });
+        expect(content).not.toHaveClass('reserve-route-entry--from-left');
+    });
+
+    it('never replays a persisted direction on document entry, even with a cached body', () => {
+        const content = document.createElement('main');
+        applyRouteEntryMotion(content, { pathnameChanged: true, direction: 'from-right', skeletonShown: false, documentEntry: true });
+        expect(content).not.toHaveClass('reserve-route-entry--from-right');
     });
 
     it('clears the old direction on a route with its own motion', () => {

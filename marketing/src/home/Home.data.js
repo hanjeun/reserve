@@ -6,28 +6,28 @@ export const STORE_DATA = [
         category: '필라테스',
         rating: 4.9,
         reviewCount: 128,
-        img: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=400&q=80',
+        img: '/images/pilates.jpg',
     },
     {
         name: '청담 헤어살롱 료',
         category: '헤어',
         rating: 4.8,
         reviewCount: 94,
-        img: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=400&q=80',
+        img: '/images/hair.jpg',
     },
 ];
 
 export const RESERVATION_DATA = [
     {
         storeName: '모던 필라테스 스튜디오',
-        img: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=400&q=80',
+        img: '/images/pilates.jpg',
         date: '2026-03-15', time: '19:00', guestCount: 2, amount: 50000,
         statusLabel: '예약 확정', statusColor: colors.primary.main,
         actionLabel: '취소', actionVariant: 'ghost-sm-danger',
     },
     {
         storeName: '청담 헤어살롱 료',
-        img: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=400&q=80',
+        img: '/images/hair.jpg',
         date: '2026-03-22', time: '20:00', guestCount: 4, amount: 80000,
         statusLabel: '이용 완료', statusColor: colors.success.main,
         actionLabel: '리뷰 쓰기', actionVariant: 'ghost-sm-primary',

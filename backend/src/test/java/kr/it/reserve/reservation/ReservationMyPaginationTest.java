@@ -81,6 +81,40 @@ class ReservationMyPaginationTest {
         assertThat(repository.searchForMember(other, "r-search-one", null, PageRequest.of(0, 15))).isEmpty();
     }
 
+    @Test
+    void candidateQueriesReturnOnlyBoundedOrderedIdsAndRespectTheirExistingEligibility() {
+        Member customer = member("batch-customer@example.test");
+        Store store = store(customer, "배치 가게");
+        store.setAllowLatePayment(false);
+        List<Long> eligible = new ArrayList<>();
+        for (int i = 0; i < 105; i++) {
+            Reservation row = reservation(customer, store);
+            row.setDepositAmount(1000);
+            row.setDepositPaid(false);
+            eligible.add(row.getId());
+        }
+        Reservation paid = reservation(customer, store);
+        paid.setDepositAmount(1000);
+        paid.setDepositPaid(true);
+        paid.setStatus(Reservation.ReservationStatus.COMPLETED);
+        entityManager.flush();
+        LocalDateTime cutoff = LocalDateTime.now().plusMinutes(1);
+        long upper = repository.findMaximumReservationId();
+        entityManager.clear();
+
+        var first = repository.findExpiredUnpaidReservationIds(cutoff, 0, upper, PageRequest.of(0, 100));
+        assertThat(first).containsExactlyElementsOf(eligible.subList(0, 100));
+        assertThat(repository.findExpiredUnpaidReservationIds(cutoff, first.getLast(), upper, PageRequest.of(0, 100)))
+                .containsExactlyElementsOf(eligible.subList(100, 105));
+        assertThat(repository.findElapsedActiveReservationIds(LocalDate.of(2031, 1, 1), LocalTime.NOON,
+                first.getLast(), upper, PageRequest.of(0, 100)))
+                .containsExactlyElementsOf(eligible.subList(100, 105));
+        assertThat(repository.findElapsedActiveReservationIds(LocalDate.of(2029, 1, 1), LocalTime.NOON,
+                0, upper, PageRequest.of(0, 100))).isEmpty();
+        assertThat(repository.findExpiredUnpaidReservationIds(cutoff, 0, eligible.get(1), PageRequest.of(0, 100)))
+                .containsExactlyElementsOf(eligible.subList(0, 2));
+    }
+
     private Member member(String email) {
         Member member = Member.builder().name("검토용").email(email).role(Role.USER).build();
         entityManager.persist(member);

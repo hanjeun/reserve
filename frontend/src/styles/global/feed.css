@@ -6,7 +6,8 @@
 .reserve-feed-content { min-width: 0; width: 100%; max-width: 640px; margin-inline: auto; }
 .reserve-legacy-domain-notice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; max-width: 1200px; margin: 16px auto; padding: 12px 20px; border-radius: 12px; background: var(--c-gray-50); color: var(--c-text-secondary); font-size: 14px; }
 .reserve-legacy-domain-notice a { color: var(--c-primary); text-decoration: underline; text-underline-offset: 3px; }
-.reserve-feed-directory-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; min-height: 60px; margin-bottom: 16px; border-bottom: 1px solid var(--c-border-default); }
+.reserve-feed-directory { padding-top: 16px; }
+.reserve-feed-directory-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--c-border-default); }
 .reserve-feed-write-tools { display: flex; align-items: center; gap: 8px; }
 .reserve-favorites-toolbar { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
 .reserve-favorites-toolbar > .reserve-filter-menu { margin-inline-start: auto; }
@@ -164,6 +165,9 @@
 .reserve-route-skeleton.reserve-route-skeleton--feed,
 .reserve-route-skeleton.reserve-route-skeleton--feed-detail,
 .reserve-route-skeleton.reserve-route-skeleton--feed-author { max-width: none; padding: 0; }
+@media (max-width: 767px) {
+    .reserve-feed-directory { padding-top: 12px; }
+}
 @media (max-width: 575px) {
     .reserve-feed-page.reserve-page-container:not(.reserve-feed-notifications-page) { padding-inline: 0 !important; }
     .reserve-feed-column-header, .reserve-feed-heading { padding-inline: 16px; }

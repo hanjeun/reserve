@@ -500,7 +500,18 @@
 }
 
 /* 이미지 미리보기의 툴바·탐색·닫기 도구가 같은 공통 색상을 사용한다. */
-/* 사진 위 아이콘의 대비를 위해 기본 배경을 두고 호버 시 공통 밝은 면으로 전환한다. */.reserve-image-preview {
+/* 사진은 확대 문구 없이 기존 덮개로 호버와 키보드 포커스를 표시한다. */
+.reserve-photo-preview-trigger .ant-image-cover { pointer-events: none; }
+/* 채팅 사진의 투명 영역에는 덮개 배경을 칠하지 않는다. */
+.reserve-chat-photo.reserve-photo-preview-trigger .ant-image-cover { background: transparent; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.28); }
+@media (hover: none), (pointer: coarse) {
+    .reserve-photo-preview-trigger:not(:focus-visible) .ant-image-cover { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .reserve-photo-preview-trigger .ant-image-cover { transition: none; }
+}
+
+.reserve-image-preview {
     --preview-btn-bg: rgba(0, 0, 0, 0.12);
     --preview-btn-hover: rgba(229, 232, 235, 0.28);
 }

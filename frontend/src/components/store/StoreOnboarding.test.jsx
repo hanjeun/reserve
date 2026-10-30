@@ -6,6 +6,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import StoreOnboarding from './StoreOnboarding';
 import { buildStoreFormData } from '../../utils/form';
 import { requestRegistrationStepBack } from '../../utils/storeRegistrationNavigation';
+import { createLoadingPresentation, LoadingPresentationContext } from '../layout/loadingPresentation';
 
 vi.mock('../../hooks', () => ({ useWindowWidth: () => 1100 }));
 vi.mock('./StoreDetailPreview', () => ({ default: ({ store, infoContent, device }) => <section aria-label="가게 상세 미리보기" data-device={device}>
@@ -31,6 +32,18 @@ function Harness({ restored, mode = 'create', initialValues }) {
 beforeEach(() => { submit.mockReset(); draft.mockReset(); changes.mockReset(); });
 const currentQuestion = () => within(document.querySelector('.reserve-onboarding-step:not([hidden])'));
 const actions = () => within(document.querySelector('.reserve-store-form-actions'));
+
+it.each(['document', 'skeleton', 'cached'])('leaves the initial %s entrance to the route and preserves question transitions', async phase => {
+    const presentation = createLoadingPresentation('form-entry', { documentEntry: phase === 'document' });
+    if (phase === 'skeleton') presentation.markSkeletonShown();
+    const { container } = render(<LoadingPresentationContext.Provider value={presentation}><Harness /></LoadingPresentationContext.Provider>);
+    expect(container.querySelector('.reserve-onboarding-page')).toHaveAttribute('data-step-motion', 'false');
+    fireEvent.click(currentQuestion().getByRole('button', { name: '맛집 · 카페' }));
+    fireEvent.click(actions().getByRole('button', { name: '다음' }));
+    await screen.findByRole('heading', { level: 1, name: '손님을 어떻게 받고 싶으세요?' });
+    expect(container.querySelector('.reserve-onboarding-page')).not.toHaveAttribute('data-step-motion');
+    expect(submit).not.toHaveBeenCalled();
+});
 
 it('validates one question at a time, skips booking for waiting-only and never submits an intermediate step', async () => {
     render(<Harness />);

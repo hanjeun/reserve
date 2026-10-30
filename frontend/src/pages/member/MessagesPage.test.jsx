@@ -96,6 +96,20 @@ describe('MessagesPage route motion', () => {
         expect(useMessengerStore.getState().activeThread).toBe(true);
     });
 
+    it('keeps an opening in progress when the conversation commits a skeleton', () => {
+        const presentation = createLoadingPresentation('messages-thread-entry');
+        const { container } = render(<MemoryRouter initialEntries={['/messages']}>
+            <LoadingPresentationContext.Provider value={presentation}><MessagesPage /></LoadingPresentationContext.Provider>
+        </MemoryRouter>);
+        const page = container.querySelector('.reserve-messages-route');
+        expect(page).toHaveClass('is-opening');
+        act(() => presentation.markSkeletonShown());
+        expect(container.querySelector('.reserve-messages-route')).toBe(page);
+        expect(page).toHaveClass('is-opening');
+        fireEvent.click(screen.getByRole('button', { name: '메시지 닫기' }));
+        expect(page).toHaveClass('is-closing');
+        expect(page).not.toHaveClass('is-opening');
+    });
 
     it('does not restart opacity from zero after a route skeleton and still animates closing', async () => {
         const presentation = createLoadingPresentation('messages-entry');
@@ -111,6 +125,14 @@ describe('MessagesPage route motion', () => {
         await waitFor(() => expect(goBack).toHaveBeenCalledTimes(1));
     });
 
+    it('does not open again on a document refresh but retains the explicit close transition', () => {
+        const presentation = createLoadingPresentation('restored-messages', { documentEntry: true });
+        const { container } = render(<MemoryRouter initialEntries={['/messages']}><LoadingPresentationContext.Provider value={presentation}><MessagesPage /></LoadingPresentationContext.Provider></MemoryRouter>);
+        const page = container.querySelector('.reserve-messages-route');
+        expect(page).not.toHaveClass('is-opening');
+        fireEvent.click(screen.getByRole('button', { name: '메시지 닫기' }));
+        expect(page).toHaveClass('is-closing');
+    });
     it.each([
         ['kind=support', 'USER', { kind: 'support' }],
         ['ownerRoomId=78', 'BUSINESS', { kind: 'owner', roomId: 78 }],

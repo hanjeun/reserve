@@ -9,7 +9,7 @@ export default function MarketingStoreCard({ store }) {
     }}>
         <div className="reserve-store-card-shell">
             <div style={{ overflow: 'hidden', lineHeight: 0, margin: 0 }}>
-                <img src={store.img} alt={store.name} className="reserve-card-image" style={{
+                <img src={store.img} alt={store.name} width="400" height="267" className="reserve-card-image" style={{
                     width: '100%', height: 'auto', objectFit: 'cover', transition: 'transform 0.3s', display: 'block',
                 }} />
             </div>

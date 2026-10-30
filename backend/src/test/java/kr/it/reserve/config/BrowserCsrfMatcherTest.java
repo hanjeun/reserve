@@ -36,6 +36,21 @@ class BrowserCsrfMatcherTest {
     }
 
     @Test
+    void intermediateAuthenticationCookiesRequireOriginProofBeforeApplicationTokensExist() {
+        for (String name : List.of("mfa_ticket", "JSESSIONID")) {
+            var request = new MockHttpServletRequest("POST", "/api/auth/mfa/cancel");
+            request.setServletPath("/api/auth/mfa/cancel");
+            request.setCookies(new Cookie(name, "synthetic-authentication"));
+            assertThat(matcher.matches(request)).isTrue();
+            request.addHeader("Referer", "https://untrusted.example/");
+            assertThat(matcher.matches(request)).isTrue();
+            request.removeHeader("Referer");
+            request.addHeader("Origin", "https://reserve.it.kr");
+            assertThat(matcher.matches(request)).isFalse();
+        }
+    }
+
+    @Test
     void browserWritesNeedAnExactTrustedOrigin() {
         var request = write();
         for (String origin : List.of("null", "http://reserve.it.kr", "https://reserve.it.kr.evil.example")) {

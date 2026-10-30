@@ -8,7 +8,6 @@ import { IndustryQuestion, ServiceQuestion, BookingQuestion, WaitingQuestion, Op
 import { STORE_FORM_DENSITY_VARS, storeFormFrame } from './storeFormFrame';
 import { useWindowWidth } from '../../hooks';
 import useReducedMotion from '../../hooks/useReducedMotion';
-import { useSkeletonShown } from '../layout/loadingPresentation';
 import { STORE_ONBOARDING_DEFAULTS, STORE_ONBOARDING_DOMAINS, onboardingSteps, onboardingPreviewStore, onboardingFieldDomain, normalizeOnboardingSubmission } from '../../utils/storeOnboarding';
 import { REGISTRATION_BACK_EVENT } from '../../utils/storeRegistrationNavigation';
 
@@ -60,7 +59,6 @@ export default function StoreOnboarding({ mode = 'create', form, formRef, initia
     const advancing = useRef(false);
     const [stepChanged, setStepChanged] = useState(false);
     const reducedMotion = useReducedMotion();
-    const skeletonShown = useSkeletonShown();
     const { container, isMobile } = storeFormFrame(useWindowWidth());
     const imageUrls = usePreviewImages(mainImage, detailImages);
     const reviewValues = last ? { ...STORE_ONBOARDING_DEFAULTS, ...form.getFieldsValue(true) } : null;
@@ -163,7 +161,7 @@ export default function StoreOnboarding({ mode = 'create', form, formRef, initia
     return <PageContainer {...container} size={last && !isMobile ? 'xl' : container.size}
         className="reserve-store-form-page reserve-onboarding-page" style={STORE_FORM_DENSITY_VARS}
         data-onboarding-step={current.key}
-        data-step-motion={skeletonShown && !stepChanged ? 'false' : undefined}>
+        data-step-motion={!stepChanged ? 'false' : undefined}>
         <div className="reserve-onboarding-shell">
             <PageTitle key={current.key} level={1} ref={heading} tabIndex={-1} className="reserve-onboarding-heading">{current.title}</PageTitle>
             <Form form={form} ref={formRef} layout="vertical" requiredMark={false} validateTrigger="onBlur" size="large"

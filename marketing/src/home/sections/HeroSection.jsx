@@ -1,35 +1,18 @@
 import { Typography } from '../../primitives.jsx';
 import { ArrowRightOutlined } from '../../../../frontend/src/components/common/icons.js';
-import { colors, fontWeight } from '../../../../frontend/src/styles/tokens/index.js';
 import Button from '../../../../frontend/src/components/common/Button.jsx';
-import { LINES, fullText } from '../../typing';
+import { LINES } from '../../typing';
+import TypingLine from '../../TypingLine';
 import { styles } from '../Home.styles';
 import BounceArrow from './BounceArrow';
 
 const { Title, Text } = Typography;
 
-function renderParts(current, line) {
-    const bl = line.before.length, be = bl + line.blue.length;
-    const b = current.slice(0, Math.min(current.length, bl));
-    const m = current.length > bl ? current.slice(bl, Math.min(current.length, be)) : '';
-    const a = current.length > be ? current.slice(be) : '';
-    return (
-        <>
-            <span data-typing-before style={{ fontWeight: fontWeight.extrabold, color: colors.text.primary }}>{b}</span>
-            <span data-typing-blue style={{ fontWeight: fontWeight.extrabold, color: colors.primary.main }}>{m}</span>
-            <span data-typing-after style={{ fontWeight: fontWeight.extrabold, color: colors.text.primary }}>{a}</span>
-        </>
-    );
-}
-
 const ANIMATION = `bounceAppear 0.75s cubic-bezier(0.22,1,0.36,1) 0.6s forwards, bounceY 1.6s ease-in-out 1.5s infinite`;
 
 export default function HeroSection({ isMobile }) {
-    const current = fullText(LINES[0]);
-    const lineIdx = 0;
-
     return (
-        <div style={{
+        <section className="marketing-scene" style={{
             ...styles.contentArea,
             display: 'flex',
             flexDirection: 'column',
@@ -52,11 +35,10 @@ export default function HeroSection({ isMobile }) {
                     가장 쉬운 예약 경험
                 </div>
                 <div className="slide-up" style={{ ...styles.titleContainer, animationDelay: '0.18s' }}>
-                    <Title style={styles.mainTitle}>
+                    <Title style={styles.mainTitle} aria-label="예약이 필요한 순간, RESERVE">
                         <div style={styles.lineWrapper}>예약이 필요한 순간,</div>
                         <div data-marketing-typing style={styles.lineWrapper}>
-                            {renderParts(current, LINES[lineIdx])}
-                            <span className="cursor" />
+                            <TypingLine line={LINES[0]} />
                         </div>
                     </Title>
                 </div>
@@ -66,10 +48,13 @@ export default function HeroSection({ isMobile }) {
                         원하는 예약을 가장 빠르게 도와드립니다.
                     </Text>
                 </div>
-                <div className="slide-up" style={{ animationDelay: '0.36s', marginTop: 32 }}>
-                    <Button variant="hero" data-app-path="/stores">
+                <div className="slide-up marketing-hero-actions" style={{ animationDelay: '0.36s', marginTop: 32 }}>
+                    <Button variant="primary" size={isMobile ? 'lg' : 'hero'} data-app-path="/stores" style={{ flex: '1 1 0', minWidth: 0, padding: '0 20px' }}>
                         지금 둘러보기
                         <ArrowRightOutlined style={{ marginLeft: 8, fontSize: 17 }} />
+                    </Button>
+                    <Button variant="secondary" size={isMobile ? 'lg' : 'hero'} data-app-path="/signup" style={{ flex: '1 1 0', minWidth: 0, padding: '0 20px' }}>
+                        시작하기
                     </Button>
                 </div>
             </div>
@@ -87,6 +72,6 @@ export default function HeroSection({ isMobile }) {
                     animation: ANIMATION,
                 }}
                 />
-        </div>
+        </section>
     );
 }

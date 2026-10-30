@@ -20,7 +20,8 @@ vi.mock('../common', () => ({
     Button: ({ children, htmlType, disabled }) => <button type={htmlType} disabled={disabled}>{children}</button>,
     DataState: ({ title, onRetry }) => <div><p>{title}</p><button onClick={onRetry}>다시 불러오기</button></div>,
 }));
-vi.mock('../common/IconTool', () => ({ default: ({ label }) => <span>{label}</span> }));
+vi.mock('../common/IconTool', () => ({ default: ({ label, to, disabled, onClick }) => to && !disabled
+    ? <a href={to} aria-label={label}>{label}</a> : <button type="button" disabled={disabled} onClick={onClick}>{label}</button> }));
 vi.mock('../feed/FeedProfileFields', async () => {
     const { Form, Input } = await import('antd');
     return { default: ({ avatarField }) => <>
@@ -51,6 +52,16 @@ beforeEach(() => {
 });
 
 describe('public profile background read preservation', () => {
+    it('places the existing profile link in the photo title row', () => {
+        state.profile.data = { ...state.profile.data, publicId: 'member-seven' };
+        render(view());
+        const link = screen.getByRole('link', { name: '내 공개 프로필 보기' });
+        expect(link).toHaveAttribute('href', '/feed/u/member-seven');
+        expect(link.closest('.ant-form-item-label')).toHaveTextContent('피드 프로필 사진');
+        expect(link.closest('.reserve-account-public-profile-avatar')).not.toBeNull();
+        expect(link.closest('.reserve-account-public-profile-actions')).toBeNull();
+    });
+
     it('retains the actual editor values and selected photo after a transient profile failure', () => {
         const { rerender } = render(view());
         fireEvent.change(screen.getByLabelText('공개 닉네임'), { target: { value: '작성 중 이름' } });

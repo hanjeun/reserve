@@ -33,7 +33,10 @@ describe('deferred private session replay', () => {
         expect(client.addIntegration).not.toHaveBeenCalled();
         win.addEventListener.mock.calls[0][1]();
         await win.requestIdleCallback.mock.calls[0][0]();
-        expect(replayIntegration).toHaveBeenCalledWith({ maskAllText: true, blockAllMedia: true });
+        expect(replayIntegration).toHaveBeenCalledWith({
+            maskAllText: true, blockAllMedia: true, networkCaptureBodies: false,
+            beforeAddRecordingEvent: expect.any(Function),
+        });
         expect(client.addIntegration).toHaveBeenCalledWith({ name: 'Replay' });
     });
 

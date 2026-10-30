@@ -484,6 +484,7 @@ describe('app discovery home', () => {
         await user.click(screen.getByRole('button', { name: '현재 위치로' }));
 
         expect(locationRequest).toHaveBeenCalledTimes(1);
+        expect(locationRequest).toHaveBeenCalledWith({ showError: true });
         expect(setLiveLocation).toHaveBeenCalledWith(position);
         expect(navigate).toHaveBeenCalledWith('/stores?sort=distance&lat=37.321&lng=126.813&region=all');
     });
@@ -518,9 +519,23 @@ describe('app discovery home', () => {
 
         await user.click(screen.getByRole('button', { name: '현재 위치로' }));
 
+        expect(locationRequest).toHaveBeenCalledWith({ showError: false });
         expect(messageInfo).toHaveBeenCalledWith('마이페이지에 등록된 위치 기준으로 정렬할게요.');
         expect(navigate).toHaveBeenCalledWith('/stores?sort=distance&lat=37.581&lng=126.979&region=all');
         expect(setLiveLocation).not.toHaveBeenCalled();
+    });
+
+    it('does not suppress a location failure for invalid saved coordinates', async () => {
+        const user = userEvent.setup();
+        locationState.user = { latitude: 120, longitude: 45 };
+        renderHome();
+        navigate.mockClear();
+
+        await user.click(screen.getByRole('button', { name: '현재 위치로' }));
+
+        expect(locationRequest).toHaveBeenCalledWith({ showError: true });
+        expect(messageInfo).not.toHaveBeenCalled();
+        expect(navigate).not.toHaveBeenCalled();
     });
 
     it('disables the location action while the existing hook is requesting', () => {

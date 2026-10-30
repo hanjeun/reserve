@@ -42,12 +42,12 @@ ext['h2.version'] = '2.5.252'
 
 dependencies {
 
-    implementation platform('software.amazon.awssdk:bom:2.56.0')
+    implementation platform('software.amazon.awssdk:bom:2.57.4')
 
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     // 결제·감사 JSON 계약을 유지하며 Jackson 3 전환을 분리한다.
     implementation 'org.springframework.boot:spring-boot-jackson2'
-    implementation 'io.sentry:sentry-spring-boot-4-starter:8.61.0'
+    implementation 'io.sentry:sentry-spring-boot-4-starter:8.62.0'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-validation'

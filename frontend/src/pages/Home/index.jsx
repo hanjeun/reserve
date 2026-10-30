@@ -28,7 +28,7 @@ import useAuthStore from '../../store/useAuthStore';
 import useLocationStore from '../../store/useLocationStore';
 import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
 import { storeService } from '../../services';
-import { distanceSortParams } from '../../utils/distanceSort';
+import { distanceSortParams, hasDistanceCoordinates } from '../../utils/distanceSort';
 import { formatRegionLabel } from '../../constants/regions';
 
 const withRegion = (path, region) => {
@@ -413,11 +413,12 @@ export default function Home() {
     };
 
     const handleCurrentLocation = useCallback(async () => {
-        const position = await requestLocation();
+        const hasSavedLocation = hasDistanceCoordinates(user?.latitude, user?.longitude);
+        const position = await requestLocation({ showError: !hasSavedLocation });
         let location = position;
         if (position) {
             setLiveLocation(position);
-        } else if (user?.latitude != null && user?.longitude != null) {
+        } else if (hasSavedLocation) {
             location = { latitude: user.latitude, longitude: user.longitude };
             message.info('마이페이지에 등록된 위치 기준으로 정렬할게요.');
         }

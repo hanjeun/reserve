@@ -28,6 +28,22 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
+it('offers the shared enlarge hint and keyboard action while preserving controlled preview options', async () => {
+    const onOpenChange = vi.fn();
+    const view = render(<LoadingAntImage src={FIRST} alt="가게 사진" preview={{ open: false, onOpenChange }} />);
+    const trigger = await screen.findByRole('button', { name: '가게 사진 크게 보기' });
+    expect(trigger.querySelector('.ant-image-cover')).toBeEmptyDOMElement();
+    expect(screen.queryByText('크게 보기')).toBeNull();
+    expect(trigger).toHaveClass('reserve-photo-preview-trigger');
+    fireEvent.keyDown(trigger, { key: 'Enter' });
+    expect(onOpenChange).toHaveBeenCalledWith(true);
+    view.rerender(<LoadingAntImage src={FIRST} alt="가게 사진" preview={false} />);
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(view.container.querySelector('.ant-image-cover')).toBeNull();
+    fireEvent.click(screen.getByAltText('가게 사진'));
+    expect(onOpenChange).toHaveBeenCalledTimes(1);
+});
+
 it('withholds protected sources from real AntD preflight until visible, preserving the full preview group', async () => {
     const view = render(<Image.PreviewGroup items={[FIRST, SECOND]}>
         <div className="reserve-feed-media-item"><LoadingAntImage src={FIRST} srcSet={`${FIRST} 1x`} fallback={FALLBACK}
@@ -114,7 +130,7 @@ it.each([undefined, 'eager'])('keeps original eager source, geometry and preview
     expect(observers).toHaveLength(0);
     expect(screen.getByAltText('사진')).toHaveAttribute('src', FIRST);
     expect(screen.getByAltText('사진')).toHaveStyle({ aspectRatio: 'auto 600 / 800', height: '360px', objectFit: 'contain' });
-    expect(screen.getByRole('button', { name: '사진' })).toHaveClass('original-root');
+    expect(screen.getByRole('button', { name: '사진 크게 보기' })).toHaveClass('original-root');
     expect(view.container.querySelector('[class*="reserve-lazy-image-"]')).toBeNull();
     expect(preflight.mock.calls.some(([src]) => src === FIRST)).toBe(true);
 });

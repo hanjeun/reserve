@@ -1,9 +1,10 @@
 import { StrictMode, Suspense, lazy, useMemo } from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import Bone from '../common/Bone';
-import { LoadingPresentationContext, createLoadingPresentation, useSkeletonShown } from './loadingPresentation';
+import { LoadingPresentationContext, createLoadingPresentation, useDocumentEntry, useRouteLoadingPresentation, useSkeletonShown } from './loadingPresentation';
 
 function Content({ children }) {
     const shown = useSkeletonShown();
@@ -12,6 +13,20 @@ function Content({ children }) {
 function Navigation({ navigationKey = 'first', loading = false, children = <p>내용</p> }) {
     const presentation = useMemo(() => createLoadingPresentation(navigationKey), [navigationKey]);
     return <LoadingPresentationContext.Provider value={presentation}><Content>{loading ? <Bone /> : children}</Content></LoadingPresentationContext.Provider>;
+}
+function DocumentMarker() {
+    const documentEntry = useDocumentEntry();
+    return <output data-testid="document-entry">{String(documentEntry)}</output>;
+}
+function RouteNavigation({ loading }) {
+    const location = useLocation();
+    const navigate = useNavigate();
+    const presentation = useRouteLoadingPresentation(location, useNavigationType());
+    return <LoadingPresentationContext.Provider value={presentation}>
+        <Content>{loading && <Bone />}<DocumentMarker /></Content>
+        <button onClick={() => navigate('?region=all', { replace: true })}>주소 보정</button>
+        <button onClick={() => navigate('/my-page')}>새 화면</button>
+    </LoadingPresentationContext.Provider>;
 }
 
 describe('one loading presentation per navigation', () => {
@@ -28,6 +43,20 @@ describe('one loading presentation per navigation', () => {
         rerender(<StrictMode><Navigation /></StrictMode>);
         expect(screen.getByTestId('content')).toHaveTextContent('내용');
         expect(screen.getByTestId('content')).toHaveAttribute('data-skeleton-shown', 'true');
+    });
+
+    it('retains the document and skeleton phase through same-page replacement, then starts a fresh navigation', () => {
+        const tree = loading => <MemoryRouter initialEntries={['/']}><RouteNavigation loading={loading} /></MemoryRouter>;
+        const view = render(tree(true));
+        expect(screen.getByTestId('content')).toHaveAttribute('data-skeleton-shown', 'true');
+        expect(screen.getByTestId('document-entry')).toHaveTextContent('true');
+        view.rerender(tree(false));
+        fireEvent.click(screen.getByRole('button', { name: '주소 보정' }));
+        expect(screen.getByTestId('content')).toHaveAttribute('data-skeleton-shown', 'true');
+        expect(screen.getByTestId('document-entry')).toHaveTextContent('true');
+        fireEvent.click(screen.getByRole('button', { name: '새 화면' }));
+        expect(screen.getByTestId('content')).not.toHaveAttribute('data-skeleton-shown');
+        expect(screen.getByTestId('document-entry')).toHaveTextContent('false');
     });
 
     it('allows existing entrance motion when cached data is ready, including a later navigation', () => {

@@ -2,6 +2,8 @@ version: '3.8'
 services:
   blue:
     container_name: blue
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     # 배포는 커밋 SHA 태그를 명시하며, 값이 없으면 latest를 사용한다.
     image: ${DOCKERHUB_USERNAME}/reserve:${IMAGE_TAG:-latest}
     ports:

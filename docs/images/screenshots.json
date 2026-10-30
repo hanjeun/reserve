@@ -1,55 +1,84 @@
 {
-  "schemaVersion": 2,
-  "purpose": "README screenshots captured from a real site.",
-  "viewport": {
-    "width": 1600,
-    "height": 900
-  },
-  "generators": [
-    "Browser Use / Chrome live production capture"
-  ],
+  "schemaVersion": 3,
+  "purpose": "README screenshots captured from the production site.",
   "files": [
     {
-      "path": "home.png",
-      "bytes": 603299,
-      "sha256": "5b7535a35fc532b48fe5dedd5175d5b734bcbc1ebac6205d6d6ec40a23a86b05",
-      "source": "https://app.reserve.it.kr",
-      "capturedAt": "2026-10-18T10:08:21.526Z"
+      "path": "home.jpg",
+      "bytes": 92955,
+      "sha256": "c8b7d11713c7efc6f6219b03affcd0b2466f93e6c1cbacd1a9252c93f5dfc650",
+      "source": "https://app.reserve.it.kr/?region=all",
+      "capturedAt": "2026-10-26T07:22:23.838Z",
+      "viewport": {
+        "width": 1521,
+        "height": 722
+      },
+      "mimeType": "image/jpeg",
+      "generator": "Chrome browser capture"
     },
     {
       "path": "stores.png",
-      "bytes": 88845,
-      "sha256": "7531e616e5f2abcd82ff15c79821e3779610561b20ccf639a305f0528fa47c1d",
-      "source": "https://app.reserve.it.kr",
-      "capturedAt": "2026-10-18T10:08:23.970Z"
+      "bytes": 84424,
+      "sha256": "f6fb851b3afe86c07af3d49b52f11e0ad471e06ac15a4e48f05f7c79c76bcf7e",
+      "source": "https://app.reserve.it.kr/stores",
+      "capturedAt": "2026-10-26T06:50:33.147Z",
+      "viewport": {
+        "width": 1600,
+        "height": 900
+      },
+      "mimeType": "image/png",
+      "generator": "Playwright CLI"
     },
     {
       "path": "store-detail.png",
-      "bytes": 141160,
-      "sha256": "eed79b286b331ccdfca6d5fa782d6f2f2c5c246f121b7f1587c9e5a8cfc1c06b",
-      "source": "https://app.reserve.it.kr",
-      "capturedAt": "2026-10-18T10:08:30.004Z"
+      "bytes": 228456,
+      "sha256": "59dd44e441108efd9acb3079b93230e7f535699c230129b35ca103f8090053c6",
+      "source": "https://app.reserve.it.kr/store/5",
+      "capturedAt": "2026-10-26T06:50:34.854Z",
+      "viewport": {
+        "width": 1600,
+        "height": 900
+      },
+      "mimeType": "image/png",
+      "generator": "Playwright CLI"
     },
     {
-      "path": "business.png",
-      "bytes": 80322,
-      "sha256": "e3f61f5babb3a80ec794c1317ee5fed9409b6c0e65665a25e3b13bca0ba5a6c1",
-      "source": "https://app.reserve.it.kr",
-      "capturedAt": "2026-10-18T10:08:34.363Z"
+      "path": "business.jpg",
+      "bytes": 43567,
+      "sha256": "79045f17fc789eb3301d6ebb95aaf02bb6d48ca58aacb2f73e34c3bfb8710ac4",
+      "source": "https://app.reserve.it.kr/business?tab=analytics",
+      "capturedAt": "2026-10-26T07:19:50.384Z",
+      "viewport": {
+        "width": 1521,
+        "height": 722
+      },
+      "mimeType": "image/jpeg",
+      "generator": "Chrome browser capture"
     },
     {
       "path": "admin.png",
-      "bytes": 87051,
-      "sha256": "4d0a89c4b24cb721e74fd12b3c2ecb0e2393cf9ece15c9a62a98612c437d4f99",
-      "source": "https://app.reserve.it.kr",
-      "capturedAt": "2026-10-18T10:05:53.999Z"
+      "bytes": 81642,
+      "sha256": "2eb1a7a1a7c35e54a33a1ee9c7589ca3fd23a637ce8dcde00d89aeef562d6670",
+      "source": "https://app.reserve.it.kr/admin?tab=dashboard",
+      "capturedAt": "2026-10-26T07:10:24.977Z",
+      "viewport": {
+        "width": 1920,
+        "height": 912
+      },
+      "mimeType": "image/png",
+      "generator": "Chrome browser capture"
     },
     {
-      "path": "grafana.png",
-      "bytes": 56558,
-      "sha256": "c8c984ca909b875a3c2ce18fe48c2a6d191ef84548894c412917cb97d59ba763",
-      "source": "https://grafana.reserve.it.kr",
-      "capturedAt": "2026-10-18T10:08:02.094Z"
+      "path": "grafana.jpg",
+      "bytes": 81948,
+      "sha256": "2beb1a52e1306db8f70de327f9b8ddbda528caa9834dc2d2c9bf19ed784e955f",
+      "source": "https://grafana.reserve.it.kr/d/reserve-hardware/reserve-ec849c-ebb284-ec9e90-ec9b90",
+      "capturedAt": "2026-10-26T07:19:52.025Z",
+      "viewport": {
+        "width": 1536,
+        "height": 730
+      },
+      "mimeType": "image/jpeg",
+      "generator": "Chrome browser capture"
     }
   ]
 }

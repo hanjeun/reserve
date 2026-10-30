@@ -6,7 +6,7 @@ import FaqSection from './sections/FaqSection';
 
 export default function Home({ isMobile = false }) {
     return (
-        <div style={{ backgroundColor: colors.background.default, overflowX: 'hidden' }}>
+        <div style={{ backgroundColor: colors.background.default, overflowX: 'clip' }}>
 
             <HeroSection isMobile={isMobile} />
 

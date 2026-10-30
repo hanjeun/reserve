@@ -365,7 +365,7 @@ test('image publication and frontend staging remain main-push-only', () => {
     assert.equal(staging.steps.find(entry => entry.name === 'Stage marketing files').if, "vars.RESERVE_DOMAIN_SPLIT == 'true'");
     for (const job of [backend, staging]) {
         const writes = job.steps.filter(entry => /^docker\/login-action@|^appleboy\/(scp|ssh)-action@/.test(entry.uses ?? '')
-            || /docker (build|push)\b/.test(entry.run ?? ''));
+            || /docker push\b|docker (?:build|buildx build)[^\n]*--push\b/.test(entry.run ?? ''));
         assert.ok(writes.length > 0);
         for (const entry of writes) {
             // GitHub는 단계 조건과 별개로 작업 조건도 요구한다.

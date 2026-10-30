@@ -18,5 +18,7 @@
 | 운영 | [모니터링](monitoring.md) | 로그·지표·알림·개인정보 |
 | 운영 | [백업과 복구](backup.md) | 백업 대상·권한·복원 확인 |
 | 운영 | [데이터베이스 구조 변경](manual-ddl.md) | 수동 SQL·제한 계정·스키마 검사 |
+| 입장 제한 | [인기 예약 입장 대기](reservation-admission.md) | 설정·상태·운영 관문 |
+| 입장 제한 | [서비스 공통 입장권](service-admission.md) | 설정·상태·운영 관문 |
 | 규칙 | [코드 규칙](../rules/code-conventions.md) | 이름·데이터·로그·주석 |
 | 규칙 | [Git 워크플로](../rules/git-workflow.md) | 브랜치·커밋·PR·릴리스 |

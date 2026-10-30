@@ -374,23 +374,28 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
            "AND r.deletedAt IS NULL AND r.status IN ('PENDING', 'CONFIRMED', 'UNCONFIRMED')")
     int countLifecycleBlockingByMemberId(@Param("memberId") Long memberId);
 
-    /** 가게별 결제 제한 시간을 적용할 수 있도록 미결제 후보를 조회한다. */
+    /** 만료 후보 ID를 제한 조회하며 최종 결제·만료 조건은 처리자가 잠금 아래 다시 확인한다. */
     // 나중 결제를 허용한 가게는 미결제 만료 대상에서 제외한다.
-    @Query("SELECT r FROM Reservation r JOIN FETCH r.store s JOIN FETCH r.member "
+    @Query("SELECT r.id FROM Reservation r JOIN r.store s "
          + "WHERE r.status = 'PENDING' AND r.depositAmount > 0 AND r.depositPaid = false "
          + "AND s.allowLatePayment = false "
-         + "AND r.createdAt < :cutoff")
-    List<Reservation> findExpiredUnpaidReservations(@Param("cutoff") LocalDateTime cutoff);
+         + "AND r.createdAt < :cutoff AND r.id > :afterId AND r.id <= :throughId "
+         + "ORDER BY r.id ASC")
+    List<Long> findExpiredUnpaidReservationIds(@Param("cutoff") LocalDateTime cutoff,
+            @Param("afterId") long afterId, @Param("throughId") long throughId, Pageable pageable);
 
-    /** 날짜·시각은 저장된 예약과 같은 한국 시간으로 비교한다. 오래된 대상부터 처리해 배치 상한에도 먼저 정리되게 한다. */
-    @Query("SELECT r FROM Reservation r JOIN FETCH r.store JOIN FETCH r.member "
+    /** 순회 시작 시 상한을 고정해 계속 들어오는 새 예약이 기존 후보의 재시도를 미루지 않게 한다. */
+    @Query("SELECT COALESCE(MAX(r.id), 0) FROM Reservation r")
+    long findMaximumReservationId();
+
+    /** 예약 날짜·시각과 같은 한국 시간으로 비교한다. ID 순환 커서로 제한 조회해 실패한 후보 뒤의 대상도 처리한다. */
+    @Query("SELECT r.id FROM Reservation r "
          + "WHERE r.deletedAt IS NULL AND r.checkedInAt IS NULL AND r.status IN ('PENDING', 'CONFIRMED') "
          + "AND (r.reservationDate < :date "
          + "     OR (r.reservationDate = :date AND r.reservationTime <= :time)) "
-         + "ORDER BY r.reservationDate ASC, r.reservationTime ASC")
-    List<Reservation> findElapsedActiveReservations(@Param("date") LocalDate date,
-                                                    @Param("time") LocalTime time,
-                                                    Pageable pageable);
+         + "AND r.id > :afterId AND r.id <= :throughId ORDER BY r.id ASC")
+    List<Long> findElapsedActiveReservationIds(@Param("date") LocalDate date, @Param("time") LocalTime time,
+            @Param("afterId") long afterId, @Param("throughId") long throughId, Pageable pageable);
 
     /**
      * 가게 소프트 삭제 시 PENDING 예약 자동 취소

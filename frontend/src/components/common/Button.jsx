@@ -99,7 +99,7 @@ const SIZE_HEIGHT = {
 };
 
 /* 소형 일반 버튼은 모달과 같은 좌우 여백을 사용한다. */
-const SM_PADDING_X = { primary: 20, danger: 20, outline: 20, secondary: 20 };
+const SM_PADDING_X = { primary: 20, danger: 20, outline: 20, secondary: 20, ghost: 20 };
 
 const SIZE_FONT = {
     sm:   fontSize.sm,

@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 const css = postcss.parse(readFileSync(resolve(cwd(), 'src/styles/global/feature-surfaces.css'), 'utf8'));
 const iconCss = postcss.parse(readFileSync(resolve(cwd(), 'src/styles/global/icons.css'), 'utf8'));
 const iconTokens = postcss.parse(readFileSync(resolve(cwd(), 'src/styles/tokens/icon-controls.css'), 'utf8'));
+const previewCss = postcss.parse(readFileSync(resolve(cwd(), 'src/styles/global/interactions.css'), 'utf8'));
 
 function declarations(selector, media = null, source = css) {
     const result = {};
@@ -24,6 +25,15 @@ const iconPress = "):active:not(:disabled):not([aria-disabled='true'])";
 const iconHover = "):hover:not(:disabled):not([aria-disabled='true'])::before";
 
 describe('messenger interaction roles', () => {
+    it('shares enlarge hints without painting a rectangular background over transparent chat photos', () => {
+        expect(declarations('.reserve-photo-preview-trigger .ant-image-cover', null, previewCss)['pointer-events']).toBe('none');
+        expect(declarations('.reserve-chat-photo.reserve-photo-preview-trigger .ant-image-cover', null, previewCss).background).toBe('transparent');
+        expect(declarations('.reserve-photo-preview-trigger:not(:focus-visible) .ant-image-cover',
+            '(hover: none), (pointer: coarse)', previewCss).opacity).toBe('0');
+        expect(declarations('.reserve-photo-preview-trigger .ant-image-cover',
+            '(prefers-reduced-motion: reduce)', previewCss).transition).toBe('none');
+    });
+
     it('keeps unread badges red and overlays message actions without reserving an extra column', () => {
         for (const scope of ['.reserve-messenger', '.reserve-messenger-launcher-wrap']) {
             expect(declarations(scope)['--reserve-messenger-unread-bg'])

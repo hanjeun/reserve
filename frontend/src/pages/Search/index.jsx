@@ -8,11 +8,11 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { SERVICE_DOMAIN_OPTIONS } from '../../constants';
 import ServiceDomainIcon from '../../components/common/ServiceDomainIcon';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
-import useReducedMotion from '../../hooks/useReducedMotion';
+import useSearchTransition from '../../hooks/useSearchTransition';
 import SearchControls from '../../components/common/SearchControls';
 import useRecentSearches from '../../hooks/useRecentSearches';
 import { SEARCH_MOTION_DURATION_MS } from '../../components/layout/searchTransition';
-import { useSkeletonShown } from '../../components/layout/loadingPresentation';
+import { useDocumentEntry, useSkeletonShown } from '../../components/layout/loadingPresentation';
 
 // 안내용 예시다. 실측 인기 순위나 현재 위치 기반 추천으로 표현하지 않는다.
 const QUICK_SEARCHES = ['카페', '스튜디오', '필라테스', '공방', '클리닉', '팝업'];
@@ -35,33 +35,16 @@ export default function SearchPage() {
     const restoredRef = useRef(null);
     const restoreDisabledRef = useRef(false);
     const skeletonShown = useSkeletonShown();
+    const documentEntry = useDocumentEntry();
     const { terms: recentSearches, add: rememberSearch, remove: removeSearch, clear: clearRecentSearches } = useRecentSearches();
     const inputRef = useRef(null);
-    const [isClosing, setIsClosing] = useState(false);
-    const reducedMotion = useReducedMotion();
-    // 연달아 누른 취소가 뒤로가기를 두 번 하지 않게 한다(뒤로가기는 비동기라 화면이 잠깐 남아 있다).
-    const closingRef = useRef(false);
-    const exitTimerRef = useRef(null);
+    const { isClosing, leaveSearch, motionClass } = useSearchTransition({
+        inputRef, animateEntry: !skeletonShown && !documentEntry,
+    });
     const result = useUnifiedSearch({ keyword, submittedKeyword, confirmed, composing, enabled: !isClosing, choice, submittedAt });
     useDocumentTitle('검색', '가게와 메뉴, 도움말과 내 예약·웨이팅·메시지를 찾아보세요.');
 
     useEffect(() => { inputRef.current?.focus({ preventScroll: true }); }, []);
-
-    useEffect(() => () => window.clearTimeout(exitTimerRef.current), []);
-
-    // 결과 선택·취소·Esc 모두 같은 아래로 내려가는 모션 뒤 이동한다. 원래 화면은 옆으로 밀리지 않는다.
-
-    const leaveSearch = leave => {
-        if (closingRef.current) return;
-        closingRef.current = true;
-        inputRef.current?.blur();
-        if (reducedMotion) {
-            leave();
-            return;
-        }
-        setIsClosing(true);
-        exitTimerRef.current = window.setTimeout(leave, SEARCH_MOTION_DURATION_MS);
-    };
 
     const closeSearch = () => leaveSearch(() => {
         if (state?.searchEntry === true) navigate(-1);
@@ -145,10 +128,6 @@ export default function SearchPage() {
         const destination = event.currentTarget.getAttribute('href');
         leaveSearch(() => navigate(destination, { replace: true }));
     };
-
-    let motionClass = '';
-    if (isClosing) motionClass = ' reserve-search-page--leaving';
-    else if (!reducedMotion && !skeletonShown) motionClass = ' reserve-search-page--entering';
 
     return (
         <div className={'reserve-search-page' + motionClass} inert={isClosing ? true : undefined}

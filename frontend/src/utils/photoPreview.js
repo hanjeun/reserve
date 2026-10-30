@@ -1,5 +1,11 @@
 export const photoPreviewClassNames = { popup: { root: 'reserve-image-preview reserve-store-detail-preview' } };
 
+export const PHOTO_PREVIEW_LABEL = '크게 보기';
+export const withPhotoPreviewHint = (preview = true) => preview === false ? false : {
+    cover: '',
+    ...(preview && typeof preview === 'object' ? preview : {}),
+};
+
 export const rememberPhotoPreviewOrigin = event => {
     const source = event.target?.closest?.('.ant-image') ?? event.currentTarget;
     const rect = source?.getBoundingClientRect?.();

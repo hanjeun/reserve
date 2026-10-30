@@ -1,6 +1,7 @@
 import Hangul from 'hangul-js';
-import { LINES, fullText } from './src/typing';
+import { installMarketingTyping } from './src/typing';
 import { installFaqMotion } from './src/faq';
+import { installMarketingScroll } from './src/scroll';
 
 document.documentElement.classList.add('js');
 const theme = window.matchMedia('(prefers-color-scheme: dark)');
@@ -10,48 +11,8 @@ theme.addEventListener('change', updateTheme);
 
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 installFaqMotion(document, motion);
-const typing = [...document.querySelectorAll('[data-marketing-typing]')];
-let timer;
-let lineIndex = 0;
-const showText = value => {
-    const line = LINES[lineIndex];
-    const blueStart = line.before.length;
-    const blueEnd = blueStart + line.blue.length;
-    for (const node of typing) {
-        node.querySelector('[data-typing-before]').textContent = value.slice(0, blueStart);
-        node.querySelector('[data-typing-blue]').textContent = value.slice(blueStart, blueEnd);
-        node.querySelector('[data-typing-after]').textContent = value.slice(blueEnd);
-    }
-};
-function runSequence(sequence, speed, next) {
-    let index = 0;
-    const step = () => {
-        if (motion.matches) return;
-        if (index < sequence.length) { showText(sequence[index++]); timer = setTimeout(step, speed); }
-        else next();
-    };
-    step();
-}
-function erase() {
-    const letters = Hangul.disassemble(fullText(LINES[lineIndex]));
-    runSequence(letters.map((_, index) => Hangul.assemble(letters.slice(0, letters.length - index - 1))), 40, () => {
-        lineIndex = (lineIndex + 1) % LINES.length;
-        timer = setTimeout(type, 160);
-    });
-}
-function type() {
-    const letters = Hangul.disassemble(fullText(LINES[lineIndex]));
-    runSequence(letters.map((_, index) => Hangul.assemble(letters.slice(0, index + 1))), 58, () => { timer = setTimeout(erase, 1800); });
-}
-function updateMotion() {
-    clearTimeout(timer);
-    if (motion.matches) { lineIndex = 0; showText(fullText(LINES[0])); }
-    else timer = setTimeout(erase, 1000);
-}
-updateMotion();
-motion.addEventListener('change', updateMotion);
-window.addEventListener('pagehide', () => clearTimeout(timer));
-window.addEventListener('pageshow', event => { if (event.persisted) updateMotion(); });
+installMarketingTyping(document, motion, Hangul);
+installMarketingScroll(document, motion);
 
 if ('IntersectionObserver' in window) {
     const observer = new IntersectionObserver(entries => {
@@ -61,8 +22,6 @@ if ('IntersectionObserver' in window) {
 } else document.querySelectorAll('.reveal').forEach(node => node.classList.add('rv'));
 
 document.addEventListener('click', event => {
-    const scroll = event.target.closest('[data-scroll-target]');
-    if (scroll) document.getElementById(scroll.dataset.scrollTarget)?.scrollIntoView({ behavior: motion.matches ? 'instant' : 'smooth', block: 'start' });
     const like = event.target.closest('[data-demo-like]');
     if (like) like.setAttribute('aria-pressed', String(like.getAttribute('aria-pressed') !== 'true'));
     const step = event.target.closest('[data-demo-delta]');

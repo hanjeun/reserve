@@ -1,7 +1,6 @@
 package kr.it.reserve.reservation.scheduler;
 
 import kr.it.reserve.global.common.ServiceTime;
-import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,23 +44,25 @@ public class ReservationElapsedScheduler {
      * 10분마다 도니 밀린 건은 몇 사이클에 걸쳐 빠진다.
      */
     private static final int BATCH_SIZE = 100;
+    private final ReservationCandidateCursor cursor = new ReservationCandidateCursor(BATCH_SIZE);
 
     @Scheduled(fixedDelay = 10 * 60 * 1000)
     @Transactional(propagation = Propagation.NEVER)
-    public void processElapsedReservations() {
+    public synchronized void processElapsedReservations() {
         LocalDateTime now = LocalDateTime.now(SERVICE_ZONE);
 
-        List<Reservation> elapsed = reservationRepository.findElapsedActiveReservations(
-                now.toLocalDate(), now.toLocalTime(), PageRequest.of(0, BATCH_SIZE));
+        List<Long> elapsed = cursor.next(reservationRepository::findMaximumReservationId,
+                (afterId, throughId) -> reservationRepository.findElapsedActiveReservationIds(
+                        now.toLocalDate(), now.toLocalTime(), afterId, throughId, PageRequest.of(0, BATCH_SIZE)));
 
         if (elapsed.isEmpty()) return;
 
         int cancelled = 0;
         int unconfirmed = 0;
         int failed = 0;
-        for (Reservation reservation : elapsed) {
+        for (Long reservationId : elapsed) {
             try {
-                switch (processor.processOne(reservation.getId(), now)) {
+                switch (processor.processOne(reservationId, now)) {
                     case CANCELLED -> cancelled++;
                     case UNCONFIRMED -> unconfirmed++;
                     case SKIPPED -> { }
@@ -69,7 +70,7 @@ public class ReservationElapsedScheduler {
             } catch (RuntimeException e) {
                 failed++;
                 log.error("[ElapsedScheduler] Reservation processing deferred: reservationId={}, errorType={}",
-                        reservation.getId(), e.getClass().getSimpleName());
+                        reservationId, e.getClass().getSimpleName());
             }
         }
         log.info("[ElapsedScheduler] processed {} candidates: {} cancelled, {} unconfirmed, {} failed",

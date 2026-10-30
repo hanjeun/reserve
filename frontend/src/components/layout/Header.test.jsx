@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import Header from './Header';
+import Header, { HeaderPlaceholder } from './Header';
 import DiscoveryNav from './DiscoveryNav';
 import FilterToolbar from '../common/FilterToolbar';
+import { createLoadingPresentation, LoadingPresentationContext } from './loadingPresentation';
 
 const { goBack, authState, reducedMotionState } = vi.hoisted(() => ({
     goBack: vi.fn(),
@@ -56,6 +57,19 @@ const renderHeader = (path = '/') => render(
 
 describe('shared wordmark and result search header', () => {
     beforeEach(() => { vi.clearAllMocks(); authState.isLoggedIn = false; reducedMotionState.value = true; });
+
+    it('keeps the first back control still on a document load and reserves its position during auth boot', () => {
+        reducedMotionState.value = false;
+        const placeholder = render(<HeaderPlaceholder />);
+        expect(placeholder.container.querySelector('.reserve-header-back-slot')).toBeInTheDocument();
+        expect(placeholder.container.querySelector('.reserve-header-back-slot')).not.toHaveClass('reserve-header-control-slot--entering');
+        expect(placeholder.container.querySelector('button,a')).toBeNull();
+        placeholder.unmount();
+        const presentation = createLoadingPresentation('restored', { documentEntry: true });
+        render(<MemoryRouter initialEntries={['/my-page']}><LoadingPresentationContext.Provider value={presentation}><Header /></LoadingPresentationContext.Provider></MemoryRouter>);
+        expect(screen.getByRole('button', { name: '이전 화면으로 돌아가기' })).toBeEnabled();
+        expect(document.querySelector('.reserve-header-back-slot')).not.toHaveClass('reserve-header-control-slot--entering');
+    });
 
     it('uses one full wordmark and restores Login / Start for guests', () => {
         renderHeader('/stores');

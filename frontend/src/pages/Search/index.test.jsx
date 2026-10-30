@@ -64,6 +64,15 @@ describe('dedicated search submission and result editing', () => {
         window.scrollTo = vi.fn();
     });
 
+    it.each([false, true])('does not replay search entry on a document reload, with a prior skeleton=%s', skeleton => {
+        reducedMotionMock.value = false;
+        const presentation = createLoadingPresentation('restored-search', { documentEntry: true });
+        if (skeleton) presentation.markSkeletonShown();
+        const { container } = renderSearch([{ pathname: '/search', state: { searchEntry: true } }], 0, presentation);
+        expect(container.querySelector('.reserve-search-page')).not.toHaveClass('reserve-search-page--entering');
+        expect(field()).toBeEnabled();
+    });
+
     it('loads the search term and submits it with Enter', async () => {
         const user = userEvent.setup();
         renderSearch(['/search?keyword=' + encodeURIComponent('공방')]);

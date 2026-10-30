@@ -27,6 +27,8 @@ Java 패키지의 시작점은 kr.it.reserve예요.
 
 각 영역은 요청을 받는 controller, 업무 규칙을 처리하는 service, 저장을 담당하는 repository, 데이터 모델인 entity로 나눠요.
 
+내 예약 목록은 인증된 회원의 `GET /api/reservations/my/page`에서 검색·상태·정렬을 적용한 페이지로 조회해요. 기본 크기는 15건, 최대 100건이며 `/api/reservations/my-reservations/page`도 같은 계약이에요. 예전 배열 조회 주소인 `/api/reservations/my`와 `/api/reservations/my-reservations`는 예약 내역을 읽지 않고 `410 Gone`과 화면 새로고침 안내를 반환해요.
+
 ## 프론트엔드
 
 | 폴더 | 역할 |
@@ -47,6 +49,7 @@ Java 패키지의 시작점은 kr.it.reserve예요.
 - 브라우저에 필요한 공개 설정만 VITE_ 환경 변수로 전달해요.
 - 비밀번호·암호화 키·공급자 비밀 값은 서버 환경에만 두어요.
 - 개발·시험·운영은 별도 프로필과 저장 경로를 사용해요.
+- `reserve.scheduling.enabled`는 정기 작업, `reservation.code-backfill.enabled`는 시작 시 예약번호 백필을 제어해요. 둘 다 기본값은 `true`이며, 읽기 전용 기동 확인에서는 각각 꺼야 해요.
 
 ## 개발 확인 도구
 

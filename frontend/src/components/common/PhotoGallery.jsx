@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Carousel, Image } from 'antd';
 import LoadingAntImage from './LoadingAntImage';
-import { photoPreviewClassNames, rememberPhotoPreviewOrigin } from '../../utils/photoPreview';
+import { photoPreviewClassNames, rememberPhotoPreviewOrigin, withPhotoPreviewHint } from '../../utils/photoPreview';
 
 /** 가게 상세·피드·소식이 같은 슬라이드, 확대 보기와 모바일 스와이프를 쓴다. */
 export default function PhotoGallery({ label, sources, imageSizes, autoplay = false, wrapperStyle, imageStyle, previewEnabled = true, dots = true, adaptiveHeight = false, onSlideChange }) {
@@ -74,9 +74,7 @@ export default function PhotoGallery({ label, sources, imageSizes, autoplay = fa
                         <LoadingAntImage src={src} alt={`${label} 사진 ${index + 1}`} referrerPolicy="no-referrer"
                             imageSize={imageSizes?.[index]}
                             placeholder={loadedSources.has(src) ? false : undefined}
-                            width="100%" style={imageStyle} draggable={false}
-                            aria-label={previewEnabled ? `${label} 사진 ${index + 1} 크게 보기` : undefined}
-                            preview={previewEnabled ? { cover: '' } : false} />
+                            width="100%" style={imageStyle} draggable={false} preview={withPhotoPreviewHint(previewEnabled)} />
                     </div>)}
                 </Carousel>
             </Image.PreviewGroup>

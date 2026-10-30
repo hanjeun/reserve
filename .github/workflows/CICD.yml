@@ -108,6 +108,9 @@ jobs:
       - name: Validate operations scripts
         run: |
           node --test scripts/tests/observability-config.test.mjs scripts/tests/deployment-memory.test.mjs scripts/tests/release-schema-readonly.test.mjs scripts/tests/backup-engine.test.mjs
+          node --test scripts/tests/container-security.test.mjs
+          python3 -B scripts/tests/ubuntu-security_test.py
+          bash -n scripts/scan-container-security.sh
           bash -n scripts/backup-mysql.sh
           bash -n scripts/restore-mysql.sh
           bash -n scripts/verify-post-deploy-readonly.sh
@@ -208,7 +211,23 @@ jobs:
           chmod +x ./gradlew
           ./gradlew bootJar --console=plain
 
-      # 검증된 main push에서만 이미지를 푸시해 미병합 PR이 운영 후보를 바꾸지 못하게 한다.
+      # PR에서도 실제 이미지를 검사하고 검사를 통과한 같은 이미지에만 배포 태그를 붙여요.
+      - name: Build Docker image
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          docker build --pull --no-cache --platform linux/amd64 \
+            --label reserve.schema-compat=v280-mfa-completion-settlement-v1 \
+            --label reserve.feature-compat=waiting-signup-hidden-feed-oauth-login-session-admission-mfa-completion-test-settlement-v11 \
+            -t "reserve-security:$COMMIT_SHA" \
+            ./backend
+
+      - name: Scan backend image vulnerabilities
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: bash scripts/scan-container-security.sh "reserve-security:$COMMIT_SHA"
+
+      # 검사가 끝나기 전에는 레지스트리 쓰기 자격을 주입하지 않아요.
       - name: Login to DockerHub
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -216,27 +235,14 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 커밋 SHA 태그로 배포 후보를 식별한다. latest는 호환 경로로 함께 유지한다.
-      # 시크릿은 env로 전달해 셸 스크립트에 문자열로 직접 치환하지 않는다.
-      - name: Build Docker image
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          COMMIT_SHA: ${{ github.sha }}
-        run: |
-          docker build --platform linux/amd64 \
-            --label reserve.schema-compat=v280-mfa-completion-settlement-v1 \
-            --label reserve.feature-compat=waiting-signup-hidden-feed-oauth-login-session-admission-mfa-completion-test-settlement-v11 \
-            -t "$DOCKERHUB_USERNAME/reserve:latest" \
-            -t "$DOCKERHUB_USERNAME/reserve:sha-$COMMIT_SHA" \
-            ./backend
-
       - name: Push Docker image
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           COMMIT_SHA: ${{ github.sha }}
         run: |
+          docker tag "reserve-security:$COMMIT_SHA" "$DOCKERHUB_USERNAME/reserve:sha-$COMMIT_SHA"
+          docker tag "reserve-security:$COMMIT_SHA" "$DOCKERHUB_USERNAME/reserve:latest"
           docker push "$DOCKERHUB_USERNAME/reserve:sha-$COMMIT_SHA"
           docker push "$DOCKERHUB_USERNAME/reserve:latest"
 
@@ -697,6 +703,14 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
           script: |
+            set -eu
+            TARGET_CONTAINER='${{ env.TARGET_UPSTREAM }}'
+            case "$TARGET_CONTAINER" in blue|green) ;; *) exit 1 ;; esac
+            CAP_DROP=$(sudo docker inspect --format '{{range .HostConfig.CapDrop}}{{println .}}{{end}}' "$TARGET_CONTAINER")
+            SECURITY_OPTIONS=$(sudo docker inspect --format '{{range .HostConfig.SecurityOpt}}{{println .}}{{end}}' "$TARGET_CONTAINER")
+            printf '%s\n' "$CAP_DROP" | grep -Fxq 'ALL'
+            printf '%s\n' "$SECURITY_OPTIONS" | grep -Exq 'no-new-privileges(:true)?'
+            echo "Container privilege restrictions verified"
             for i in $(seq 1 10); do
               STATUS=$(curl -o /dev/null -w "%{http_code}" -s --connect-timeout 5 --max-time 10 http://localhost:${{ env.STOPPED_PORT }}/actuator/health) || STATUS="000"
               echo "Attempt $i: $STATUS"

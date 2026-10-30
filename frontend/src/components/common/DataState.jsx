@@ -19,7 +19,7 @@ import {
     WalletOutlined,
     WifiOutlined,
 } from './icons';
-import Button from './Button';
+import RetryButton from './RetryButton';
 import StateIllustration from './StateIllustration';
 import { fontSize, spacing } from '../../styles/tokens';
 import { isMissingRequestError, listRequestErrorKind, listRequestErrorMessage } from '../../utils/listErrorMessage';
@@ -109,17 +109,14 @@ const DataState = ({
                 {description && <p className="reserve-data-state__description">{description}</p>}
             </div>
             {action ?? (isMissingDetail ? missingAction : onRetry && (
-                <Button
+                <RetryButton
                     variant={compact ? 'ghost-sm' : 'ghost'}
-                    size="sm"
                     loading={retrying}
-                    icon={<SyncOutlined />}
-                    loadingIcon={<SyncOutlined spin />}
-                    onClick={onRetry}
+                    onRetry={onRetry}
                     className="reserve-data-state__retry"
                 >
                     {retryLabel}
-                </Button>
+                </RetryButton>
             ))}
         </section>
     );

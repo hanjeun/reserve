@@ -13,6 +13,9 @@ import java.util.Set;
 /** 브라우저의 상태 변경 요청은 허용 출처를 증명해야 한다. */
 final class BrowserCsrfMatcher implements RequestMatcher {
     private static final Set<String> SAFE_METHODS = Set.of("GET", "HEAD", "OPTIONS", "TRACE");
+    private static final Set<String> CREDENTIAL_COOKIES = Set.of(
+            "access_token", "refresh_token", "mfa_ticket", "JSESSIONID",
+            "__Host-reserve-entry", "reserve_entry");
     private final Set<String> allowedOrigins;
 
     BrowserCsrfMatcher(List<String> allowedOrigins) {
@@ -39,9 +42,8 @@ final class BrowserCsrfMatcher implements RequestMatcher {
         if (fetchSite != null) return !"same-origin".equals(fetchSite);
         Cookie[] cookies = request.getCookies();
         // 쿠키가 없는 서버 간 호출은 주변 브라우저 자격 증명을 사용할 수 없다.
-        return cookies != null && Arrays.stream(cookies).anyMatch(cookie ->
-                "access_token".equals(cookie.getName()) || "refresh_token".equals(cookie.getName())
-                        || "__Host-reserve-entry".equals(cookie.getName()) || "reserve_entry".equals(cookie.getName()));
+        return cookies != null && Arrays.stream(cookies)
+                .anyMatch(cookie -> CREDENTIAL_COOKIES.contains(cookie.getName()));
     }
 
     private boolean hasAllowedReferer(String referer) {

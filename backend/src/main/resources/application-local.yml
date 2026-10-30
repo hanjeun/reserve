@@ -11,7 +11,9 @@ spring:
     livereload:
       enabled: true
     restart:
-      enabled: true
+      # IDE와 Gradle이 같은 출력 경로를 갱신하는 동안 부분 클래스 상태로 재시작하지 않는다.
+      # 자동 재시작이 필요한 개발 실행에서만 명시적으로 켠다.
+      enabled: ${RESERVE_DEVTOOLS_RESTART_ENABLED:false}
 
   # 로컬 MySQL 연결
   datasource:

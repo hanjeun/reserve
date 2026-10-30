@@ -1,7 +1,6 @@
 package kr.it.reserve.reservation;
 
 import kr.it.reserve.global.error.PaymentException;
-import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.reservation.scheduler.ReservationElapsedProcessor;
 import kr.it.reserve.reservation.scheduler.ReservationElapsedScheduler;
@@ -10,6 +9,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
 
 import java.util.List;
 
@@ -26,8 +26,9 @@ class ReservationElapsedSchedulerIsolationTest {
 
     @Test
     void oneConflictingRefundDoesNotPreventTheNextReservationFromBeingProcessed() {
-        when(reservations.findElapsedActiveReservations(any(), any(), any())).thenReturn(List.of(
-                Reservation.builder().id(1L).build(), Reservation.builder().id(2L).build()));
+        when(reservations.findMaximumReservationId()).thenReturn(2L);
+        when(reservations.findElapsedActiveReservationIds(any(), any(), eq(0L), eq(2L), eq(PageRequest.of(0, 100))))
+                .thenReturn(List.of(1L, 2L));
         when(processor.processOne(eq(1L), any())).thenThrow(new PaymentException("Synthetic unresolved refund"));
         when(processor.processOne(eq(2L), any())).thenReturn(ReservationElapsedProcessor.Result.CANCELLED);
 

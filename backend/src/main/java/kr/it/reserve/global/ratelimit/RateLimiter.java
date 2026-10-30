@@ -96,6 +96,9 @@ public class RateLimiter {
     /** 마지막 접근 이후 이만큼 지난 버킷은 스윕 대상. 최장 정책 창(10분)보다 넉넉하게 잡는다. */
     private static final Duration IDLE_TTL = Duration.ofMinutes(30);
 
+    // 이메일·IP·내부 식별자보다 긴 요청 원문을 버킷 키로 보관하지 않는다.
+    private static final int MAX_KEY_LENGTH = 512;
+
     /**
      * 스윕이 못 따라갈 만큼 폭증했을 때의 안전밸브 임계.
      *
@@ -130,6 +133,7 @@ public class RateLimiter {
      * @param key 정책과 함께 버킷을 구분하는 값. 계정 이메일은 소문자로 정규화해야 한다.
      */
     public boolean tryConsume(String key, Policy policy) {
+        if (key == null || key.length() > MAX_KEY_LENGTH) return false;
         Entry entry = buckets.computeIfAbsent(
                 policy.name() + ":" + key,
                 k -> new Entry(newBucket(policy))
@@ -145,6 +149,7 @@ public class RateLimiter {
 
     /** 성공한 검증이 예약했던 토큰 1개만 반환한다. 기존 실패와 리필 시점은 유지한다. */
     public void refund(String key, Policy policy) {
+        if (key == null || key.length() > MAX_KEY_LENGTH) return;
         buckets.computeIfPresent(policy.name() + ":" + key, (ignored, entry) -> {
             entry.lastAccessMs.set(System.currentTimeMillis());
             entry.bucket.addTokens(1);

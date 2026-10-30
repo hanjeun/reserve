@@ -121,7 +121,8 @@ test('CVE aliases deduplicate advisories; primary references survive and advisor
     assert.equal(result.projects[0].packages[0].advisories[0].applicability, 'NOT_ASSESSED');
     assert.deepEqual(result.projects[0].packages[0].advisories[0].fixedVersions, ['1.0.1']);
     const text = JSON.stringify(result);
-    assert.equal(text.includes('https://github.com/advisories/'), true);
+    assert.ok(result.projects[0].packages[0].advisories[0].references.some(
+        reference => reference.url === 'https://github.com/advisories/GHSA-aaaa-bbbb-cccc'));
     for (const value of ['synthetic-private-command', 'synthetic-secret', '127.0.0.1']) assert.equal(text.includes(value), false);
 });
 test('unsupported or unproved public packages are excluded from requests and preserve unknown coverage', async () => {

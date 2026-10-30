@@ -2,41 +2,23 @@ import { expect, test } from '@playwright/test';
 
 test.use({ contextOptions: { reducedMotion: 'no-preference' }, screenshot: 'off', trace: 'off', video: 'off' });
 
-async function expectContentEntry(page, destination, direction, { cached = false, homeLogo = false } = {}) {
+async function expectContentEntry(page, destination, direction, { cached = false } = {}) {
     const content = page.locator('.ant-layout-content');
     const skeletonShown = await content.getAttribute('data-skeleton-shown') === 'true';
     if (cached) expect(skeletonShown).toBe(false);
     await expect(content).toHaveCSS('animation-name', 'none');
     const entries = () => page.evaluate(() => window.__reservePageEntries.slice(window.__reservePageEntryCursor)
         .filter(entry => entry.pathname === location.pathname));
-    if (homeLogo) {
-        await expect(content).toHaveAttribute('data-home-logo-entry', 'true');
-        await expect(content).not.toHaveClass(/reserve-route-entry--/);
-        await expect(destination).toHaveCSS('animation-name', 'none');
-        await expect(page.locator('.reserve-discovery-recommended')).toHaveCSS('animation-name', 'none');
-        const sections = ['reserve-discovery-location', 'reserve-discovery-featured', 'reserve-discovery-shortcuts'];
-        await expect.poll(entries).toEqual(expect.arrayContaining(sections.map(targetSection => expect.objectContaining({
-            animationName: 'reserve-discovery-page-from-left',
-            destinationAnimation: 'reserve-discovery-page-from-left',
-            contentAnimation: 'none',
-            homeLogoEntry: 'true',
-            targetSection,
-        }))));
-        const startedEntries = await entries();
-        expect(startedEntries).toHaveLength(3);
-        expect(startedEntries.every(entry => entry.directionClass === undefined)).toBe(true);
-    } else {
-        // 골격부터 본문까지 고정된 부모가 한 번만 진입하는지 확인해요.
-        await expect.poll(entries).toContainEqual(expect.objectContaining({
-            animationName: `reserve-discovery-page-${direction}`,
-            destinationAnimation: `reserve-discovery-page-${direction}`,
-            contentAnimation: `reserve-discovery-page-${direction}`,
-            directionClass: `reserve-route-entry--${direction}`,
-            targetIsContent: true,
-        }));
-        expect(await entries()).toHaveLength(1);
-        await expect(destination).toHaveCSS('animation-name', 'none');
-    }
+    // 골격부터 본문까지 고정된 부모가 한 번만 진입하는지 확인해요.
+    await expect.poll(entries).toContainEqual(expect.objectContaining({
+        animationName: `reserve-discovery-page-${direction}`,
+        destinationAnimation: `reserve-discovery-page-${direction}`,
+        contentAnimation: `reserve-discovery-page-${direction}`,
+        directionClass: `reserve-route-entry--${direction}`,
+        targetIsContent: true,
+    }));
+    expect(await entries()).toHaveLength(1);
+    await expect(destination).toHaveCSS('animation-name', 'none');
     await page.evaluate(() => { window.__reservePageEntryCursor = window.__reservePageEntries.length; });
 }
 
@@ -54,8 +36,6 @@ test.beforeEach(async ({ page }) => {
                 contentAnimation: getComputedStyle(content).animationName,
                 targetIsContent: event.target === content,
                 directionClass: [...content.classList].find(name => name.startsWith('reserve-route-entry--')),
-                homeLogoEntry: content.getAttribute('data-home-logo-entry'),
-                targetSection: [...event.target.classList].find(name => ['reserve-discovery-location', 'reserve-discovery-featured', 'reserve-discovery-shortcuts'].includes(name)),
             });
         });
     });
@@ -132,7 +112,7 @@ test('top tabs move only their content in the selected direction, including brow
     expect(await tabs.boundingBox()).toEqual(initialTabs);
 });
 
-test('the header logo and store section stay still while ready home sections enter once', async ({ page }) => {
+test('the header logo stays still while the cached home parent enters once', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByText('아직 추천할 가게가 없어요.', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: '서비스 이용약관', exact: true }).click();
@@ -142,16 +122,36 @@ test('the header logo and store section stay still while ready home sections ent
     await expect(page).toHaveURL(url => url.pathname === '/' && url.searchParams.get('region') === 'all');
     await expect(logo).not.toHaveClass(/reserve-header-logo--home-motion/);
     await expect(logo).toHaveCSS('animation-name', 'none');
-    await expectContentEntry(page, page.locator('.reserve-discovery-home'), 'from-left', { cached: true, homeLogo: true });
+    await expectContentEntry(page, page.locator('.reserve-discovery-home'), 'from-left', { cached: true });
+    await expect(page.locator('.ant-layout-content')).not.toHaveAttribute('data-home-logo-entry');
+    for (const section of ['location', 'recommended', 'featured', 'shortcuts']) {
+        await expect(page.locator(`.reserve-discovery-${section}`)).toHaveCSS('animation-name', 'none');
+    }
+    const home = await page.locator('.reserve-discovery-home').elementHandle();
+    const entriesBefore = await page.evaluate(() => window.__reservePageEntries.length);
+    await logo.click();
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    expect(await home.evaluate(node => node === document.querySelector('.reserve-discovery-home'))).toBe(true);
+    expect(await page.evaluate(() => window.__reservePageEntries.length)).toBe(entriesBefore);
 });
 
 test('rapid header back presses produce one collapse and one history move', async ({ page }) => {
     await page.addInitScript(() => {
         const go = window.history.go.bind(window.history);
+        window.__reserveHistoryMoves = [];
         // 실제 비동기 POP의 커밋 대기를 늘려 빠른 입력 경쟁을 결정적으로 검사한다.
-        window.history.go = delta => window.setTimeout(() => go(delta), 120);
+        window.history.go = delta => {
+            window.__reserveHistoryMoves.push(delta);
+            return window.setTimeout(() => go(delta), 120);
+        };
     });
-    await page.goto('/');
+    // 새 문서의 정적 헤더와 이미 방문한 화면의 도구 진입을 각각 확인해요.
+    await page.goto('/login');
+    await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible();
+    await expect(page.locator('.reserve-header-back-slot')).toHaveCSS('animation-name', 'none');
+    await page.getByRole('link', { name: 'RESERVE 홈' }).click();
+    await expect(page.getByText('아직 추천할 가게가 없어요.', { exact: true })).toBeVisible();
+    await expect(page.locator('.reserve-header-back')).toHaveCount(0);
     await page.getByRole('button', { name: '로그인', exact: true }).click();
     await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible();
     const back = page.getByRole('button', { name: '이전 화면으로 돌아가기' });
@@ -176,6 +176,7 @@ test('rapid header back presses produce one collapse and one history move', asyn
     await expect(page).toHaveURL(url => url.pathname === '/' && url.searchParams.get('region') === 'all');
     await expect(page.locator('.reserve-header-back')).toHaveCount(0);
     expect(await page.evaluate(() => window.__reserveHeaderBackAnimations)).toEqual(['reserve-header-back-leave']);
+    expect(await page.evaluate(() => window.__reserveHistoryMoves)).toEqual([-1]);
     await page.goForward();
     await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: '이전 화면으로 돌아가기' })).toBeEnabled();

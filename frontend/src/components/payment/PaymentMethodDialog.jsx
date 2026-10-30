@@ -68,7 +68,7 @@ function MethodOption({ method, selected, onChange, device }) {
 }
 MethodOption.propTypes = { method: PropTypes.object.isRequired, selected: PropTypes.bool.isRequired, onChange: PropTypes.func.isRequired, device: PropTypes.object.isRequired };
 
-export default function PaymentMethodDialog({ open, prepared, summary = {}, methods, selectedId, onChange, onConfirm, onClose, afterClose, paymentDevice }) {
+export default function PaymentMethodDialog({ open, prepared, summary = {}, methods, selectedId, onChange, onConfirm, onClose, afterClose, paymentDevice, onViewTerms }) {
     const [cardCompany, setCardCompany] = useState('');
     const [acknowledged, setAcknowledged] = useState(false);
     const device = paymentDevice || readPaymentDevice();
@@ -86,7 +86,10 @@ export default function PaymentMethodDialog({ open, prepared, summary = {}, meth
         onSubmit={confirm} submitText={amount + ' 결제하기'} submitDisabled={!ready} width={820}
         footer={<div className="reserve-payment-footer">
             <Checkbox checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)}>
-                [필수] {reservation ? '예약' : '주문'} 내용과 <TextLink to="/terms#payments" onClick={event => event.stopPropagation()}>결제·취소·환불 안내</TextLink>를 확인했어요.
+                [필수] {reservation ? '예약' : '주문'} 내용과 <TextLink to="/terms#payments" onClick={event => {
+                    event.stopPropagation();
+                    if (!event.defaultPrevented && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) onViewTerms?.();
+                }}>결제·취소·환불 안내</TextLink>를 확인했어요.
             </Checkbox>
             <Button variant="primary" size="sm" disabled={!ready} onClick={confirm}>{amount} 결제하기</Button>
         </div>}>
@@ -125,5 +128,5 @@ export default function PaymentMethodDialog({ open, prepared, summary = {}, meth
 PaymentMethodDialog.propTypes = {
     open: PropTypes.bool, prepared: PropTypes.object.isRequired, summary: PropTypes.object,
     methods: PropTypes.array.isRequired, selectedId: PropTypes.string, onChange: PropTypes.func.isRequired,
-    onConfirm: PropTypes.func.isRequired, onClose: PropTypes.func.isRequired, afterClose: PropTypes.func, paymentDevice: PropTypes.object,
+    onConfirm: PropTypes.func.isRequired, onClose: PropTypes.func.isRequired, afterClose: PropTypes.func, paymentDevice: PropTypes.object, onViewTerms: PropTypes.func,
 };

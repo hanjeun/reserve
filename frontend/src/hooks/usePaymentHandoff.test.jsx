@@ -47,6 +47,44 @@ describe('결제 외부 화면 복귀', () => {
         await act(async () => { vi.advanceTimersByTime(300); expect(await done).toBe(PAYMENT_HANDOFF); });
         expect(returned).toHaveBeenCalledTimes(1);
     });
+    it.each([{ paymentId: 'popup-order' }, { code: 'PAY_PROCESS_CANCELED' }])('팝업 SDK가 대기 중이면 부모 창 복귀와 시간 경과로 결과를 앞당기지 않아요: %j', async response => {
+        const returned = vi.fn(); const { result } = renderHook(() => usePaymentHandoff(returned));
+        let complete; let payment;
+        await act(async () => { payment = result.current({ merchantUid: 'popup-order' }, () => new Promise(resolve => { complete = resolve; })); });
+        act(() => { window.dispatchEvent(new Event('blur')); window.dispatchEvent(new Event('focus')); vi.advanceTimersByTime(60000); });
+        expect(returned).not.toHaveBeenCalled();
+        await act(async () => { complete(response); });
+        expect(await payment).toEqual(response);
+        expect(returned).not.toHaveBeenCalled();
+    });
+    it('팝업 SDK가 늦게 거절해도 같은 호출의 오류로 전달해요', async () => {
+        const returned = vi.fn(); const { result } = renderHook(() => usePaymentHandoff(returned));
+        let reject; let payment;
+        await act(async () => { payment = result.current({ merchantUid: 'popup-error' }, () => new Promise((_, fail) => { reject = fail; })); });
+        act(() => vi.advanceTimersByTime(20000));
+        const failure = new Error('synthetic SDK rejection');
+        await act(async () => { reject(failure); await expect(payment).rejects.toBe(failure); });
+        expect(returned).not.toHaveBeenCalled();
+    });
+    it('SDK가 이동으로 넘긴 뒤의 실제 중단은 같은 주문 확인으로 복구해요', async () => {
+        const returned = vi.fn(); const { result } = renderHook(() => usePaymentHandoff(returned));
+        let payment;
+        await act(async () => { payment = result.current({ merchantUid: 'redirect-order' }, () => Promise.resolve(undefined)); });
+        expect(await payment).toBeUndefined();
+        act(() => result.current({ merchantUid: 'redirect-order' }));
+        act(() => vi.advanceTimersByTime(10000));
+        expect(returned).toHaveBeenCalledOnce();
+    });
+    it('팝업 대기 중 계정을 바꾸면 늦은 성공이 이전 주문으로 이동시키지 않아요', async () => {
+        const returned = vi.fn(); const { result } = renderHook(() => usePaymentHandoff(returned));
+        let complete; let payment;
+        await act(async () => { payment = result.current({ merchantUid: 'old-popup' }, () => new Promise(resolve => { complete = resolve; })); });
+        act(() => useAuthStore.setState({ sessionRevision: 2 }));
+        expect(await payment).toBe(PAYMENT_HANDOFF);
+        await act(async () => { complete({ paymentId: 'old-popup' }); });
+        act(() => vi.advanceTimersByTime(20000));
+        expect(returned).not.toHaveBeenCalled();
+    });
     it('계정 전환과 화면 종료 뒤에는 이전 주문으로 이동하지 않아요', () => {
         const returned = vi.fn(); const { result, unmount } = renderHook(() => usePaymentHandoff(returned));
         act(() => result.current({ merchantUid: 'old-order' }));

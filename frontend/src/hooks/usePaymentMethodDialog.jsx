@@ -2,9 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import PaymentMethodDialog from '../components/payment/PaymentMethodDialog';
 import useAuthStore from '../store/useAuthStore';
 import { configuredPaymentMethods } from '../utils/paymentMethods';
+import usePaymentTermsNotice from './usePaymentTermsNotice';
 
 export default function usePaymentMethodDialog() {
     const revision = useAuthStore(state => state.sessionRevision);
+    const rememberTerms = usePaymentTermsNotice();
     const [dialog, setDialog] = useState(null);
     const pending = useRef(null);
     const sequence = useRef(0);
@@ -40,6 +42,7 @@ export default function usePaymentMethodDialog() {
     const paymentDialog = dialog && dialog.revision === revision ? <PaymentMethodDialog
         {...dialog} onChange={selectedId => setDialog(current => current?.methods.some(method => method.id === selectedId) ? { ...current, selectedId } : current)}
         onConfirm={method => settle(method)} onClose={() => settle(null)} afterClose={() => closed(dialog.id)}
+        onViewTerms={() => rememberTerms(dialog.summary.kind)}
     /> : null;
     return { choosePayment, paymentDialog };
 }

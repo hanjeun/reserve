@@ -2,6 +2,7 @@ const KEY = 'reserve:payment-return';
 const MAX_AGE = 30 * 60 * 1000;
 const MAX_ENTRIES = 5;
 let entries = [];
+let termsReturn = null;
 
 function returnPath(location) {
     if (/^\/store\/[1-9][0-9]*$/.test(location?.pathname)) return location.pathname;
@@ -56,5 +57,26 @@ export function consumePaymentReturn(merchantUid, memberId, storeId) {
 
 export function clearPaymentReturns() {
     entries = [];
+    termsReturn = null;
     save();
+}
+
+// 약관을 읽은 같은 방문 기록에만 안내를 복원하며 결제 정보·동의 상태는 저장하지 않아요.
+export function rememberPaymentTermsReturn(location, memberId, epoch, kind) {
+    if (!Number.isSafeInteger(memberId) || memberId <= 0 || !location?.key
+        || !location.pathname?.startsWith('/') || location.pathname.startsWith('//')
+        || !['RESERVATION', 'ADVERTISEMENT'].includes(kind)) return;
+    termsReturn = { key: location.key, pathname: location.pathname, memberId, epoch, kind, at: Date.now() };
+}
+
+export function consumePaymentTermsReturn(location, memberId, epoch, navigationType) {
+    const notice = termsReturn;
+    if (!notice) return null;
+    if (notice.memberId !== memberId || notice.epoch !== epoch || Date.now() < notice.at || Date.now() - notice.at >= MAX_AGE) {
+        termsReturn = null;
+        return null;
+    }
+    if (navigationType !== 'POP' || notice.key !== location.key || notice.pathname !== location.pathname) return null;
+    termsReturn = null;
+    return notice;
 }

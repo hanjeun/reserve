@@ -15,6 +15,7 @@ export default function usePaymentHandoff(onReturn) {
             if (!order || order.revision !== useAuthStore.getState().sessionRevision || document.visibilityState === 'hidden') return;
             // 인증 중인 프레임이나 팝업으로 나간 사용자를 시간만으로 중단하지 않아요.
             if (order.frame?.isConnected || order.away && !document.hasFocus()) return;
+            if (order.pendingSdk && !order.frame) return;
             current.current = null;
             order.dispose();
             order.resolve?.(PAYMENT_HANDOFF);
@@ -49,7 +50,7 @@ export default function usePaymentHandoff(onReturn) {
         previous?.dispose();
         previous?.resolve?.(PAYMENT_HANDOFF);
         const value = { ...order, revision: useAuthStore.getState().sessionRevision,
-            away: document.visibilityState === 'hidden', frame: null };
+            away: document.visibilityState === 'hidden', frame: null, pendingSdk: Boolean(request) };
         const priorFrame = document.getElementById('imp-iframe');
         let observer;
         let closeTimer;

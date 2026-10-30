@@ -44,6 +44,15 @@ describe('Sentry 11 production collection boundary', () => {
                 webVitals: { softNavigations: false, bfcacheNavigations: false },
             });
             expect(sentry.browserSessionIntegration).toHaveBeenCalledWith({ lifecycle: 'route' });
+            expect(options.integrations).toContainEqual(expect.objectContaining({
+                name: 'ReserveTelemetryPrivacy', processEvent: expect.any(Function),
+            }));
+            const privateUrl = 'https://reserve.it.kr/store/1#waiting-token=synthetic-secret';
+            expect(options.beforeSend({ request: { url: privateUrl } }).request.url).toBe('https://reserve.it.kr/store/1');
+            expect(options.beforeSendTransaction({ spans: [{ data: { 'url.fragment': 'synthetic-secret' } }] })
+                .spans[0].data['url.fragment']).toBe('[Filtered]');
+            expect(options.beforeBreadcrumb({ category: 'navigation', data: { to: privateUrl } })
+                .data.to).toBe('https://reserve.it.kr/store/1');
         } finally {
             vi.unstubAllEnvs();
         }

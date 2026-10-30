@@ -2,7 +2,8 @@ FROM amazoncorretto:21-alpine-jdk
 
 # 기반 이미지와 별개로 보안 패치가 적용된 Corretto 패키지 버전을 고정한다.
 # https://github.com/corretto/corretto-21/releases/tag/21.0.13.0.11
-RUN apk add --no-cache amazon-corretto-21=21.0.13.0.11-r0
+RUN apk add --no-cache amazon-corretto-21=21.0.13.0.11-r0 && \
+    apk upgrade --no-cache
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
     mkdir -p /var/log/reserve && chown -R appuser:appgroup /var/log/reserve
@@ -71,9 +72,6 @@ RUN for REQUIRED_CLASS in \
     BOOT-INF/classes/kr/it/reserve/search/SearchResponse\$GroupError.class \
     BOOT-INF/classes/kr/it/reserve/store/search/StoreFulltextSearch.class \
     BOOT-INF/classes/kr/it/reserve/store/search/StoreFulltextSearch\$Preview.class \
-    BOOT-INF/classes/kr/it/reserve/member/controller/LoginMethodController.class \
-    BOOT-INF/classes/kr/it/reserve/member/service/LoginMethodService.class \
-    BOOT-INF/classes/kr/it/reserve/member/entity/LoginMethodChallenge.class \
     BOOT-INF/classes/kr/it/reserve/member/service/MemberWithdrawalService.class \
     BOOT-INF/classes/kr/it/reserve/member/mfa/MfaService.class \
     BOOT-INF/classes/kr/it/reserve/member/mfa/MfaPasskeys.class \
@@ -84,6 +82,9 @@ RUN for REQUIRED_CLASS in \
     BOOT-INF/classes/kr/it/reserve/payment/service/TestSettlementService.class \
     BOOT-INF/classes/kr/it/reserve/payment/entity/TestSettlementPayout.class \
     BOOT-INF/classes/db/manual/mfa-completion-settlement.sql \
+    BOOT-INF/classes/kr/it/reserve/member/controller/LoginMethodController.class \
+    BOOT-INF/classes/kr/it/reserve/member/service/LoginMethodService.class \
+    BOOT-INF/classes/kr/it/reserve/member/entity/LoginMethodChallenge.class \
     BOOT-INF/classes/kr/it/reserve/config/oauth2/OAuthProviderTokenCipher.class \
     BOOT-INF/classes/kr/it/reserve/config/oauth2/OAuthProviderTokenConverter.class \
     BOOT-INF/classes/kr/it/reserve/config/oauth2/OAuthSessionIssuer.class \

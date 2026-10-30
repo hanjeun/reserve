@@ -63,6 +63,7 @@ public class StoreService {
 
     private final StoreRepository storeRepository;
     private final StoreFulltextSearch storeFulltextSearch;
+    private final StoreWaitingCounts waitingCounts;
     private final FileStorageService fileStorageService;
     private final FileDeletionOutboxService fileDeletionOutboxService;
     private final DataLifecycleGuard dataLifecycleGuard;
@@ -202,10 +203,7 @@ public class StoreService {
                 .orElseThrow(StoreException::notFound);
         if (store.isDeleted()) throw StoreException.notFound();
 
-        if (store.getOwner() != null && !store.getOwner().getId().equals(member.getId())) {
-            log.error("Unauthorized store access: storeOwnerId={}, requestMemberId={}", store.getOwner().getId(), member.getId());
-            throw StoreException.forbidden(EDIT_FORBIDDEN_MESSAGE);
-        }
+        requireStoreOwner(store, member, EDIT_FORBIDDEN_MESSAGE);
 
         try {
             applyStoreDetails(store, request);
@@ -336,9 +334,7 @@ public class StoreService {
     public StoreResponse toggleAutoApproval(Long id, boolean enabled, Member member) {
         Store store = storeRepository.findById(id)
                 .orElseThrow(StoreException::notFound);
-        if (store.getOwner() != null && !store.getOwner().getId().equals(member.getId())) {
-            throw StoreException.forbidden(EDIT_FORBIDDEN_MESSAGE);
-        }
+        requireStoreOwner(store, member, EDIT_FORBIDDEN_MESSAGE);
         store.setAutoApprovalEnabled(enabled);
         if (updates != null) updates.changed(store, EntityUpdates.Operation.UPDATED, false);
         return StoreResponse.fromEntity(storeRepository.save(store));
@@ -351,9 +347,7 @@ public class StoreService {
     public int countActiveReservations(Long id, Member member) {
         Store store = storeRepository.findById(id)
                 .orElseThrow(StoreException::notFound);
-        if (store.getOwner() != null && !store.getOwner().getId().equals(member.getId())) {
-            throw StoreException.forbidden("가게를 조회할 권한이 없어요.");
-        }
+        requireStoreOwner(store, member, "가게를 조회할 권한이 없어요.");
         return reservationRepository.countActiveReservationsByStoreId(id);
     }
 
@@ -361,9 +355,7 @@ public class StoreService {
     public StoreClosureReadiness getClosureReadiness(Long id, Member member) {
         Store store = storeRepository.findById(id)
                 .orElseThrow(StoreException::notFound);
-        if (store.getOwner() != null && !store.getOwner().getId().equals(member.getId())) {
-            throw StoreException.forbidden("가게를 조회할 권한이 없어요.");
-        }
+        requireStoreOwner(store, member, "가게를 조회할 권한이 없어요.");
         return dataLifecycleGuard.inspectStore(id);
     }
 
@@ -393,9 +385,7 @@ public class StoreService {
         if (store.isDeleted()) {
             throw StoreException.notFound();
         }
-        if (store.getOwner() != null && !store.getOwner().getId().equals(member.getId())) {
-            throw StoreException.forbidden("가게 영업을 종료할 권한이 없어요.");
-        }
+        requireStoreOwner(store, member, "가게 영업을 종료할 권한이 없어요.");
 
         dataLifecycleGuard.requireStoreClosureAllowed(id);
 
@@ -444,8 +434,16 @@ public class StoreService {
         log.info("Store closure completed: storeId={}", id);
     }
 
+    private void requireStoreOwner(Store store, Member member, String message) {
+        // 소유자가 없는 행은 어떤 회원에게도 소유권을 부여하지 않는다.
+        if (member == null || member.getId() == null || store.getOwner() == null
+                || !member.getId().equals(store.getOwner().getId())) {
+            throw StoreException.forbidden(message);
+        }
+    }
+
     private StoreDirectory directory() {
-        return new StoreDirectory(storeRepository, storeFulltextSearch, fulltextEnabled);
+        return new StoreDirectory(storeRepository, storeFulltextSearch, fulltextEnabled, waitingCounts);
     }
 
     private StoreImages images() {

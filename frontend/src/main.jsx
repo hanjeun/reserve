@@ -6,6 +6,7 @@ import App from './App.jsx'
 import { initTheme } from './hooks/useTheme'
 import { installChunkReloadHandler } from './utils/chunkReload'
 import { scheduleSessionReplay } from './utils/sessionReplay'
+import { telemetryPrivacy } from './utils/telemetryPrivacy'
 
 // React 렌더보다 먼저 <html>에 data-theme / --app-font를 반영한다.
 // 렌더 이후에 하면 라이트로 한 번 그려졌다가 다크로 바뀌는 번쩍임(FOUC)이 생긴다.
@@ -28,9 +29,13 @@ Sentry.init({
   },
   attachStacktrace: false,
   traceLifecycle: 'static',
+  beforeSend: telemetryPrivacy.beforeSend,
+  beforeSendTransaction: telemetryPrivacy.beforeSend,
+  beforeBreadcrumb: telemetryPrivacy.beforeBreadcrumb,
   integrations: [
     Sentry.browserTracingIntegration({ webVitals: { softNavigations: false, bfcacheNavigations: false } }),
     Sentry.browserSessionIntegration({ lifecycle: 'route' }),
+    telemetryPrivacy.integration,
   ],
   tracesSampleRate: 0.1,
   tracePropagationTargets: ["localhost", /^https:\/\/reserve\.it\.kr\/api/],

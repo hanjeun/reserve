@@ -12,7 +12,7 @@ dependencyLocking {
 group = 'kr.it.reserve'
 // 프론트 package.json과 릴리스 버전을 맞춘다.
 
-version = '2.16.0'
+version = '2.16.1'
 description = 'We are reserve'
 
 java {
@@ -36,6 +36,7 @@ ext {
 
 // Spring Boot BOM 이후의 호환 보안 패치를 지정한다.
 ext['jackson-2-bom.version'] = '2.21.8'
+ext['jackson-bom.version'] = '3.1.8'
 // 2.4.240의 연결 종료 뒤 CHECK 제약 평가 오류를 피한다.
 ext['h2.version'] = '2.5.252'
 

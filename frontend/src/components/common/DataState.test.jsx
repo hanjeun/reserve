@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import DataState from './DataState';
 
@@ -58,5 +58,19 @@ describe('DataState', () => {
 
         expect(container.querySelector('.anticon-sync.anticon-spin')).toBeTruthy();
         expect(container.querySelector('.reserve-btn-spin')).toBeNull();
+    });
+
+    it('follows a returned request even when the caller has no separate retrying flag', async () => {
+        let resolve;
+        const retry = vi.fn(() => new Promise(done => { resolve = done; }));
+        const { container } = render(<DataState state="error" title="가게 소식 상태를 불러오지 못했어요." onRetry={retry} />);
+        const button = screen.getByRole('button', { name: '다시 불러오기' });
+        fireEvent.click(button);
+        expect(button).toHaveClass('reserve-retry-button');
+        expect(button).toHaveAttribute('aria-busy', 'true');
+        expect(container.querySelector('.anticon-sync.anticon-spin')).toBeTruthy();
+        await act(async () => resolve());
+        expect(button).toBeEnabled();
+        expect(retry).toHaveBeenCalledOnce();
     });
 });

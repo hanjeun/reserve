@@ -2,23 +2,15 @@ import { Typography } from '../../primitives.jsx';
 import { CheckCircleFilled } from '../../../../frontend/src/components/common/icons.js';
 import { colors } from '../../../../frontend/src/styles/tokens/index.js';
 import { styles } from '../Home.styles';
+import TypingLine from '../../TypingLine';
+import { splitLine } from '../../typing';
 
 const { Title, Text } = Typography;
 
 function SectionTitle({ title, blue, style }) {
     return (
-        <Title style={style}>
-            {title.map((line, j) => {
-                const idx = line.indexOf(blue);
-                if (idx === -1) return <div key={j}>{line}</div>;
-                return (
-                    <div key={j}>
-                        {line.slice(0, idx)}
-                        <span style={{ color: colors.primary.main }}>{blue}</span>
-                        {line.slice(idx + blue.length)}
-                    </div>
-                );
-            })}
+        <Title level={2} style={style} data-marketing-section-title aria-label={title.join(' ')}>
+            {title.map((line, index) => <TypingLine key={index} line={splitLine(line, blue)} reserveSpace />)}
         </Title>
     );
 }
@@ -29,7 +21,7 @@ export default function FeatureSection({ sec, index, isMobile }) {
 
     if (isMobile) {
         return (
-            <div
+            <section className="marketing-scene"
                 id={id}
                 style={{
                     ...styles.sectionMobile,
@@ -62,12 +54,12 @@ export default function FeatureSection({ sec, index, isMobile }) {
                         <Ui />
                     </div>
                 </div>
-            </div>
+            </section>
         );
     }
 
     return (
-        <div id={id} style={{ ...styles.section, background: bgColor }}>
+        <section className="marketing-scene" id={id} style={{ ...styles.section, background: bgColor }}>
             <div style={styles.sectionBody}>
                 <div style={{ ...styles.sectionInner, flexDirection: reverse ? 'row-reverse' : 'row' }}>
                     <div className="reveal" style={styles.sectionText}>
@@ -92,6 +84,6 @@ export default function FeatureSection({ sec, index, isMobile }) {
                     </div>
                 </div>
             </div>
-        </div>
+        </section>
     );
 }

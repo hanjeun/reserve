@@ -1,6 +1,7 @@
 import { PageTitle } from '../../components/common/PageTypography';
 import PhotoGallery from '../../components/common/PhotoGallery';
 import WaitingJoin from '../../components/waiting/WaitingJoin';
+import WaitingStoreSummary from '../../components/waiting/WaitingStoreSummary';
 import { useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import useAuthStore from '../../store/useAuthStore';
@@ -44,6 +45,8 @@ export const StoreIdentity = ({ store, nearby, canContact, onContact, preview = 
                 <PageTitle level={1}>{store.name}</PageTitle>
                 <fieldset className="reserve-store-identity-actions" aria-label="가게 빠른 작업" style={{ border: 0, padding: 0, minWidth: 0, marginInline: 0 }}>
                     {!preview && <FavoriteButton storeId={store.id} appearance="plain" inactiveColor={colors.text.primary} />}
+                    {!preview && ['ONSITE', 'REMOTE', 'BOTH'].includes(store.waitingIntakeMode)
+                        && <WaitingStoreSummary store={store} detail />}
                     {canContact && onContact && (
                         <Tooltip title="가게에 채팅 문의하기"><button type="button" className="reserve-store-contact-action reserve-icon-tool" data-icon-kind="navigation"
                             onClick={onContact} aria-label="가게에 채팅 문의하기">

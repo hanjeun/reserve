@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StoreIdentity, StoreInfoSection } from './StoreDetail';
 
 vi.mock('../../api/axios', () => ({ default: {} }));
@@ -20,6 +21,21 @@ vi.mock('../../hooks', () => ({
 }));
 
 describe('store detail identity rating', () => {
+    it('reuses the waiting information control beside favorites on the shared PC/mobile detail identity', () => {
+        const client = new QueryClient();
+        const { container, rerender } = render(<QueryClientProvider client={client}>
+            <StoreIdentity store={{ id: 31, name: '가게', waitingIntakeMode: 'REMOTE', waitingTeams: 3 }} />
+        </QueryClientProvider>);
+        const hint = screen.getByRole('button', { name: '웨이팅 정보: 접수 가능, 대기 3팀' });
+        expect(hint).toHaveClass('reserve-info-hint-trigger');
+        expect(container.querySelector('.reserve-store-identity-actions')).toContainElement(hint);
+        rerender(<QueryClientProvider client={client}><StoreIdentity store={{ id: 31, name: '가게', waitingIntakeMode: 'OFF' }} /></QueryClientProvider>);
+        expect(screen.queryByRole('button', { name: /웨이팅 정보/ })).toBeNull();
+        rerender(<QueryClientProvider client={client}><StoreIdentity preview store={{ id: 31, name: '가게', waitingIntakeMode: 'REMOTE' }} /></QueryClientProvider>);
+        expect(screen.queryByRole('button', { name: /웨이팅 정보/ })).toBeNull();
+        client.clear();
+    });
+
     it('puts favorite, chat and registered phone actions beside the title without covering the description', () => {
         const { container } = render(<StoreIdentity store={{ id: 31, name: '가게', category: '맛집', keywords: ['주차'], description: '소개', phone: '02-1234-5678' }} nearby canContact onContact={() => {}} />);
         const identity = container.querySelector('.reserve-store-identity');

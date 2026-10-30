@@ -61,6 +61,19 @@ class SecurityConfigAuthorizationTest {
     }
 
     @Test
+    void mfaCookieWithoutOriginProofCannotReachPublicAuthenticationActions() throws Exception {
+        for (String prefix : new String[]{"/api", "/api/v1"}) {
+            mockMvc.perform(post(prefix + "/auth/mfa/cancel")
+                            .cookie(new jakarta.servlet.http.Cookie("mfa_ticket", "synthetic-invalid-ticket")))
+                    .andExpect(status().isForbidden());
+            mockMvc.perform(post(prefix + "/auth/mfa/cancel")
+                            .header("Referer", "https://reserve.it.kr/login")
+                            .cookie(new jakarta.servlet.http.Cookie("mfa_ticket", "synthetic-invalid-ticket")))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    @Test
     void foreignRefererCannotUseAuthenticationCookie() throws Exception {
         mockMvc.perform(post("/api/chat/support/open")
                         .header("Referer", "https://reserve.it.kr.attacker.test/")

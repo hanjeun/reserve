@@ -15,6 +15,21 @@ const select = {
 };
 
 describe('FilterToolbar', () => {
+    it('keeps the search and refresh slots in the first-loading skeleton until the real toolbar is ready', () => {
+        const props = { search: { value: '공방', onChange: vi.fn(), placeholder: '가게 검색' }, onReload: vi.fn() };
+        const { container, rerender } = render(<FilterToolbar {...props} initialLoading />);
+        const skeleton = container.querySelector('.reserve-filter-toolbar');
+        expect(skeleton).toHaveAttribute('aria-hidden', 'true');
+        const row = skeleton.querySelector('.reserve-filter-toolbar-secondary');
+        expect(row.children).toHaveLength(2);
+        expect(row.lastElementChild).toHaveClass('reserve-filter-toolbar-refresh');
+        expect(screen.queryByPlaceholderText('가게 검색')).toBeNull();
+        expect(screen.queryByRole('button', { name: '새로고침' })).toBeNull();
+        rerender(<FilterToolbar {...props} />);
+        expect(screen.getByPlaceholderText('가게 검색')).toHaveValue('공방');
+        expect(screen.getByRole('button', { name: '새로고침' })).toBeEnabled();
+    });
+
     it('reuses the compact menu toolbar for filtered list pages', () => {
         const { container } = render(
             <FilterToolbar

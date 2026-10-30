@@ -42,7 +42,9 @@ function PublicProfileEditor({ profile }) {
     };
     return <Form form={form} layout="vertical" size="large" requiredMark={false} disabled={save.isPending} onFinish={submit}
         initialValues={{ nickname: profile?.nickname || '', bio: profile?.bio || '', avatarSource: avatarSource(profile) }}>
-        <FeedProfileFields avatarField={<Form.Item name="avatarSource" label="피드 프로필 사진" style={{ marginBottom: 16 }}
+        <FeedProfileFields avatarField={<Form.Item name="avatarSource" className="reserve-account-public-profile-avatar"
+            label={<><span>피드 프로필 사진</span>{profile && <IconTool label="내 공개 프로필 보기" icon={<UserOutlined aria-hidden="true" />}
+                disabled={save.isPending} to={authorPath(profile.publicId)} />}</>} style={{ marginBottom: 16 }}
             rules={[{ validator: (_, value) => value !== 'CUSTOM' || pendingPhoto?.file || profile?.avatarSource === 'CUSTOM'
                 ? Promise.resolve() : Promise.reject(new Error('피드에서 사용할 사진을 골라주세요.')) }]}>
             <FeedProfileAvatarField accountImage={accountImage} customImage={profile?.avatarSource === 'CUSTOM' ? profile.avatarUrl : undefined}
@@ -54,8 +56,6 @@ function PublicProfileEditor({ profile }) {
         <div className="reserve-account-public-profile-actions">
             {commentDraft && <span style={{ marginRight: 'auto' }}><IconTool kind="navigation" label="댓글로 돌아가기" icon={<ArrowLeftOutlined aria-hidden="true" />}
                 disabled={save.isPending} onClick={returnToComment} /></span>}
-            {profile && <IconTool label="내 공개 프로필 보기" icon={<UserOutlined aria-hidden="true" />}
-                disabled={save.isPending} to={authorPath(profile.publicId)} />}
         </div>
     </Form>;
 }

@@ -1,4 +1,5 @@
 import { getClient } from '@sentry/react';
+import { telemetryPrivacy } from './telemetryPrivacy';
 
 // 오류·성능 수집은 main에서 바로 시작한다. DOM 재현기는 첫 화면을 그린 후 같은 출처 청크로 읽는다.
 export function scheduleSessionReplay(win = window) {
@@ -13,7 +14,12 @@ export function scheduleSessionReplay(win = window) {
         try {
             const { replayIntegration } = await import('@sentry/replay');
             if (cancelled || getClient() !== client || client.getIntegrationByName('Replay')) return;
-            client.addIntegration(replayIntegration({ maskAllText: true, blockAllMedia: true }));
+            client.addIntegration(replayIntegration({
+                maskAllText: true,
+                blockAllMedia: true,
+                networkCaptureBodies: false,
+                beforeAddRecordingEvent: telemetryPrivacy.beforeAddRecordingEvent,
+            }));
         } catch {
             // 선택적 관측 청크 오류는 화면과 기본 오류 수집에 영향을 주지 않는다.
             console.warn('Session replay could not be loaded');

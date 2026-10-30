@@ -7,7 +7,7 @@ import ProfilePhotoPicker from '../common/ProfilePhotoPicker';
 import ProfilePhotoResetButton from '../common/ProfilePhotoResetButton';
 import useAuthStore from '../../store/useAuthStore';
 import useExitAnimation from '../../hooks/useExitAnimation';
-import { animation } from '../../styles/tokens';
+import useReducedMotion from '../../hooks/useReducedMotion';
 
 const ProfileImageTab = ({ user }) => {
     const { message, confirm } = useMessage();
@@ -69,25 +69,33 @@ const ProfileImageTab = ({ user }) => {
     // 취소/저장 버튼 행 — 새 이미지를 고르면 슬라이드 인으로 나타나는데, 취소를 누르면(pending이 null이
     // 되는 순간) 그 자리에서 바로 사라져서 "열릴 땐 애니메이션, 닫힐 땐 즉시"였던 것을 수정
     const showButtons = !!pending?.file;
-    const { shouldRender: buttonsShouldRender, isClosing: buttonsClosing } = useExitAnimation(showButtons, 200);
+    const reducedMotion = useReducedMotion();
+    const { shouldRender: buttonsShouldRender, isClosing: buttonsClosing } = useExitAnimation(showButtons, reducedMotion ? 0 : 200);
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
 
             <ProfilePhotoPicker src={previewSrc} disabled={loading} onSelect={handleFileChange} animate={Boolean(pending?.previewUrl)} />
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%', marginTop: 4 }}>
-                {buttonsShouldRender ? (
-                    <div style={{ display: 'flex', gap: 8, animation: buttonsClosing ? animation.slideUpOut : animation.slideUpIn }}>
+            <div style={{ display: 'grid', alignItems: 'start', width: '100%', marginTop: 4 }}>
+                <div aria-hidden={buttonsShouldRender || undefined} inert={buttonsShouldRender ? true : undefined}
+                    style={{ gridArea: '1 / 1', display: 'flex', flexDirection: 'column', visibility: buttonsShouldRender ? 'hidden' : undefined }}>
+                    <ProfilePhotoResetButton onClick={handleResetToDefault} disabled={loading} />
+                </div>
+                {buttonsShouldRender && (
+                    <div className="reserve-profile-photo-actions" aria-hidden={!showButtons || buttonsClosing || undefined}
+                        inert={!showButtons || buttonsClosing ? true : undefined}
+                        style={{ gridArea: '1 / 1', display: 'grid', gridTemplateRows: '1fr', animation: reducedMotion ? 'none'
+                            : !showButtons || buttonsClosing ? 'reserve-feed-replies-exit 200ms ease-in both' : 'reserve-feed-replies-enter 200ms ease-out both' }}>
+                    <div style={{ minHeight: 0, overflow: 'hidden' }}><div style={{ display: 'flex', gap: 8 }}>
                         <Button variant="outline" onClick={handleCancel} disabled={loading} style={{ flex: 1 }}>
                             취소
                         </Button>
                         <Button variant="primary" onClick={handleSave} loading={loading} style={{ flex: 1 }}>
                             저장
                         </Button>
+                    </div></div>
                     </div>
-                ) : (
-                    <ProfilePhotoResetButton onClick={handleResetToDefault} disabled={loading} />
                 )}
             </div>
         </div>

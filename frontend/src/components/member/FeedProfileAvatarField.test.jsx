@@ -13,10 +13,10 @@ const textLinkRule = selector => {
 
 vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: { error: vi.fn() } }) }));
 
-function Editor({ busy = false, onSave }) {
+function Editor({ busy = false, onSave, initialSource = 'CUSTOM' }) {
     const [form] = Form.useForm();
-    const [pendingImage, setPendingImage] = useState('blob:pending-photo');
-    return <Form form={form} initialValues={{ avatarSource: 'CUSTOM' }} disabled={busy} onFinish={onSave}>
+    const [pendingImage, setPendingImage] = useState(initialSource === 'CUSTOM' ? 'blob:pending-photo' : null);
+    return <Form form={form} initialValues={{ avatarSource: initialSource }} disabled={busy} onFinish={onSave}>
         <Form.Item name="avatarSource">
             <FeedProfileAvatarField accountImage="/account.png" pendingImage={pendingImage} disabled={busy}
                 onSelect={() => {}} onReset={() => setPendingImage(null)} />
@@ -29,6 +29,23 @@ function Editor({ busy = false, onSave }) {
 }
 
 describe('public profile photo reset form connection', () => {
+    it.each(['ACCOUNT', 'CUSTOM'])('selects the real default without changing the account photo from %s', async initialSource => {
+        const onSave = vi.fn();
+        render(<Editor initialSource={initialSource} onSave={onSave} />);
+        const reset = screen.getByRole('button', { name: '기본 이미지로 변경' });
+        expect(reset).toHaveAttribute('type', 'button');
+        expect(reset).toHaveClass('reserve-text-link');
+        fireEvent.click(reset);
+        expect(screen.getByLabelText('사진 선택 상태')).toHaveTextContent('NONE:none');
+        expect(screen.getByRole('button', { name: '피드 프로필 사진 변경' }).querySelector('img')).toBeNull();
+        expect(onSave).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: '저장', exact: true }));
+        await waitFor(() => expect(onSave).toHaveBeenCalledWith({ avatarSource: 'NONE' }));
+        fireEvent.click(screen.getByRole('button', { name: '계정 사진으로 되돌리기' }));
+        expect(screen.getByLabelText('사진 선택 상태')).toHaveTextContent('ACCOUNT:none');
+        expect(screen.getByRole('button', { name: '피드 프로필 사진 변경' }).querySelector('img')).not.toBeNull();
+    });
+
     it('clears a pending photo and submits ACCOUNT through the real form field', async () => {
         const onSave = vi.fn();
         render(<Editor onSave={onSave} />);
@@ -55,8 +72,10 @@ describe('public profile photo reset form connection', () => {
         render(<Editor busy onSave={vi.fn()} />);
         const reset = screen.getByRole('button', { name: '계정 사진으로 되돌리기' });
         expect(reset).toBeDisabled();
+        expect(screen.getByRole('button', { name: '기본 이미지로 변경' })).toBeDisabled();
         expect(screen.getByRole('button', { name: '피드 프로필 사진 변경' })).toBeDisabled();
         fireEvent.click(reset);
+        fireEvent.click(screen.getByRole('button', { name: '기본 이미지로 변경' }));
         expect(screen.getByLabelText('사진 선택 상태')).toHaveTextContent('CUSTOM:blob:pending-photo');
     });
 });

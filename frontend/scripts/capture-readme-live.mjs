@@ -9,7 +9,7 @@ import process from 'node:process';
 import readline from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { README_IMAGE_FILENAMES } from './readme-image-paths.mjs';
+import { README_IMAGE_FILENAMES, readmeImageDimensions } from './readme-image-paths.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.resolve(SCRIPT_DIR, '..');
@@ -17,10 +17,10 @@ const REPOSITORY_DIR = path.resolve(FRONTEND_DIR, '..');
 const OUTPUT_DIR = path.join(REPOSITORY_DIR, 'docs', 'images');
 const AUTH_DIR = path.join(FRONTEND_DIR, '.readme-capture');
 const AUTH_FILE = path.join(AUTH_DIR, 'auth.json');
-const BASE_URL = (process.env.README_BASE_URL || 'https://reserve.it.kr').replace(/(?<!\/)\/+$/, '');
+const BASE_URL = (process.env.README_BASE_URL || 'https://app.reserve.it.kr').replace(/(?<!\/)\/+$/, '');
 const VIEWPORT = { width: 1600, height: 900 };
 const CDP_URL = `http://127.0.0.1:${process.env.README_CDP_PORT || 9222}`;
-const GRAFANA_URL = process.env.README_GRAFANA_URL || 'https://grafana.reserve.it.kr/d/reserve-logs';
+const GRAFANA_URL = process.env.README_GRAFANA_URL || 'https://grafana.reserve.it.kr/d/reserve-hardware';
 // 로그인 상태 파일에는 RESERVE·Grafana 쿠키만 남긴다(같은 Chrome 의 Google 등 다른 사이트 쿠키는 버린다).
 const AUTH_DOMAINS = [new URL(BASE_URL).hostname, new URL(GRAFANA_URL).hostname];
 const ONLY = (process.argv.find(arg => arg.startsWith('--only=')) ?? '').slice('--only='.length)
@@ -69,7 +69,10 @@ async function importAuthFromChrome() {
 }
 
 async function cleanAuth() {
-    await rm(AUTH_DIR, { recursive: true, force: true });
+    const resolved = path.resolve(AUTH_DIR);
+    if (path.dirname(resolved) !== path.resolve(FRONTEND_DIR) || path.basename(resolved) !== '.readme-capture')
+        throw new Error('로그인 상태 저장 경로를 확인해주세요.');
+    await rm(resolved, { recursive: true, force: true });
     console.log('저장한 로그인 상태를 지웠습니다.');
 }
 
@@ -89,21 +92,27 @@ async function firstStoreId() {
 async function waitReady(page, { grafana = false } = {}) {
     if (grafana) {
         // Grafana 는 패널마다 따로 쿼리한다 — 로딩 막대가 다 사라지고 숫자가 그려질 때까지 기다린다.
-        await page.waitForSelector('.react-grid-layout', { timeout: 30_000 })
-            .catch(() => console.warn('  ! Grafana 대시보드가 30초 안에 뜨지 않았습니다. 그대로 찍습니다.'));
+        await page.waitForSelector('.react-grid-layout', { timeout: 30_000 });
         await page.waitForFunction(() => document.querySelectorAll('[aria-label="Panel loading bar"]').length === 0,
-            null, { timeout: 30_000 }).catch(() => {});
+            null, { timeout: 30_000 });
         await page.evaluate(() => document.fonts.ready);
         await page.waitForTimeout(2000);
         return;
     }
     await page.waitForFunction(() => {
-        const busy = document.querySelector('[aria-busy="true"], .reserve-skeleton-block, .ant-skeleton');
-        return !busy || busy.getClientRects().length === 0;
-    }, null, { timeout: 30_000 }).catch(() => console.warn('  ! 로딩 표시가 30초 안에 사라지지 않았습니다. 그대로 찍습니다.'));
+        return ![...document.querySelectorAll('[aria-busy="true"], .reserve-skeleton-block, .ant-skeleton')]
+            .some(element => {
+                const box = element.getBoundingClientRect();
+                return box.width > 0 && box.height > 0 && box.bottom > 0 && box.top < innerHeight
+                    && box.right > 0 && box.left < innerWidth;
+            });
+    }, null, { timeout: 30_000 });
     await page.evaluate(() => document.fonts.ready);
-    await page.waitForFunction(() => [...document.images].every(image => image.complete), null, { timeout: 10_000 })
-        .catch(() => {});
+    await page.waitForFunction(() => [...document.images].every(image => {
+        const box = image.getBoundingClientRect();
+        return box.width === 0 || box.height === 0 || box.bottom <= 0 || box.top >= innerHeight
+            || image.complete && image.naturalWidth > 0;
+    }), null, { timeout: 10_000 });
     await page.waitForTimeout(800);
 }
 
@@ -139,16 +148,17 @@ async function capture(context, { name, pathname, url, auth, grafana }) {
     try {
         const target = url ?? `${BASE_URL}${pathname}`;
         console.log(`Capturing ${name} (${target})...`);
-        await page.goto(target, { waitUntil: 'domcontentloaded' });
+        const response = await page.goto(target, { waitUntil: 'domcontentloaded' });
+        if (!response?.ok()) throw new Error('화면이 정상 응답하지 않았어요.');
         await waitReady(page, { grafana });
-        if (auth && await landedOnLogin(page)) {
+        if (await landedOnLogin(page)) {
             console.warn(`  ! ${name}: 로그인 화면으로 돌아갔습니다(로그인 만료·권한 없음). 이 화면은 건너뜁니다 — 기존 ${name}.png 는 그대로 남습니다.`);
             return null;
         }
         await maskPersonalText(page);
         await page.evaluate(() => window.scrollTo(0, 0));
         // README 는 여섯 화면을 같은 크기 격자로 보여 준다 — Grafana 도 자르지 않고 같은 1600×900 으로 찍는다.
-        const image = await page.screenshot({ fullPage: false });
+        const image = await page.screenshot({ fullPage: false, type: README_IMAGE_FILENAMES[name].endsWith('.jpg') ? 'jpeg' : 'png' });
         return (await saveImage(name, image)) ? name : null;
     } catch (error) {
         // 개별 캡처가 실패해도 회전된 토큰의 상태 저장까지 진행한다.
@@ -179,10 +189,8 @@ async function saveImage(name, image) {
             return true;
         } catch (error) {
             if (attempt === 6) {
-                const fallback = path.join(OUTPUT_DIR, filename.replace(/\.png$/, '.new.png'));
-                await rename(temp, fallback).catch(() => {});
-                console.warn(`  ! ${name}.png 를 덮어쓰지 못했습니다(${error.code}) — 다른 프로그램이 파일을 열고 있는지 확인하세요.`);
-                console.warn(`    찍은 결과는 ${path.basename(fallback)} 로 저장했습니다. 그 프로그램을 닫고 이름을 바꾸거나 다시 실행하세요.`);
+                await rm(temp, { force: true });
+                console.warn(`  ! ${filename} 교체에 실패해 기존 이미지를 유지해요(${error.code}).`);
                 return false;
             }
             await new Promise(resolve => setTimeout(resolve, 500 * attempt));
@@ -194,12 +202,17 @@ async function saveImage(name, image) {
 async function writeManifest(captured) {
     const manifestPath = path.join(OUTPUT_DIR, 'screenshots.json');
     const previous = existsSync(manifestPath) ? JSON.parse(await readFile(manifestPath, 'utf8')) : { files: [] };
-    const files = new Map((previous.files ?? []).map(file => [file.path, file]));
+    const canonical = new Set(Object.values(README_IMAGE_FILENAMES));
+    const files = new Map((previous.files ?? []).filter(file => canonical.has(file.path))
+        .map(file => [file.path, { ...file, viewport: file.viewport ?? previous.viewport }]));
     const entries = await Promise.all(captured.map(async name => {
         const filename = README_IMAGE_FILENAMES[name];
         const contents = await readFile(path.join(OUTPUT_DIR, filename));
         return [filename, {
             path: filename,
+            viewport: readmeImageDimensions(contents),
+            mimeType: filename.endsWith('.jpg') ? 'image/jpeg' : 'image/png',
+            generator: 'Playwright CLI',
             bytes: contents.byteLength,
             sha256: createHash('sha256').update(contents).digest('hex'),
             source: name === 'monitoring' ? new URL(GRAFANA_URL).origin : BASE_URL,
@@ -208,9 +221,8 @@ async function writeManifest(captured) {
     }));
     for (const [filename, entry] of entries) files.set(filename, entry);
     const manifest = {
-        schemaVersion: 2,
+        schemaVersion: 3,
         purpose: 'README screenshots captured from a real site.',
-        viewport: VIEWPORT,
         generators: ['frontend/scripts/capture-readme-live.mjs'],
         files: [...files.values()],
     };

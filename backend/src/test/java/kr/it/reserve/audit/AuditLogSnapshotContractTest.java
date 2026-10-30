@@ -17,6 +17,7 @@ import kr.it.reserve.mailbox.repository.AdminSentMailRepository;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.member.repository.MemberRepository;
+import kr.it.reserve.payment.service.PaymentService;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.review.entity.Review;
@@ -72,6 +73,7 @@ class AuditLogSnapshotContractTest {
     @Mock private AuditCleanupWorker auditCleanupWorker;
     @Mock private MemberRepository memberRepository;
     @Mock private StoreRepository storeRepository;
+    @Mock private PaymentService paymentService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private AuditLogService service;
@@ -79,7 +81,7 @@ class AuditLogSnapshotContractTest {
     @BeforeEach
     void setUp() {
         service = new AuditLogService(auditLogRepository, adminSentMailRepository, reservationRepository,
-                reviewRepository, advertisementRepository, objectMapper, auditCleanupWorker);
+                reviewRepository, advertisementRepository, objectMapper, auditCleanupWorker, paymentService);
         Member actor = Member.builder().id(90L).email(ACTOR_EMAIL).build();
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(actor, null, List.of()));
@@ -130,7 +132,7 @@ class AuditLogSnapshotContractTest {
     @DisplayName("관리자 예약 삭제는 행과 예약 상태를 보존하며 예약 타입의 스냅샷을 기록한다")
     void reservationSoftDeleteKeepsTheRowAndItsStatus() throws Exception {
         Reservation reservation = reservation();
-        when(reservationRepository.findById(21L)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.findByIdForUpdate(21L)).thenReturn(Optional.of(reservation));
         LocalDateTime started = LocalDateTime.now(Clock.systemDefaultZone());
 
         service.softDeleteReservation(21L);
@@ -138,7 +140,11 @@ class AuditLogSnapshotContractTest {
         assertThat(reservation.isDeleted()).isTrue();
         assertThat(reservation.getStatus()).isEqualTo(Reservation.ReservationStatus.CANCELLED);
         assertReservationSnapshot(21L, started);
-        verify(reservationRepository).findById(21L);
+        verify(reservationRepository).findByIdForUpdate(21L);
+        var order = org.mockito.Mockito.inOrder(paymentService, reservationRepository);
+        order.verify(paymentService).lockReservationForStateChange(21L);
+        order.verify(reservationRepository).findByIdForUpdate(21L);
+        order.verify(paymentService).requireReservationRemovable(reservation);
         verifyNoMoreInteractions(auditLogRepository, reservationRepository);
         verifyNoInteractions(adminSentMailRepository, reviewRepository, advertisementRepository, auditCleanupWorker);
     }
@@ -191,13 +197,20 @@ class AuditLogSnapshotContractTest {
     @DisplayName("복구는 지정된 저장소만 호출하고 해당 휴지통 기록만 제거한다")
     void restoreTargetsOnlyItsRepositoryAndItsTrashEntry(String entityType) throws Exception {
         LocalDateTime started = LocalDateTime.now(Clock.systemDefaultZone());
+        Reservation reservation = reservation(); reservation.softDelete();
+        if (RESERVATION_TYPE.equalsIgnoreCase(entityType))
+            when(reservationRepository.findByIdForUpdate(51L)).thenReturn(Optional.of(reservation));
 
         service.restore(entityType, 51L);
 
         String normalizedType = entityType.toUpperCase(Locale.ROOT);
         switch (normalizedType) {
             case "SENT_MAIL" -> verify(adminSentMailRepository).restoreById(51L);
-            case RESERVATION_TYPE -> verify(reservationRepository).restoreById(51L);
+            case RESERVATION_TYPE -> {
+                verify(paymentService).lockReservationForStateChange(51L);
+                verify(reservationRepository).findByIdForUpdate(51L);
+                assertThat(reservation.isDeleted()).isFalse();
+            }
             case "REVIEW" -> verify(reviewRepository).restoreById(51L);
             case "ADVERTISEMENT" -> verify(advertisementRepository).restoreById(51L);
             default -> throw new AssertionError("Unexpected test type: " + entityType);
@@ -295,7 +308,7 @@ class AuditLogSnapshotContractTest {
 
     private void assertReservationSnapshot(Long reservationId, LocalDateTime started) throws Exception {
         assertRecordedLog(RESERVATION_TYPE, reservationId, SOFT_DELETE_ACTION,
-                Map.of("가게", "스냅샷 가게", "예약자", "예약 고객", "날짜", "2026-10-03", "상태", "CANCELLED"),
+                Map.of("가게", "스냅샷 가게", "예약번호", "", "날짜", "2026-10-03", "상태", "CANCELLED"),
                 started, 30);
     }
 

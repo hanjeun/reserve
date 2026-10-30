@@ -81,6 +81,8 @@ public class StoreUpdateRequest {
     // 빈 문자열("") 허용 : 빈 문자열 = 무제한(null), 숫자 = 제한 인원
     private String maxCapacityPerSlotRaw;
     private Boolean autoApprovalEnabled;
+    private Boolean autoCompletionEnabled;
+    private Integer serviceDurationMinutes;
 
     // 예약 가능 마감 시간
     private Integer bookingDeadlineHours;

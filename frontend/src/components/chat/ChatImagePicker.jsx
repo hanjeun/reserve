@@ -5,7 +5,6 @@ import { animation, colors, radius } from '../../styles/tokens';
 import useExitAnimation from '../../hooks/useExitAnimation';
 import useAuthStore from '../../store/useAuthStore';
 import LoadingImage from '../common/LoadingImage';
-import Tooltip from '../common/Tooltip';
 import ChatAttachmentThumbnail from './ChatAttachmentThumbnail';
 
 const IMAGE_TYPES = 'image/jpeg,image/png,image/webp,image/gif';
@@ -36,8 +35,8 @@ function AnimatedAttachment({ file, active, disabled, onRemove, itemKey, onExite
             animation: isClosing || !active ? animation.slideUpOut : ready ? animation.slideUpIn : 'none' }}>
         {url && (active ? <ChatAttachmentThumbnail key={url} file={file} url={url} onReady={imageReady} />
             : <LoadingImage src={url} alt="" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: radius.md }} />)}
-        <Tooltip title="첨부 사진 제거"><button type="button" className="reserve-chat-tool" aria-label={label}
-            disabled={disabled || !active} onClick={onRemove}><CloseOutlined /></button></Tooltip>
+        <button type="button" className="reserve-chat-tool" aria-label={label}
+            disabled={disabled || !active} onClick={onRemove}><CloseOutlined /></button>
     </div>;
 }
 AnimatedAttachment.propTypes = { file: PropTypes.object.isRequired, active: PropTypes.bool.isRequired,
@@ -83,8 +82,8 @@ export default function ChatImagePicker({ file, onChange, disabled, enabled, onF
     const control = <>
         <input ref={input} type="file" accept={accept} multiple={Boolean(onFilesChange)}
             onChange={select} disabled={disabled} hidden aria-label="첨부할 사진 선택" />
-        <Tooltip title="사진 첨부"><button type="button" className="reserve-chat-tool" aria-label="사진 첨부"
-            disabled={disabled || Boolean(files && files.length >= maxFiles)} onClick={() => input.current?.click()}><PaperClipOutlined /></button></Tooltip>
+        <button type="button" className="reserve-chat-tool" aria-label="사진 첨부"
+            disabled={disabled || Boolean(files && files.length >= maxFiles)} onClick={() => input.current?.click()}><PaperClipOutlined /></button>
     </>;
     const previews = retained.entries.length || error ? <div className="reserve-chat-attachments" aria-label="첨부 사진">
         {retained.revision === revision && retained.entries.map(entry => <AnimatedAttachment key={`${revision}:${entry.key}`}

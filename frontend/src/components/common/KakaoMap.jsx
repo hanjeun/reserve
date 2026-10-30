@@ -6,6 +6,7 @@ import { createStoreOverlayContent } from './kakaoMapOverlay';
 import { loadKakaoMapsSdk } from './kakaoMapsLoader';
 import { Bone } from './Skeletons';
 import DataState from './DataState';
+import useReducedMotion from '../../hooks/useReducedMotion';
 
 /**
  * 카카오맵 컴포넌트
@@ -16,6 +17,9 @@ const KakaoMap = ({ latitude, longitude, address, storeName, height = 240 }) => 
     const containerRef = useRef(null);
     const mapRef       = useRef(null);
     const mapInstance  = useRef(null);
+    const reducedMotion = useReducedMotion();
+    const motionRef = useRef(reducedMotion);
+    useEffect(() => { motionRef.current = reducedMotion; }, [reducedMotion]);
     const [visible, setVisible] = useState(() => typeof IntersectionObserver !== 'function');
     const [mapStatus, setMapStatus] = useState('loading');
     const [loadAttempt, setLoadAttempt] = useState(0);
@@ -54,8 +58,14 @@ const KakaoMap = ({ latitude, longitude, address, storeName, height = 240 }) => 
                 scrollwheel: true,
             });
 
-            if (storeName && kakaoMapUrl) {
-                const content = createStoreOverlayContent(storeName, kakaoMapUrl);
+            if (storeName) {
+                const content = createStoreOverlayContent(storeName, () => {
+                    if (cancelled) return;
+                    const position = map.getCenter();
+                    if (map.getLevel() === 4 && Math.abs(position.getLat() - lat) < 1e-8
+                        && Math.abs(position.getLng() - lng) < 1e-8) return;
+                    map.jump(center, 4, { animate: !motionRef.current });
+                });
                 mapDecoration = new kakao.maps.CustomOverlay({
                     map, position: center, content, yAnchor: 1.4,
                 });
@@ -151,7 +161,7 @@ const KakaoMap = ({ latitude, longitude, address, storeName, height = 240 }) => 
                         zIndex: 10,
                     }}
                 >
-                    <EnvironmentOutlined style={{ color: colors.primary.main }} />
+                    <EnvironmentOutlined aria-hidden="true" style={{ color: colors.primary.main }} />
                     카카오맵으로 보기
                 </a>
             )}

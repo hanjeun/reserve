@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
@@ -36,6 +36,16 @@ async function agreeToIntake() {
     await waitFor(() => expect(checkbox).not.toBeDisabled());
     fireEvent.click(checkbox);
 }
+
+it('opens the privacy policy in the current SPA without submitting a waiting request', async () => {
+    setup();
+    fireEvent.click(screen.getByRole('button', { name: '웨이팅 접수' }));
+    const link = screen.getByRole('link', { name: '개인정보 처리방침' });
+    expect(link).not.toHaveAttribute('target');
+    fireEvent.click(link);
+    await waitFor(() => expect(screen.getByLabelText('현재 접수 경로')).toHaveTextContent('/privacy'));
+    expect(waitingService.join).not.toHaveBeenCalled();
+});
 
 it('blocks duplicate submits and keeps the retry key until the party size changes', async () => {
     let fail;
@@ -144,5 +154,23 @@ it('blocks intake when refreshing a cached notice fails', async () => {
     expect(screen.getByRole('checkbox', { name: '가게에 개인정보 제공 동의' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '접수하기' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: '접수하기' }));
+    expect(waitingService.join).not.toHaveBeenCalled();
+});
+
+it('retries only the failed notice read and still requires consent before any intake write', async () => {
+    let resolve;
+    waitingService.getRetentionPolicy.mockRejectedValueOnce(new Error('정책 조회 실패'))
+        .mockImplementationOnce(() => new Promise(done => { resolve = done; }));
+    setup(); fireEvent.click(screen.getByRole('button', { name: '웨이팅 접수' }));
+    await screen.findByText('접수 안내를 불러오지 못했어요.');
+    const retry = screen.getByRole('button', { name: '다시 시도' });
+    expect(retry).toHaveClass('reserve-retry-button', 'reserve-btn--outline');
+    fireEvent.click(retry);
+    await waitFor(() => expect(waitingService.getRetentionPolicy).toHaveBeenCalledTimes(2));
+    expect(within(screen.getByRole('dialog')).getByRole('status')).toHaveTextContent('접수 안내를 불러오는 중');
+    expect(waitingService.join).not.toHaveBeenCalled();
+    await act(async () => resolve({ intakeReady: true, noticePublishedAt: '2026-10-07T09:00:00Z', finishedRecordRetentionDays: 7 }));
+    expect(screen.getByRole('checkbox', { name: '가게에 개인정보 제공 동의' })).not.toBeChecked();
+    expect(screen.getByRole('button', { name: '접수하기' })).toBeDisabled();
     expect(waitingService.join).not.toHaveBeenCalled();
 });

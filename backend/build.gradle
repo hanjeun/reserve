@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '3.5.16'
+    id 'org.springframework.boot' version '4.1.2'
     id 'io.spring.dependency-management' version '1.1.7'
 }
 
@@ -12,7 +12,7 @@ dependencyLocking {
 group = 'kr.it.reserve'
 // 프론트 package.json과 릴리스 버전을 맞춘다.
 
-version = '2.15.0'
+version = '2.16.0'
 description = 'We are reserve'
 
 java {
@@ -35,23 +35,23 @@ ext {
 }
 
 // Spring Boot BOM 이후의 호환 보안 패치를 지정한다.
-ext['jackson-bom.version'] = '2.21.8'
-ext['netty.version'] = '4.1.139.Final'
-ext['tomcat.version'] = '10.1.61'
-ext['httpclient5.version'] = '5.6.3'
-ext['httpcore5.version'] = '5.4.3'
-ext['log4j2.version'] = '2.25.5'
+ext['jackson-2-bom.version'] = '2.21.8'
+// 2.4.240의 연결 종료 뒤 CHECK 제약 평가 오류를 피한다.
+ext['h2.version'] = '2.5.252'
 
 dependencies {
 
     implementation platform('software.amazon.awssdk:bom:2.56.0')
 
-    implementation 'org.springframework.boot:spring-boot-starter-web'
-    implementation 'io.sentry:sentry-spring-boot-starter-jakarta:8.61.0'
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    // 결제·감사 JSON 계약을 유지하며 Jackson 3 전환을 분리한다.
+    implementation 'org.springframework.boot:spring-boot-jackson2'
+    implementation 'io.sentry:sentry-spring-boot-4-starter:8.61.0'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'com.yubico:webauthn-server-core:2.10.1'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
     implementation "io.jsonwebtoken:jjwt-api:${jjwtVersion}"
@@ -73,10 +73,11 @@ dependencies {
     runtimeOnly "io.jsonwebtoken:jjwt-impl:${jjwtVersion}"
     runtimeOnly "io.jsonwebtoken:jjwt-jackson:${jjwtVersion}"
 
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
     testImplementation 'org.mockito:mockito-core:5.24.0'
     testImplementation 'org.mockito:mockito-junit-jupiter:5.24.0'
-    testImplementation 'org.springframework.security:spring-security-test'
     // 모듈 사이의 순환 의존을 검사한다.
     testImplementation 'com.tngtech.archunit:archunit-junit5:1.5.1'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -104,11 +105,23 @@ jar {
     enabled = false
 }
 
+// Windows 명령 길이 제한을 넘지 않도록 운영 도구 시험의 클래스 경로를 묶는다.
+def toolTestClasspath = tasks.register('toolTestClasspath', Jar) {
+    dependsOn tasks.named('testClasses')
+    archiveFileName = 'tool-test-classpath.jar'
+    destinationDirectory = layout.buildDirectory.dir('tool-test')
+    inputs.files(sourceSets.test.runtimeClasspath).withPropertyName('toolClasspath')
+    doFirst {
+        manifest.attributes('Class-Path': sourceSets.test.runtimeClasspath.files.collect { it.toURI().toString() }.join(' '))
+    }
+}
+
 tasks.named('test') {
+    dependsOn toolTestClasspath
     useJUnitPlatform()
     // 워커를 재사용하는 동안 쌓인 Spring·ArchUnit 상태를 주기적으로 해제한다.
     forkEvery = 50
-    systemProperty 'reserve.toolTestClasspath', sourceSets.test.runtimeClasspath.asPath
+    systemProperty 'reserve.toolTestClasspath', toolTestClasspath.get().archiveFile.get().asFile.absolutePath
 }
 
 // 운영 도구를 격리된 읽기 전용 테스트에서 검사한다.

@@ -3,6 +3,7 @@ import { Typography } from 'antd';
 import StoreListViewToggle from '../store/StoreListViewToggle';
 import FilterMenu from '../common/FilterMenu';
 import ListingControlsSkeleton from '../common/ListingControlsSkeleton';
+import useInitialLoading from '../../hooks/useInitialLoading';
 
 const { Text } = Typography;
 
@@ -11,7 +12,8 @@ export default function ReservationListingToolbar({ view, onViewChange, status, 
     statusOptions, sort, onSortChange, sortOptions, store, onStoreChange, storeOptions,
     count, disabled, initialLoading = false, storeDisabled = false, storeLoading = false, label = '예약 목록 필터',
     statusAriaLabel = '예약 상태', sortAriaLabel = '예약 정렬' }) {
-    if (initialLoading) return <ListingControlsSkeleton count={count} className="reserve-reservation-filters" filters={[
+    const firstLoading = useInitialLoading(initialLoading);
+    if (firstLoading) return <ListingControlsSkeleton count={count} className="reserve-reservation-filters" filters={[
         ...(storeOptions && onStoreChange ? [{ value: store, options: storeOptions, className: 'reserve-reservation-store-filter' }] : []),
         { value: status, options: statusOptions, className: 'reserve-explore-domain-filter reserve-reservation-status-filter' },
         { value: sort, options: sortOptions, className: 'reserve-explore-sort-filter reserve-reservation-sort-filter' },

@@ -11,7 +11,7 @@ vi.mock('../../../services/holidayService', () => ({
 }));
 
 vi.mock('antd', async importOriginal => {
-    const { Tooltip } = await importOriginal();
+    const { Tooltip, Form } = await importOriginal();
     const ReactModule = await import('react');
     const Modal = ({ open, children, title }) => (
         open ? ReactModule.createElement(
@@ -21,7 +21,6 @@ vi.mock('antd', async importOriginal => {
             children,
         ) : null
     );
-    const Form = { Item: { useStatus: () => ({ status: undefined }) } };
     return { Form, Modal, Tooltip };
 });
 

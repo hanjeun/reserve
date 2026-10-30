@@ -70,6 +70,9 @@ public class AdPaymentService {
             PortoneV2CancelResponse outcome = null;
             try {
                 outcome = portone.cancelPayment(command.merchantUid(), command.amount(), "광고 취소 요청", command.key());
+            } catch (PortoneService.RequestNotSentException e) {
+                ledger.deferUnsentRefund(command);
+                return false;
             } catch (RuntimeException e) {
                 log.warn("Advertisement refund outcome uncertain: errorType={}", e.getClass().getSimpleName());
             }

@@ -16,6 +16,7 @@ async function mockReservations(page, count) {
         const url = new URL(route.request().url());
         if (!url.pathname.startsWith('/api/')) return route.continue();
         let data = [];
+        if (url.pathname === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: business, refreshPossible: false } } }); }
         if (url.pathname === '/api/member/me') data = business;
         else if (url.pathname === '/api/stores/my') data = stores;
         else if (url.pathname === '/api/reservations/store') {

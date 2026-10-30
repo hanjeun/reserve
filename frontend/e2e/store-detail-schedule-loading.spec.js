@@ -11,8 +11,15 @@ const store = {
     bookingDeadlineHours: 1, paymentTimeoutMinutes: 10, maxCapacityPerSlot: 2,
 };
 
-test('keeps the data skeleton still and moves schedule copy into store information', async ({ page }, testInfo) => {
+test('keeps skeleton geometry through one parent entry and moves schedule copy into store information', async ({ page }, testInfo) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.addInitScript(() => {
+        window.__storePageEntries = [];
+        document.addEventListener('animationstart', event => {
+            if (location.pathname === '/store/81' && event.target.matches('.ant-layout-content')
+                && event.animationName.startsWith('reserve-discovery-page-from-')) window.__storePageEntries.push(event.animationName);
+        });
+    });
     let releaseDetail;
     const detailReady = new Promise(resolve => { releaseDetail = resolve; });
     let releaseChunk;
@@ -28,6 +35,7 @@ test('keeps the data skeleton still and moves schedule copy into store informati
     await page.route('**/api/**', async route => {
         const path = new URL(route.request().url()).pathname;
         if (!path.startsWith('/api/')) return route.continue();
+        if (path === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: null, refreshPossible: false } } }); }
         if (path === '/api/member/me' || path === '/api/auth/refresh') {
             return route.fulfill({ status: 401, json: { success: false, message: '로그인이 필요합니다.' } });
         }
@@ -53,8 +61,9 @@ test('keeps the data skeleton still and moves schedule copy into store informati
                 const element = document.querySelector('.reserve-data-skeleton');
                 if (!element) { reject(new Error('The pending store route must retain a visible skeleton.')); return; }
                 const box = element.getBoundingClientRect();
+                const parentBox = element.closest('.ant-layout-content').getBoundingClientRect();
                 const style = getComputedStyle(element);
-                samples.push({ x: box.x, y: box.y, width: box.width, height: box.height, animation: style.animationName, transform: style.transform });
+                samples.push({ x: box.x - parentBox.x, y: box.y - parentBox.y, width: box.width, height: box.height, animation: style.animationName, transform: style.transform });
                 if (samples.length < 18) requestAnimationFrame(sample);
                 else resolve(samples);
             };
@@ -68,10 +77,11 @@ test('keeps the data skeleton still and moves schedule copy into store informati
                 const element = document.querySelector('.reserve-data-skeleton');
                 if (!element) throw new Error('The route-to-data transition must retain a visible store skeleton.');
                 const box = element.getBoundingClientRect();
+                const parentBox = element.closest('.ant-layout-content').getBoundingClientRect();
                 if (box.width <= 0 || box.height <= 0) throw new Error('The current store skeleton must keep its geometry.');
                 const style = getComputedStyle(element);
                 const route = Boolean(element.closest('.reserve-route-skeleton'));
-                samples.push({ x: box.x, y: box.y, width: box.width, height: box.height, route, animation: style.animationName, transform: style.transform });
+                samples.push({ x: box.x - parentBox.x, y: box.y - parentBox.y, width: box.width, height: box.height, route, animation: style.animationName, transform: style.transform });
                 readyFrames = route ? 0 : readyFrames + 1;
             }
             return samples;
@@ -89,17 +99,22 @@ test('keeps the data skeleton still and moves schedule copy into store informati
         releaseDetail();
         await expect(page.getByRole('heading', { name: store.name, exact: true })).toBeVisible();
         await expect(skeleton).toHaveCount(0);
-        const loaded = await page.locator('.reserve-store-detail').boundingBox();
+        const loaded = await page.locator('.reserve-store-detail').evaluate(element => {
+            const box = element.getBoundingClientRect();
+            const parentBox = element.closest('.ant-layout-content').getBoundingClientRect();
+            return { x: box.x - parentBox.x, y: box.y - parentBox.y, width: box.width };
+        });
         const lastSkeleton = dataFrames.at(-1);
         expect(loaded.x).toBeCloseTo(lastSkeleton.x, 1);
         expect(loaded.y).toBeCloseTo(lastSkeleton.y, 1);
         expect(loaded.width).toBeCloseTo(lastSkeleton.width, 1);
+        expect(await page.evaluate(() => window.__storePageEntries)).toEqual(['reserve-discovery-page-from-right']);
         await expect(page.getByText('기존 가게 소개', { exact: true })).toBeVisible();
         await expect(page.getByText('운영 기간', { exact: true })).toBeVisible();
         await expect(page.getByText('2026-09-01 ~ 2026-12-31', { exact: true })).toBeVisible();
         await expect(page.getByText('매주 토·일 휴무', { exact: true })).toBeVisible();
         await expect(page.getByText('30일 이내만 예약 가능', { exact: true })).toBeVisible();
-        const dateField = page.locator('.ant-form-item').filter({ has: page.getByRole('button', { name: '날짜 선택', exact: true }) });
+        const dateField = page.locator('.ant-form-item').filter({ has: page.getByRole('button', { name: '예약 날짜', exact: true }) });
         await expect(dateField.locator('.ant-form-item-extra')).toHaveCount(0);
         await expect(page.getByText('날짜를 먼저 선택해주세요', { exact: true })).toBeVisible();
         await expect(page.getByText('아직 리뷰가 없어요. 첫 번째 리뷰를 남겨보세요!', { exact: true })).toBeVisible();

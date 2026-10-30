@@ -1,7 +1,7 @@
 {
   "name": "reserve",
   "private": true,
-  "version": "2.15.0",
+  "version": "2.16.0",
   "type": "module",
   "engines": {
     "node": "^22.23.4 || ^24.22.1 || >=26.12.1"
@@ -17,7 +17,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:policy": "node --test scripts/apply-vendor-patches.test.mjs scripts/eslint-reserve-rules.test.mjs ../scripts/tests/pr-review-audit.test.mjs ../scripts/tests/cicd-contract.test.mjs ../scripts/tests/ci-evidence.test.mjs ../scripts/tests/audit-preview-release.test.mjs ../scripts/tests/domain-split.test.mjs",
+    "test:policy": "node --test scripts/apply-vendor-patches.test.mjs scripts/eslint-reserve-rules.test.mjs ../scripts/tests/pr-review-audit.test.mjs ../scripts/tests/cicd-contract.test.mjs ../scripts/tests/ci-evidence.test.mjs ../scripts/tests/audit-preview-release.test.mjs ../scripts/tests/domain-split.test.mjs ../scripts/tests/secret-boundaries.test.mjs",
     "test:e2e": "playwright test",
     "capture:readme": "node scripts/capture-readme-live.mjs",
     "capture:readme:auth": "node scripts/capture-readme-live.mjs --auth",

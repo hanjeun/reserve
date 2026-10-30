@@ -18,6 +18,7 @@ import java.time.LocalTime;
 /* 복합 인덱스는 조회 조건·정렬 순서를 기준으로 구성한다. 운영의 구조 변경은 별도 승인된 수동 DDL로 적용한다. */
 @Table(name = "reservation", indexes = {
     // findByMemberOrderByCreatedAtDesc — 내 예약 목록. 로그인 사용자가 가장 자주 여는 화면.
+    @Index(name = "idx_reservation_auto_completion", columnList = "auto_completion_enabled, status, usage_ends_at"),
     @Index(name = "idx_reservation_member", columnList = "member_id, deleted_at, created_at"),
     // getAvailability 계열 — 예약 가능 시간 계산. 가게 상세에서 날짜를 고를 때마다 돈다.
     @Index(name = "idx_reservation_store_date", columnList = "store_id, reservation_date"),
@@ -92,6 +93,21 @@ public class Reservation {
     @Column(name = "deposit_amount")
     @Builder.Default
     private Integer depositAmount = 0;
+
+    @Column(name = "auto_completion_enabled", nullable = false)
+    @Builder.Default
+    private Boolean autoCompletionEnabled = false;
+
+    @Column(name = "attendance_refund_enabled", nullable = false)
+    @Builder.Default
+    private Boolean attendanceRefundEnabled = false;
+
+    @Column(name = "service_duration_minutes")
+    private Integer serviceDurationMinutes;
+
+    /** 예약 당시 확정한 한국 시간의 이용 종료 시각이에요. */
+    @Column(name = "usage_ends_at")
+    private LocalDateTime usageEndsAt;
 
     /** 실제 방문 QR 체크인 시각(KST 벽시계). 승인 상태와 분리해 출석 사실만 기록하며 값이 없으면 미체크인이다. */
     @Column(name = "checked_in_at")

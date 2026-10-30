@@ -1,7 +1,5 @@
 # 백업과 복구
 
-백업은 장애나 잘못된 변경이 생겼을 때 데이터를 되찾기 위한 복구 수단이에요.
-
 ## 백업 대상
 
 | 대상 | 보관 방식 |
@@ -28,4 +26,4 @@
 
 ## 관련 코드
 
-[백업 스크립트](../../scripts/backup-mysql.sh)와 [복원 스크립트](../../scripts/restore-mysql.sh)가 백업 파일 검사와 복원 작업을 담당해요. 배포와 데이터 구조의 관계는 [배포](deployments.md), [데이터베이스 구조 변경](manual-ddl.md)을 보세요.
+[백업 스크립트](../../scripts/backup-mysql.sh)와 [복원 스크립트](../../scripts/restore-mysql.sh)가 백업 파일 검사와 복원 작업을 담당해요.

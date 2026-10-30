@@ -4,7 +4,6 @@ import { Popover } from 'antd';
 import { ArrowRightOutlined, SmileOutlined, StopOutlined } from '../common/icons';
 import { SpinIndicator } from '../common/Loading';
 import ChatImagePicker from './ChatImagePicker';
-import Tooltip from '../common/Tooltip';
 import { colors } from '../../styles/tokens';
 
 const usesTouchInput = () => globalThis.matchMedia?.('(pointer: coarse)').matches === true;
@@ -95,18 +94,18 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
                         if (open) { setQuery(''); if (usesTouchInput()) input.current?.blur(); }
                     }}
                     afterOpenChange={open => { if (open && !usesTouchInput()) searchInput.current?.focus(); }}>
-                    <Tooltip title="이모지 선택" disabled={emojiOpen}><button ref={trigger} type="button" className="reserve-chat-tool" aria-label="이모지 선택"
+                    <button ref={trigger} type="button" className="reserve-chat-tool" aria-label="이모지 선택"
                         onKeyDown={event => { if (event.key === 'Escape' && emojiOpen) { event.stopPropagation(); setEmojiOpen(false); } }}
                         aria-expanded={emojiOpen && !blocked} aria-controls={emojiOpen && !blocked ? id : undefined} disabled={blocked}>
                         <SmileOutlined />
-                    </button></Tooltip>
+                    </button>
                 </Popover>
             </div>
-            <Tooltip title={sendLabel}><button type="button" className="reserve-chat-send reserve-messenger-send" onClick={sending && onCancel ? onCancel : onSend}
+            <button type="button" className="reserve-chat-send reserve-messenger-send" onClick={sending && onCancel ? onCancel : onSend}
                 disabled={disabled || (sending ? !onCancel : (!value.trim() && !hasAttachments))} aria-label={sendLabel}
                 aria-busy={sending || undefined}>
                 {sendIcon}
-            </button></Tooltip>
+            </button>
         </div>
     </div>;
     if (typeof attachmentControl === 'function') {

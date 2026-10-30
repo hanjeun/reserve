@@ -32,6 +32,7 @@ async function mockUiApi(page, initialRead = {}) {
             return route.fulfill({ status: 409, json: { success: false, message: 'UI 검사는 데이터를 변경하지 않습니다.' } });
         }
         if (path === initialRead.path) await initialRead.ready;
+        if (path === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: account, refreshPossible: false } } }); }
         if (path === '/api/member/me') return ok(route, account);
         if (path === '/api/favorites/my') {
             requests.favorites += 1;
@@ -204,7 +205,7 @@ for (const [label, path, menu, destination] of [
     ['owned stores', '/api/stores/my', '내 가게 관리', '/my-stores'],
     ['reservations', '/api/reservations/my/page', '내 예약 확인', '/my-reservations'],
 ]) {
-    test(`three-second ${label} loading stays still during SPA navigation`, async ({ page }) => {
+    test(`three-second ${label} loading keeps its geometry through one parent entry during SPA navigation`, async ({ page }) => {
         test.setTimeout(60_000);
         let releaseRead;
         const ready = new Promise(resolve => { releaseRead = resolve; });
@@ -216,6 +217,11 @@ for (const [label, path, menu, destination] of [
         await page.getByRole('button', { name: '내 계정 메뉴 열기', exact: true }).click();
         await page.evaluate(targetPath => {
             window.__loadingFrames = [];
+            window.__loadingPageEntries = [];
+            document.addEventListener('animationstart', event => {
+                if (location.pathname === targetPath && event.target.matches('.ant-layout-content')
+                    && event.animationName.startsWith('reserve-discovery-page-from-')) window.__loadingPageEntries.push(event.animationName);
+            });
             const sample = () => {
                 const root = location.pathname === targetPath
                     ? Array.from(document.querySelectorAll('.ant-layout-content > .reserve-page-container:not(.reserve-route-skeleton)'))
@@ -223,8 +229,9 @@ for (const [label, path, menu, destination] of [
                     : null;
                 if (root?.querySelector('.reserve-skeleton-block')) {
                     const box = root.getBoundingClientRect();
+                    const parentBox = root.closest('.ant-layout-content').getBoundingClientRect();
                     const styles = getComputedStyle(root);
-                    window.__loadingFrames.push({ x: box.x, y: box.y, animation: styles.animationName, transform: styles.transform });
+                    window.__loadingFrames.push({ x: box.x - parentBox.x, y: box.y - parentBox.y, animation: styles.animationName, transform: styles.transform });
                 }
                 window.__loadingRaf = requestAnimationFrame(sample);
             };
@@ -249,6 +256,9 @@ for (const [label, path, menu, destination] of [
             if (!page.isClosed()) await page.evaluate(() => cancelAnimationFrame(window.__loadingRaf));
         }
         await expect(page.locator('.ant-layout-content .reserve-skeleton-block')).toHaveCount(0);
+        const entries = await page.evaluate(() => window.__loadingPageEntries);
+        expect(entries).toHaveLength(1);
+        expect(entries[0]).toMatch(/^reserve-discovery-page-from-(?:right|left)$/);
         expect(requests.writes).toBe(0);
     });
 }

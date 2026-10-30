@@ -30,10 +30,10 @@ it('uses the read-only request-result endpoint with the original payload and can
     const data = { storeId: 10, reservationDate: '2030-01-01', reservationTime: '12:00', guestCount: 1,
         requestId: '11111111-1111-4111-8111-111111111111' };
     const signal = new AbortController().signal;
-    api.post.mockResolvedValueOnce(null);
-    await expect(reservationService.recoverReservation(data, { signal })).resolves.toBeNull();
+    api.post.mockResolvedValueOnce({ outcome: 'NOT_SUBMITTED', reservation: null });
+    await expect(reservationService.recoverReservation(data, { signal })).resolves.toEqual({ outcome: 'NOT_SUBMITTED', reservation: null });
     expect(api.post).toHaveBeenCalledWith('/api/reservations/requests/result', data, { signal });
-    api.post.mockResolvedValueOnce({ id: 23 });
-    await expect(reservationService.recoverReservation(data)).resolves.toEqual({ id: 23 });
+    api.post.mockResolvedValueOnce({ outcome: 'RESERVED', reservation: { id: 23 } });
+    await expect(reservationService.recoverReservation(data)).resolves.toEqual({ outcome: 'RESERVED', reservation: { id: 23 } });
     expect(api.post).toHaveBeenLastCalledWith('/api/reservations/requests/result', data, {});
 });

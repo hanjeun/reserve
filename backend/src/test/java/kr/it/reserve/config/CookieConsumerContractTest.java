@@ -79,7 +79,7 @@ class CookieConsumerContractTest {
         var principal = mock(CustomOAuth2User.class);
         when(principal.getMember()).thenReturn(member);
         when(principal.isNewUser()).thenReturn(true);
-        when(sessionIssuer.issue(principal)).thenReturn(new OAuthSessionIssuer.SessionTokens("test-access", "test-refresh"));
+        when(sessionIssuer.issue(principal, false)).thenReturn(new OAuthSessionIssuer.SessionTokens("test-access", "test-refresh"));
         var request = new MockHttpServletRequest();
         request.getSession().setAttribute("oauth-state", "used");
         var response = new MockHttpServletResponse();
@@ -87,7 +87,8 @@ class CookieConsumerContractTest {
                 new UsernamePasswordAuthenticationToken(principal, null, List.of()));
         assertThat(request.getSession(false)).isNull();
         assertThat(response.getRedirectedUrl()).isEqualTo("https://reserve.it.kr/oauth2/callback?newUser=true");
-        assertThat(response.getHeaders(HttpHeaders.SET_COOKIE)).hasSize(5)
+        assertThat(response.getHeaders(HttpHeaders.SET_COOKIE)).hasSize(6)
+                .anySatisfy(cookie -> assertThat(cookie).startsWith("mfa_ticket=;").contains("Max-Age=0", "Secure", "HttpOnly"))
                 .anySatisfy(cookie -> assertThat(cookie).startsWith("access_token=test-access;")
                         .contains("Max-Age=1800", "Secure", "HttpOnly", "SameSite=Lax"))
                 .anySatisfy(cookie -> assertThat(cookie).startsWith("refresh_token=test-refresh;")
@@ -95,12 +96,35 @@ class CookieConsumerContractTest {
                 .anySatisfy(cookie -> assertThat(cookie).startsWith("JSESSIONID=;").contains("Max-Age=0", "Secure"));
     }
 
+    @Test void oauthCallbackCannotMakeTheSessionCookiePersistent() throws Exception {
+        var properties = JwtSessionFixture.properties();
+        var handler = new OAuth2AuthenticationSuccessHandler(sessionIssuer, properties, new CookieUtil("prod"),
+                new OAuth2AuthenticationFailureHandler());
+        var principal = mock(CustomOAuth2User.class);
+        when(principal.getMember()).thenReturn(member);
+        when(sessionIssuer.issue(principal, false)).thenReturn(new OAuthSessionIssuer.SessionTokens(
+                "synthetic-access", "synthetic-refresh", java.time.Duration.ofDays(14), null, false));
+        var request = new MockHttpServletRequest();
+        request.setAttribute(kr.it.reserve.config.oauth2.LoginAuthorizationRequestRepository.PERSISTENT, false);
+        request.setParameter("rememberMe", "true");
+        request.getSession().setAttribute("oauth-state", "used");
+        var response = new MockHttpServletResponse();
+        handler.onAuthenticationSuccess(request, response,
+                new UsernamePasswordAuthenticationToken(principal, null, List.of()));
+        var credentials = response.getHeaders(HttpHeaders.SET_COOKIE).stream().filter(value ->
+                value.startsWith("access_token=synthetic-access;") || value.startsWith("refresh_token=synthetic-refresh;")).toList();
+        assertThat(credentials).hasSize(3).allSatisfy(value ->
+                assertThat(value).doesNotContain("Max-Age=", "Expires=").contains("HttpOnly", "Secure", "SameSite=Lax"));
+        verify(sessionIssuer).issue(principal, false);
+        assertThat(request.getSession(false)).isNull();
+    }
+
     @Test void securityEventBetweenUserLoadingAndTokenIssuanceDoesNotSetAuthenticationCookies() throws Exception {
         var handler = new OAuth2AuthenticationSuccessHandler(sessionIssuer, new JwtProperties(), new CookieUtil("prod"),
                 new OAuth2AuthenticationFailureHandler());
         var principal = mock(CustomOAuth2User.class);
         when(principal.getMember()).thenReturn(member);
-        when(sessionIssuer.issue(principal)).thenThrow(new org.springframework.security.oauth2.core.OAuth2AuthenticationException(
+        when(sessionIssuer.issue(principal, false)).thenThrow(new org.springframework.security.oauth2.core.OAuth2AuthenticationException(
                 "oauth_reauthentication_required"));
         var request = new MockHttpServletRequest();
         request.getSession().setAttribute("oauth-state", "used");

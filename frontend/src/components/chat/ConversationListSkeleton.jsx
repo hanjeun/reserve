@@ -1,5 +1,5 @@
 import LoadingStatus from '../common/LoadingStatus';
-import { Bone } from '../common/Skeletons';
+import Bone from '../common/Bone';
 
 export default function ConversationListSkeleton() {
     return (

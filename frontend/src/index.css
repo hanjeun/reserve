@@ -5,6 +5,8 @@
 @import './styles/global/text-links.css';
 @import './styles/global/navigation-and-media.css';
 @import './styles/global/components-and-forms.css';
+@import './styles/global/account-security.css';
+@import './styles/global/payment-bridge.css';
 @import './styles/global/icons.css';
 @import './styles/global/interactions.css';
 @import './styles/global/feature-surfaces.css';

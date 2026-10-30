@@ -51,9 +51,9 @@ const OAuthCallback = () => {
                 } else {
                     throw new Error('사용자 정보가 올바르지 않아요.');
                 }
-            } catch (err) {
+            } catch {
                 if (!mounted.current) return;
-                console.error('OAuth 인증 실패:', err);
+                console.error('OAuth sign-in could not be completed');
                 message.error('로그인 정보를 가져오지 못했어요.');
                 navigate('/login', { replace: true });
             }

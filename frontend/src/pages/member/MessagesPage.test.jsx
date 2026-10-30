@@ -31,9 +31,14 @@ describe('MessagesPage route motion', () => {
         expect(page).toHaveClass('is-opening');
         const close = screen.getByRole('button', { name: '메시지 닫기' });
         expect(container.querySelector('.reserve-messenger-launcher-wrap')).toBeNull();
+        close.focus();
+        expect(close).toHaveFocus();
         fireEvent.click(close);
         fireEvent.click(close);
         expect(page).toHaveClass('is-closing');
+        expect(close).not.toHaveFocus();
+        expect(page).toHaveAttribute('inert');
+        expect(page).not.toHaveAttribute('aria-hidden');
         expect(goBack).not.toHaveBeenCalled();
         fireEvent.animationEnd(page);
         fireEvent.animationEnd(page);

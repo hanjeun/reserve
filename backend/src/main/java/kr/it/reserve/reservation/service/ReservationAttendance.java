@@ -83,14 +83,10 @@ final class ReservationAttendance {
         // DB timestamp는 createdAt과 같은 JVM(운영 컨테이너 UTC) 시계를 사용하고,
         // 사용자에게 내보낼 때 ReservationResponse에서 한국 시각으로 바꾼다.
         reservation.setCheckedInAt(LocalDateTime.now(Clock.systemDefaultZone()));
+        reservation.setStatus(Reservation.ReservationStatus.CONFIRMED);
         changed(reservation);
 
-        // 개인정보 없이 출석 사실을 운영 로그에 남긴다. checkedInAt은 DB의 장기 근거다.
-        //
-        //   audit_log 테이블(AuditLogService)이 아니라 로그로 남기는 이유: 그 테이블은
-        //   "휴지통 스냅샷 + 관리자 행위"용이고 90일 뒤 스케줄러가 지운다. 체크인은 영업 중 반복되는
-        //   일반 동작이라 매 스캔마다 행을 쌓으면 성격이 다른 데이터가 섞이고 조회도 느려진다.
-        //   Loki 가 이미 이 로그를 수집하고 level 라벨로 인덱싱하므로 조회는 그쪽이 낫다.
+        // 출석 시각은 DB에 보존하고 로그에는 업무 식별자만 남긴다.
         log.info("QR check-in recorded: reservationId={}, storeId={}, ownerId={}, reservationDate={}, reservationTime={}",
                 reservation.getId(), reservation.getStore().getId(), owner.getId(),
                 reservation.getReservationDate(), reservation.getReservationTime());
@@ -102,11 +98,15 @@ final class ReservationAttendance {
         Reservation reservation = findByIdForUpdateOrThrow(id);
         ReservationAccess.owner(reservation, owner);
 
+        if (reservation.getStatus() == Reservation.ReservationStatus.COMPLETED) return;
         // 승인 후 시간이 지난 UNCONFIRMED도 완료·노쇼 처리할 수 있다.
         if (!ReservationAccess.approved(reservation)) {
             throw new ReservationException("승인된 예약만 이용완료 처리할 수 있어요.", HttpStatus.BAD_REQUEST);
         }
 
+        if (Boolean.TRUE.equals(reservation.getAttendanceRefundEnabled()) && reservation.getCheckedInAt() == null) {
+            throw new ReservationException("QR 체크인을 확인한 뒤 이용 완료할 수 있어요.", HttpStatus.BAD_REQUEST);
+        }
         reservation.setStatus(Reservation.ReservationStatus.COMPLETED);
         changed(reservation);
     }

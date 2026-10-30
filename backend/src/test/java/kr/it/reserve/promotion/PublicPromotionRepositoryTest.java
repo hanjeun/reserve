@@ -13,7 +13,7 @@ import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.entity.StoreStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
@@ -170,5 +170,31 @@ class PublicPromotionRepositoryTest {
                 .content("안내 원문").category(Promotion.PromotionCategory.ETC).benefitState(Promotion.BenefitState.APPROVED).build();
         em.persist(promotion);
         return promotion.getId();
+    }
+
+    @Test
+    void deletedApplicationsAreExcludedBeforePaginationAndCounting() {
+        Long approved = promotion(StoreStatus.ACTIVE, false);
+        Long pending = promotion(StoreStatus.ACTIVE, false);
+        Long deleted = promotion(StoreStatus.ACTIVE, false);
+        Long deletedCarrier = promotion(StoreStatus.ACTIVE, false);
+        Long timestampOnly = promotion(StoreStatus.ACTIVE, false);
+        em.find(Promotion.class, pending).setBenefitState(Promotion.BenefitState.PENDING);
+        em.find(Promotion.class, deleted).deleteNews(StoreNewsPolicy.now());
+        em.find(Promotion.class, timestampOnly).setDeletedAt(StoreNewsPolicy.now());
+        Promotion linked = em.find(Promotion.class, deletedCarrier);
+        FeedProfile profile = FeedProfile.mediaOwner(linked.getMember(), StoreNewsPolicy.now());
+        em.persist(profile);
+        FeedPost post = FeedPost.create(profile, null, StoreNewsPolicy.now());
+        post.linkNews(linked, "서울", StoreNewsPolicy.now()); em.persist(post); post.delete(StoreNewsPolicy.now());
+        em.flush(); em.clear();
+
+        var page = repository.findAll(StoreNewsPolicy.applicationSpecification(null), PageRequest.of(0, 1));
+        assertThat(page.getTotalElements()).isEqualTo(2);
+        assertThat(repository.findAll(StoreNewsPolicy.applicationSpecification(Promotion.BenefitState.PENDING)))
+                .extracting(Promotion::getId).containsExactly(pending);
+        assertThat(repository.findAll(StoreNewsPolicy.applicationSpecification(Promotion.BenefitState.APPROVED)))
+                .extracting(Promotion::getId).containsExactly(approved);
+        assertThat(repository.findById(deleted)).isPresent();
     }
 }

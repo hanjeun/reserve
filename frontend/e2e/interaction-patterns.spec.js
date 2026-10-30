@@ -13,6 +13,7 @@ async function mockApi(page, user = null) {
     await page.route('**/api/**', async route => {
         const path = new URL(route.request().url()).pathname;
         if (!path.startsWith('/api/')) return route.continue();
+        if (path === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: user, refreshPossible: false } } }); }
         if (path === '/api/member/me' || (path === '/api/auth/refresh' && !user)) {
             if (path === '/api/member/me' && user) return ok(route, user);
             return route.fulfill({ status: 401, json: { success: false, message: '세션이 없습니다.' } });
@@ -67,7 +68,7 @@ test('guest header separates neutral navigation hover from primary press and key
     await page.goto('/');
     const search = page.getByRole('link', { name: '통합 검색' });
     const login = page.getByRole('button', { name: '로그인', exact: true });
-    const start = page.getByRole('button', { name: '시작하기' });
+    const start = page.getByRole('button', { name: '회원가입', exact: true });
     await expect(search).toBeVisible();
     await expect(login).toBeVisible();
     await expect(start).toBeVisible();

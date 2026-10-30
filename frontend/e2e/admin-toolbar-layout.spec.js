@@ -21,6 +21,7 @@ async function mockAdminApi(page) {
         if (!url.pathname.startsWith('/api/')) return route.continue();
 
         let data = pageOf([], 0);
+        if (url.pathname === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: admin, refreshPossible: false } } }); }
         if (url.pathname === '/api/member/me' || url.pathname === '/api/auth/refresh') data = admin;
         if (url.pathname === '/api/admin/chat/reports') data = pageOf([{
             id: 1, storeName: '테스트 가게', reporterRole: 'MEMBER', reason: 'OTHER',

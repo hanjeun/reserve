@@ -10,8 +10,8 @@ import kr.it.reserve.waiting.config.WaitingRedisConfiguration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
-import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -108,13 +108,13 @@ class RedisLocalBoundaryTest {
 
     @Test
     void manualConnectionAndTemplateDoNotDuplicateSpringRedisAutoConfiguration() {
-        context.withConfiguration(AutoConfigurations.of(RedisAutoConfiguration.class))
+        context.withConfiguration(AutoConfigurations.of(DataRedisAutoConfiguration.class))
                 .withPropertyValues("spring.profiles.active=prod", "reserve.redis.enabled=true",
                         "reserve.redis.host=redis", "reserve.redis.password=" + PASSWORD).run(app -> {
                     assertThat(app).hasNotFailed();
                     assertThat(app).hasSingleBean(RedisConnectionFactory.class).hasSingleBean(StringRedisTemplate.class);
                 });
         assertThat(ReserveApplication.class.getAnnotation(SpringBootApplication.class).exclude())
-                .contains(RedisAutoConfiguration.class, RedisRepositoriesAutoConfiguration.class);
+                .contains(DataRedisAutoConfiguration.class, DataRedisRepositoriesAutoConfiguration.class);
     }
 }

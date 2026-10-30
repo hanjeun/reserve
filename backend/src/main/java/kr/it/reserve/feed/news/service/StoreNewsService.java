@@ -236,9 +236,8 @@ public class StoreNewsService {
     public Page<StoreNewsDto.News> applications(Long admin, String state, int page, int size) {
         policy.requireEnabled(); feeds.requireAdmin(admin);
         if (!Set.of("ALL", "PENDING", "APPROVED", "REJECTED").contains(state)) throw FeedException.invalid("혜택 신청 상태를 다시 선택해주세요.");
-        Specification<Promotion> filter = (root, query, cb) -> "ALL".equals(state)
-                ? root.get("benefitState").in(Promotion.BenefitState.PENDING, Promotion.BenefitState.APPROVED, Promotion.BenefitState.REJECTED)
-                : cb.equal(root.get("benefitState"), Promotion.BenefitState.valueOf(state));
+        Specification<Promotion> filter = StoreNewsPolicy.applicationSpecification(
+                "ALL".equals(state) ? null : Promotion.BenefitState.valueOf(state));
         Page<StoreNewsDto.News> result = promotions.findAll(filter, PageRequests.bounded(page, size)
                 .withSort(Sort.by(Sort.Direction.DESC, "benefitRequestedAt", "id"))).map(item -> newsDto(item, true));
         for (var item : result) audits.save(FeedAuditRecord.news(admin, "BENEFIT_LIST_READ", item.feedPostId(), item.id(), null, null, StoreNewsPolicy.now()));
@@ -249,7 +248,8 @@ public class StoreNewsService {
     public StoreNewsDto.News application(Long admin, Long id) {
         policy.requireEnabled(); feeds.requireAdmin(admin);
         Promotion news = promotions.findForRead(id).orElseThrow(FeedException::missing);
-        if (news.getBenefitState() == Promotion.BenefitState.NONE || news.getBenefitState() == Promotion.BenefitState.DRAFT) throw FeedException.missing();
+        if (StoreNewsPolicy.deleted(news) || news.getBenefitState() == Promotion.BenefitState.NONE
+                || news.getBenefitState() == Promotion.BenefitState.DRAFT) throw FeedException.missing();
         benefitAudit(admin, "BENEFIT_READ", news, "revision=" + news.getRevision()); return newsDto(news, true);
     }
 

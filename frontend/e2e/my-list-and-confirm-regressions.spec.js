@@ -63,6 +63,7 @@ test.beforeEach(async ({ page }) => {
             return route.fulfill({ json: { success: true, data: { content: content.slice(number * size, (number + 1) * size),
                 page: { number, size, totalElements: content.length, totalPages: Math.ceil(content.length / size) } } } });
         }
+        if (path === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: member, refreshPossible: false } } }); }
         const data = path === '/api/member/me' ? member
             : path === '/api/stores/my' ? stores : emptyPage;
         return route.fulfill({ json: { success: true, data } });

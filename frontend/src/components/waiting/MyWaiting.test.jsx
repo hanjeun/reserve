@@ -105,18 +105,20 @@ it('reuses the reservation toolbar with an adjacent server count and only recent
     expect(currentParams().get('view')).toBe('cards');
 });
 
-it('keeps the same focused search field and prior own data while a debounced server search is pending', async () => {
+it('keeps the focused search field while only pending results become skeletons', async () => {
     const request = deferred();
     waitingService.getMine.mockResolvedValueOnce(pageWith('이전 내 웨이팅', 60)).mockReturnValue(request.promise);
     showMine('/my-reservations?tab=waiting&view=list&waitingPage=3&status=CONFIRMED&sort=oldest');
     await screen.findByText('이전 내 웨이팅');
     const input = screen.getByPlaceholderText('가게명, 대기번호로 검색'); input.focus();
     fireEvent.change(input, { target: { value: '새 가게' } });
+    expect(screen.getByRole('status', { name: '내 웨이팅 목록을 불러오는 중' })).toBeInTheDocument();
+    expect(screen.queryByText('이전 내 웨이팅')).toBeNull();
     await waitFor(() => expect(waitingService.getMine).toHaveBeenCalledWith(0, expect.anything(), { keyword: '새 가게', status: 'ALL', sort: 'recent' }));
     expect(screen.getByPlaceholderText('가게명, 대기번호로 검색')).toBe(input);
     expect(input).toHaveFocus(); expect(input).toBeEnabled();
-    expect(screen.getByText('이전 내 웨이팅')).toBeInTheDocument();
-    expect(screen.queryByRole('status', { name: '내 웨이팅을 불러오는 중' })).toBeNull();
+    expect(screen.queryByText('이전 내 웨이팅')).toBeNull();
+    expect(screen.getByRole('status', { name: '내 웨이팅 목록을 불러오는 중' })).toBeInTheDocument();
     expect(currentParams().get('waitingPage')).toBe('1');
     expect(currentParams().get('status')).toBe('CONFIRMED');
     expect(currentParams().get('sort')).toBe('oldest');
@@ -132,7 +134,8 @@ it('does not correct a new waiting page using placeholder totals from an earlier
     fireEvent.click(screen.getByRole('button', { name: '페이지 9로 이동' }));
     await waitFor(() => expect(waitingService.getMine).toHaveBeenCalledWith(8, expect.anything(), { keyword: '', status: 'ALL', sort: 'recent' }));
     expect(currentParams().get('waitingPage')).toBe('9');
-    expect(screen.getByText('앞 페이지')).toBeInTheDocument();
+    expect(screen.queryByText('앞 페이지')).toBeNull();
+    expect(screen.getByRole('status', { name: '내 웨이팅 목록을 불러오는 중' })).toBeInTheDocument();
     await act(async () => request.resolve(pageWith('아홉 번째 페이지', 180)));
     await screen.findByText('아홉 번째 페이지');
     expect(currentParams().get('waitingPage')).toBe('9');
@@ -254,6 +257,7 @@ it('keeps search focus after a failed initial request instead of replacing the t
     expect(screen.getByPlaceholderText('가게명, 대기번호로 검색')).toBe(input);
     expect(input).toHaveFocus(); expect(input).toBeEnabled();
     expect(screen.queryByRole('status', { name: '내 웨이팅을 불러오는 중' })).toBeNull();
+    expect(screen.getByRole('status', { name: '내 웨이팅 목록을 불러오는 중' })).toBeInTheDocument();
     await act(async () => request.resolve({ content: [], page: { totalElements: 0 } }));
     await screen.findByText('조건에 맞는 웨이팅이 없어요.');
 });

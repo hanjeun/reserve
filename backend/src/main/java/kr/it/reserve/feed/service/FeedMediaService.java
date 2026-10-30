@@ -144,7 +144,7 @@ public class FeedMediaService {
     public ImageContent readBenefitApplication(Long adminId, Long newsId, Long imageId) {
         newsAvailability.requireEnabled(); cipher.requireKey(); feeds.requireAdmin(adminId);
         var news = promotions.findForRead(newsId).orElseThrow(FeedException::missing);
-        if (news.getState() == Promotion.State.DELETED || news.getNewsPost() == null
+        if (StoreNewsPolicy.deleted(news) || news.getNewsPost() == null
                 || news.getBenefitState() == Promotion.BenefitState.NONE || news.getBenefitState() == Promotion.BenefitState.DRAFT) throw FeedException.missing();
         FeedPost post = posts.findForRead(news.getNewsPost().getId()).orElseThrow(FeedException::missing);
         FeedMedia image = media.findForRead(imageId).orElseThrow(FeedException::missing);

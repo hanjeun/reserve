@@ -408,6 +408,23 @@ public class ChatService {
         return ChatHistoryResponse.of(messages, slice.hasNext(), nextBeforeId);
     }
 
+    public ConversationThreadResponse getSearchContext(Member member, Long roomId, Long messageId) {
+        assertHistoryAccess(roomId, member);
+        ChatRoom room = findRoom(roomId);
+        boolean customer = room.getMember().getId().equals(member.getId());
+        boolean support = room.getType() == ChatRoom.RoomType.SUPPORT;
+        String role = customer ? MEMBER_VIEWER_ROLE : support ? "ADMIN" : OWNER_VIEWER_ROLE;
+        String title = customer ? support ? ConversationSummaryResponse.SUPPORT_NAME : room.getStoreNameSnapshot() : room.getMember().getName();
+        return ConversationThreadResponse.from(room, title, role, support || isStoreMessageable(room.getStoreId()),
+                getOlderMessages(roomId, messageId + 1, PAGE_SIZE, member.getId()));
+    }
+
+    public void assertHistoryAccess(Long roomId, Member member) {
+        ChatRoom room = findRoom(roomId);
+        if (member.isAdmin() && room.getType() == ChatRoom.RoomType.SUPPORT) return;
+        assertParticipant(roomId, member);
+    }
+
     /** 그 방이 이 회원의 것인지. 손님 경로에서 방 ID 를 받을 때 쓴다. */
     public void assertOwnedBy(Long roomId, Member member) {
         ChatRoom room = findRoom(roomId);

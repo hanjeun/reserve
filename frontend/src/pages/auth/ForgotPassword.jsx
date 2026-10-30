@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Form, Typography, Flex } from 'antd';
 import { PageContainer, Button, FormInput } from '../../components/common';
+import { MailOutlined, LockOutlined } from '../../components/common/icons';
 import { useMessage } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import api from '../../api/axios';
@@ -186,7 +187,7 @@ const ForgotPassword = () => {
     return (
         <PageContainer size="sm" paddingTop="60px" center>
             <div className="fade-in-up">
-                <PageTitle style={styles.title}>비밀번호 찾기</PageTitle>
+                <PageTitle style={styles.title}><MailOutlined aria-hidden="true" /> 비밀번호 찾기</PageTitle>
                 <PageDescription style={styles.subtitle}>
                     가입한 이메일로 인증 후 비밀번호를 재설정해요
                 </PageDescription>
@@ -259,7 +260,7 @@ const ForgotPassword = () => {
                             >
                                 <FormInput type="password" placeholder="새 비밀번호 확인" />
                             </Form.Item>
-                            <Button variant="primary" htmlType="submit" block loading={submitLoading}>
+                            <Button variant="primary" htmlType="submit" block loading={submitLoading} icon={<LockOutlined />}>
                                 비밀번호 변경
                             </Button>
                         </>

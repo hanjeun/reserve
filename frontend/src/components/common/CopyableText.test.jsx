@@ -27,4 +27,15 @@ describe('CopyableText', () => {
         expect(screen.getByText('없음')).toBeInTheDocument();
         expect(screen.queryByRole('button')).toBeNull();
     });
+
+    it('copies the full order number when the last character stays with the inline button', async () => {
+        const user = userEvent.setup();
+        const orderNumber = 'ORD' + '1234567890'.repeat(3) + 'abcdefg';
+        render(<CopyableText value={orderNumber} label="주문번호" wrap />);
+
+        await user.click(screen.getByRole('button', { name: '주문번호 복사' }));
+
+        expect(await navigator.clipboard.readText()).toBe(orderNumber);
+        expect(screen.getByRole('status')).toHaveTextContent('주문번호를 복사했어요.');
+    });
 });

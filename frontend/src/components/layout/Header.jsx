@@ -1,9 +1,10 @@
 import React, { lazy, Suspense, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
-import { ArrowLeftOutlined, MenuOutlined, SearchOutlined } from '../common/icons';
+import { ArrowLeftOutlined, MenuOutlined, SearchOutlined, LockOutlined, UserOutlined } from '../common/icons';
 import { Link, useLocation, useNavigationType } from 'react-router-dom';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import useGoBack from '../../hooks/useGoBack';
+import { requestAuthenticationBack } from '../../utils/authenticationNavigation';
 import useWorkspaceNavigate from '../../hooks/useWorkspaceNavigate';
 import useWorkspaceAction from '../../hooks/useWorkspaceAction';
 import useExitAnimation from '../../hooks/useExitAnimation';
@@ -23,10 +24,21 @@ const HEADER_ACTION_MOTION_MS = 180;
 
 function HeaderControlSlot({ kind, leaving, skipEntry = false, children }) {
     const [animateEntry] = useState(() => !skipEntry);
-    return <span className={`reserve-header-control-slot reserve-header-${kind}-slot`
+    const slotRef = useRef(null);
+    useLayoutEffect(() => {
+        const slot = slotRef.current;
+        if (!slot) return;
+        if (leaving && slot.contains(document.activeElement)) {
+            slot.closest('header')?.querySelector('.reserve-header-logo')?.focus({ preventScroll: true });
+        }
+        slot.toggleAttribute('inert', Boolean(leaving));
+        if (leaving) slot.setAttribute('aria-hidden', 'true');
+        else slot.removeAttribute('aria-hidden');
+    }, [leaving]);
+    return <span ref={slotRef} className={`reserve-header-control-slot reserve-header-${kind}-slot`
         + (animateEntry ? ' reserve-header-control-slot--entering' : '')
         + (leaving ? ' reserve-header-control-slot--leaving' : '')}
-        aria-hidden={leaving ? true : undefined}>{children}</span>;
+        >{children}</span>;
 }
 HeaderControlSlot.propTypes = {
     kind: PropTypes.oneOf(['back', 'workspace-menu']).isRequired,
@@ -60,8 +72,8 @@ const Header = () => {
     useLayoutEffect(() => { navigationLocationRef.current = { location, navigationType }; }, [location, navigationType]);
     // 뒤로가기 도구가 없어질 때도 접힘 모션이 끝날 때까지 DOM을 유지한다.
 
-    const { shouldRender: backMounted } = useExitAnimation(showBack, HEADER_ACTION_MOTION_MS);
-    const { shouldRender: workspaceMounted } = useExitAnimation(showWorkspaceMenu, HEADER_ACTION_MOTION_MS);
+    const { shouldRender: backMounted } = useExitAnimation(showBack, HEADER_ACTION_MOTION_MS, true);
+    const { shouldRender: workspaceMounted } = useExitAnimation(showWorkspaceMenu, HEADER_ACTION_MOTION_MS, true);
     // 모션 최소화에서는 애니메이션이 꺼져 있으므로 남겨 둘 이유가 없다 — 즉시 나타나고 사라진다.
     const renderBack = reducedMotion ? showBack : backMounted;
     const renderWorkspaceMenu = reducedMotion ? showWorkspaceMenu : workspaceMounted;
@@ -107,6 +119,7 @@ const Header = () => {
     }, [reducedMotion, location.key, location.pathname, location.hash]);
 
     const handleBack = () => {
+        if (requestAuthenticationBack()) return;
         const storeQuestions = currentPath === '/store/register' || /^\/store\/\d+\/edit$/.test(currentPath);
         if (storeQuestions && requestRegistrationStepBack()) return;
         if (currentPath === '/messages' && requestMessengerRouteClose()) return;
@@ -151,11 +164,11 @@ const Header = () => {
                     </button></Tooltip></HeaderControlSlot>}
                     {renderBack && (
                         <HeaderControlSlot kind="back" leaving={backLeaving}>
-                        <Tooltip title="이전 화면으로 돌아가기" disabled={backLeaving || searchLeaving}><button type="button" className={'reserve-header-back' + (backLeaving ? ' reserve-header-back--leaving' : '')}
+                        <button type="button" className={'reserve-header-back' + (backLeaving ? ' reserve-header-back--leaving' : '')}
                             onClick={handleBack} aria-label="이전 화면으로 돌아가기" disabled={backLeaving}
-                            aria-hidden={showBack ? undefined : true}>
+                            >
                             <ArrowLeftOutlined aria-hidden="true" />
-                        </button></Tooltip></HeaderControlSlot>
+                        </button></HeaderControlSlot>
                     )}
                     <a className="reserve-header-logo"
                         href="/" onClick={handleLogoClick} style={styles.logo} aria-label="RESERVE 홈">
@@ -163,17 +176,17 @@ const Header = () => {
                     </a>
                 </div>
                 <div className="reserve-header-actions" style={styles.actions}>
-                    <Tooltip title="통합 검색" disabled={searchLeaving}><Link to={searchTarget} state={{ searchEntry: true }} onClick={handleSearchEntry} className="reserve-header-search" aria-label="통합 검색">
+                    <Link to={searchTarget} state={{ searchEntry: true }} onClick={handleSearchEntry} className="reserve-header-search" aria-label="통합 검색">
                         <SearchOutlined aria-hidden="true" />
-                    </Link></Tooltip>
+                    </Link>
                     {isLoggedIn ? (
                         <Suspense fallback={<span className="reserve-header-account-loading" aria-hidden="true" style={styles.avatarFallback} />}>
                             <HeaderAccountMenu />
                         </Suspense>
                     ) : (
                         <div className="reserve-header-guest-actions" style={styles.guestActions}>
-                            <Button variant="ghost" size="md" onClick={() => navigate('/login')} style={styles.navBtn}>로그인</Button>
-                            <Button variant="primary" size="md" onClick={() => navigate('/signup')} style={styles.actionBtn}>시작하기</Button>
+                            <Button variant="ghost" size="md" icon={<LockOutlined />} onClick={() => navigate('/login')} style={styles.navBtn}>로그인</Button>
+                            <Button variant="primary" size="md" icon={<UserOutlined />} onClick={() => navigate('/signup')} style={styles.actionBtn}>회원가입</Button>
                         </div>
                     )}
                 </div>

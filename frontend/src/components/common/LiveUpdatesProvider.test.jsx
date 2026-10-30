@@ -6,7 +6,7 @@ import useLiveUpdatesStatus from '../../hooks/useLiveUpdatesStatus';
 import LiveUpdatesProvider from './LiveUpdatesProvider';
 
 const state = vi.hoisted(() => ({ sessionRevision: 0, isLoggedIn: true,
-    expireSession: vi.fn(), refresh: vi.fn() }));
+    expireSession: vi.fn(), checkAuth: vi.fn(), refresh: vi.fn() }));
 vi.mock('../../store/useAuthStore', () => {
     const useAuth = selector => selector(state);
     useAuth.getState = () => state;
@@ -42,13 +42,25 @@ const tick = async ms => { await act(async () => { await vi.advanceTimersByTimeA
 beforeEach(() => {
     vi.useFakeTimers();
     vi.stubGlobal('EventSource', Stream);
-    state.sessionRevision = 0; state.isLoggedIn = true;
+    state.sessionRevision = 0; state.isLoggedIn = true; state.authRestoring = false;
     state.refresh.mockClear(); state.expireSession.mockClear(); connections.length = 0;
+    state.checkAuth.mockReset().mockResolvedValue({ id: 7 });
     advanceSession();
     client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
 });
 afterEach(() => { cleanup(); client.clear(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
+it('waits for authentication restoration and keeps anonymous streams credentialless', () => {
+    state.authRestoring = true;
+    const rendered = render(ui('restoring'));
+    expect(connections).toHaveLength(0);
+    state.authRestoring = false;
+    state.isLoggedIn = false;
+    rendered.rerender(ui('restoring'));
+    expect(connections).toHaveLength(1);
+    expect(connections[0].url).toMatch(/updates\/public\/events$/);
+    expect(connections[0].options).toEqual({ withCredentials: false });
+});
 it('uses one credentialed stream and enables only server-advertised supported domains after ready', async () => {
     render(ui('account'));
     expect(connections).toHaveLength(1);
@@ -61,6 +73,12 @@ it('uses one credentialed stream and enables only server-advertised supported do
     expect(status()).toEqual({ present: true, connected: true, domains: ['FEED', 'NEWS'] });
     await tick(250);
     expect(state.refresh).toHaveBeenCalledWith([], true);
+});
+it.each([null, false, [], { epoch: '', domains: [] }])('ignores malformed ready payload %j without breaking the page', data => {
+    render(ui('account'));
+    expect(() => act(() => connections[0].emit('ready', data))).not.toThrow();
+    expect(status()).toEqual({ present: true, connected: false, domains: [] });
+    expect(state.refresh).not.toHaveBeenCalled();
 });
 
 it('coalesces signals and rejects duplicates and stale versions per entity without losing another entity', async () => {
@@ -107,6 +125,7 @@ it('reconciles after transport failure without logging the member out and ignore
     expect(status()).toEqual({ present: true, connected: false, domains: ['FEED', 'NEWS'] });
     expect(state.expireSession).not.toHaveBeenCalled();
     await tick(6_000);
+    expect(state.checkAuth).toHaveBeenCalledExactlyOnceWith(true, { rethrowTransient: true, timeout: 8000 });
     expect(connections).toHaveLength(2);
     act(() => { old.emit('update', update(1)); old.emit('session-ended', {}); });
     expect(state.refresh).not.toHaveBeenCalled();
@@ -117,6 +136,101 @@ it('reconciles after transport failure without logging the member out and ignore
     await tick(54_000);
     expect(state.refresh).toHaveBeenCalledWith([], true, { periodic: true });
     expect(state.expireSession).not.toHaveBeenCalled();
+});
+
+it('waits for session renewal and coalesces repeated failures and visibility changes', async () => {
+    let finish;
+    state.checkAuth.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+    render(ui('account'));
+    act(() => { connections[0].onerror(); connections[0].onerror(); });
+    await tick(6_000);
+    expect(state.checkAuth).toHaveBeenCalledOnce();
+    expect(connections).toHaveLength(1);
+    hidden.mockReturnValue(true);
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    hidden.mockReturnValue(false);
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    expect(connections).toHaveLength(1);
+    await act(async () => finish({ id: 7 }));
+    expect(connections).toHaveLength(2);
+    expect(state.checkAuth).toHaveBeenCalledOnce();
+});
+
+it('ends private reconnects after confirmed expiry and uses only the public stream', async () => {
+    const view = render(ui('account'));
+    state.checkAuth.mockImplementationOnce(async () => {
+        state.isLoggedIn = false; state.sessionRevision = advanceSession();
+        return null;
+    });
+    act(() => connections[0].onerror());
+    await tick(6_000);
+    expect(connections).toHaveLength(1);
+    view.rerender(ui('account'));
+    expect(connections).toHaveLength(2);
+    expect(connections[1].url).toMatch(/updates\/public\/events$/);
+    expect(connections[1].options.withCredentials).toBe(false);
+    await tick(70_000);
+    expect(connections).toHaveLength(2);
+});
+
+it('backs off a transient session-check failure without logging out or reopening an unchecked stream', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    state.checkAuth.mockRejectedValueOnce(Object.assign(new Error('unavailable'), { status: 503 }));
+    render(ui('account'));
+    act(() => connections[0].onerror());
+    await tick(5_000);
+    expect(connections).toHaveLength(1);
+    expect(state.expireSession).not.toHaveBeenCalled();
+    await tick(9_999);
+    expect(state.checkAuth).toHaveBeenCalledOnce();
+    await tick(1);
+    expect(state.checkAuth).toHaveBeenCalledTimes(2);
+    expect(connections).toHaveLength(2);
+});
+
+it.each(['unmount', 'account-switch'])('ignores a late session probe after %s', async action => {
+    let finish;
+    state.checkAuth.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const view = render(ui('account'));
+    act(() => connections[0].onerror());
+    await tick(6_000);
+    if (action === 'unmount') view.unmount();
+    else {
+        state.isLoggedIn = false; state.sessionRevision = advanceSession();
+        view.rerender(ui('account'));
+    }
+    const count = connections.length;
+    await act(async () => finish({ id: 7 }));
+    await tick(70_000);
+    expect(connections).toHaveLength(count);
+});
+
+it('keeps polling when EventSource construction fails and recovers through the session gate', async () => {
+    let blocked = true;
+    vi.stubGlobal('EventSource', class extends Stream {
+        constructor(...args) {
+            if (blocked) throw new DOMException('blocked', 'SecurityError');
+            super(...args);
+        }
+    });
+    render(ui('account'));
+    expect(connections).toHaveLength(0);
+    expect(status().connected).toBe(false);
+    blocked = false;
+    await tick(6_000);
+    expect(state.checkAuth).toHaveBeenCalledOnce();
+    expect(connections).toHaveLength(1);
+});
+
+it('reconnects anonymously without attempting session renewal', async () => {
+    state.isLoggedIn = false;
+    render(ui('anonymous'));
+    act(() => connections[0].onerror());
+    await tick(6_000);
+    expect(state.checkAuth).not.toHaveBeenCalled();
+    expect(connections).toHaveLength(2);
+    expect(connections[1].options.withCredentials).toBe(false);
 });
 
 it('marks healthy-stream fallback as periodic while retaining signals in the same batch', async () => {

@@ -5,6 +5,7 @@ test.beforeEach(async ({ page }) => {
         const { pathname } = new URL(route.request().url());
         // Vite 소스 경로에 포함된 /api/까지 JSON으로 응답하지 않는다.
         if (!pathname.startsWith('/api/')) return route.continue();
+        if (pathname === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: null, refreshPossible: false } } }); }
         if (pathname === '/api/member/me' || pathname === '/api/auth/refresh') {
             return route.fulfill({ status: 401, json: { success: false, message: '인증이 필요합니다.' } });
         }

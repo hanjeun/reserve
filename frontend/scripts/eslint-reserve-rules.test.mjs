@@ -41,7 +41,15 @@ test('copy policy checks text, template messages and JSX while allowing labels a
 
 test('legal pages may use formal text but cannot introduce legal threats', () => {
     assert.deepEqual(lintCopy('const text = "90일 보관합니다.";', 'src/pages/legal/Privacy.jsx'), []);
+    assert.deepEqual(lintCopy('const text = <p>출처와 이용 조건을 안내합니다.</p>;', 'src/pages/legal/ContentSources.jsx'), []);
+    assert.equal(lintCopy('const text = <p>법적 조치를 취합니다.</p>;', 'src/pages/legal/ContentSources.jsx').length, 1);
+    assert.equal(lintCopy('const text = <p>이용 방법을 안내합니다.</p>;', 'src/pages/legal/UserGuide.jsx').length, 1);
     assert.equal(lintCopy('const text = "법적 조치를 취합니다.";', 'src/pages/legal/Terms.jsx').length, 1);
     assert.equal(lintCopy('const text = <p>고소할 수 있어요.</p>;').length, 1);
     assert.deepEqual(lintCopy('const text = <p>고소한 맛과 향이에요.</p>;'), []);
+});
+
+test('reservation consent legal notice retains formal copy without exempting ordinary forms', () => {
+    assert.deepEqual(lintCopy('const text = <p>개인정보 제공 내용을 안내합니다.</p>;', 'src/pages/legal/ReservationConsentNotice.jsx'), []);
+    assert.equal(lintCopy('const text = <p>예약 처리가 완료되었습니다.</p>;', 'src/components/reservation/ReservationConsentField.jsx').length, 1);
 });

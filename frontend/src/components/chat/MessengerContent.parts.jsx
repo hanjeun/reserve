@@ -2,6 +2,7 @@ import React, { useId, useState } from 'react';
 import { ArrowLeftOutlined, CloseOutlined, DownOutlined, MessageOutlined } from '../common/icons';
 import { Bone, Button, DataState, Tooltip } from '../common';
 import ConversationListSkeleton from './ConversationListSkeleton';
+import MessengerThreadSkeleton from './MessengerThreadSkeleton';
 import MessengerListHeading from './MessengerListHeading';
 import MessengerHome from './MessengerHome';
 import MessengerSettings from './MessengerSettings';
@@ -25,10 +26,10 @@ const OWNER_REPLIES = [
 export function MessengerCloseButton({ surface, onClose }) {
     if (surface !== 'page' || !onClose) return null;
     return (
-        <Tooltip title="메시지 닫기"><button type="button" className="reserve-chat-close reserve-messenger-shell-close"
+        <button type="button" className="reserve-chat-close reserve-messenger-shell-close"
             onClick={onClose} aria-label="메시지 닫기">
             <CloseOutlined />
-        </button></Tooltip>
+        </button>
     );
 }
 
@@ -212,7 +213,7 @@ function ThreadAvatar({ selection, thread, selectedRow }) {
     return <MessengerAvatar imageSrc={thread?.storeImageUrl || selectedRow?.storeImageUrl} variant="store" className="reserve-messenger-thread-avatar" />;
 }
 
-function ThreadMessages({ messages, thread, selection, history, onLoadOlder, onRetracted, emptyText }) {
+function ThreadMessages({ messages, thread, selection, history, onLoadOlder, onRetracted, emptyText, searchMessageId }) {
     return (
         <div>
             {history.hasMore && (
@@ -228,6 +229,7 @@ function ThreadMessages({ messages, thread, selection, history, onLoadOlder, onR
                 </div>
             )}
             {messages.some(message => !message.hidden) ? <ChatBubbleList messages={messages} mine={thread?.viewerRole || viewerRoleOf(selection)}
+                searchMessageId={searchMessageId}
                 roomId={thread?.roomId} onRetracted={onRetracted}
                 reportRole={thread?.type === 'STORE' ? thread.viewerRole : undefined} />
                 : <DataState state="empty" kind="message" title={emptyText} />}
@@ -237,11 +239,7 @@ function ThreadMessages({ messages, thread, selection, history, onLoadOlder, onR
 
 function ThreadBody({ loading, loadError, openError, onReload, intro, emptyText, messageProps }) {
     if (loading) {
-        return (
-            <output className="reserve-messenger-thread-skeleton" aria-label="대화를 불러오는 중" aria-busy="true">
-                <div aria-hidden="true"><Bone width="65%" height={44} borderRadius={14} /><Bone width="50%" height={44} borderRadius={14} style={{ marginLeft: 'auto' }} /><Bone width="75%" height={44} borderRadius={14} /></div>
-            </output>
-        );
+        return <MessengerThreadSkeleton />;
     }
     if (loadError) {
         return (
@@ -311,13 +309,13 @@ function ThreadComposerArea({ closed, disabledMessage, showOwnerReplies, draft, 
 
 export function ThreadPanel({
     onAnimationEnd, onBack, returningToList, avatarProps, title, threadKind, moderationProps,
-    threadBodyRef, isSupport, bodyProps, composerAreaProps, retentionNoticeVisible = true, backLabel = '대화 목록으로 돌아가기',
+    threadBodyRef, isSupport, bodyProps, composerAreaProps, retentionNoticeVisible = true, backLabel = '대화 목록으로 돌아가기', searchContext,
 }) {
     return (
         <section className="reserve-messenger-thread" aria-labelledby="reserve-messenger-thread-title"
             onAnimationEnd={onAnimationEnd}>
             <header className="reserve-messenger-thread-heading">
-                <Tooltip title={backLabel}><button
+                <button
                     type="button"
                     className="reserve-messenger-mobile-back"
                     onClick={onBack}
@@ -325,7 +323,7 @@ export function ThreadPanel({
                     aria-label={backLabel}
                 >
                     <ArrowLeftOutlined />
-                </button></Tooltip>
+                </button>
                 <ThreadAvatar {...avatarProps} />
                 <span className="reserve-messenger-thread-copy">
                     <strong id="reserve-messenger-thread-title">{title}</strong>
@@ -336,6 +334,8 @@ export function ThreadPanel({
                 </span>
             </header>
 
+            {searchContext && <div className="reserve-messenger-search-context"><span>검색한 메시지</span>
+                <Button variant="ghost-sm-primary" onClick={searchContext.onLatest}>최신 대화로 이동</Button></div>}
             <div ref={threadBodyRef} className={`reserve-messenger-thread-body${isSupport ? ' reserve-messenger-thread-body--support' : ''}`}>
                 <ChatRetentionNotice visible={retentionNoticeVisible} />
                 <ThreadBody {...bodyProps} />

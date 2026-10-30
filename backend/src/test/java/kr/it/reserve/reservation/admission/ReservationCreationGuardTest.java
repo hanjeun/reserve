@@ -14,6 +14,21 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class ReservationCreationGuardTest {
+
+    @Test void consentVersionAndDecisionsArePartOfTheSameReservationRequest() {
+        String legacy = ReservationCreationGuard.fingerprint(request);
+        var proof = new kr.it.reserve.reservation.service.ReservationConsentService.Proof(true, true, "fixture-version", "a".repeat(64));
+        request.setLegalConsent(proof);
+        String accepted = ReservationCreationGuard.fingerprint(request);
+        assertThat(accepted).isNotEqualTo(legacy);
+        request.setLegalConsent(new kr.it.reserve.reservation.service.ReservationConsentService.Proof(true, false, "fixture-version", "a".repeat(64)));
+        assertThat(ReservationCreationGuard.fingerprint(request)).isNotEqualTo(accepted);
+        request.setLegalConsent(new kr.it.reserve.reservation.service.ReservationConsentService.Proof(true, true, "next-version", "a".repeat(64)));
+        assertThat(ReservationCreationGuard.fingerprint(request)).isNotEqualTo(accepted);
+        request.setLegalConsent(null);
+        assertThat(ReservationCreationGuard.fingerprint(request)).isEqualTo(legacy);
+    }
+
     private final ReservationRequestRepository requests = mock(ReservationRequestRepository.class);
     private final AdmissionService admission = mock(AdmissionService.class);
     private final ReservationCreationGuard guard = new ReservationCreationGuard(requests, admission);

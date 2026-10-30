@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import FilterToolbar from './FilterToolbar';
 import { LiveUpdatesContext } from '../../hooks/useLiveUpdatesStatus';
@@ -53,6 +53,20 @@ describe('FilterToolbar', () => {
         expect(screen.getByRole('button', { name: '새로고침' })).toBeDisabled();
     });
 
+    it.each([false, true])('재조회 중에도 같은 검색창과 입력 포커스를 유지해요 (%s)', withMenu => {
+        const search = { value: '', onChange: vi.fn(), placeholder: '연속 입력' };
+        const controls = loading => <FilterToolbar selects={withMenu ? [select] : []} search={search} initialLoading={loading} />;
+        const { rerender } = render(controls(false));
+        const input = screen.getByPlaceholderText('연속 입력');
+        input.focus();
+        search.value = '가'; rerender(controls(true));
+        expect(screen.getByPlaceholderText('연속 입력')).toBe(input);
+        expect(input).toHaveFocus(); expect(input).toBeEnabled();
+        fireEvent.change(input, { target: { value: '가게' } });
+        expect(search.onChange).toHaveBeenCalledTimes(1);
+        search.value = '가게'; rerender(controls(false));
+        expect(input).toHaveValue('가게'); expect(input).toHaveFocus();
+    });
     it('hides refresh only after the server advertises support for this screen', () => {
         const toolbar = <FilterToolbar search={{ value: '카페', onChange: vi.fn() }} onReload={vi.fn()} autoRefreshDomain="WAITING" />;
         const { rerender } = render(<LiveUpdatesContext.Provider value={{ present: true, connected: false, domains: [] }}>{toolbar}</LiveUpdatesContext.Provider>);

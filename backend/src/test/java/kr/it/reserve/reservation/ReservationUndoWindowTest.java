@@ -56,7 +56,7 @@ class ReservationUndoWindowTest {
         when(reservations.findByIdForUpdate(20L)).thenReturn(Optional.of(reservation));
         service = new ReservationService(reservations, stores, mock(HolidayService.class),
                 payments, emails, mock(MemberRepository.class), mock(AuditLogService.class),
-                mock(QrCheckinTokenProvider.class), mock(kr.it.reserve.reservation.admission.ReservationCreationGuard.class));
+                mock(QrCheckinTokenProvider.class), mock(kr.it.reserve.reservation.admission.ReservationCreationGuard.class), org.mockito.Mockito.mock(kr.it.reserve.reservation.service.ReservationConsentService.class));
         org.springframework.test.util.ReflectionTestUtils.setField(service, "reservationEntityManager", mock(jakarta.persistence.EntityManager.class));
     }
 

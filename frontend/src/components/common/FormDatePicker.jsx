@@ -249,7 +249,7 @@ DateTextInput.propTypes = {
     describedBy: PropTypes.string, disabled: PropTypes.bool,
 };
 
-const FormDatePickerBase = ({
+const FormDatePickerField = ({
     mode = 'single',
     value,
     onChange,
@@ -544,15 +544,15 @@ const FormDatePickerBase = ({
                         <Tooltip title="이전 해"><button type="button" className="rsv-tap-btn reserve-cal-nav" onClick={() => goYear(-1)} aria-label="이전 해">
                             <DoubleLeftOutlined style={{ fontSize: 11 }} />
                         </button></Tooltip>
-                        <Tooltip title="이전 달"><button type="button" className="rsv-tap-btn reserve-cal-nav" onClick={() => goMonth(-1)} aria-label="이전 달">
+                        <button type="button" className="rsv-tap-btn reserve-cal-nav" onClick={() => goMonth(-1)} aria-label="이전 달">
                             <LeftOutlined style={{ fontSize: 12 }} />
-                        </button></Tooltip>
+                        </button>
                     </div>
                     <span style={styles.monthLabel}>{month.format('YYYY년 M월')}</span>
                     <div style={styles.navGroup}>
-                        <Tooltip title="다음 달"><button type="button" className="rsv-tap-btn reserve-cal-nav" onClick={() => goMonth(1)} aria-label="다음 달">
+                        <button type="button" className="rsv-tap-btn reserve-cal-nav" onClick={() => goMonth(1)} aria-label="다음 달">
                             <RightOutlined style={{ fontSize: 12 }} />
-                        </button></Tooltip>
+                        </button>
                         <Tooltip title="다음 해"><button type="button" className="rsv-tap-btn reserve-cal-nav" onClick={() => goYear(1)} aria-label="다음 해">
                             <DoubleRightOutlined style={{ fontSize: 11 }} />
                         </button></Tooltip>
@@ -582,6 +582,8 @@ const FormDatePickerBase = ({
         </>
     );
 };
+
+const FormDatePickerBase = props => <Form.Item noStyle><FormDatePickerField {...props} /></Form.Item>;
 
 const FormDatePicker = ({ multiple = false, ...props }) => (
     <FormDatePickerBase {...props} mode={multiple ? 'multiple' : 'single'} />

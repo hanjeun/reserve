@@ -1,6 +1,9 @@
 package kr.it.reserve.file.service;
 
 import kr.it.reserve.global.error.FileException;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.MeterRegistry;
 import kr.it.reserve.file.util.ImageFileValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -56,6 +59,17 @@ public class FileStorageService {
      */
     @Value("${s3.env-prefix:}")
     private String envPrefix;
+
+    private final ChatImageCiphertextCache chatImageCache = new ChatImageCiphertextCache();
+    private Counter chatImageOriginRequests;
+    private DistributionSummary chatImageOriginBytes;
+
+    @Autowired
+    void bindChatImageMetrics(MeterRegistry registry) {
+        chatImageCache.bindMetrics(registry);
+        chatImageOriginRequests = registry.counter("reserve.chat.image.s3.requests");
+        chatImageOriginBytes = registry.summary("reserve.chat.image.s3.bytes");
+    }
 
     private S3Client s3Client;
     private S3Presigner s3Presigner;
@@ -125,7 +139,12 @@ public class FileStorageService {
         if (prefixPath == null || !prefixPath.matches("users/\\d+/chat/\\d+") || !isManagedFileUnderPrefix(key, prefixPath)) {
             throw FileException.invalid("올바른 대화 사진이 아니에요.");
         }
+        return chatImageCache.read(key, () -> readChatImageOrigin(key));
+    }
+
+    private byte[] readChatImageOrigin(String key) {
         int limit = (int) ImageFileValidator.MAX_FILE_BYTES + 28;
+        if (chatImageOriginRequests != null) chatImageOriginRequests.increment();
         try (var stream = s3Client.getObject(GetObjectRequest.builder().bucket(bucket).key(key).build())) {
             if (stream.response().contentLength() != null && stream.response().contentLength() > limit) {
                 stream.abort();
@@ -136,6 +155,7 @@ public class FileStorageService {
                 stream.abort(); // close만 호출하면 HTTP 클라이언트가 남은 대용량 본문을 drain할 수 있다.
                 throw FileException.invalid("사진 크기가 허용 범위를 초과했어요.");
             }
+            if (chatImageOriginBytes != null) chatImageOriginBytes.record(bytes.length);
             return bytes;
         } catch (IOException | software.amazon.awssdk.core.exception.SdkException exception) {
             log.error("Chat image read failed: errorType={}", exception.getClass().getSimpleName());
@@ -280,7 +300,9 @@ public class FileStorageService {
             return;
         }
 
-        s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
+        chatImageCache.invalidate(key);
+        try { s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build()); }
+        finally { chatImageCache.invalidate(key); }
         log.info("S3 delete success");
     }
 

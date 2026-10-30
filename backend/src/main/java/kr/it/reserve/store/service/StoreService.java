@@ -123,6 +123,8 @@ public class StoreService {
                 .partialRefundRate(clampPartialRefundRate(request.getPartialRefundRate()))
                 .maxCapacityPerSlot(normalizeCapacity(request.getMaxCapacityPerSlot()))
                 .autoApprovalEnabled(Boolean.TRUE.equals(request.getAutoApprovalEnabled()))
+                .autoCompletionEnabled(Boolean.TRUE.equals(request.getAutoCompletionEnabled()))
+                .serviceDurationMinutes(kr.it.reserve.reservation.service.ReservationCompletionPolicy.duration(request.getServiceDurationMinutes()))
                 .bookingDeadlineHours(clampBookingDeadlineHours(request.getBookingDeadlineHours()))
                 .paymentTimeoutMinutes(clampPaymentTimeout(request.getPaymentTimeoutMinutes()))
                 .reservationSlotMinutes(clampSlotMinutes(request.getReservationSlotMinutes()))
@@ -216,6 +218,8 @@ public class StoreService {
                 store.setMaxCapacityPerSlot(normalizeCapacity(request.getMaxCapacityPerSlot()));
             }
             if (request.getAutoApprovalEnabled() != null) store.setAutoApprovalEnabled(request.getAutoApprovalEnabled());
+            if (request.getAutoCompletionEnabled() != null) store.setAutoCompletionEnabled(request.getAutoCompletionEnabled());
+            if (request.getServiceDurationMinutes() != null) store.setServiceDurationMinutes(kr.it.reserve.reservation.service.ReservationCompletionPolicy.duration(request.getServiceDurationMinutes()));
             if (request.hasField("bookingDeadlineHours")) store.setBookingDeadlineHours(clampBookingDeadlineHours(request.getBookingDeadlineHours()));
             if (request.getPaymentTimeoutMinutes() != null) store.setPaymentTimeoutMinutes(clampPaymentTimeout(request.getPaymentTimeoutMinutes()));
             if (request.getReservationSlotMinutes() != null) store.setReservationSlotMinutes(clampSlotMinutes(request.getReservationSlotMinutes()));

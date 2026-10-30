@@ -2,7 +2,6 @@ import PropTypes from 'prop-types';
 import ChatAttachmentThumbnail from '../chat/ChatAttachmentThumbnail';
 import { CloseOutlined } from '../common/icons';
 import SortableImageUpload from '../common/SortableImageUpload';
-import Tooltip from '../common/Tooltip';
 import { feedMediaUrl } from '../../utils/feed';
 
 export default function CommentAttachments({ images, busy, onRemove, onReorder }) {
@@ -14,8 +13,8 @@ export default function CommentAttachments({ images, busy, onRemove, onReorder }
         onReorder={order => onReorder(order.map(file => file.uid))}
         itemRender={(_, file) => <div className="reserve-chat-attachment reserve-feed-comment-attachment">
             <ChatAttachmentThumbnail uid={file.uid} url={file.url} file={file.originFileObj} gallery={files} />
-            <Tooltip title="첨부 사진 제거"><button type="button" className="reserve-chat-tool" aria-label={`댓글 사진 제거: ${file.name}`}
-                disabled={busy} onClick={() => onRemove(file.uid)}><CloseOutlined /></button></Tooltip>
+            <button type="button" className="reserve-chat-tool" aria-label={`댓글 사진 제거: ${file.name}`}
+                disabled={busy} onClick={() => onRemove(file.uid)}><CloseOutlined /></button>
         </div>} />;
 }
 CommentAttachments.propTypes = { images: PropTypes.array.isRequired, busy: PropTypes.bool,

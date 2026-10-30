@@ -3,6 +3,7 @@ package kr.it.reserve.chat;
 import kr.it.reserve.chat.dto.ChatMessageResponse;
 import kr.it.reserve.chat.dto.ChatReportContextResponse;
 import kr.it.reserve.chat.entity.ChatMessage;
+import kr.it.reserve.chat.entity.ChatReportAccessAudit;
 import kr.it.reserve.chat.entity.ChatRoom;
 import kr.it.reserve.chat.service.*;
 import kr.it.reserve.chat.repository.*;
@@ -138,6 +139,32 @@ class ChatImageAccessTest {
         assertThat(support.getMemberUnread()).isEqualTo(3);
         verify(rooms, never()).findByIdForUpdate(any());
         verify(rooms, never()).save(any());
+    }
+
+    @Test void browserCacheChecksNeverReadStorageAndRepeatCurrentVisibilityChecks() {
+        var photo = photo();
+        when(messages.findById(33L)).thenReturn(Optional.of(photo));
+        when(rooms.findById(10L)).thenReturn(Optional.of(room));
+        images.assertReadable(customer, 33L);
+        verifyNoInteractions(storage);
+        when(hidden.existsByMemberIdAndMessageId(customer.getId(), 33L)).thenReturn(true);
+        assertThatThrownBy(() -> images.assertReadable(customer, 33L)).isInstanceOf(ChatException.class);
+        when(hidden.existsByMemberIdAndMessageId(customer.getId(), 33L)).thenReturn(false);
+        photo.retract(java.time.LocalDateTime.now(), 1);
+        assertThatThrownBy(() -> images.assertReadable(customer, 33L)).isInstanceOf(ChatException.class);
+        verifyNoInteractions(storage);
+    }
+
+    @Test void cachedReportBytesStillRequireAnAccessAuditOnEveryRead() {
+        var photo = photo();
+        when(moderation.contextForImage(admin, 20L)).thenReturn(ChatReportContextResponse.builder()
+                .reportedMessage(ChatMessageResponse.from(photo)).recentMessages(List.of()).build());
+        when(messages.findById(33L)).thenReturn(Optional.of(photo));
+        when(storage.readEncryptedChatImage(photo.getImageKey(), "users/1/chat/10"))
+                .thenReturn(cipher.encrypt(new byte[] {1}, "users/1/chat/10"));
+        images.readForReport(admin, 20L, 33L);
+        images.readForReport(admin, 20L, 33L);
+        verify(audit, times(2)).recordAccess(admin, 20L, 33L, ChatReportAccessAudit.Action.IMAGE);
     }
 
     private ChatMessage photo() {

@@ -2,6 +2,8 @@ package kr.it.reserve.payment.controller;
 
 import kr.it.reserve.config.SiteUrls;
 import kr.it.reserve.config.util.SecurityUtil;
+import jakarta.validation.Valid;
+import kr.it.reserve.global.ratelimit.RateLimiter;
 import kr.it.reserve.global.common.ApiResponse;
 import kr.it.reserve.global.error.BusinessException;
 import kr.it.reserve.global.error.PaymentException;
@@ -33,13 +35,14 @@ import java.util.Map;
 @Import(SiteUrls.class)
 public class PaymentApiController {
 
-    private static final String FAILED_REDIRECT_QUERY = "?success=false&merchant_uid=";
+    private static final String FAILED_REDIRECT_QUERY = "?success=false&checkout_return=true&merchant_uid=";
     private static final String ERROR_MESSAGE_QUERY = "&error_msg=";
 
     private final PaymentService paymentService;
     private final PaymentVerificationService paymentVerificationService;
     private final PortoneService portoneService;
     private final PaymentRepository paymentRepository;
+    private final RateLimiter limiter;
 
     @Value("#{siteUrls.frontendOrigin}")
     private String frontendUrl;
@@ -116,8 +119,9 @@ public class PaymentApiController {
      * [기능] 결제 준비
      */
     @PostMapping("/prepare")
-    public ApiResponse<PaymentPrepareDto> preparePayment(@RequestBody PaymentRequestDto requestDto) {
+    public ApiResponse<PaymentPrepareDto> preparePayment(@Valid @RequestBody PaymentRequestDto requestDto) {
         Long memberId = SecurityUtil.getCurrentMember("결제 준비를 위해 로그인이 필요해요.").getId();
+        limitMember(memberId);
         PaymentPrepareDto response = paymentService.preparePayment(requestDto, memberId);
         return ApiResponse.success(response, "결제 준비가 완료됐어요.");
     }
@@ -126,16 +130,18 @@ public class PaymentApiController {
      * [기능] 결제 검증 (AJAX/Axios 전용)
      */
     @PostMapping("/verify")
-    public ApiResponse<PaymentResponseDto> verifyPayment(@RequestBody PaymentVerifyDto verifyDto) {
+    public ApiResponse<PaymentResponseDto> verifyPayment(@Valid @RequestBody PaymentVerifyDto verifyDto) {
         Member requester = SecurityUtil.getCurrentMember("인증되지 않은 사용자예요.");
+        limitMember(requester.getId());
         PaymentResponseDto response = paymentVerificationService.verifyByMember(verifyDto, requester);
         return ApiResponse.success(response, "결제 검증 및 처리가 완료됐어요.");
     }
 
     /** 예약 소유권을 확인하고 환불 금액은 서버 정책으로 계산한다. 본문의 금액·결제 ID는 신뢰하지 않는다. */
     @PostMapping("/refund")
-    public ApiResponse<PaymentResponseDto> refundPayment(@RequestBody PaymentRefundDto refundDto) {
+    public ApiResponse<PaymentResponseDto> refundPayment(@Valid @RequestBody PaymentRefundDto refundDto) {
         Member requester = SecurityUtil.getCurrentMember("환불을 위해 로그인이 필요해요.");
+        limitMember(requester.getId());
         PaymentResponseDto response = paymentService.refundByMemberRequest(
                 refundDto.getReservationId(), refundDto.getRefundReason(), requester);
         String message = Payment.PaymentStatus.REFUND_PENDING.name().equals(response.getStatus())
@@ -180,5 +186,11 @@ public class PaymentApiController {
         // 여기서 같이 내리면 결제창을 열 때마다 왕복이 하나 더 생기고, 값이 두 곳에 존재하게 된다.
         Map<String, String> config = Map.of("storeId", portoneService.getStoreId());
         return ApiResponse.success(config, "결제 설정 정보 조회 성공");
+    }
+
+    private void limitMember(Long memberId) {
+        if (!limiter.tryConsume("member:" + memberId, RateLimiter.Policy.PAYMENT_VERIFY)) {
+            throw new PaymentException("결제 요청이 많아요. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+        }
     }
 }

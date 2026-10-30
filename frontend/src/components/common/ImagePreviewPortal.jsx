@@ -16,18 +16,15 @@ const ImagePreviewPortal = ({ open, items, current, sessionKey, onClose, onCurre
              */
             key={sessionKey}
             items={items}
+            classNames={{ popup: { root: 'reserve-image-preview' } }}
             preview={{
-                visible: open,
-                onVisibleChange: (visible) => { if (!visible) onClose(); },
+                open,
+                onOpenChange: (visible) => { if (!visible) onClose(); },
                 current,
                 /*
                  * 제어된 사진 인덱스를 onChange로 갱신해 사용자 넘김을 유지한다.
                  */
                 onChange: onCurrentChange,
-                /*
-                 * 미리보기 루트의 공통 도구 스타일은 rootClassName에 연결한다.
-                 */
-                rootClassName: 'reserve-image-preview',
             }}
         />
     );

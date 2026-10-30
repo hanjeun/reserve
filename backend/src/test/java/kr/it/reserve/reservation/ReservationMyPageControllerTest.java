@@ -30,15 +30,32 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.standal
 
 class ReservationMyPageControllerTest {
     private final ReservationService service = mock(ReservationService.class);
+    private final RateLimiter limiter = mock(RateLimiter.class);
+    private final kr.it.reserve.reservation.service.ReservationRemovalService removals =
+            mock(kr.it.reserve.reservation.service.ReservationRemovalService.class);
     private final Member member = Member.builder().id(7L).build();
     private MockMvc mvc;
 
     @BeforeEach
     void prepare() {
-        mvc = standaloneSetup(new ReservationApiController(service, mock(RateLimiter.class)))
+        mvc = standaloneSetup(new ReservationApiController(service, limiter, removals))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(new ObjectMapper().findAndRegisterModules())).build();
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(member, null, List.of()));
+    }
+
+    @Test void removalUsesTheAuthorizedCoordinator() throws Exception {
+        when(limiter.tryConsume("member:7", RateLimiter.Policy.RESERVATION_REMOVE)).thenReturn(true);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/reservations/31/remove"))
+                .andExpect(status().isOk());
+        verify(removals).remove(31L, member);
+        verify(service, never()).removeReservation(anyLong(), any());
+    }
+
+    @Test void removalRateLimitDoesNotReachTheCoordinator() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/reservations/31/remove"))
+                .andExpect(status().isTooManyRequests());
+        verifyNoInteractions(removals, service);
     }
 
     @AfterEach

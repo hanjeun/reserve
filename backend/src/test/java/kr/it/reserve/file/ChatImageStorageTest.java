@@ -33,6 +33,21 @@ class ChatImageStorageTest {
                 .isInstanceOf(FileException.class);
         verifyNoInteractions(s3);
     }
+    @Test void reusesOnlyCiphertextAfterPrefixValidationAndInvalidatesDeletedObjects() {
+        var storage = storage();
+        String key = "local/users/1/chat/10/photo.bin";
+        when(s3.getObject(any(GetObjectRequest.class))).thenAnswer(invocation -> new ResponseInputStream<>(
+                GetObjectResponse.builder().contentLength(3L).build(), new ByteArrayInputStream(new byte[] {1, 2, 3})));
+        byte[] original = storage.readEncryptedChatImage(key, "users/1/chat/10");
+        original[0] = 99;
+        assertThat(storage.readEncryptedChatImage(key, "users/1/chat/10")).containsExactly(1, 2, 3);
+        verify(s3, times(1)).getObject(any(GetObjectRequest.class));
+        assertThatThrownBy(() -> storage.readEncryptedChatImage(key, "users/2/chat/10")).isInstanceOf(FileException.class);
+        storage.deleteFileRequired(key);
+        storage.readEncryptedChatImage(key, "users/1/chat/10");
+        verify(s3, times(2)).getObject(any(GetObjectRequest.class));
+    }
+
     @Test void oversizedStreamIsAbortedWithoutReadingItsBody() throws Exception {
         var input = spy(new ByteArrayInputStream(new byte[1]));
         var stream = spy(new ResponseInputStream<>(GetObjectResponse.builder().contentLength(9L * 1024 * 1024).build(), input));

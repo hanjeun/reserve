@@ -59,6 +59,7 @@ async function mockApi(page, authenticatedUser = null) {
             return;
         }
 
+        if (url.pathname === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: authenticatedUser, refreshPossible: false } } }); }
         if (url.pathname === '/api/member/me') {
             if (!authenticatedUser) {
                 await route.fulfill({

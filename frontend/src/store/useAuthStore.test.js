@@ -2,14 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import useAuthStore from './useAuthStore';
 import api from '../api/axios';
 import { currentSession } from '../api/sessionScope';
-vi.mock('../api/axios', () => ({ default: { get: vi.fn() } }));
+vi.mock('../api/axios', () => ({ default: { get: vi.fn(), post: vi.fn() } }));
 
 const a = { id: 1, name: 'A', email: 'a@example.test', role: 'USER' };
 const b = { id: 2, name: 'B', email: 'b@example.test', role: 'USER' };
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
 
 describe('auth identity transitions', () => {
-    beforeEach(() => { useAuthStore.getState().logout(); api.get.mockReset(); });
+    beforeEach(() => { useAuthStore.getState().logout(); api.get.mockReset(); api.post.mockReset(); });
     afterEach(() => vi.useRealTimers());
     it('A checkAuth success cannot restore A after B logs in', async () => {
         useAuthStore.getState().login(a);
@@ -17,7 +17,7 @@ describe('auth identity transitions', () => {
         api.get.mockReturnValueOnce(pending.promise);
         const checked = useAuthStore.getState().checkAuth();
         useAuthStore.getState().login(b);
-        pending.resolve(a);
+        pending.resolve({ member: a, refreshPossible: false });
         await checked;
         expect(useAuthStore.getState().user).toEqual(b);
     });
@@ -34,17 +34,17 @@ describe('auth identity transitions', () => {
         api.get.mockReturnValueOnce(later.promise);
         const checkB = useAuthStore.getState().checkAuth();
         useAuthStore.getState().logout();
-        later.resolve(b);
+        later.resolve({ member: b, refreshPossible: false });
         await checkB;
         expect(useAuthStore.getState().user).toBeNull();
     });
     it('same identity refresh keeps its cache but role and login transitions rotate it', async () => {
         useAuthStore.getState().login(a);
         const previous = useAuthStore.getState().sessionRevision;
-        api.get.mockResolvedValueOnce({ ...a, name: 'updated' });
+        api.get.mockResolvedValueOnce({ member: { ...a, name: 'updated' }, refreshPossible: false });
         await useAuthStore.getState().checkAuth();
         expect(useAuthStore.getState().sessionRevision).toBe(previous);
-        api.get.mockResolvedValueOnce({ ...a, role: 'BUSINESS' });
+        api.get.mockResolvedValueOnce({ member: { ...a, role: 'BUSINESS' }, refreshPossible: false });
         await useAuthStore.getState().checkAuth();
         expect(useAuthStore.getState().sessionRevision).toBeGreaterThan(previous);
     });
@@ -72,7 +72,7 @@ describe('auth identity transitions', () => {
 
     it('retries a transient startup failure before showing an anonymous session', async () => {
         vi.useFakeTimers();
-        api.get.mockRejectedValueOnce({ status: 503 }).mockResolvedValueOnce(a);
+        api.get.mockRejectedValueOnce({ status: 503 }).mockResolvedValueOnce({ member: a, refreshPossible: false });
 
         const initialized = useAuthStore.getState().initializeAuth();
         await vi.waitFor(() => expect(api.get).toHaveBeenCalledTimes(1));
@@ -83,6 +83,24 @@ describe('auth identity transitions', () => {
         expect(useAuthStore.getState().user).toEqual(a);
     });
 
+    it('anonymous startup uses a neutral session read without probing protected or refresh routes', async () => {
+        api.get.mockResolvedValueOnce({ member: null, refreshPossible: false });
+        await expect(useAuthStore.getState().initializeAuth()).resolves.toBeNull();
+        expect(api.get).toHaveBeenCalledExactlyOnceWith('/api/auth/session', { skipAuthRefresh: true, timeout: 8000 });
+        expect(api.post).not.toHaveBeenCalled();
+    });
+    it('coalesces startup restoration and refreshes only when the server offers that possibility', async () => {
+        const probe = deferred();
+        api.get.mockReturnValueOnce(probe.promise).mockResolvedValueOnce({ member: a, refreshPossible: false });
+        api.post.mockResolvedValueOnce(null);
+        const first = useAuthStore.getState().initializeAuth();
+        const second = useAuthStore.getState().initializeAuth();
+        probe.resolve({ member: null, refreshPossible: true });
+        await expect(first).resolves.toEqual(a);
+        await expect(second).resolves.toEqual(a);
+        expect(api.post).toHaveBeenCalledExactlyOnceWith('/api/auth/refresh', undefined, { skipAuthRefresh: true, timeout: 8000 });
+        expect(api.get).toHaveBeenCalledTimes(2);
+    });
     it('does not retry when the server confirms that the session expired', async () => {
         api.get.mockRejectedValueOnce({ status: 401 });
 

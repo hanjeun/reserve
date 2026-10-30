@@ -118,6 +118,9 @@ public class LoginMethodService {
                 || challenge.getPurpose() == Purpose.PASSWORD_SETUP
                 || !challenge.getProvider().name().equalsIgnoreCase(registration)) throw oauthExpired();
         session.setAttribute(BOUND, new Bound(challenge.getId(), authorization.getState()));
+        boolean persistent = tokens.isPersistentLogin(CookieUtil.getCookie(request, "access_token"));
+        authorization = OAuth2AuthorizationRequest.from(authorization).attributes(attributes ->
+                attributes.put(kr.it.reserve.config.oauth2.LoginAuthorizationRequestRepository.PERSISTENT, persistent)).build();
         if (challenge.getPurpose() != Purpose.SOCIAL_REAUTH) return authorization;
         return OAuth2AuthorizationRequest.from(authorization)
                 .additionalParameters(parameters -> {

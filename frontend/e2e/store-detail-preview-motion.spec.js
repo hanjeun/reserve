@@ -16,6 +16,7 @@ async function mockStorePreview(page, { authenticated = false, storeOverrides = 
     await page.route('**/api/**', route => {
         const path = new URL(route.request().url()).pathname;
         if (!path.startsWith('/api/')) return route.continue();
+        if (path === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: authenticated ? { id: 41, name: '레이아웃 확인 사용자', role: 'USER', termsAgreed: true } : null, refreshPossible: false } } }); }
         if (path === '/api/member/me') return route.fulfill(authenticated
             ? { json: { success: true, data: { id: 41, name: '레이아웃 확인 사용자', role: 'USER', termsAgreed: true } } }
             : { status: 401, json: { success: false, message: '로그인이 필요합니다.' } });

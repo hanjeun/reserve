@@ -23,6 +23,7 @@ async function mockUiApi(page, { signedIn = false } = {}) {
         const url = new URL(route.request().url());
         const path = url.pathname;
         if (!path.startsWith('/api/')) return route.continue();
+        if (path === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: signedIn ? account : null, refreshPossible: false } } }); }
         if (path === '/api/member/me') return signedIn ? ok(route, account)
             : route.fulfill({ status: 401, json: { success: false, message: '로그인이 필요합니다.' } });
         if (path === '/api/auth/refresh') return route.fulfill({ status: 401, json: { success: false, message: '로그인이 필요합니다.' } });
@@ -130,7 +131,7 @@ test('gallery slide corners stay rounded during movement and original preview re
 test('out-of-period dates stay disabled without visible period labels and valid dates can still be picked', async ({ page }) => {
     await mockUiApi(page);
     await page.goto('/store/81');
-    await page.getByRole('button', { name: '날짜 선택', exact: true }).click();
+    await page.getByRole('button', { name: '예약 날짜', exact: true }).click();
     const calendar = page.getByRole('dialog', { name: '예약 날짜 선택' });
     await expect(calendar).toBeVisible();
     const blocked = calendar.locator('button.reserve-cal-cell').filter({ hasText: /^4$/ });

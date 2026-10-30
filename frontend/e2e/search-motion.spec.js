@@ -28,6 +28,7 @@ test.beforeEach(async ({ page }) => {
             await route.fulfill({ json: { success: true, data: { keyword, groups: ['stores', 'benefits', 'feed'].map(key => ({ key, items: [], error: null, hasMore: false })) } } });
             return;
         }
+        if (path === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: null, refreshPossible: false } } }); }
         if (path === '/api/member/me' || path === '/api/auth/refresh') {
             await route.fulfill({ status: 401, json: { success: false, message: '세션이 없습니다.' } });
             return;

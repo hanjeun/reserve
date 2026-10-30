@@ -45,7 +45,8 @@ describe('ReservationSummaryCard', () => {
         expect(details).toHaveTextContent('R-20260917-ABCD예약자·2명2026-09-20·14:0010,000원');
         expect(details?.children[0]).toHaveClass('reserve-reservation-summary-card-code');
         expect(details?.children[1]).toHaveClass('reserve-reservation-summary-card-party');
-        expect(details?.children[3]).toHaveClass('reserve-reservation-summary-card-price');
+        expect(details?.children[3]).toHaveClass('reserve-reservation-summary-card-price-group');
+        expect(details?.children[3].querySelector('strong')).toHaveClass('reserve-reservation-summary-card-price');
 
         await user.click(screen.getByRole('button', { name: '테스트 가게 예약 상세 보기' }));
         expect(openDetail).toHaveBeenCalledOnce();

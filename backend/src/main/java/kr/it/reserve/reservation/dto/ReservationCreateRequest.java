@@ -38,6 +38,12 @@ public class ReservationCreateRequest {
 
     private String requestId;
     private String admissionTicket;
+    @jakarta.validation.Valid
+    private kr.it.reserve.reservation.service.ReservationConsentService.Proof legalConsent;
+
+    public ReservationCreateRequest(Long storeId, LocalDate date, LocalTime time, Integer guests, String specialRequest, Boolean skipPayment, String requestId, String admissionTicket) {
+        this(storeId, date, time, guests, specialRequest, skipPayment, requestId, admissionTicket, null);
+    }
 
     public ReservationCreateRequest(Long storeId, LocalDate date, LocalTime time, Integer guests, String specialRequest, Boolean skipPayment) {
         this(storeId, date, time, guests, specialRequest, skipPayment, null, null);

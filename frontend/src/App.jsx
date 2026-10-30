@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useContext, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, matchPath, useLocation, useNavigationType } from 'react-router-dom';
 import SessionQueryProvider from './components/common/SessionQueryProvider';
 import ServiceAdmissionProvider from './components/common/ServiceAdmissionProvider';
@@ -82,9 +82,10 @@ import { resolveRouteSkeletonLocation } from './components/layout/routeSkeletonK
 import { applyRouteEntryMotion, clearRouteEntryMotion, getRouteHistoryIndex, resolveRouteEntryMotion } from './components/layout/routeEntryMotion';
 import { SEARCH_MOTION_DURATION_MS } from './components/layout/searchTransition';
 import { TooltipScopeContext } from './components/common/tooltipScope';
-import { LoadingPresentationContext, createLoadingPresentation, useSkeletonShown } from './components/layout/loadingPresentation';
+import { LoadingPresentationContext, useRouteLoadingPresentation, useDocumentEntry, useSkeletonShown } from './components/layout/loadingPresentation';
 import { DISCOVERY_NAV_ITEMS, isDiscoveryRootPath } from './constants/discovery';
 import AppFooter from './components/layout/Footer';
+import SignupLegalLayout from './components/layout/SignupLegalLayout';
 import OfflineBanner from './components/layout/OfflineBanner';
 import { loadingConfig } from './components/common/loadingConfig';
 import PrivateRoute from './components/PrivateRoute';
@@ -214,9 +215,10 @@ function appLayoutClassName(pathname) {
 }
 
 function AppContent() {
-    const { pathname, search, key: locationKey } = useLocation();
+    const location = useLocation();
+    const { pathname, search } = location;
     const initialPathnameRef = useRef(pathname);
-    const presentation = useMemo(() => createLoadingPresentation(locationKey), [locationKey]);
+    const presentation = useRouteLoadingPresentation(location, useNavigationType());
     const { initializeAuth, sessionRevision } = useAuthStore();
     const [loading, setLoading] = useState(true);
 
@@ -282,6 +284,8 @@ function AppRoutes() {
     const isSearchLayout = isSearchPath(displayLocation.pathname);
     const isMessagesLayout = isMessagesPath(displayLocation.pathname);
     const skeletonShown = useSkeletonShown();
+    const presentation = useContext(LoadingPresentationContext);
+    const documentEntry = useDocumentEntry();
     const navigationType = useNavigationType();
     const isSearchPage = isSearchPath(pathname);
     const homeLogoEntry = pathname === '/' && locationState?.reserveHomeEntry === true;
@@ -323,12 +327,13 @@ function AppRoutes() {
         applyRouteEntryMotion(content, {
             pathnameChanged: previousPathname !== pathname,
             direction: routeMotion,
-            skeletonShown,
+            skeletonShown: presentation?.getSnapshot() ?? skeletonShown,
+            documentEntry,
         });
         previousPathnameRef.current = pathname;
         previousDiscoveryTabRef.current = currentTabIndex;
         previousHistoryIndexRef.current = historyIndex;
-    }, [pathname, search, locationKey, locationState, navigationType, isSearchPage, homeLogoEntry, skeletonShown]);
+    }, [pathname, search, locationKey, locationState, navigationType, isSearchPage, homeLogoEntry, skeletonShown, presentation, documentEntry]);
 
     return (
         <TooltipScopeContext.Provider value={locationKey}>
@@ -339,6 +344,7 @@ function AppRoutes() {
             {!isSearchLayout && !isMessagesLayout && (isOAuthCallback ? <HeaderPlaceholder discoveryRoot={discoveryRoot} /> : <Header />)}
             {discoveryRoot && <DiscoveryNav pendingPathname={isOAuthCallback ? displayLocation.pathname : undefined} />}
             <Content ref={routeContentRef} data-skeleton-shown={skeletonShown ? 'true' : undefined}
+                data-document-entry={documentEntry ? 'true' : undefined}
                 data-home-logo-entry={homeLogoEntry ? 'true' : undefined}
                 onAnimationEnd={event => {
                     if (['reserve-discovery-page-from-right', 'reserve-discovery-page-from-left'].includes(event.animationName)) {
@@ -360,14 +366,16 @@ function AppRoutes() {
                     <Route path="/feed/posts/:id" element={<FeedDetail />} />
                     <Route path="/feed/u/:publicId" element={<FeedAuthor />} />
                     <Route path="/login" element={<Login />} />
-                    <Route path="/signup" element={<Signup />} />
+                    <Route element={<SignupLegalLayout signup={<Signup />} socialAgreement={<SocialAgreement />} />}>
+                        <Route path="/signup" element={null} />
+                        <Route path="/signup/social" element={null} />
+                        <Route path="/terms" element={<Terms />} />
+                        <Route path="/privacy" element={<Privacy />} />
+                    </Route>
                     <Route path="/forgot-password" element={<ForgotPassword />} />
                     <Route path="/oauth2/callback" element={<OAuthCallback />} />
-                    <Route path="/signup/social" element={<SocialAgreement />} />
                     <Route path="/stores" element={<StoreList />} />
                     <Route path="/store/:id" element={<StoreDetail />} />
-                    <Route path="/terms" element={<Terms />} />
-                    <Route path="/privacy" element={<Privacy />} />
                     <Route path="/content-sources" element={<ContentSources />} />
                     <Route path="/operation-guide" element={<OperationGuide />} />
                     <Route path="/guide/user" element={<UserGuide />} />

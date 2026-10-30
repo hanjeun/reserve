@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Divider, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
@@ -14,7 +14,7 @@ import { memberService } from '../../services';
 import useAuthStore from '../../store/useAuthStore';
 import { handleApiError } from '../../utils/errorHandler';
 import { oauthAuthorizationUrl } from '../../utils/oauthAuthorization';
-import { colors, fontSize } from '../../styles/tokens';
+import MfaSecuritySection from './MfaSecuritySection';
 import PasswordTab from './PasswordTab';
 import { LoginMethodPasswordProof, LoginMethodPasswordSetup } from './LoginMethodForms';
 import styles from './myPageStyles';
@@ -22,9 +22,9 @@ import styles from './myPageStyles';
 const PROVIDERS = [['NAVER', '네이버'], ['KAKAO', '카카오'], ['GOOGLE', 'Google']];
 const { Text } = Typography;
 const rowStyle = { display: 'contents' };
-const methodLabelStyle = { minWidth: 0, padding: '8px 0', overflowWrap: 'anywhere' };
-const methodActionsStyle = { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, padding: '8px 0' };
-const hintStyle = { display: 'block', fontSize: fontSize.xs, color: colors.text.tertiary, marginTop: 4 };
+const methodLabelStyle = styles.loginMethodLabel;
+const methodActionsStyle = styles.loginMethodActions;
+const hintStyle = styles.loginMethodHint;
 
 export default function LoginSecuritySection({ user, initialPasswordOpen = false, children }) {
     const { message, confirm } = useMessage();
@@ -33,6 +33,8 @@ export default function LoginSecuritySection({ user, initialPasswordOpen = false
     const [load, setLoad] = useState(null);
     const [pendingState, setPendingState] = useState(null);
     const [panel, setPanel] = useState(null);
+    const [proofPanel, setProofPanel] = useState(null);
+    const proofPanelId = useId();
     const active = useRef(null);
     const mounted = useRef(false);
     const initialPassword = useRef(initialPasswordOpen);
@@ -115,13 +117,22 @@ export default function LoginSecuritySection({ user, initialPasswordOpen = false
     const busy = pending || loading;
     const ready = status && status.memberId === user?.id && !loading && !loadError;
     const providerName = PROVIDERS.find(([key]) => key === status?.socialProvider)?.[1];
-    const socialProofReason = status?.socialProofFresh ? '' : `먼저 ${providerName}로 본인 확인을 진행해주세요.`;
     const emailSetupReason = status?.passwordEnabled ? '' : '먼저 이메일 로그인을 설정해주세요. 로그인 방법은 최소 하나를 유지해야 해요.';
     const visibleProviders = PROVIDERS.filter(([provider]) => provider === (status?.socialProvider || status?.linkableSocialProvider));
     const ownsPanel = panel?.owner.id === user?.id && panel?.owner.revision === revision;
     const panelOpen = Boolean(ownsPanel && ready && panel?.open);
     const reducedMotion = useReducedMotion();
     const { shouldRender: renderPanel, isClosing: panelClosing } = useExitAnimation(panelOpen, reducedMotion ? 0 : 200);
+    const needsSocialProof = Boolean(status?.socialProvider && !status.socialProofFresh);
+    const proofOpen = Boolean(ready && needsSocialProof && proofPanel?.key === loadKey && proofPanel.open);
+    const { shouldRender: renderProof, isClosing: proofClosing } = useExitAnimation(proofOpen, reducedMotion ? 0 : 200);
+    const setupOpen = proofOpen || panelOpen && panel?.kind === 'setup-password';
+    const toggleProof = () => setProofPanel({ key: loadKey, open: !proofOpen });
+    const togglePasswordSetup = () => {
+        if (needsSocialProof) toggleProof();
+        else if (panelOpen && panel?.kind === 'setup-password') closePanel();
+        else open('setup-password');
+    };
 
     return <section aria-label="로그인 및 보안" style={{ ...styles.tabsCard, marginTop: 24 }} aria-busy={busy}>
         <Text strong style={styles.sectionTitle}>로그인 및 보안</Text>
@@ -137,21 +148,29 @@ export default function LoginSecuritySection({ user, initialPasswordOpen = false
                         <IconTool label="비밀번호 변경" icon={<EditOutlined aria-hidden="true" />} disabled={busy}
                             active={panelOpen && panel?.kind === 'change-password'} onClick={() => open('change-password')} />
                         {status.socialProvider && <IconTool label="이메일 로그인 해제" icon={<DisconnectOutlined aria-hidden="true" />}
-                            disabled={busy} unavailableReason={socialProofReason} onClick={removePassword} />}
-                    </> : <IconTool label="이메일 로그인 설정" icon={<PlusOutlined aria-hidden="true" />} disabled={busy}
-                        active={panelOpen && panel?.kind === 'setup-password'} unavailableReason={socialProofReason} onClick={() => open('setup-password')} />}
+                            disabled={busy} active={proofOpen} expanded={needsSocialProof ? proofOpen : undefined}
+                            controls={needsSocialProof ? proofPanelId : undefined} onClick={needsSocialProof ? toggleProof : removePassword} />}
+                    </> : <IconTool label="이메일 로그인 설정" icon={<PlusOutlined aria-hidden="true" className={`reserve-login-setup-icon${setupOpen ? ' is-open' : ''}`} />} disabled={busy}
+                        active={setupOpen} expanded={needsSocialProof ? proofOpen : undefined}
+                        controls={needsSocialProof ? proofPanelId : undefined} onClick={togglePasswordSetup} />}
                 </div>
             </div>
-            {status.socialProvider && !status.socialProofFresh && <div style={rowStyle}>
+            {renderProof && needsSocialProof && proofPanel?.key === loadKey && <div id={proofPanelId}
+                className="reserve-login-security-proof" inert={!proofOpen || proofClosing ? true : undefined}
+                aria-hidden={!proofOpen || proofClosing || undefined}
+                style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateRows: '1fr', animation: reducedMotion ? 'none'
+                    : !proofOpen || proofClosing ? 'reserve-feed-replies-exit 200ms ease-in both' : 'reserve-feed-replies-enter 200ms ease-out both' }}>
+                <div style={{ minHeight: 0, overflow: 'hidden' }}><div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', columnGap: 12, alignItems: 'center' }}>
                 <Text style={{ ...hintStyle, ...methodLabelStyle }}>이메일 로그인 설정·해제 전 {providerName}로 본인 확인이 필요해요.</Text>
                 <div style={methodActionsStyle}>
                 <Tooltip title={`${providerName}로 본인 확인`}><SocialLoginButton provider={status.socialProvider.toLowerCase()}
                     label={`${providerName}로 본인 확인`} disabled={busy}
                     onClick={() => oauth(scope(), status.socialProvider, undefined, true)} /></Tooltip>
                 </div>
+                </div></div>
             </div>}
             {visibleProviders.map(([provider, label]) => <div key={provider} style={rowStyle}>
-                <div style={methodLabelStyle}><Text strong>{label}</Text><Text style={hintStyle}>{status.socialProvider === provider ? '연결됨' : '연결하지 않음'}</Text></div>
+                <div style={methodLabelStyle}><Text strong>소셜 로그인</Text><Text style={hintStyle}>{label} {status.socialProvider === provider ? '연결됨' : '연결하지 않음'}</Text></div>
                 <div style={methodActionsStyle}>
                 {status.socialProvider === provider
                     ? <IconTool label={`${label} 로그인 연결 해제`} icon={<DisconnectOutlined aria-hidden="true" />} disabled={busy}
@@ -160,6 +179,7 @@ export default function LoginSecuritySection({ user, initialPasswordOpen = false
                         label={`${label} 연결`} disabled={busy} onClick={() => open(`link:${provider}`)} /></Tooltip>}
                 </div>
             </div>)}
+            <MfaSecuritySection loginMethods={status} disabled={busy} />
             </div>
             {!status.socialProvider && visibleProviders.length === 0 && <Text style={{ ...hintStyle, marginTop: 12 }}>이 이메일은 소셜 로그인 연결을 지원하지 않아요. 이메일 로그인은 계속 사용할 수 있어요.</Text>}
             <Text style={{ ...hintStyle, marginTop: 12 }}>소셜 계정은 한 개를 연결할 수 있어요. 로그인 방법은 최소 하나를 유지해주세요.</Text>

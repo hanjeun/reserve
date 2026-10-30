@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import ChatImage from './ChatImage';
 import chatService from '../../services/chatService';
+import { advanceSession } from '../../api/sessionScope';
 import { downloadChatImage, getChatImageBlob } from '../../utils/chatImageTransfer';
 
 const state = vi.hoisted(() => ({ revision: 1 }));
@@ -22,7 +23,7 @@ let visibility;
 const flush = async () => { await act(async () => {}); };
 const intersect = (near, observer = observers.at(-1)) => act(() => observer.callback([{ target: observer.node, isIntersecting: near }]));
 beforeEach(() => {
-    state.revision = 1;
+    state.revision = advanceSession();
     observers = [];
     autoIntersect = true;
     visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
@@ -45,7 +46,7 @@ it('revokes the old account photo, closes its preview and aborts its request on 
     fireEvent.keyDown(await screen.findByRole('button', { name: '사진 크게 보기' }), { key: 'Enter' });
     expect(screen.getByRole('button')).toHaveAttribute('aria-expanded', 'true');
     const signal = chatService.getImage.mock.calls[0][1];
-    state.revision = 2;
+    state.revision = advanceSession();
     await act(async () => { rerender(<ChatImage url="/api/chat/images/1" />); });
     await waitFor(() => expect(screen.getByAltText('대화에 첨부한 사진')).toHaveAttribute('src', 'blob:second'));
     fireEvent.load(screen.getByAltText('대화에 첨부한 사진'));
@@ -101,7 +102,7 @@ it.each(['account', 'room', 'unmount'])('discards a late photo after its %s scop
     const view = render(<ChatImage roomId={3} url="/api/chat/images/47" />);
     await flush();
     const signal = chatService.getImage.mock.calls[0][1];
-    if (change === 'account') state.revision = 2; // React 렌더 전에 저장소의 계정 변경이 반영된다.
+    if (change === 'account') state.revision = advanceSession(); // React 렌더 전에 저장소의 계정 변경이 반영된다.
     else if (change === 'room') {
         autoIntersect = false;
         view.rerender(<ChatImage roomId={4} url="/api/chat/images/47" />);

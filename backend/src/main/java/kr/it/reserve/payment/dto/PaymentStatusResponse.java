@@ -1,5 +1,11 @@
 package kr.it.reserve.payment.dto;
 
-/** 결제 결과 화면용 최소 응답. DB 기록 조회이며 PG 재검증이나 환불을 실행하지 않는다. */
-public record PaymentStatusResponse(String type, String merchantUid, String status, Integer amount, String payMethod) {
+import java.time.LocalDate;
+import java.time.LocalTime;
+
+/** 본인 결제와 연결된 예약을 읽으며 PG 검증·환불은 실행하지 않는다. */
+public record PaymentStatusResponse(String type, String merchantUid, String status, Integer amount, String payMethod,
+                                    String payProvider, Integer refundedAmount, ReservationSummary reservation) {
+    public record ReservationSummary(String storeName, String reservationCode, LocalDate reservationDate,
+                                     LocalTime reservationTime, Integer guestCount, String memberName) {}
 }

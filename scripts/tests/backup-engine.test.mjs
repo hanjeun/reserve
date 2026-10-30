@@ -48,7 +48,8 @@ docker() {
             [[ "$#" == 4 && "$2" == -f && "$3" == '{{.State.Running}}' && "$4" == "$MYSQL_CONTAINER" ]] || return 98
             printf 'true\n' ;;
         exec)
-            [[ "$#" == 11 && "$2" == -e && "$3" == MYSQL_PWD=synthetic-backup-only && "$4" == "$MYSQL_CONTAINER" && "$5" == mysql ]] || return 98
+            [[ "$#" == 11 && "$2" == -e && "$3" == MYSQL_PWD && "$4" == "$MYSQL_CONTAINER" && "$5" == mysql ]] || return 98
+            [[ "$MYSQL_PWD" == synthetic-backup-only && "$*" != *synthetic-backup-only* ]] || return 98
             [[ "$6" == --user=reserve_backup && "$7" == --batch && "$8" == --skip-column-names && "$9" == reserve_synthetic ]] || return 98
             local query
             for query; do :; done

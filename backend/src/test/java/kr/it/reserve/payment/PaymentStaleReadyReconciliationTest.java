@@ -187,6 +187,17 @@ class PaymentStaleReadyReconciliationTest {
         return payment;
     }
 
+    @Test
+    void aConfirmedPg404ClosesOnlyAFinishedReservationsReadyPayment() {
+        Payment payment = readyPayment(6L, reservation(Reservation.ReservationStatus.CANCELLED));
+        when(paymentRepository.findByIdForUpdate(6L)).thenReturn(Optional.of(payment));
+        when(portoneService.getPaymentInfo(MERCHANT_UID)).thenThrow(new PaymentException("not found", HttpStatus.NOT_FOUND));
+        assertThat(paymentService.reconcileStaleReadyPayment(6L).outcome())
+                .isEqualTo(StaleReadyReconciliationResponse.Outcome.CLOSED_AS_NOT_PAID);
+        assertThat(payment.getStatus()).isEqualTo(Payment.PaymentStatus.FAILED);
+        verify(reconciliationIssueService).resolveForPayment(6L);
+    }
+
     private PortoneV2PaymentResponse pgPayment(String status, int amount) {
         try {
             return new ObjectMapper().readValue("""
@@ -201,5 +212,16 @@ class PaymentStaleReadyReconciliationTest {
         } catch (JsonProcessingException e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    @Test void aLaterUnpaidSnapshotCannotAutoCloseAnExistingFinancialConflict() {
+        Payment payment = readyPayment(7L, reservation(Reservation.ReservationStatus.CANCELLED));
+        when(paymentRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(payment));
+        when(portoneService.getPaymentInfo(MERCHANT_UID)).thenReturn(pgPayment("READY", AMOUNT));
+        when(reconciliationIssueService.hasFinancialConflict(100L)).thenReturn(true);
+        assertThat(paymentService.reconcileStaleReadyPayment(7L).outcome())
+                .isEqualTo(StaleReadyReconciliationResponse.Outcome.MANUAL_REVIEW_REQUIRED);
+        assertThat(payment.getStatus()).isEqualTo(Payment.PaymentStatus.READY);
+        verify(reconciliationIssueService, never()).resolveForPayment(any());
     }
 }

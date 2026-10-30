@@ -14,7 +14,7 @@ const canRetry = error => {
     return status == null || status === 429 || status >= 500 && status < 600;
 };
 
-/** 공개 CDN URL 대신 세션 관문을 거친 Blob을 표시한다. 계정 전환/언마운트에서 즉시 폐기한다. */
+/** 비공개 사진은 권한 확인 후 표시하고 개별 Object URL은 화면 종료 때 해제한다. */
 export default function ChatImage({ url, roomId, width, height }) {
     const revision = useAuthStore(state => state.sessionRevision);
     const scope = `${revision}:${roomId ?? ''}:${url}`;
@@ -42,7 +42,7 @@ export default function ChatImage({ url, roomId, width, height }) {
             if (!isCurrent()) return;
             const controller = new AbortController();
             active.controller = controller;
-            requestChatImageBlob(url, controller.signal, isCurrent).then(blob => {
+            requestChatImageBlob(url, controller.signal, isCurrent, `${revision}:${roomId ?? ''}`).then(blob => {
                 if (!isCurrent() || controller.signal.aborted) return;
                 active.objectUrl = URL.createObjectURL(blob);
                 active.finished = true;
@@ -64,7 +64,7 @@ export default function ChatImage({ url, roomId, width, height }) {
             clearTimeout(timer);
             active.controller?.abort();
         };
-    }, [near, scope, url, revision, canLoad]);
+    }, [near, scope, url, revision, roomId, canLoad]);
     const current = result?.scope === scope ? result : null;
     const aspectRatio = width > 0 && height > 0 ? `${width} / ${height}` : '1';
     const loaded = current?.loaded === true;
@@ -78,7 +78,7 @@ export default function ChatImage({ url, roomId, width, height }) {
             <Bone width="100%" height="100%" borderRadius={10} />
         </output>}
         {!current?.error && current?.src && <Image src={current.src} alt="대화에 첨부한 사진" style={style}
-        classNames={{ root: 'reserve-chat-photo', image: 'reserve-chat-photo-image' }}
+        classNames={{ root: 'reserve-chat-photo', image: 'reserve-chat-photo-image', popup: { root: 'reserve-image-preview' } }}
         styles={{ root: { width: '100%', height: '100%' } }}
         onLoad={() => settle()} onError={() => settle(true)}
         role={loaded ? 'button' : undefined} tabIndex={loaded ? 0 : -1} aria-hidden={!loaded}
@@ -96,7 +96,7 @@ export default function ChatImage({ url, roomId, width, height }) {
                 setPreviewScope(scope);
             }
         }}
-        preview={{ cover: false, rootClassName: 'reserve-image-preview',
+        preview={{ cover: false,
             open: loaded && previewScope === scope,
             onOpenChange: open => setPreviewScope(open && loaded ? scope : null) }} />}
     </div>;

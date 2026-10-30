@@ -19,7 +19,7 @@ import useAuthStore from '../../store/useAuthStore';
 import useMessage from '../../hooks/useMessage';
 import { API_ENDPOINTS } from '../../constants';
 import { USER_ROLE_LABELS, hasOwnerAccess } from '../../constants/roles';
-import { colors, fontWeight, radius } from '../../styles/tokens';
+import { colors, fontSize, fontWeight, radius } from '../../styles/tokens';
 import Avatar from '../common/Avatar';
 import Tooltip from '../common/Tooltip';
 import { SpinIndicator } from '../common/Loading';
@@ -134,7 +134,7 @@ const HeaderAccountMenu = () => {
                 aria-label="내 계정 메뉴 열기"
                 aria-haspopup="menu"
             >
-                <Avatar src={user?.profileImageUrl || user?.profileImage} size={36} />
+                <Avatar src={user?.profileImageUrl || user?.profileImage} size={36} iconSize={fontSize['4xl']} />
             </button></Tooltip>
         </Dropdown>
     );

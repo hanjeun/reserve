@@ -126,6 +126,8 @@ export function nextNewsBoundary(client, now) {
     return Number.isFinite(next) ? next : null;
 }
 
+export const isListQueryLoading = query => query.isPending || query.isPlaceholderData;
+
 /* 진행 중인 조회 뒤에 이벤트가 도착하면 완료 뒤 한 번 더 조회한다. */
 export function createLiveQueryRefresh(client, current) {
     const following = new Map();

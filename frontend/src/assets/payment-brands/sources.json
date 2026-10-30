@@ -1,0 +1,32 @@
+[
+  {
+    "file": "tosspay.svg",
+    "source": "https://static.toss.im/pay-docs/tosspay-logo.zip",
+    "guide": "https://docs-pay.toss.im/",
+    "rights": "Toss trademark; original official logo"
+  },
+  {
+    "file": "naverpay.svg",
+    "source": "https://developers.pay.naver.com/img/logo/zip/npayLogos.zip",
+    "guide": "https://developers.pay.naver.com/design/brand/logo",
+    "rights": "NAVER Pay trademark; original official logo"
+  },
+  {
+    "file": "kakaopay.png",
+    "source": "https://t1.daumcdn.net/kakaopay/partner/center/image/kakaopay_결제수단로고.zip",
+    "guide": "https://partner.kakaopay.com/partner/online/guide/payment-method",
+    "rights": "Kakao Pay trademark; original official logo"
+  },
+  {
+    "file": "applepay.svg",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/applepay.svg",
+    "guide": "https://developer.apple.com/apple-pay/marketing/",
+    "rights": "Simple Icons CC0-1.0; trademark rights reserved"
+  },
+  {
+    "file": "samsungpay.svg",
+    "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/samsungpay.svg",
+    "guide": "https://developer.samsung.com/pay/downloads-and-resources/branding-guidelines.html",
+    "rights": "Simple Icons CC0-1.0; trademark rights reserved"
+  }
+]

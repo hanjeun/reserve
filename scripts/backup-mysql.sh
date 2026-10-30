@@ -85,7 +85,7 @@ if [[ "$AVAIL_MB" -lt 500 ]]; then
 fi
 
 # 루틴이 권한 부족으로 조용히 누락되지 않도록 정의 조회 권한을 먼저 확인한다.
-ROUTINE_ACCESS="$(docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER" \
+ROUTINE_ACCESS="$(MYSQL_PWD="$DB_PASSWORD" docker exec -e MYSQL_PWD "$MYSQL_CONTAINER" \
     mysql --user="$DB_USER" --batch --skip-column-names "$DB_NAME" \
     -e "SELECT COUNT(*) FROM information_schema.user_privileges WHERE privilege_type IN ('SHOW_ROUTINE','SELECT') AND grantee = CONCAT(QUOTE(SUBSTRING_INDEX(CURRENT_USER(), '@', 1)), '@', QUOTE(SUBSTRING_INDEX(CURRENT_USER(), '@', -1)));")" \
     || fail "cannot verify stored routine definition access"
@@ -94,7 +94,7 @@ ROUTINE_ACCESS="$(docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER" \
     || fail "stored routine definitions are not readable; check SHOW_ROUTINE before backup"
 
 # 단일 트랜잭션 백업의 전제를 확인하며 동시 DDL은 별도로 통제한다.
-TABLE_ENGINES="$(docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER" \
+TABLE_ENGINES="$(MYSQL_PWD="$DB_PASSWORD" docker exec -e MYSQL_PWD "$MYSQL_CONTAINER" \
     mysql --user="$DB_USER" --batch --skip-column-names "$DB_NAME" \
     -e "SELECT COUNT(*), COALESCE(SUM(ENGINE IS NULL OR ENGINE <> 'InnoDB'), 0) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE';")" \
     || fail "cannot verify table storage engines"
@@ -107,7 +107,7 @@ open_dump || fail "dump path already exists or cannot be created"
 DUMP_OWNED=1
 log "dumping..."
 set +e
-docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER" \
+MYSQL_PWD="$DB_PASSWORD" docker exec -e MYSQL_PWD "$MYSQL_CONTAINER" \
     mysqldump \
         --user="$DB_USER" \
         --single-transaction \

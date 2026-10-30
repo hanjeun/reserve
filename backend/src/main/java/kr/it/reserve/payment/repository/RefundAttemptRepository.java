@@ -19,6 +19,9 @@ import jakarta.persistence.LockModeType;
 /** 미결 상태 집합은 {@link RefundAttempt#UNRESOLVED}를 공통으로 사용한다. */
 @Repository
 public interface RefundAttemptRepository extends JpaRepository<RefundAttempt, Long> {
+    @Query("SELECT DISTINCT r.paymentId FROM RefundAttempt r WHERE r.paymentId IN :ids AND r.status IN :statuses")
+    List<Long> findUnresolvedPaymentIds(@Param("ids") Collection<Long> ids, @Param("statuses") Collection<RefundAttempt.Status> statuses);
+
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT ra FROM RefundAttempt ra WHERE ra.id = :id")

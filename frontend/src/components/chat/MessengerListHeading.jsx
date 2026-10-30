@@ -12,7 +12,7 @@ export default function MessengerListHeading({ headingLevel = 2, onRefresh, refr
         <header className="reserve-messenger-list-heading">
             <Heading>{showHidden ? '숨긴 대화' : '대화'}</Heading>
             <div className="reserve-messenger-list-actions">
-                {onFindStore && <IconTool label="가게 찾기" kind="navigation" icon={<SearchOutlined aria-hidden="true" />} onClick={onFindStore} />}
+                {onFindStore && <IconTool label="채팅 검색" kind="navigation" icon={<SearchOutlined aria-hidden="true" />} onClick={onFindStore} />}
                 {onToggleHidden && (
                     <Tooltip title={hiddenLabel}><button
                         type="button"
@@ -24,7 +24,7 @@ export default function MessengerListHeading({ headingLevel = 2, onRefresh, refr
                         {showHidden ? <EyeOutlined aria-hidden="true" /> : <EyeInvisibleOutlined aria-hidden="true" />}
                     </button></Tooltip>
                 )}
-                <Tooltip title="대화 목록 새로고침"><button
+                <button
                     type="button"
                     className={`reserve-messenger-list-refresh${refreshing ? ' is-refreshing' : ''}`}
                     onClick={reload}
@@ -33,7 +33,7 @@ export default function MessengerListHeading({ headingLevel = 2, onRefresh, refr
                     aria-busy={refreshing || undefined}
                 >
                     <SyncOutlined spin={refreshing} aria-hidden="true" />
-                </button></Tooltip>
+                </button>
             </div>
         </header>
     );

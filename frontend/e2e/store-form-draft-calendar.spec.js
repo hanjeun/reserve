@@ -74,6 +74,7 @@ test.beforeEach(async ({ context, page }) => {
             await route.continue();
             return;
         }
+        if (url.pathname === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: business, refreshPossible: false } } }); }
         if (url.pathname === '/api/member/me') {
             await ok(route, business);
             return;

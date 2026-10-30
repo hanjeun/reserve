@@ -30,7 +30,12 @@ public final class TrustedOAuth2AuthorizationRequestResolver implements OAuth2Au
     private OAuth2AuthorizationRequest bound(HttpServletRequest request, OAuth2AuthorizationRequest authorization) {
         if (loginMethods == null && request.getParameter("account_link") != null)
             throw new OAuth2AuthenticationException(new OAuth2Error("invalid_request"), "Login method linking is unavailable");
-        return loginMethods == null ? authorization : loginMethods.bindOAuth(request, authorization);
+        if (authorization == null) return null;
+        if (request.getParameter("account_link") != null) return loginMethods.bindOAuth(request, authorization);
+        String[] values = request.getParameterValues("rememberMe");
+        boolean persistent = values != null && values.length == 1 && "true".equals(values[0]);
+        return OAuth2AuthorizationRequest.from(authorization)
+                .attributes(attributes -> attributes.put(LoginAuthorizationRequestRepository.PERSISTENT, persistent)).build();
     }
     private OAuth2AuthorizationRequest checked(OAuth2AuthorizationRequest request) {
         if (request == null) return null;

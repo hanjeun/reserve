@@ -110,8 +110,7 @@ const AppFooter = () => {
                             호스팅 서비스 제공자: Amazon Web Services (AWS)
                         </div>
                         <div className="footer-copyright-right" style={{ color: colors.text.tertiary }}>
-                            대표자 한재은 &middot; 개인정보 보호책임자 한재은<br />
-                            <a href="mailto:hanjeun111@gmail.com" className="reserve-app-footer-email reserve-text-link">hanjeun111@gmail.com</a>
+                            대표자 한재은 &middot; 개인정보 보호책임자 한재은
                         </div>
                     </div>
                 </div>

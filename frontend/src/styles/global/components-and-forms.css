@@ -4,10 +4,10 @@
     transition: box-shadow 0.2s ease;
 }
 .reserve-card--interactive { cursor: pointer; }
-.reserve-card:has(.reserve-store-card-hit) {
+.reserve-card:has(.reserve-store-card-hit), .reserve-reservation-summary-card:has(.reserve-tap-card__trigger) {
     transition: box-shadow 0.2s ease, transform 0.12s ease, opacity 0.12s ease;
 }
-.reserve-card:has(.reserve-store-card-hit:active) { transform: scale(0.98); opacity: 0.88; }
+.reserve-card:has(.reserve-store-card-hit:active), .reserve-reservation-summary-card:has(.reserve-tap-card__trigger:active) { transform: scale(0.98); opacity: 0.88; }
 .reserve-card-link {
     display: block;
     color: inherit;
@@ -39,10 +39,10 @@
 /* 모션 줄이기 설정은 카드 전환에만 적용한다. */
 @media (prefers-reduced-motion: reduce) {
     .reserve-card,
-    .reserve-card:has(.reserve-store-card-hit),
+    .reserve-card:has(.reserve-store-card-hit), .reserve-reservation-summary-card:has(.reserve-tap-card__trigger),
     .reserve-card-link { transition: none; }
     .reserve-card-link:active { transform: none; }
-    .reserve-card:has(.reserve-store-card-hit:active) { transform: none; }
+    .reserve-card:has(.reserve-store-card-hit:active), .reserve-reservation-summary-card:has(.reserve-tap-card__trigger:active) { transform: none; }
     .reserve-card.ant-card-hoverable:hover .reserve-card-image { transform: none; }
 }
 /* 카드 하단도 테마의 CSS 변수를 사용한다. */
@@ -193,21 +193,19 @@
 .reserve-data-state--compact {
     min-height: 0;
     display: grid;
-    grid-template-columns: 20px minmax(0, auto) auto;
+    grid-template-columns: 20px minmax(0, 1fr);
     justify-content: start;
+    align-items: start;
     gap: 8px 12px;
     padding: 18px 16px;
     text-align: left;
 }
-.reserve-data-state--compact .reserve-data-state__icon { flex: 0 0 auto; font-size: 20px; }
+.reserve-data-state--compact .reserve-data-state__icon { flex: 0 0 auto; font-size: 20px; margin-top: 1px; }
 .reserve-data-state--compact .reserve-data-state__copy { min-width: 0; }
 .reserve-data-state--compact .reserve-data-state__title { font-size: 14px; font-weight: 400; color: var(--c-text-secondary, #4e5968); }
 .reserve-data-state--compact .reserve-data-state__description { font-size: 13px; }
-.reserve-data-state--compact .reserve-data-state__retry { margin: 0; justify-self: start; }
-@media (max-width: 479px) {
-    .reserve-data-state--compact { grid-template-columns: 20px minmax(0, 1fr); }
-    .reserve-data-state--compact .reserve-data-state__retry { grid-column: 2; padding-inline: 0; }
-}
+.reserve-data-state--compact .reserve-data-state__retry { grid-column: 2; margin: 0; justify-self: start; }
+.reserve-data-state--compact > :not(.reserve-data-state__icon):not(.reserve-data-state__copy) { grid-column: 2; }
 
 /* PageStatus와 골격은 화면의 유일한 상태 안내로 같은 배치를 쓴다. */
 .reserve-page-status {
@@ -309,93 +307,38 @@
 .reserve-payment-result__description {
     max-width: 368px;
 }
-.reserve-payment-result__hint {
-    width: 100%;
-    box-sizing: border-box;
-    margin: 2px 0 0;
-    padding: 14px 16px;
-    border-radius: 14px;
-    background: var(--c-bg-subtle, #f8f9fa);
-    color: var(--c-text-tertiary, #8b95a1);
-    font-size: 13px;
-    line-height: 1.55;
-    text-align: left;
-}
 .reserve-payment-result__recovery {
     margin: 0;
     color: var(--c-text-tertiary, #8b95a1);
     font-size: 13px;
     line-height: 1.55;
 }
-.reserve-payment-result__recovery button {
-    padding: 2px 0;
-    border: 0;
-    background: transparent;
-    font: inherit;
-    cursor: pointer;
-}
-.reserve-payment-result__recovery button:focus { outline: none; }
-.reserve-payment-result__recovery button:focus-visible {
+.reserve-payment-result__recovery .reserve-text-link:focus-visible {
     outline: var(--reserve-focus-ring);
     outline-offset: 3px;
     border-radius: 3px;
 }
 .reserve-payment-result__summary {
     width: 100%;
-    box-sizing: border-box;
-    margin: 10px 0 0;
-    overflow: hidden;
-    border: 1px solid var(--c-border-default, #e5e8eb);
-    border-radius: 16px;
-    background: var(--c-bg-subtle, #f8f9fa);
+    margin-top: 10px;
     text-align: left;
+    --reserve-info-label-width: 72px;
 }
-.reserve-payment-result__summary-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 20px;
-    min-height: 50px;
-    padding: 0 18px;
-}
-.reserve-payment-result__summary-row + .reserve-payment-result__summary-row {
-    border-top: 1px solid var(--c-border-light, #f2f4f6);
-}
-.reserve-payment-result__summary dt {
-    flex: 0 0 auto;
-    color: var(--c-text-tertiary, #8b95a1);
-    font-size: 13px;
-}
-.reserve-payment-result__summary dd {
-    min-width: 0;
-    margin: 0;
-    color: var(--c-text-primary, #1a1f27);
-    font-size: 14px;
+.reserve-payment-result__summary h2 {
+    margin: 0 0 8px;
+    color: var(--c-text-primary);
+    font-size: 18px;
     font-weight: 600;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-}
-.reserve-payment-result__summary-value--muted {
-    color: var(--c-text-tertiary, #8b95a1) !important;
-    font-size: 12px !important;
-    font-weight: 500 !important;
-    overflow-wrap: anywhere;
-}
-.reserve-payment-result__summary-value--strong {
-    color: var(--c-primary, #3182f6) !important;
-    font-size: 17px !important;
-    font-weight: 700 !important;
 }
 .reserve-payment-result__actions {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
-    gap: 8px;
+    gap: 10px;
     margin-top: 10px;
 }
 @media (max-width: 479px) {
     .reserve-payment-result__content { padding-bottom: 40px; }
-    .reserve-payment-result__summary-row { gap: 12px; padding: 0 15px; }
 }
 
 /* 테두리 버튼은 hover에서 테두리만 진하게 한다. */

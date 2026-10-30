@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 운영 큐와 스키마만 조회하며 실제 결제·재처리·삭제·보정은 수행하지 않는다.
-# 해당 DDL 준비 후 RESERVE_VERIFY_WAITING_SIGNUP_SCHEMA=1 또는 RESERVE_VERIFY_AUTH_ADMISSION_SCHEMA=1로 추가 검사한다.
+# 해당 DDL 준비 후 WAITING_SIGNUP·AUTH_ADMISSION·V11 스키마 검사를 명시적으로 선택한다.
 # 추가 SQL 검사는 실제 릴리스 JAR의 Hibernate validate를 대체하지 않는다.
 
 set -euo pipefail
@@ -30,7 +30,10 @@ WAITING_SIGNUP_SCHEMA="${RESERVE_VERIFY_WAITING_SIGNUP_SCHEMA:-0}"
 AUTH_ADMISSION_SCHEMA="${RESERVE_VERIFY_AUTH_ADMISSION_SCHEMA:-0}"
 [[ "$AUTH_ADMISSION_SCHEMA" = "0" || "$AUTH_ADMISSION_SCHEMA" = "1" ]] \
     || die "RESERVE_VERIFY_AUTH_ADMISSION_SCHEMA must be 0 or 1"
-if [[ "$AUTH_ADMISSION_SCHEMA" = "1" ]]; then
+V11_SCHEMA="${RESERVE_VERIFY_V11_SCHEMA:-0}"
+[[ "$V11_SCHEMA" = "0" || "$V11_SCHEMA" = "1" ]] \
+    || die "RESERVE_VERIFY_V11_SCHEMA must be 0 or 1"
+if [[ "$AUTH_ADMISSION_SCHEMA" = "1" || "$V11_SCHEMA" = "1" ]]; then
     [[ "$DB_USER" = "reserve_backup" ]] || die "auth/admission checks require the configured backup role"
 fi
 
@@ -41,10 +44,10 @@ docker inspect "$MYSQL_CONTAINER" >/dev/null 2>&1 \
 
 mysql_query() {
     local query=$1
-    if [[ "$AUTH_ADMISSION_SCHEMA" = "1" ]]; then
+    if [[ "$AUTH_ADMISSION_SCHEMA" = "1" || "$V11_SCHEMA" = "1" ]]; then
         query="START TRANSACTION READ ONLY; ${query} ROLLBACK;"
     fi
-    docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER" \
+    MYSQL_PWD="$DB_PASSWORD" docker exec -e MYSQL_PWD "$MYSQL_CONTAINER" \
         mysql --connect-timeout=5 --user="$DB_USER" --batch --skip-column-names "$DB_NAME" -e "$query"
 }
 
@@ -129,7 +132,7 @@ ATTENTION=0
 
 note "schema=${DB_NAME}, container=${MYSQL_CONTAINER}"
 
-if [[ "$AUTH_ADMISSION_SCHEMA" = "1" ]]; then
+if [[ "$AUTH_ADMISSION_SCHEMA" = "1" || "$V11_SCHEMA" = "1" ]]; then
     AUTHENTICATED_BACKUP_ROLE="$(mysql_query "SELECT IF(SUBSTRING_INDEX(CURRENT_USER(),'@',1) = 'reserve_backup', 1, 0);")"
     [[ "$AUTHENTICATED_BACKUP_ROLE" = "1" ]] || die "authenticated backup role differs; refusing auth/admission checks"
 fi
@@ -270,6 +273,64 @@ if [[ "$AUTH_ADMISSION_SCHEMA" = "1" ]]; then
     require_foreign_key_contract reservation_request fk_reservation_request_member member_id member member_id CASCADE
     require_foreign_key_contract reservation_request fk_reservation_request_reservation reservation_id reservation reservation_id CASCADE
     note "auth/admission schema: contract matches; actual release JAR validation is still required"
+fi
+
+if [[ "$V11_SCHEMA" = "1" ]]; then
+    V11_INNODB="$(mysql_query "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN ('mfa_account','mfa_credential','mfa_challenge','mfa_recovery_code','test_settlement_payout','reservation_consent','reservation_retention_hold') AND table_type = 'BASE TABLE' AND engine = 'InnoDB';")"
+    [[ "$V11_INNODB" = "7" ]] || die "v11 tables must exist and use InnoDB"
+    V11_ASCII="$(mysql_query "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND character_set_name = 'ascii' AND collation_name = 'ascii_bin' AND ((table_name = 'mfa_credential' AND column_name IN ('slot_key','credential_id','public_key_cose')) OR (table_name = 'mfa_challenge' AND column_name = 'id') OR (table_name = 'mfa_recovery_code' AND column_name = 'digest') OR (table_name = 'test_settlement_payout' AND column_name = 'request_key')); ")"
+    [[ "$V11_ASCII" = "6" ]] || die "v11 credential and request identifiers require ascii_bin comparison"
+    require_column_contract mfa_credential secret_ciphertext 'varchar(512)' YES '<NULL>'
+    require_column_contract mfa_credential credential_id 'varchar(2048)' YES '<NULL>'
+    require_column_contract mfa_credential public_key_cose 'varchar(4096)' YES '<NULL>'
+    require_column_contract mfa_challenge consumed_at 'datetime(6)' YES '<NULL>'
+    require_index_contract mfa_account uk_mfa_account_handle 0 user_handle
+    require_index_contract mfa_credential uk_mfa_credential_slot 0 slot_key
+    require_index_contract mfa_credential idx_mfa_credential_member 1 member_id
+    require_index_contract mfa_challenge idx_mfa_challenge_expiry 1 expires_at
+    require_index_contract mfa_recovery_code PRIMARY 0 digest
+    require_index_contract test_settlement_payout PRIMARY 0 request_key
+    require_index_contract test_settlement_payout idx_test_settlement_payment 1 payment_id
+    require_column_contract store auto_completion_enabled 'tinyint(1)' NO 0
+    require_column_contract store service_duration_minutes int NO 60
+    require_column_contract reservation auto_completion_enabled 'tinyint(1)' NO 0
+    require_column_contract reservation attendance_refund_enabled 'tinyint(1)' NO 0
+    require_column_contract reservation service_duration_minutes int YES '<NULL>'
+    require_column_contract reservation usage_ends_at 'datetime(6)' YES '<NULL>'
+    require_index_contract reservation idx_reservation_auto_completion 1 'auto_completion_enabled,status,usage_ends_at'
+    require_column_contract payment verified_channel_type 'varchar(16)' YES '<NULL>'
+    require_column_contract payment verified_channel_id 'varchar(80)' YES '<NULL>'
+    require_column_contract payment verified_store_id 'varchar(80)' YES '<NULL>'
+    require_column_contract payment verified_disputed 'tinyint(1)' YES '<NULL>'
+
+    # JDBC 전용 표도 타입·보존 연결까지 확인하며 JPA validate로 대신하지 않는다.
+    for column in reservation_id member_id store_id recipient_id; do
+        require_column_contract reservation_consent "$column" bigint NO '<NULL>'
+    done
+    require_column_contract reservation_consent notice_version 'varchar(32)' NO '<NULL>'
+    require_column_contract reservation_consent notice_hash 'char(64)' NO '<NULL>'
+    require_column_contract reservation_consent notice_snapshot longtext NO '<NULL>'
+    require_column_contract reservation_consent privacy_accepted 'tinyint(1)' NO '<NULL>'
+    require_column_contract reservation_consent conditions_accepted 'tinyint(1)' NO '<NULL>'
+    for column in accepted_at expires_at; do
+        require_column_contract reservation_consent "$column" 'datetime(6)' NO '<NULL>'
+    done
+    require_index_contract reservation_consent PRIMARY 0 reservation_id
+    require_index_contract reservation_consent idx_reservation_consent_expiry 1 expires_at
+    require_foreign_key_contract reservation_consent fk_reservation_consent_reservation reservation_id reservation reservation_id RESTRICT
+    require_column_contract reservation_retention_hold retention_hold_id bigint NO '<NULL>' auto_increment
+    for column in reservation_id held_by; do
+        require_column_contract reservation_retention_hold "$column" bigint NO '<NULL>'
+    done
+    require_column_contract reservation_retention_hold case_reference 'varchar(80)' NO '<NULL>'
+    require_column_contract reservation_retention_hold purpose 'varchar(32)' NO '<NULL>'
+    require_column_contract reservation_retention_hold held_at 'datetime(6)' NO '<NULL>'
+    require_column_contract reservation_retention_hold released_by bigint YES '<NULL>'
+    require_column_contract reservation_retention_hold released_at 'datetime(6)' YES '<NULL>'
+    require_index_contract reservation_retention_hold PRIMARY 0 retention_hold_id
+    require_index_contract reservation_retention_hold idx_reservation_retention_hold 1 'reservation_id,released_at'
+    require_foreign_key_contract reservation_retention_hold fk_reservation_retention_hold reservation_id reservation reservation_id RESTRICT
+    note "v11/JDBC schema: contract matches; actual release JAR validation and restricted app grants are still required"
 fi
 
 NON_INNODB="$(mysql_query "SELECT CONCAT(table_name, ':', engine) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN ('payment','reservation','payment_webhook_inbox','payment_reconciliation_issue','file_deletion_task','oauth_unlink_task','marketing_consent_history','refresh_token') AND engine <> 'InnoDB';")"

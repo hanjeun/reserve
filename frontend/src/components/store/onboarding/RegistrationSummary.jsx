@@ -42,6 +42,8 @@ export function RegistrationSummary({ values, goTo, imageCounts = { main: 0, det
             { Icon: CalendarOutlined, label: '임시 휴무일', value: store.closedDates.filter(Boolean).join(' · ') || '없음'},
             detail('운영 기간', FieldTimeOutlined, '제한 없음'),
             { Icon: EnvironmentOutlined, label: '우리동네 배지 기준', value: NEARBY_RADIUS_OPTIONS.find(option => option.value === values.nearbyRadiusKm)?.label || '작성 안 됨'},
+            { Icon: CheckCircleOutlined, label: '이용 완료', value: enabled ? values.autoCompletionEnabled ? '체크인 후 이용 종료 시 자동 완료·전액 환불해요.' : '사업자가 직접 완료한 뒤 전액 환불해요.' : '사용 안 함' },
+            { Icon: CheckCircleOutlined, label: '이용 시간', value: enabled ? values.bookingType === 'DAY' ? '예약일 영업 종료까지' : `${values.serviceDurationMinutes ?? 60}분` : '사용 안 함' },
             { Icon: CheckCircleOutlined, label: '예약 승인', value: enabled ? values.autoApprovalEnabled ? '자동 승인해요.' : '사업자가 확인 후 승인해요.' : '사용 안 함'},
             bookingDetail('최대 인원', TeamOutlined, '제한 없음'),
             { Icon: TeamOutlined, label: '중복 예약', value: enabled ? values.allowDuplicateReservation ? '허용' : '허용 안 함' : '사용 안 함'},

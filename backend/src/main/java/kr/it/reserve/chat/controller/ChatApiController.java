@@ -169,7 +169,7 @@ public class ChatApiController {
             @RequestParam Long beforeId,
             @RequestParam(defaultValue = "50") int size) {
         Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
-        chatService.assertParticipant(roomId, me);
+        chatService.assertHistoryAccess(roomId, me);
         return ResponseEntity.ok(ApiResponse.success(
                 chatService.getOlderMessages(roomId, beforeId, size, me.getId()), "이전 대화 조회 성공"));
     }

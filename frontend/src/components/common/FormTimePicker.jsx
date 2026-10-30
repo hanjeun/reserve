@@ -66,7 +66,7 @@ const pickerHintText = (hasInputError, mode, hasOrderError) => {
     return hintText;
 };
 
-const FormTimePickerBase = ({
+const FormTimePickerField = ({
     mode, controlled, value, defaultValue, onChange, onBlur, onFocus, placeholder,
     disabled = false, format = 'HH:mm', style, id, className = '',
     'aria-describedby': describedBy, 'aria-invalid': ariaInvalid,
@@ -286,6 +286,8 @@ const FormTimePickerBase = ({
         </>
     );
 };
+
+const FormTimePickerBase = props => <Form.Item noStyle><FormTimePickerField {...props} /></Form.Item>;
 
 const FormTimePicker = ({ multiple = false, ...props }) => (
     <FormTimePickerBase {...props} controlled={Object.hasOwn(props, 'value')} mode={multiple ? 'multiple' : 'single'} />

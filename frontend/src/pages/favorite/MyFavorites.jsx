@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { DataState, FilterMenu, FilterToolbar, PageContainer, StoreCardSkeleton } from '../../components/common';
 import ListingContent from '../../components/common/ListingContent';
+import TextLink from '../../components/common/TextLink';
 import LikedContentList from '../../components/feed/LikedContentList';
 import { useFeedInteractions } from '../../hooks/feedInteractionQueries';
 import { StoreCard } from '../../components/store';
@@ -92,7 +93,8 @@ const MyFavorites = () => {
             );
         }
         if (favorites.length === 0) {
-            return <DataState state="empty" kind="favorite" title="아직 즐겨찾기한 가게가 없어요." />;
+            return <DataState state="empty" kind="favorite" title="아직 즐겨찾기한 가게가 없어요."
+                action={<TextLink to="/stores">가게 둘러보기</TextLink>} />;
         }
         return (
             <>

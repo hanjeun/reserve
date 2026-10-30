@@ -9,11 +9,13 @@ import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.reservation.dto.ReservationCreateRequest;
 import kr.it.reserve.reservation.dto.QrCheckinResponse;
 import kr.it.reserve.reservation.dto.ReservationResponse;
+import kr.it.reserve.reservation.dto.ReservationRequestResult;
 import kr.it.reserve.reservation.dto.ReservationUpdateRequest;
 import kr.it.reserve.reservation.dto.CalendarDayResponse;
 import kr.it.reserve.reservation.dto.SlotAvailabilityResponse;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.service.ReservationService;
+import kr.it.reserve.reservation.service.ReservationRemovalService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +41,7 @@ public class ReservationApiController {
 
     private final ReservationService reservationService;
     private final RateLimiter rateLimiter;
+    private final ReservationRemovalService reservationRemovalService;
 
     // --- 일반 사용자 API ---
 
@@ -56,7 +59,7 @@ public class ReservationApiController {
     }
 
     @PostMapping("/requests/result")
-    public ResponseEntity<ApiResponse<ReservationResponse>> recoverReservation(
+    public ResponseEntity<ApiResponse<ReservationRequestResult>> recoverReservation(
             @Valid @RequestBody ReservationCreateRequest request) {
         Member member = SecurityUtil.getCurrentMember();
         if (!rateLimiter.tryConsume("reservation-result:" + member.getId(), RateLimiter.Policy.PROFILE_READ))
@@ -143,7 +146,11 @@ public class ReservationApiController {
 
     @DeleteMapping("/{id}/remove")
     public ResponseEntity<ApiResponse<Void>> removeReservation(@PathVariable Long id) {
-        reservationService.removeReservation(id, SecurityUtil.getCurrentMember());
+        Member actor = SecurityUtil.getCurrentMember();
+        if (!rateLimiter.tryConsume("member:" + actor.getId(), RateLimiter.Policy.RESERVATION_REMOVE)) {
+            throw new ReservationException("삭제 요청이 많아요. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+        }
+        reservationRemovalService.remove(id, actor);
         return ResponseEntity.ok(ApiResponse.success(null, "예약이 목록에서 제거됐어요."));
     }
 
@@ -162,6 +169,19 @@ public class ReservationApiController {
         Page<ReservationResponse> reservations = reservationService.getStoreReservations(
                 member, page, size, search, parseReservationStatus(status), storeId, sort);
         return ResponseEntity.ok(ApiResponse.success(reservations, "가게 예약 목록 조회 성공"));
+    }
+
+    @GetMapping("/admin/page")
+    public ResponseEntity<ApiResponse<Page<ReservationResponse>>> getAdminReservations(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Long storeId,
+            @RequestParam(defaultValue = "recent") String sort) {
+        return ResponseEntity.ok(ApiResponse.success(reservationService.getAdminReservations(
+                SecurityUtil.getCurrentMember(), page, size, search, parseReservationStatus(status), storeId, sort),
+                "전체 예약 목록 조회 성공"));
     }
 
     @GetMapping("/store/status-summary")

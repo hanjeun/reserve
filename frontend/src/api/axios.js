@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { currentSession, assertCurrentSession, StaleSessionError } from './sessionScope';
+import { refreshSessionOnce } from './sessionRefresh';
 import { skeletonDelayInterceptor } from '../utils/skeletonDelay';
 import { canonicalApiPath, versionedApiUrl } from './apiVersion';
 import { ServiceAdmissionRequiredError, observeServiceAdmission, isServiceAdmissionBlocked,
@@ -11,8 +12,6 @@ const instance = axios.create({
     withCredentials: true,  // 쿠키 자동 전송 (access_token, refresh_token)
     timeout: 30000,         // 30초 (이미지 업로드 등 대용량 요청 대비)
 });
-
-let refreshFlight = null;
 
 // 세션 만료 전용 에러 클래스
 class SessionExpiredError extends Error {
@@ -26,6 +25,7 @@ class SessionExpiredError extends Error {
 // 인증 관련 엔드포인트 목록 (refresh 재시도 제외 대상)
 const AUTH_BYPASS_ROUTES = [
     '/api/auth/login',
+    '/api/auth/mfa',
     '/api/auth/signup',
     '/api/password-reset',
     '/api/email',
@@ -46,30 +46,30 @@ const getStatusMessage = (status) => {
     return '요청에 실패했어요.';
 };
 
+const expireRequestSession = request => {
+    const scope = request._sessionEpoch;
+    assertCurrentSession(scope);
+    if (canonicalApiPath(request.url) !== '/api/member/me') {
+        globalThis.dispatchEvent(new CustomEvent('reserve:session-expired', { detail: { epoch: scope } }));
+    }
+    return new SessionExpiredError();
+};
+
 // 401 처리: 토큰 재발급 또는 대기열 처리
 const handle401 = async (originalRequest) => {
     const scope = originalRequest._sessionEpoch;
     assertCurrentSession(scope);
     originalRequest._retry = true;
-    if (!refreshFlight || refreshFlight.scope !== scope) {
-        refreshFlight = { scope, promise: instance.post('/api/auth/refresh', undefined, { _sessionEpoch: scope }) };
-    }
-    const flight = refreshFlight;
     try {
-        await flight.promise;
+        await refreshSessionOnce(scope, () => instance.post('/api/auth/refresh', undefined, { _sessionEpoch: scope }));
         assertCurrentSession(scope);
         return instance(originalRequest);
     } catch (error) {
         // 이전 계정의 refresh 실패가 새 계정의 세션·요청을 바꾸지 않게 한다.
         assertCurrentSession(scope);
         if (error?.status !== 401 && error?.status !== 403) throw error;
-        if (canonicalApiPath(originalRequest.url) !== '/api/member/me') {
-            // 공개 화면은 API에서 이동시키지 않는다. 개인 캐시를 비우고 보호 라우트의 가드에 맡긴다.
-            globalThis.dispatchEvent(new CustomEvent('reserve:session-expired', { detail: { epoch: scope } }));
-        }
-        throw new SessionExpiredError();
-    } finally {
-        if (refreshFlight === flight) refreshFlight = null;
+        // 공개 화면의 이동은 보호 라우트에 맡기고 현재 세션의 개인 상태만 비워요.
+        throw expireRequestSession(originalRequest);
     }
 };
 
@@ -101,7 +101,7 @@ instance.interceptors.response.use(
     (response) => {
         assertCurrentSession(response.config._sessionEpoch);
 
-        if (response.status === 204) return null;
+        if (response.status === 204 || response.config.method?.toLowerCase() === 'head') return null;
         // 인증·세션 관문을 통과한 사진 다운로드만 binary 본문을 반환한다.
         if (response.config.responseType === 'blob' && response.data instanceof Blob) return response.data;
         const res = response.data;
@@ -140,6 +140,11 @@ instance.interceptors.response.use(
             !isAuthEndpoint(originalRequest.url)
         ) {
             return handle401(originalRequest);
+        }
+
+        if (error.response?.status === 401 && originalRequest?._retry && !originalRequest.skipAuthRefresh
+            && canonicalApiPath(originalRequest.url) !== '/api/auth/refresh' && !isAuthEndpoint(originalRequest.url)) {
+            throw expireRequestSession(originalRequest);
         }
 
         if (error.response) {

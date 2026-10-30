@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 /*
  * 닫힘 전환 동안 렌더링을 유지한다. 호출부는 isClosing으로 닫힘 애니메이션을 선택한다.
  */
-const useExitAnimation = (open, exitDuration = 200) => {
+const useExitAnimation = (open, exitDuration = 200, waitForPaint = false) => {
     const [shouldRender, setShouldRender] = useState(open);
     const [isClosing, setIsClosing] = useState(false);
     const timerRef = useRef(null);
@@ -29,13 +29,27 @@ const useExitAnimation = (open, exitDuration = 200) => {
         if (!renderedRef.current) return undefined;
         setIsClosing(true);
         /* eslint-enable react-hooks/set-state-in-effect */
-        timerRef.current = setTimeout(() => {
-            renderedRef.current = false;
-            setShouldRender(false);
-            setIsClosing(false);
-        }, exitDuration);
-        return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-    }, [open, exitDuration]);
+        let firstFrame;
+        let secondFrame;
+        const startTimer = () => {
+            timerRef.current = setTimeout(() => {
+                renderedRef.current = false;
+                setShouldRender(false);
+                setIsClosing(false);
+            }, exitDuration);
+        };
+        // 바쁜 프레임에서도 퇴장 스타일을 먼저 그린 뒤 유지 시간을 계산한다.
+        if (waitForPaint && typeof window.requestAnimationFrame === 'function') {
+            firstFrame = window.requestAnimationFrame(() => {
+                secondFrame = window.requestAnimationFrame(startTimer);
+            });
+        } else startTimer();
+        return () => {
+            if (timerRef.current) clearTimeout(timerRef.current);
+            if (firstFrame !== undefined) window.cancelAnimationFrame(firstFrame);
+            if (secondFrame !== undefined) window.cancelAnimationFrame(secondFrame);
+        };
+    }, [open, exitDuration, waitForPaint]);
 
     return { shouldRender, isClosing };
 };

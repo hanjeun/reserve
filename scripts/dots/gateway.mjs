@@ -11,7 +11,7 @@ export async function handleRequest(raw, { loadConfig, store, providers, now = (
     try { request = parseRequest(raw, now()); }
     catch (error) { return { ...base, outcome: 'REJECTED', reason: safeReason(error, 'INVALID_REQUEST') }; }
     Object.assign(base, { requestId: request.requestId, action: request.action });
-    // This binary has no implementation for operational writes, regardless of configuration.
+    // 이 실행 파일에는 운영 변경 경로가 없어 설정으로도 쓰기를 켤 수 없어요.
     if (!READ_ACTIONS.includes(request.action)) return { ...base, outcome: 'DENIED', reason: 'WRITE_CAPABILITY_NOT_GRANTED' };
     let claimed = false;
     try {

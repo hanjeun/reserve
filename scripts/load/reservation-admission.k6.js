@@ -99,7 +99,7 @@ function join(account) {
     return status(http.post(plan.origin + '/api/reservations/admission/' + identity.campaignId, null, params(account, 'admission_join')), false, joinLatency);
 }
 function poll(account, ticket) {
-    // The four-second server poll contract is respected per VU/account.
+    // VU·계정마다 서버의 4초 조회 간격을 지켜요.
     const remaining = LIMITS.pollSeconds * 1000 - (Date.now() - lastPoll);
     if (remaining > 0) sleep(remaining / 1000);
     assertCurrent();

@@ -78,7 +78,7 @@ export function parseMetrics(text, ageSeconds) {
         if (match && METRICS.has(match[1]) && Number.isFinite(Number(match[2]))) values[match[1]] = Number(match[2]);
     }
     if (Object.keys(values).length !== METRICS.size || !Number.isFinite(ageSeconds) || ageSeconds < 0 || ageSeconds > 180) return { state: 'unknown', reason: 'METRICS_MISSING_OR_STALE', values: null };
-    // The existing collector can emit fallback zeroes after a command failure and has no sample timestamp.
+    // 기존 수집기는 실패 뒤 0을 대입할 수 있고 표본 시각이 없어 근거로 확정하지 않아요.
     return { state: 'unknown', reason: 'METRIC_SAMPLE_VALIDITY_UNVERIFIED', ageSeconds, freshnessBasis: 'file-mtime', quality: 'sample-timestamps-unverified', values };
 }
 function metrics(now) {

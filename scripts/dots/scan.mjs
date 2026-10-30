@@ -14,7 +14,7 @@ export async function run(args, { collect = collectManifest, scan = scanManifest
     let warnings;
     try { warnings = options.remember ? remember(result, now) : { ...updateWarnings(null, result, now), persistence: 'not-recorded' }; }
     catch {
-        // An unreadable ledger is not replaced and cannot make old warnings disappear.
+        // 읽지 못한 원장을 덮어써서 기존 경고를 없애지 않아요.
         return { schemaVersion: 1, status: 'UNKNOWN', reason: 'WARNING_STATE_UNAVAILABLE', networkUsed: true, manifest, scan: result, warnings: null };
     }
     const { nextState, ...publicWarnings } = warnings;

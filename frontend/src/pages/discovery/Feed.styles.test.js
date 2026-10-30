@@ -7,7 +7,7 @@ const read = file => readFileSync(resolve('src', file), 'utf8');
 const stylesheets = ['styles/global/feature-surfaces.css', 'styles/global/feed.css']
     .map(file => postcss.parse(read(file)));
 
-// Compare the layout source contracts; these are not browser pixel measurements.
+// 소스의 배치 계약을 비교하며 브라우저의 픽셀 측정으로 해석하지 않아요.
 const styleAtWidth = (selectors, width, initial = {}) => {
     const style = { ...initial };
     for (const stylesheet of stylesheets) stylesheet.walkRules(rule => {

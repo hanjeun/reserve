@@ -70,7 +70,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-/** Test-only HTTP experiment. Rate limit policy and all external effects are excluded. */
+/** 외부 작업·요청 제한 정책을 제외한 시험 전용 HTTP 실험이에요. */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {"server.address=127.0.0.1", "server.env=local", "reserve.redis.enabled=false"})
 @EnabledIfEnvironmentVariable(named = "RESERVE_ADMISSION_LOAD_TEST", matches = "1")
@@ -124,7 +124,7 @@ class ReservationAdmissionLoadFixtureTest extends ReservationAdmissionMySqlTest 
                 .role(Role.USER).termsAgreed(true).build()));
         var accessCookies = new ArrayList<Map<String, Object>>();
         for (var member : customers) {
-            // Access and refresh share a registered device session; only access leaves this method.
+            // 기기 세션은 access·refresh를 함께 등록하되 이 메서드는 access만 내보내요.
             var issued = tokens.issueSession(member, null);
             accessCookies.add(Map.of("synthetic", true, "cookies", Map.of("access_token", issued.accessToken())));
         }
@@ -150,7 +150,7 @@ class ReservationAdmissionLoadFixtureTest extends ReservationAdmissionMySqlTest 
                 writePrivate(cookies, credentials);
 
                 JsonNode result = runProfile(scenario, attestation, cookies);
-                // Runner output is already projected; print only the aggregate object.
+                // 실행 결과는 사전에 허용한 집계 항목만 출력해요.
                 System.out.println("ISOLATED_LOAD " + mapper.writeValueAsString(Map.of(
                         "scope", "test-only-rate-limit-policy-and-external-effects-excluded",
                         "capacity", CAPACITY, "concurrent", CONCURRENT, "accounts", ACCOUNTS, "result", result)));

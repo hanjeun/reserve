@@ -39,7 +39,7 @@ function pointers(value, expectedRelease) {
     };
 }
 export function sanitizeChecks(action, value, expectedRelease) {
-    // Projection is intentional: even an adapter regression cannot return arbitrary fields or prose.
+    // 어댑터가 잘못 응답해도 허용한 필드 외의 원문을 내보내지 않아요.
     if (action === 'reserve.verify_counts.v1') return { operations: operations(value?.operations) };
     if (!plain(value)) throw new Error('SOURCE_CONTRACT_MISMATCH');
     const health = ['UP', 'DOWN', 'OUT_OF_SERVICE'].includes(value.health?.status)

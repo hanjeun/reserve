@@ -102,8 +102,8 @@ export function updateWarnings(previous, scan, now = Date.now()) {
             emit('RESOLVED', record);
         } else { record.verification = 'unknown'; }
     }
-    // A missing project is collection uncertainty, including when the caller selects one project.
-    // No absent project, PC-offline event or empty scan closes an earlier warning.
+    // 일부 프로젝트만 선택해도 누락한 프로젝트는 수집 불확실 상태로 남겨요.
+    // 프로젝트 누락·PC 오프라인·빈 조회만으로 기존 경고를 닫지 않아요.
     const nextState = { schemaVersion: 1, updatedAt: when, records: records.filter(record => !removed.has(record.key)), observations };
     assertState(nextState);
     return { schemaVersion: 1, events, openWarnings: nextState.records.filter(record => record.status === 'OPEN'), nextState };
@@ -124,7 +124,7 @@ function ensureDirectory() {
     const stat = fs.lstatSync(DIRECTORY);
     if (process.platform !== 'win32' && (stat.mode & 0o077)) throw new Error('STATE_UNAVAILABLE');
 }
-// The caller must explicitly choose --remember; no schedules or service configuration are written.
+// --remember를 명시해야 기록하며 일정·서비스 설정을 만들지 않아요.
 export function rememberScan(scan, now = Date.now()) {
     ensureDirectory();
     let lock;

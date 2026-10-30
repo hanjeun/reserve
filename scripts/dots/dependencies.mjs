@@ -12,7 +12,7 @@ const NPM = /^(?:@[a-z0-9._-]+\/)?[a-z0-9._-]+$/;
 const MAVEN = /^[A-Za-z0-9._-]+:[A-Za-z0-9._-]+$/;
 const PACKAGIST = /^[a-z0-9_.-]+\/[a-z0-9_.-]+$/;
 const PUBLIC_PYPI = new Set(['pyqt5', 'pyqt5-qt5', 'pyqt5-sip', 'pyqt-fluent-widgets', 'pyqt5-frameless-window', 'pywin32', 'darkdetect', 'numpy', 'pyqtgraph']);
-// New Maven groups need a source review before package names may leave the machine.
+// 새 Maven 그룹은 패키지 이름의 외부 전송 전에 출처를 검토해야 해요.
 const PUBLIC_MAVEN_GROUPS = new Set([
     'biz.aQute.bnd', 'ch.qos.logback', 'com.bucket4j', 'com.fasterxml', 'com.fasterxml.jackson',
     'com.fasterxml.jackson.core', 'com.fasterxml.jackson.dataformat', 'com.fasterxml.jackson.datatype', 'com.fasterxml.jackson.module',

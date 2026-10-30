@@ -99,7 +99,7 @@ function reason(error) {
     return ['REQUEST_LIMIT', 'RESPONSE_LIMIT', 'REQUEST_TIMEOUT', 'INVALID_RESPONSE', 'HTTP_OR_BODY_ERROR', 'ADVISORY_LIMIT', 'PAGE_LIMIT'].includes(error?.message) ? error.message : 'OSV_UNAVAILABLE';
 }
 
-// Network access is only reached by an explicit scan invocation; importing this module does not fetch.
+// 명시적인 scan 호출만 외부에 연결하며 모듈 import는 조회하지 않아요.
 export async function scanManifest(manifest, { allowNetwork = false, fetchImpl = globalThis.fetch, now = Date.now(), limits: overrides = {} } = {}) {
     if (allowNetwork !== true) return { schemaVersion: 1, scannedAt: new Date(now).toISOString(), status: 'UNKNOWN', reason: 'NETWORK_OPT_IN_REQUIRED', projects: [], vulnerabilityCount: null };
     if (!plain(manifest) || !Array.isArray(manifest.projects) || manifest.projects.length > 6
@@ -120,7 +120,7 @@ export async function scanManifest(manifest, { allowNetwork = false, fetchImpl =
         let pending = list.slice(offset, offset + limits.batch).map(item => ({ item, token: null, seen: new Set() }));
         for (let page = 0; pending.length && page < limits.pages; page++) {
             try {
-                // Project, source, hashes, paths and lock contents are deliberately absent.
+                // 프로젝트·출처·해시·경로·잠금 파일 원문은 전송하지 않아요.
                 const queries = pending.map(({ item, token }) => ({
                     package: { ecosystem: item.ecosystem, name: item.name }, version: item.version,
                     ...(token ? { page_token: token } : {}),
@@ -205,7 +205,7 @@ export async function scanManifest(manifest, { allowNetwork = false, fetchImpl =
     return { ...result, resultHash: digest(result) };
 }
 
-// Alias components are merged before alerting so GHSA/OSV/CVE aliases produce one finding.
+// GHSA·OSV·CVE 별칭을 합쳐 같은 경고를 한 번만 알려요.
 export function groupFindings(packages) {
     const groups = [];
     for (const item of packages) for (const advisory of item.advisories ?? []) {

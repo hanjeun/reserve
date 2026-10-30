@@ -126,7 +126,7 @@ it('animates the cached home parent without a child entrance or remount on norma
 });
 
 it('keeps ordinary cached route navigation animated and clears it when the animation finishes', async () => {
-    // Importing code alone does not initialize React.lazy. Visit once before asserting a cached revisit.
+    // 코드 import만으로 React.lazy가 초기화되지 않아 캐시 재방문 전에 한 번 방문해요.
     show('/terms');
     await screen.findByRole('heading', { name: '약관' });
     fireEvent.click(screen.getByRole('link', { name: '마이페이지 이동' }));

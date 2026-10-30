@@ -36,4 +36,12 @@ describe('reservation details during closing', () => {
         render(<ReservationDetailModal reservation={null} open={false} />);
         expect(screen.queryByRole('dialog')).toBeNull();
     });
+    it('가림 응답에서 개인정보를 표시하지 않고 같은 예약의 관리자 도구를 연결해요', () => {
+        const tools = vi.fn((value, open) => <span>{value.reservationCode}:{String(open)}</span>);
+        render(<ReservationDetailModal reservation={{ ...reservation, memberName: null, memberEmail: null,
+            personalInfoHidden: true, reservationCode: 'SYNTHETIC-1' }} open tools={tools} />);
+        expect(screen.getByText('개인정보 조회 기간이 지났어요')).toBeInTheDocument();
+        expect(screen.queryByText('예약자', { selector: 'span' })).toBeInTheDocument();
+        expect(screen.getByText('SYNTHETIC-1:true')).toBeInTheDocument();
+    });
 });

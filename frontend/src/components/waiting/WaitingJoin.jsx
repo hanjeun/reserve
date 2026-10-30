@@ -6,6 +6,7 @@ import { Checkbox } from 'antd';
 import { Button, FormModal, FormField, FormInput } from '../common';
 import StoreActionPanel from '../store/StoreActionPanel';
 import TextLink from '../common/TextLink';
+import RetryButton from '../common/RetryButton';
 import useMessage from '../../hooks/useMessage';
 import useAuthStore from '../../store/useAuthStore';
 import waitingService from '../../services/waitingService';
@@ -128,10 +129,10 @@ function WaitingJoinForm({ store, preview, isPC }) {
             onSubmit={submit} submitting={pending} submitDisabled={!privacyAgreed} submitText="접수하기" width={440} mobileSize="content">
             <p className="reserve-waiting-form-help">{store.name} 운영자에게 회원 이름, 인원, 접수 번호·상태와 처리 시각을 제공해요. 웨이팅 접수·호출·입장 관리에 사용하며, 연락처와 회원 식별자는 명단에 표시하지 않아요.</p>
             <p className="reserve-waiting-form-help">진행 접수는 처리할 때까지 보관해요. 입장·취소 후 다음 한국 시간 날짜에 이름과 회원 연결을 지우고, 종료 접수 기록은 7일 후 파기해요. 개인정보 제공에 동의하지 않을 수 있으며, 동의하지 않으면 앱에서 웨이팅을 접수할 수 없어요.</p>
-            <p className="reserve-waiting-form-help"><TextLink to="/privacy" target="_blank" rel="noopener noreferrer">개인정보 처리방침</TextLink></p>
+            <p className="reserve-waiting-form-help"><TextLink to="/privacy">개인정보 처리방침</TextLink></p>
             {policyQuery.isFetching ? <p className="reserve-waiting-form-help" role="status">접수 안내를 불러오는 중이에요.</p>
                 : !policyReady && <FormField error={policyQuery.isError ? '접수 안내를 불러오지 못했어요.' : '웨이팅 접수를 준비 중이에요. 잠시 후 다시 이용해주세요.'}>
-                    <Button variant="outline" size="sm" onClick={() => { void policyQuery.refetch(); }}>다시 시도</Button>
+                    <RetryButton variant="outline" size="sm" onRetry={policyQuery.refetch} loading={policyQuery.isFetching}>다시 시도</RetryButton>
                 </FormField>}
             <FormField error={privacyError}>
                 <Checkbox checked={privacyAgreed} disabled={pending || !policyReady}

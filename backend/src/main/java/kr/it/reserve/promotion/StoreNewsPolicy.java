@@ -27,6 +27,10 @@ public final class StoreNewsPolicy {
     public static boolean newsWriter(Member member) {
         return active(member) && (member.getRole() == Role.BUSINESS || member.getRole() == Role.ADMIN);
     }
+    public static boolean deleted(Promotion news) {
+        return news == null || news.getState() == Promotion.State.DELETED || news.getDeletedAt() != null
+                || news.getNewsPost() != null && news.getNewsPost().isDeleted();
+    }
     public static boolean publicNews(Promotion news) {
         return news != null && news.getState() == Promotion.State.PUBLISHED && news.getDeletedAt() == null
                 && usable(news.getStore()) && newsWriter(news.getMember())
@@ -48,6 +52,16 @@ public final class StoreNewsPolicy {
         return publicBenefit(news);
     }
     public static OffsetDateTime offset(LocalDateTime time) { return time == null ? null : time.atOffset(ZoneOffset.UTC); }
+    public static Specification<Promotion> applicationSpecification(Promotion.BenefitState state) {
+        return (root, query, cb) -> {
+            var post = root.join("newsPost", JoinType.LEFT);
+            var requested = state == null
+                    ? root.get("benefitState").in(Promotion.BenefitState.PENDING, Promotion.BenefitState.APPROVED, Promotion.BenefitState.REJECTED)
+                    : cb.equal(root.get("benefitState"), state);
+            return cb.and(requested, cb.notEqual(root.get("state"), Promotion.State.DELETED), cb.isNull(root.get("deletedAt")),
+                    cb.or(cb.isNull(post.get("id")), cb.notEqual(post.get("state").as(String.class), "DELETED")), cb.isNull(post.get("deletedAt")));
+        };
+    }
     public static Specification<Promotion> publicSpecification(Long storeId, Promotion.NewsType type, boolean ongoing) {
         return visibilitySpecification(storeId, type, ongoing);
     }

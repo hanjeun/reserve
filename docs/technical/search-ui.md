@@ -31,3 +31,11 @@
 캐시 본문 또는 첫 골격에서 한 번만 진입하고 골격이 본문으로 바뀔 때 다시 진입하지 않아요. 닫힘 DOM·초점·스크롤·모션 줄이기 설정을 보존해요. PC 메시지 결과는 메신저를 표시할 수 있는 화면으로 인계해요.
 
 구현은 [검색 화면](../../frontend/src/pages/Search/index.jsx), [검색 hook](../../frontend/src/hooks/useUnifiedSearch.js), [검색 서비스](../../backend/src/main/java/kr/it/reserve/search/SearchService.java)를 확인해요.
+
+## 서버 조회와 색인
+
+search 모듈이 결과를 조합하고 개인 조회는 각 도메인의 ReservationSearchReader·WaitingSearchReader·ChatSearchReader가 처리해요. MemberSearchAccess가 현재 회원 상태를 확인해요. 각 그룹은 독립 읽기 트랜잭션·3초 제한으로 최대 여섯 행을 읽어 다음 결과 여부를 판단해요.
+
+가게 FULLTEXT/ngram은 실제 색인·파서·컬럼을 확인하며 앱이 자동 생성하지 않아요. 통합검색의 search.store.unified-fulltext-enabled는 기본 false이며 search.store.fulltext-enabled도 필요해요. 누락 행을 최대 한 건 확인한 뒤 제한 조회하고 누락 시 원문 조건으로 돌아가요. 일반 페이지 API의 전체 건수 계약은 유지해요.
+
+검색 시간·일치·무결과·오류는 reserve.search 지표로 집계하고 부분 실패는 reserve.search.responses로 구분해요. 검색어·회원·결과 ID는 지표에 넣지 않아요.

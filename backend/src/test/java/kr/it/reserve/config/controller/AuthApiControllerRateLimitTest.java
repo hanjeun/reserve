@@ -45,7 +45,7 @@ class AuthApiControllerRateLimitTest {
         when(memberService.findByEmailOrNull(EMAIL)).thenReturn(member);
         when(passwordEncoder.matches(anyString(), eq("encoded")))
                 .thenAnswer(invocation -> "correct".equals(invocation.getArgument(0)));
-        when(tokenProvider.issueSession(member, null)).thenReturn(new TokenProvider.IssuedSession(
+        when(tokenProvider.issueSession(member, null, false)).thenReturn(new TokenProvider.IssuedSession(
                 "access-token", "refresh-token", java.time.Duration.ofDays(14)));
 
         JwtProperties properties = new JwtProperties();
@@ -66,7 +66,24 @@ class AuthApiControllerRateLimitTest {
         verify(memberService, times(capacity)).findByEmailOrNull(EMAIL);
         verify(passwordEncoder, times(capacity)).matches("wrong", "encoded");
         verify(passwordEncoder, never()).matches("correct", "encoded");
-        verify(tokenProvider, never()).issueSession(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        verify(tokenProvider, never()).issueSession(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyBoolean());
+    }
+
+
+    @Test
+    void pendingMfaCannotIssueApplicationCookiesOrExposeItsTicket() throws Exception {
+        var mfa=mock(kr.it.reserve.member.mfa.MfaService.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(controller,"mfa",mfa);
+        Member member=memberService.findByEmailOrNull(EMAIL);
+        String raw="A".repeat(43);
+        when(mfa.beginLogin(member,null,null,false)).thenReturn(new kr.it.reserve.member.mfa.MfaService.Ticket(raw));
+        when(mfa.status(raw,null,null)).thenReturn(new kr.it.reserve.member.mfa.MfaService.View(true,false,false,false,true,"LOGIN",java.time.LocalDateTime.now().plusMinutes(5),false));
+        var response=new MockHttpServletResponse();
+        var result=controller.login(credentials("correct"),nextRequest(),response);
+        assertThat(response.getHeaders("Set-Cookie")).anyMatch(value->value.startsWith("mfa_ticket=") && value.contains("HttpOnly") && value.contains("Secure"));
+        assertThat(response.getHeaders("Set-Cookie")).noneMatch(value->value.startsWith("access_token=access-token") || value.startsWith("refresh_token=refresh-token"));
+        assertThat(new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules().writeValueAsString(result)).doesNotContain(raw);
+        verify(tokenProvider,never()).issueSession(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyBoolean());
     }
 
     @Test
@@ -74,7 +91,8 @@ class AuthApiControllerRateLimitTest {
         int attempts = RateLimiter.Policy.LOGIN_ACCOUNT.capacity() + 2;
         for (int attempt = 0; attempt < attempts; attempt++) {
             assertThat(controller.login(credentials("correct"), nextRequest(),
-                    new MockHttpServletResponse()).getData().getEmail()).isEqualTo(EMAIL);
+                    new MockHttpServletResponse()).getData()).isInstanceOfSatisfying(kr.it.reserve.member.dto.MemberResponse.class,
+                    member -> assertThat(member.getEmail()).isEqualTo(EMAIL));
         }
 
         verify(passwordEncoder, times(attempts)).matches("correct", "encoded");

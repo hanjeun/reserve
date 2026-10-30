@@ -25,7 +25,7 @@ const BLOCKED_LABEL = {
     FULL: '마감',
 };
 
-const BookingCalendar = ({ storeId, reservationId, value, onChange, style, disabled = false }) => {
+const BookingCalendarField = ({ id, storeId, reservationId, value, onChange, style, disabled = false, onFocus, onBlur, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid }) => {
     const { status } = Form.Item.useStatus();
     const isError = status === 'error';
 
@@ -176,6 +176,7 @@ const BookingCalendar = ({ storeId, reservationId, value, onChange, style, disab
             <button
                 type="button"
                 className="rsv-tap-btn reserve-cal-trigger"
+                id={id} onFocus={onFocus} onBlur={onBlur} aria-describedby={describedBy} aria-invalid={ariaInvalid}
                 disabled={disabled}
                 onClick={openCalendar}
                 style={{ ...styles.trigger, ...(isError ? styles.triggerError : null), ...style }}
@@ -215,17 +216,17 @@ const BookingCalendar = ({ storeId, reservationId, value, onChange, style, disab
                                 onClick={() => goYear(-1)} aria-label="이전 해">
                             <DoubleLeftOutlined style={{ fontSize: 11 }} />
                         </button></Tooltip>
-                        <Tooltip title="이전 달"><button type="button" className="rsv-tap-btn reserve-cal-nav" disabled={!canGoPrev}
+                        <button type="button" className="rsv-tap-btn reserve-cal-nav" disabled={!canGoPrev}
                                 onClick={() => goMonth(-1)} aria-label="이전 달">
                             <LeftOutlined style={{ fontSize: 12 }} />
-                        </button></Tooltip>
+                        </button>
                     </div>
                     <span style={styles.monthLabel}>{month.format('YYYY년 M월')}</span>
                     <div style={styles.navGroup}>
-                        <Tooltip title="다음 달"><button type="button" className="rsv-tap-btn reserve-cal-nav"
+                        <button type="button" className="rsv-tap-btn reserve-cal-nav"
                                 onClick={() => goMonth(1)} aria-label="다음 달">
                             <RightOutlined style={{ fontSize: 12 }} />
-                        </button></Tooltip>
+                        </button>
                         <Tooltip title="다음 해"><button type="button" className="rsv-tap-btn reserve-cal-nav"
                                 onClick={() => goYear(1)} aria-label="다음 해">
                             <DoubleRightOutlined style={{ fontSize: 11 }} />
@@ -315,6 +316,8 @@ const styles = {
         overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0,
     },
 };
+
+const BookingCalendar = props => <Form.Item noStyle><BookingCalendarField {...props} /></Form.Item>;
 
 BookingCalendar.propTypes = {
     storeId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),

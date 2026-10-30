@@ -9,11 +9,12 @@ describe('workspace menu and query contracts', () => {
         expect(reviewPage('3')).toBe(3);
         expect(reviewPage('10000')).toBe(10000);
     });
-    it('has unique entries for all fifteen admin and seven business functions', () => {
+    it('has unique entries for all admin and business functions including settlement', () => {
         const admin = ADMIN_WORKSPACE_GROUPS.flatMap(group => group.items.map(item => item.key));
         const business = BUSINESS_WORKSPACE_GROUPS.flatMap(group => group.items.map(item => item.key));
         expect(new Set(admin).size).toBe(15);
-        expect(new Set(business).size).toBe(7);
+        expect(new Set(business).size).toBe(8);
+        expect(business).toContain('settlements');
     });
     it('normalizes legacy and unknown menu addresses instead of opening an empty panel', () => {
         expect(resolveAdminTab('chat')).toBe('reports');

@@ -69,6 +69,13 @@ describe('useStoreForm draft scheduling', () => {
         vi.useRealTimers();
     });
 
+    it('기존 가게의 미설정 이용 시간은 수정 화면에서 60분으로 시작해요', async () => {
+        form.setFieldsValue.mockClear();
+        renderHook(() => useStoreForm({ form, mode: 'edit', storeId: 12,
+            initialData: { id: 12, name: '기존 가게', serviceDurationMinutes: 0 } }), { wrapper });
+        await act(async () => { await Promise.resolve(); });
+        expect(form.setFieldsValue).toHaveBeenCalledWith(expect.objectContaining({ serviceDurationMinutes: 60 }));
+    });
     it('saves after one second of idle time', async () => {
         const { result } = renderHook(() => useStoreForm({ form }), { wrapper });
 

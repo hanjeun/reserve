@@ -61,6 +61,9 @@ const styles = {
         fontWeight: fontWeight.bold, color: colors.text.primary, marginBottom: 16,
     },
     tabLabel: { fontSize: fontSize.sm, fontWeight: fontWeight.semibold },
+    loginMethodLabel: { minWidth: 0, padding: '8px 0', overflowWrap: 'anywhere' },
+    loginMethodActions: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, padding: '8px 0' },
+    loginMethodHint: { display: 'block', fontSize: fontSize.xs, color: colors.text.tertiary, marginTop: 4 },
     securityNotice: {
         display: 'flex', alignItems: 'center', gap: 6,
         backgroundColor: colors.primary.light,

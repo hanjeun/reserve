@@ -18,6 +18,9 @@ import java.time.LocalTime;
 import java.util.List;
 
 public interface ReservationRepository extends JpaRepository<Reservation, Long> {
+    @Query("SELECT r.id FROM Reservation r WHERE r.autoCompletionEnabled = true AND r.checkedInAt IS NOT NULL "
+            + "AND r.deletedAt IS NULL AND r.status IN ('CONFIRMED', 'UNCONFIRMED') AND r.usageEndsAt <= :now ORDER BY r.usageEndsAt, r.id")
+    List<Long> findAutoCompletionIds(@Param("now") LocalDateTime now, Pageable pageable);
 
     /** 가게 행 잠금 아래에서 검사한다. 이미 약속한 유료 예약의 환불 기준을 변경하지 않는다. */
     @Query("""
@@ -125,10 +128,12 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
                AND (:storeId IS NULL OR s.id = :storeId)
                AND (:keyword = ''
                     OR LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                    OR LOWER(m.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                    OR LOWER(m.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
                     OR LOWER(r.reservationCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                    OR LOWER(r.specialRequest) LIKE LOWER(CONCAT('%', :keyword, '%')))
+                    OR ((r.usageEndsAt > :#{T(kr.it.reserve.reservation.retention.ReservationPrivacyPolicy).searchCutoff()}
+                         OR r.usageEndsAt IS NULL AND r.reservationDate > :#{T(kr.it.reserve.reservation.retention.ReservationPrivacyPolicy).legacySearchCutoff()})
+                        AND (LOWER(m.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                             OR LOWER(m.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                             OR LOWER(r.specialRequest) LIKE LOWER(CONCAT('%', :keyword, '%')))))
             """,
             countQuery = """
             SELECT COUNT(r) FROM Reservation r
@@ -139,10 +144,12 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
                AND (:storeId IS NULL OR s.id = :storeId)
                AND (:keyword = ''
                     OR LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                    OR LOWER(m.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                    OR LOWER(m.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
                     OR LOWER(r.reservationCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                    OR LOWER(r.specialRequest) LIKE LOWER(CONCAT('%', :keyword, '%')))
+                    OR ((r.usageEndsAt > :#{T(kr.it.reserve.reservation.retention.ReservationPrivacyPolicy).searchCutoff()}
+                         OR r.usageEndsAt IS NULL AND r.reservationDate > :#{T(kr.it.reserve.reservation.retention.ReservationPrivacyPolicy).legacySearchCutoff()})
+                        AND (LOWER(m.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                             OR LOWER(m.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                             OR LOWER(r.specialRequest) LIKE LOWER(CONCAT('%', :keyword, '%')))))
             """)
     Page<Reservation> searchForAdmin(
             @Param("keyword") String keyword,
@@ -161,10 +168,12 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
                AND (:storeId IS NULL OR s.id = :storeId)
                AND (:keyword = ''
                     OR LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                    OR LOWER(m.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                    OR LOWER(m.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
                     OR LOWER(r.reservationCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                    OR LOWER(r.specialRequest) LIKE LOWER(CONCAT('%', :keyword, '%')))
+                    OR ((r.usageEndsAt > :#{T(kr.it.reserve.reservation.retention.ReservationPrivacyPolicy).searchCutoff()}
+                         OR r.usageEndsAt IS NULL AND r.reservationDate > :#{T(kr.it.reserve.reservation.retention.ReservationPrivacyPolicy).legacySearchCutoff()})
+                        AND (LOWER(m.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                             OR LOWER(m.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                             OR LOWER(r.specialRequest) LIKE LOWER(CONCAT('%', :keyword, '%')))))
             """,
             countQuery = """
             SELECT COUNT(r) FROM Reservation r
@@ -176,10 +185,12 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
                AND (:storeId IS NULL OR s.id = :storeId)
                AND (:keyword = ''
                     OR LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                    OR LOWER(m.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                    OR LOWER(m.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
                     OR LOWER(r.reservationCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                    OR LOWER(r.specialRequest) LIKE LOWER(CONCAT('%', :keyword, '%')))
+                    OR ((r.usageEndsAt > :#{T(kr.it.reserve.reservation.retention.ReservationPrivacyPolicy).searchCutoff()}
+                         OR r.usageEndsAt IS NULL AND r.reservationDate > :#{T(kr.it.reserve.reservation.retention.ReservationPrivacyPolicy).legacySearchCutoff()})
+                        AND (LOWER(m.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                             OR LOWER(m.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                             OR LOWER(r.specialRequest) LIKE LOWER(CONCAT('%', :keyword, '%')))))
             """)
     Page<Reservation> searchForStoreOwner(
             @Param("owner") Member owner,
@@ -373,7 +384,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
 
     /** 날짜·시각은 저장된 예약과 같은 한국 시간으로 비교한다. 오래된 대상부터 처리해 배치 상한에도 먼저 정리되게 한다. */
     @Query("SELECT r FROM Reservation r JOIN FETCH r.store JOIN FETCH r.member "
-         + "WHERE r.deletedAt IS NULL AND r.status IN ('PENDING', 'CONFIRMED') "
+         + "WHERE r.deletedAt IS NULL AND r.checkedInAt IS NULL AND r.status IN ('PENDING', 'CONFIRMED') "
          + "AND (r.reservationDate < :date "
          + "     OR (r.reservationDate = :date AND r.reservationTime <= :time)) "
          + "ORDER BY r.reservationDate ASC, r.reservationTime ASC")

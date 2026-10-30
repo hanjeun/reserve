@@ -31,7 +31,32 @@ public interface PaymentReconciliationIssueRepository
             PaymentReconciliationIssue.IssueStatus status,
             Pageable pageable);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT i FROM PaymentReconciliationIssue i WHERE i.paymentId = :id AND i.status = 'OPEN'")
+    List<PaymentReconciliationIssue> findOpenByPaymentIdForUpdate(@Param("id") Long id);
+
+    @Query("SELECT DISTINCT i.paymentId FROM PaymentReconciliationIssue i WHERE i.paymentId IN :ids AND i.status = 'OPEN'")
+    List<Long> findOpenPaymentIds(@Param("ids") java.util.Collection<Long> ids);
+
     long countByStatus(PaymentReconciliationIssue.IssueStatus status);
+
+    @Query("""
+            SELECT COUNT(i) > 0 FROM PaymentReconciliationIssue i
+             WHERE i.status = 'OPEN' AND (i.reservationId = :reservationId
+                OR i.paymentId IN (SELECT p.id FROM Payment p WHERE p.reservation.id = :reservationId)
+                OR i.merchantUid IN (SELECT p.merchantUid FROM Payment p WHERE p.reservation.id = :reservationId))
+            """)
+    boolean existsOpenForReservation(@Param("reservationId") Long reservationId);
+
+    @Query("""
+            SELECT COUNT(i) > 0 FROM PaymentReconciliationIssue i
+             WHERE i.status = 'OPEN' AND i.issueType IN :types
+               AND (i.reservationId = :reservationId
+                OR i.paymentId IN (SELECT p.id FROM Payment p WHERE p.reservation.id = :reservationId)
+                OR i.merchantUid IN (SELECT p.merchantUid FROM Payment p WHERE p.reservation.id = :reservationId))
+            """)
+    boolean existsOpenConflictForReservation(@Param("reservationId") Long reservationId,
+            @Param("types") java.util.Collection<PaymentReconciliationIssue.IssueType> types);
 
     @Query("""
             SELECT COUNT(i) FROM PaymentReconciliationIssue i

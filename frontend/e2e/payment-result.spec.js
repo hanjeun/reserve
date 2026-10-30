@@ -8,6 +8,7 @@ async function mockResult(page, type, status, error = false) {
         if (!url.pathname.startsWith('/api/')) return route.continue();
         let data = [];
         if (url.pathname.startsWith('/api/payment/')) paymentRequests.push({ path: url.pathname, method: request.method() });
+        if (url.pathname === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: { id: 1, name: '검토 사업자', email: 'owner@example.test', role: 'BUSINESS', termsAgreed: true }, refreshPossible: false } } }); }
         if (url.pathname === '/api/member/me') data = {
             id: 1, name: '검토 사업자', email: 'owner@example.test', role: 'BUSINESS', termsAgreed: true,
         };
@@ -26,11 +27,11 @@ test('forged success cannot confirm a READY payment or issue a new payment reque
     await page.goto('/payment/result?success=true&merchant_uid=RESULT-TEST&imp_uid=legacy-id');
     await expect(page.getByText('결제 상태를 확인하고 있어요', { exact: true })).toBeVisible();
     await expect(page.getByText('결제 완료', { exact: true })).not.toBeVisible();
-    await expect(page.getByRole('button', { name: '내 예약에서 다시 열기' })).toBeVisible();
-    await page.getByRole('button', { name: '상태 다시 확인' }).click();
+    await expect(page.getByRole('button', { name: '내 예약', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '다시 확인' }).click();
     await expect.poll(() => requests.length).toBe(2);
     expect(requests.every(request => request.method === 'GET' && request.path === '/api/payment/status')).toBe(true);
-    await page.getByRole('button', { name: '내 예약에서 다시 열기' }).click();
+    await page.getByRole('button', { name: '내 예약', exact: true }).click();
     await expect(page).toHaveURL(url => url.pathname === '/my-reservations');
     await expect.poll(() => Object.fromEntries(new URL(page.url()).searchParams))
         .toEqual({ view: 'list', tab: 'reservation', status: 'all', sort: 'recent' });
@@ -56,7 +57,7 @@ test('unknown ad result leads directly to the ad tab, including after reload', a
     await mockResult(page, 'ad', 'PENDING_PAYMENT');
     await page.goto('/payment/result?success=true&type=ad&merchant_uid=RESULT-TEST');
     await expect(page.getByText('결제 상태를 확인하고 있어요', { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: '광고 관리에서 다시 열기' }).click();
+    await page.getByRole('button', { name: '광고 관리', exact: true }).click();
     await expect(page).toHaveURL(url => url.pathname === '/business');
     await expect.poll(() => Object.fromEntries(new URL(page.url()).searchParams))
         .toEqual({ tab: 'ads', advertisementStore: 'all', advertisementPage: '0' });

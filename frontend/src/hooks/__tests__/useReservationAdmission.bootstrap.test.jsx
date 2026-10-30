@@ -30,10 +30,10 @@ describe('admission recovery during first auth bootstrap', () => {
         const view = renderHook(() => useReservationAdmission());
 
         expect(useAuthStore.getState().user).toBeNull();
-        api.get.mockResolvedValue({ id: 7, role: 'USER', email: 'member@example.com' });
+        api.get.mockResolvedValue({ member: { id: 7, role: 'USER', email: 'member@example.com' } });
         await act(async () => { await useAuthStore.getState().initializeAuth(); });
 
-        expect(api.get).toHaveBeenCalledWith('/api/member/me', { timeout: 8000 });
+        expect(api.get).toHaveBeenCalledWith('/api/auth/session', { skipAuthRefresh: true, timeout: 8000 });
         expect(useAuthStore.getState()).toMatchObject({ user: { id: 7 }, authRestoring: false, sessionRevision: 1 });
         expect(JSON.parse(sessionStorage.getItem(KEY))).toEqual(saved);
         await expect(view.result.current.getPendingAttempt({ storeId: 31, date: '2026-10-23', time: '10:00' }))

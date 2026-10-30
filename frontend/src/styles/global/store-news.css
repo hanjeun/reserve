@@ -15,6 +15,10 @@
 .reserve-benefit-detail .reserve-store-news-conditions h2 { margin: 0 0 8px; font-size: 16px; line-height: 1.5; }
 .reserve-benefit-detail .reserve-store-news-conditions p { margin: 0; font-size: 15px; line-height: 1.7; }
 .reserve-benefit-detail .reserve-benefit-detail-links { margin-top: 0; gap: 8px 16px; }
+.reserve-benefit-detail-navigation, .reserve-benefit-detail-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.reserve-benefit-detail-links { align-items: center; flex-wrap: wrap; }
+.reserve-benefit-detail-links .reserve-feed-interactions { margin: 0; }
+.reserve-benefit-detail-links .reserve-feed-interaction .anticon { font-size: 20px; }
 .reserve-benefit-photos { position: relative; min-width: 0; overflow: hidden; border-radius: 16px; background: transparent; }
 .reserve-benefit-detail--photo > :is(.reserve-benefit-photos, .reserve-benefit-detail-image) { order: -1; }
 .reserve-benefit-detail--compact { gap: 16px; }
@@ -29,6 +33,7 @@
 .reserve-benefit-row--photo .reserve-benefit-media::after, .reserve-benefit-row--compact .reserve-benefit-media::after { display: none; }
 .reserve-benefit-row--photo .reserve-benefit-row-copy { flex: 1; width: auto; padding: 20px; gap: 8px; }
 .reserve-benefit-row--photo .reserve-benefit-store, .reserve-benefit-row--compact .reserve-benefit-store { color: var(--c-text-primary); font-size: 20px; white-space: normal; }
+.reserve-benefit-row:is(.reserve-benefit-row--photo, .reserve-benefit-row--compact) .reserve-benefit-description { color: var(--c-text-secondary); }
 .reserve-benefit-row--photo .reserve-benefit-title-badge, .reserve-benefit-row--compact .reserve-benefit-title-badge { background: transparent; color: var(--c-text-primary); font-size: 16px; padding: 0; border-radius: 0; }
 .reserve-benefit-row--compact { display: flex; align-items: center; gap: 16px; padding: 16px; min-height: 132px; background: var(--c-bg-paper); color: var(--c-text-primary); }
 .reserve-benefit-row--compact .reserve-benefit-media { position: relative; inset: auto; z-index: auto; flex: 0 0 100px; width: 100px; height: 100px; border-radius: 12px; background: transparent; }
@@ -36,6 +41,7 @@
 .reserve-benefit-row--compact .reserve-benefit-row-copy { padding: 0; flex: 1; width: auto; }
 .reserve-benefit-row:is(.reserve-benefit-row--photo, .reserve-benefit-row--compact):is(:hover, :active) { color: var(--c-text-primary); }
 .reserve-store-news-modal .reserve-benefit-detail { margin: 0; padding: 0; max-width: none; }
+.reserve-store-news-modal .reserve-benefits-heading :is(h1, h2) { font-size: 20px; line-height: 1.5; }
 .reserve-benefit-review-list li { min-height: 72px; }
 .reserve-benefit-review-list li > div { min-width: 0; }
 .reserve-benefit-review-list strong { display: block; font-size: 16px; line-height: 1.5; overflow-wrap: anywhere; }
@@ -55,6 +61,7 @@
 .reserve-store-news-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 12px 0; font-size: 12px; color: var(--c-text-secondary); }
 .reserve-store-news-meta .is-ended { font-weight: 600; }
 .reserve-store-news-banner-label { color: var(--reserve-benefit-photo-fg, #fff); font-size: 11px; line-height: 1.5; }
+.reserve-store-news-selectors,
 .reserve-store-news-dates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .reserve-store-news-conditions { margin-top: 24px; }
 .reserve-store-news-conditions h2 { font-size: 16px; }
@@ -68,6 +75,7 @@
     .reserve-benefit-row--compact { gap: 12px; padding: 12px; }
     .reserve-benefit-row--compact .reserve-benefit-media { flex-basis: 80px; width: 80px; height: 80px; }
     .reserve-benefit-detail { gap: 16px; }
+    .reserve-store-news-selectors,
     .reserve-store-news-dates { grid-template-columns: minmax(0, 1fr); gap: 0; }
     .reserve-store-news-manage-row { padding: 16px; }
 }

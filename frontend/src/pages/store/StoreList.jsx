@@ -3,7 +3,7 @@ import React, { useCallback, useState } from 'react';
 import PropTypes from 'prop-types';
 import Pagination from '../../components/common/Pagination';
 import { useQuery } from '@tanstack/react-query';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { DataState, FilterToolbar, PageContainer, StoreCardSkeleton } from '../../components/common';
 import ListingContent from '../../components/common/ListingContent';
 import { StoreCard } from '../../components/store';
@@ -25,7 +25,7 @@ import adService from '../../services/adService';
 import { adKeys } from '../../hooks/queryKeys';
 import { SERVICE_DOMAIN_FILTER_OPTIONS, SORT_OPTIONS } from '../../constants';
 import { formatRegionLabel } from '../../constants/regions';
-import { distanceSortParams } from '../../utils/distanceSort';
+import { distanceSortParams, hasDistanceCoordinates } from '../../utils/distanceSort';
 
 // 같은 결과의 보기만 바꿔도 카드/행은 재마운트된다. 노출 집계는 안정적인 결과 관문에서 한다.
 function StoreListResult({ children, isAdvertised, adId, onImpression }) {
@@ -50,9 +50,7 @@ const StoreList = () => {
     } = useStoreList();
     const [urlSearchParams] = useSearchParams();
     const blockingError = isBlockingListReadError(error, stores);
-    const location = useLocation();
     const reducedMotion = useReducedMotion();
-    const [bannerEntry, setBannerEntry] = useState(() => location.state?.reserveDiscoveryEntry === 'featured-banner');
     const [pageMotion, setPageMotion] = useState(null);
     const [regionOpen, setRegionOpen] = useState(false);
     const [view, setView] = useViewModeParam(urlSearchParams, 'cards');
@@ -66,9 +64,7 @@ const StoreList = () => {
     }, []);
     const resultClassName = view === 'list' ? 'reserve-store-list-rows' : 'rsv-store-grid';
     let resultMotionClassName = '';
-    if (!reducedMotion && bannerEntry) {
-        resultMotionClassName = ' reserve-explore-result--banner-entry';
-    } else if (!reducedMotion && pageMotion?.page === page) {
+    if (!reducedMotion && pageMotion?.page === page) {
         resultMotionClassName = ` reserve-explore-result--page-${pageMotion.direction}`;
     }
     const ResultItem = view === 'list' ? StoreListRow : StoreCard;
@@ -131,7 +127,8 @@ const StoreList = () => {
         // 라벨을 먼저 "거리순"으로 — 좌표를 기다리는 동안에도 선택이 유지된다
         setPendingSort('distance');
 
-        const position = await requestLocation();
+        const hasSavedLocation = hasDistanceCoordinates(user?.latitude, user?.longitude);
+        const position = await requestLocation({ showError: !hasSavedLocation });
         if (position) {
             setLiveLocation(position);
             const distanceParams = distanceSortParams(position);
@@ -139,7 +136,7 @@ const StoreList = () => {
             setPendingSort(null);
             return;
         }
-        if (user?.latitude != null && user?.longitude != null) {
+        if (hasSavedLocation) {
             message.info('마이페이지에 등록된 위치 기준으로 정렬할게요.');
             const distanceParams = distanceSortParams({ latitude: user.latitude, longitude: user.longitude });
             if (distanceParams) setSearchParams(distanceParams);
@@ -181,7 +178,6 @@ const StoreList = () => {
                 className={resultClassName + resultMotionClassName}
                 onAnimationEnd={event => {
                     if (event.target !== event.currentTarget) return;
-                    setBannerEntry(false);
                     setPageMotion(null);
                 }}
             >
@@ -199,7 +195,7 @@ const StoreList = () => {
         <PageContainer
             size="xl"
             paddingTop="16px"
-            className={'reserve-explore-page' + (!reducedMotion && bannerEntry ? ' reserve-explore-page--banner-entry' : '')}
+            className="reserve-explore-page"
         >
             <h1 className="reserve-discovery-visually-hidden">{pageTitle}</h1>
 
@@ -220,9 +216,6 @@ const StoreList = () => {
                 initialLoading={initialLoading}
                 sortDisabled={loading || locating}
                 sortLoading={locating}
-                onAnimationEnd={event => {
-                    if (event.target === event.currentTarget && !loading && !refetching && (error || stores.length === 0)) setBannerEntry(false);
-                }}
             />
 
             <FilterToolbar search={{ value: searchParams.keyword,
@@ -245,7 +238,6 @@ const StoreList = () => {
                         total={totalElements}
                         onChange={value => {
                             if (value === page) return;
-                            setBannerEntry(false);
                             setPageMotion({ page: value, direction: value > page ? 'next' : 'previous' });
                             setPage(value);
                             window.scrollTo({ top: 0, left: 0, behavior: reducedMotion ? 'instant' : 'smooth' });

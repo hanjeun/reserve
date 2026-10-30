@@ -17,6 +17,7 @@ test.beforeEach(async ({ page }) => {
             throw new Error(`Time picker verification must not write to the API: ${request.method()} ${path}`);
         }
         let data = emptyPage;
+        if (path === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: business, refreshPossible: false } } }); }
         if (path === '/api/member/me') data = business;
         if (path === '/api/stores/99/edit') data = {
             id: 99, ownerId: 41, name: '시간 선택 검증 가게', category: '카페',

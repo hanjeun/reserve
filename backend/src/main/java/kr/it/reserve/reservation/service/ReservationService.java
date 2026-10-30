@@ -21,6 +21,7 @@ import kr.it.reserve.reservation.admission.ReservationCreationGuard;
 import kr.it.reserve.reservation.dto.ReservationCreateRequest;
 import kr.it.reserve.reservation.dto.QrCheckinResponse;
 import kr.it.reserve.reservation.dto.ReservationResponse;
+import kr.it.reserve.reservation.dto.ReservationRequestResult;
 import kr.it.reserve.reservation.dto.ReservationSearchDto;
 import kr.it.reserve.reservation.dto.ReservationUpdateRequest;
 import kr.it.reserve.reservation.dto.ReservationStatusSummaryResponse;
@@ -75,6 +76,7 @@ public class ReservationService {
     private final AuditLogService auditLogService;
     private final QrCheckinTokenProvider qrCheckinTokenProvider;
     private final ReservationCreationGuard creationGuard;
+    private final ReservationConsentService consents;
     @PersistenceContext
     private EntityManager reservationEntityManager;
     @Autowired(required = false)
@@ -92,7 +94,7 @@ public class ReservationService {
             MemberRepository memberRepository,
             @Lazy AuditLogService auditLogService,
             QrCheckinTokenProvider qrCheckinTokenProvider,
-            ReservationCreationGuard creationGuard) {
+            ReservationCreationGuard creationGuard, ReservationConsentService consents) {
         this.reservationRepository = reservationRepository;
         this.storeRepository = storeRepository;
         this.availability = new ReservationAvailability(reservationRepository, storeRepository, holidayService);
@@ -102,6 +104,7 @@ public class ReservationService {
         this.auditLogService = auditLogService;
         this.qrCheckinTokenProvider = qrCheckinTokenProvider;
         this.creationGuard = creationGuard;
+        this.consents = consents;
     }
 
     @Transactional(isolation = Isolation.READ_COMMITTED, timeout = 30)
@@ -168,6 +171,8 @@ public class ReservationService {
                         ? Reservation.ReservationStatus.CONFIRMED
                         : Reservation.ReservationStatus.PENDING;
 
+        var consentNotice = consents.validate(store, request.getLegalConsent());
+        int durationMinutes = ReservationCompletionPolicy.storedDuration(store.getServiceDurationMinutes());
         Reservation reservation = Reservation.builder()
                 .member(freshMember)
                 .store(store)
@@ -179,9 +184,14 @@ public class ReservationService {
                 .status(initialStatus)
                 .depositAmount(store.getNoShowDeposit() != null ? store.getNoShowDeposit() : 0)
                 .depositPaid(false)
+                .autoCompletionEnabled(Boolean.TRUE.equals(store.getAutoCompletionEnabled()))
+                .attendanceRefundEnabled(true)
+                .serviceDurationMinutes(durationMinutes)
+                .usageEndsAt(ReservationCompletionPolicy.endsAt(store, request.getReservationDate(), request.getReservationTime(), durationMinutes))
                 .build();
 
         ReservationResponse response = ReservationResponse.fromEntity(reservationRepository.save(reservation));
+        consents.record(reservation, consentNotice);
         creationGuard.saved(attempt, reservation.getId());
         changed(reservation, EntityUpdates.Operation.CREATED);
 
@@ -367,16 +377,23 @@ public class ReservationService {
 
     /** 커밋된 결과만 복구하며 입장권 점유·결제·정원 검사·쓰기 잠금은 수행하지 않는다. */
     @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
-    public ReservationResponse recoverReservation(ReservationCreateRequest request, Member member) {
+    public ReservationRequestResult recoverReservation(ReservationCreateRequest request, Member member) {
         Member current = memberRepository.findByIdAndDeletedAtIsNull(member.getId())
                 .filter(m -> !m.isDeleted())
                 .orElseThrow(() -> new ReservationException("회원 정보를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
         Long id = creationGuard.recover(request, current.getId());
-        if (id == null) return null;
-        Reservation reservation = findByIdOrThrow(id);
+        if (id == null) return ReservationRequestResult.notSubmitted();
+        Reservation reservation = reservationRepository.findById(id)
+                .orElseThrow(() -> new ReservationException("이전 예약 상태를 확인하지 못했어요. 내 예약에서 확인해주세요.", HttpStatus.CONFLICT));
         validateOwnership(reservation, current);
-        if (reservation.isDeleted()) throw new ReservationException(RESERVATION_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND);
-        return ReservationResponse.fromEntity(reservation);
+        if (reservation.getStatus() == Reservation.ReservationStatus.CANCELLED
+                || reservation.getStatus() == Reservation.ReservationStatus.REJECTED
+                || reservation.isDeleted() && (reservation.getStatus() == Reservation.ReservationStatus.COMPLETED
+                || reservation.getStatus() == Reservation.ReservationStatus.NO_SHOW)) {
+            return ReservationRequestResult.closed();
+        }
+        if (reservation.isDeleted()) throw new ReservationException("이전 예약 상태를 확인하지 못했어요. 내 예약에서 확인해주세요.", HttpStatus.CONFLICT);
+        return ReservationRequestResult.reserved(ReservationResponse.fromEntity(reservation));
     }
 
     /** 결제된 예약과 종료 상태는 수정할 수 없다. 승인된 미결제 예약은 변경 후 재승인을 받고, 자동 승인은 생성과 같은 조건을 적용한다. 상태는 서버가 결정한다. */
@@ -403,6 +420,7 @@ public class ReservationService {
         // 생성과 동일한 검증 — 단, 자기 자신은 정원/중복 계산에서 제외
         validateReservationSlot(store, member, newDate, newTime, newGuestCount, reservation.getId());
 
+        reservation.setUsageEndsAt(ReservationCompletionPolicy.endsAt(store, newDate, newTime, reservation.getServiceDurationMinutes()));
         reservation.setReservationDate(newDate);
         reservation.setReservationTime(newTime);
         reservation.setGuestCount(newGuestCount);
@@ -435,6 +453,11 @@ public class ReservationService {
             throw new ReservationException("이미 취소된 예약이에요.", HttpStatus.BAD_REQUEST);
         }
 
+        if (reservation.getStatus() == Reservation.ReservationStatus.COMPLETED
+                || reservation.getStatus() == Reservation.ReservationStatus.NO_SHOW
+                || reservation.getStatus() == Reservation.ReservationStatus.REJECTED) {
+            throw new ReservationException("종료된 예약은 취소할 수 없어요.", HttpStatus.CONFLICT);
+        }
         reservation.setStatus(Reservation.ReservationStatus.CANCELLED);
         changed(reservation, EntityUpdates.Operation.UPDATED);
 
@@ -471,6 +494,10 @@ public class ReservationService {
 
         if (reservation.getStatus() != Reservation.ReservationStatus.PENDING) {
             throw new ReservationException("대기 중인 예약만 승인할 수 있어요.", HttpStatus.BAD_REQUEST);
+        }
+
+        if (ReservationPaymentPolicy.requiresAdvancePayment(reservation)) {
+            throw new ReservationException("예약금 결제 후 승인할 수 있어요.", HttpStatus.CONFLICT);
         }
 
         reservation.setStatus(Reservation.ReservationStatus.CONFIRMED);
@@ -511,14 +538,7 @@ public class ReservationService {
         changed(reservation, EntityUpdates.Operation.UPDATED);
         reservation.setRejectionReason(reason != null ? reason : "가게 사정으로 인한 거절");
 
-        // 거절은 전액 환불이다.
-        //   그 전까지 이 메서드에는 환불 호출이 **한 줄도 없었다**. 예약금을 낸 이용자의 예약을
-        //   가게가 거절하면 상태만 REJECTED 로 바뀌고 돈은 가게에 남았다. 이용약관
-        //   (frontend/src/pages/policy/Terms.jsx)이 "가게 사정에 의한 취소는 전액 환불"이라고
-        //   명시하고 있으므로 약관 위반이었고, 이용자가 되돌릴 수단도 없었다.
-        //   주의: 정책 계산(calculateRefundAmount)을 쓰면 안 된다 — 그건 이용자 귀책 취소의 위약금
-        //      규칙이라, 가게가 당일에 거절해도 0원이 나올 수 있다. 전액 경로를 따로 쓴다.
-        //   외부 발신은 거절·환불 의도 커밋 후에 실행하므로 PG 오류가 거절을 되돌리지 않는다.
+        // 거절은 전액 환불 의도를 함께 커밋하고 PG 발신은 분리한다.
         prepareStoreDecisionRefund(id, "가게의 예약 거절에 따른 전액 환불", reservation);
 
         // 유저에게 거절 알림 (비동기) — 개인 알림 설정 ON일 때만
@@ -635,6 +655,10 @@ public class ReservationService {
         Reservation reservation = findByIdForUpdateOrThrow(id);
         validateStoreOwner(reservation, owner);
 
+        if (Boolean.TRUE.equals(reservation.getAttendanceRefundEnabled()) && reservation.getDepositAmount() != null
+                && reservation.getDepositAmount() > 0) {
+            throw new ReservationException("보증금 환불 대상 예약은 이용 완료를 되돌릴 수 없어요.", HttpStatus.CONFLICT);
+        }
         if (reservation.getStatus() != Reservation.ReservationStatus.COMPLETED) {
             throw new ReservationException("이용완료된 예약만 되돌릴 수 있어요.", HttpStatus.BAD_REQUEST);
         }
@@ -673,6 +697,7 @@ public class ReservationService {
     @Transactional
     public void completeReservation(Long id, Member owner) {
         attendance().completeReservation(id, owner);
+        refundDispatch.afterCommit(paymentService.prepareFullRefundAfterAttendance(id));
     }
 
     /**
@@ -757,12 +782,18 @@ public class ReservationService {
         int safeSize = Math.clamp(size, 1, 100);
         Pageable pageable = PageRequest.of(Math.max(page, 0), safeSize, reservationManagementSort(sort));
         String keyword = search == null ? "" : search.trim();
-        if (owner.isAdmin()) {
-            return reservationRepository.searchForAdmin(keyword, status, storeId, pageable)
-                    .map(ReservationResponse::fromEntity);
-        }
         return reservationRepository.searchForStoreOwner(owner, keyword, status, storeId, pageable)
-                .map(ReservationResponse::fromEntity);
+                .map(ReservationResponse::fromManagementEntity);
+    }
+
+    /** 전체 예약 조회는 관리자 화면의 명시적인 읽기 경로에만 제공한다. */
+    @Transactional(readOnly = true)
+    public Page<ReservationResponse> getAdminReservations(Member administrator, int page, int size, String search,
+            Reservation.ReservationStatus status, Long storeId, String sort) {
+        if (!administrator.isAdmin()) throw new ReservationException("관리자만 조회할 수 있어요.", HttpStatus.FORBIDDEN);
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, 100), reservationManagementSort(sort));
+        return reservationRepository.searchForAdmin(search == null ? "" : search.trim(), status, storeId, pageable)
+                .map(ReservationResponse::fromManagementEntity);
     }
 
     /** 예약 관리 세 화면의 정렬 계약. 알 수 없는 값은 기존 동작인 최신순으로 되돌린다. */
@@ -776,9 +807,7 @@ public class ReservationService {
 
     @Transactional(readOnly = true)
     public ReservationStatusSummaryResponse getStoreReservationSummary(Member owner) {
-        List<Object[]> rows = owner.isAdmin()
-                ? reservationRepository.countAdminReservationsGroupedByStatus()
-                : reservationRepository.countOwnerReservationsGroupedByStatus(owner);
+        List<Object[]> rows = reservationRepository.countOwnerReservationsGroupedByStatus(owner);
         return ReservationStatusSummaryResponse.fromRows(rows);
     }
 
@@ -786,28 +815,15 @@ public class ReservationService {
      * 예약 목록에서 숨기기 (소프트 삭제)
      * 사용자/사업자가 완료·취소·거절·노쇼 예약을 목록에서 제거
      */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public void removeReservation(Long id, Member member) {
         Reservation reservation = findByIdForUpdateOrThrow(id);
 
-        // 사용자 본인 또는 가게 사장님만 가능
-        boolean isOwner = reservation.getMember().getId().equals(member.getId());
-        boolean isStoreOwner = reservation.getStore().getOwner().getId().equals(member.getId());
-        if (!isOwner && !isStoreOwner && !member.isAdmin()) {
-            throw new ReservationException("해당 예약에 대한 권한이 없어요.", HttpStatus.FORBIDDEN);
-        }
+        ReservationAccess.participant(reservation, member);
 
-        // 진행 중인 예약은 삭제 불가
-        Reservation.ReservationStatus status = reservation.getStatus();
-        boolean isDeletable = status == Reservation.ReservationStatus.CANCELLED
-                || status == Reservation.ReservationStatus.REJECTED
-                || status == Reservation.ReservationStatus.COMPLETED
-                || status == Reservation.ReservationStatus.NO_SHOW;
-
-        if (!isDeletable) {
-            throw new ReservationException("완료·취소·거절·노쇼 상태의 예약만 삭제할 수 있어요.", HttpStatus.BAD_REQUEST);
-        }
-
+        ReservationRemovalPolicy.requireFinished(reservation);
+        paymentService.requireReservationRemovable(reservation);
+        if (reservation.isDeleted()) return;
         reservation.softDelete();
         changed(reservation, EntityUpdates.Operation.DELETED);
         auditLogService.logReservationDelete(reservation);  // 관리자 휴지통에 기록 (삭제 주체 = 현재 로그인 유저)

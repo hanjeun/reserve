@@ -13,11 +13,21 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class PortoneAdCancellationContractTest {
+    @Test void missingStoreIsRejectedBeforeRefundDispatch() {
+        RestTemplate http = new RestTemplate();
+        var server = MockRestServiceServer.bindTo(http).build();
+        PortoneService service = new PortoneService(http);
+        ReflectionTestUtils.setField(service, "v2Secret", "test-only");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.cancelPayment("ORDER-test", 1000,
+                "합성 환불", "reserve-refund-attempt-42", 1000)).isInstanceOf(PortoneService.RequestNotSentException.class);
+        server.verify();
+    }
     @Test void partialRefundKeepsExpectedBalanceSeparateFromRequestedAmount() {
         RestTemplate http = new RestTemplate();
         var server = MockRestServiceServer.bindTo(http).build();
         PortoneService service = new PortoneService(http);
         ReflectionTestUtils.setField(service, "v2Secret", "test-only");
+        ReflectionTestUtils.setField(service, "storeId", "test-store");
         server.expect(requestTo("https://api.portone.io/payments/ORDER-test/cancel"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("Idempotency-Key", "\"reserve-refund-attempt-42\""))

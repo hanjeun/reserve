@@ -183,7 +183,7 @@ const MembersTab = () => {
             <DataState state="error" kind="member" subject="회원 목록" error={membersError}
                 onRetry={refetch} retrying={isFetching} />
         );
-    } else if (memberLoading || isPlaceholderData) {
+    } else if (memberLoading || isPlaceholderData || memberSearch.trim() !== debouncedMemberSearch.trim()) {
         tableBody = (
             <AdminTableSkeleton
                 rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}

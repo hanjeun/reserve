@@ -20,6 +20,13 @@ describe('shared account Avatar', () => {
         expect(container.querySelector('img')).toHaveStyle({ objectFit: 'cover', position: 'absolute', inset: '0' });
     });
 
+    it('uses the existing person glyph without a colored disc while retaining the round photo mask', () => {
+        const { container } = render(<Avatar size={80} />);
+        expect(container.firstElementChild).toHaveStyle({ 'background-color': 'rgba(0, 0, 0, 0)', 'border-radius': '50%', overflow: 'hidden' });
+        expect(container.querySelector('.anticon-user')).toBeInTheDocument();
+        expect(container.querySelector('img')).toBeNull();
+    });
+
     it('uses the same fallback and recovers when the account photo changes', () => {
         const { container, rerender } = render(<Avatar src="https://example.test/failed.png" />);
         fireEvent.error(container.querySelector('img'));

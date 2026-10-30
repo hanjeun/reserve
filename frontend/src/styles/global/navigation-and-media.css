@@ -177,6 +177,8 @@
 /* 넘길 때 이미지가 "치지직" 거리는 것 — transform 으로 큰 이미지를 옮기는 동안
    GPU 레이어가 없으면 매 프레임 리페인트가 일어나 가장자리에 티어링처럼 보인다.
    트랙을 합성 레이어로 승격시키고 뒷면 렌더링을 끈다. */
+.reserve-store-action-panel { scroll-margin-top: 104px; }
+.reserve-store-gallery { touch-action: pan-y pinch-zoom; }
 .reserve-carousel .slick-track {
     will-change: transform;
     backface-visibility: hidden;

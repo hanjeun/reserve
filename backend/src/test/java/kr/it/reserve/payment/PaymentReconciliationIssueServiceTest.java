@@ -7,6 +7,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -22,6 +24,22 @@ class PaymentReconciliationIssueServiceTest {
     @AfterEach
     void clearQueue() {
         issueRepository.deleteAll();
+    }
+
+    @ParameterizedTest
+    @EnumSource(PaymentReconciliationIssue.IssueType.class)
+    void financialEvidenceIsSeparatedFromRetryableLookupErrors(PaymentReconciliationIssue.IssueType type) {
+        issueService.recordIssue("synthetic-conflict", type, 77L, 88L, "order-77", "SYNTHETIC");
+        boolean financial = java.util.Set.of(
+                PaymentReconciliationIssue.IssueType.LATE_PAID_RESERVATION,
+                PaymentReconciliationIssue.IssueType.PAID_STATE_CONFLICT,
+                PaymentReconciliationIssue.IssueType.PAID_AMOUNT_MISMATCH,
+                PaymentReconciliationIssue.IssueType.REFUND_LEDGER_MISSING,
+                PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN).contains(type);
+        assertThat(issueService.hasFinancialConflict(88L)).isEqualTo(financial);
+        assertThat(issueService.hasFinancialConflict(89L)).isFalse();
+        issueService.resolveForPayment(77L);
+        assertThat(issueService.hasFinancialConflict(88L)).isFalse();
     }
 
     @Test

@@ -5,6 +5,7 @@ import api from "../../api/axios";
 import useAuthStore from "../../store/useAuthStore";
 import { Form, Typography, Flex, Checkbox } from 'antd';
 import { PageContainer, Button, FormInput } from '../../components/common';
+import { UserOutlined } from '../../components/common/icons';
 import { useMessage, useEmailVerification, useFormErrors } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { API_ENDPOINTS } from '../../constants';
@@ -92,7 +93,7 @@ const Signup = () => {
     return (
         <PageContainer size="sm" paddingTop="60px" center>
             <div className="fade-in-up">
-                <PageTitle style={styles.title}>회원가입</PageTitle>
+                <PageTitle aria-label="회원가입" className="reserve-auth-title" style={styles.title}><UserOutlined aria-hidden="true" /></PageTitle>
                 <PageDescription style={styles.subtitle}>간편한 가입으로 예약을 시작하세요</PageDescription>
 
                 <Form form={form} onFinish={onSignupSubmit} layout="vertical" size="large" requiredMark={false}
@@ -190,7 +191,7 @@ const Signup = () => {
                                     </button>
                                     {path && (
                                         <button type="button" className="reserve-text-link" style={A.viewLink}
-                                            onClick={e => { e.stopPropagation(); window.open(path, '_blank'); }}>
+                                            onClick={e => { e.stopPropagation(); navigate(path); }}>
                                             보기
                                         </button>
                                     )}
@@ -208,6 +209,7 @@ const Signup = () => {
                         <Button
                             variant="primary"
                             htmlType="submit"
+                            icon={<UserOutlined />}
                             loading={submitLoading}
                             block
                             disabled={!isVerified}

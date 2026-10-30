@@ -276,6 +276,10 @@ const SettingsSection = ({ bookingType = 'SLOT' }) => (
         <Flex vertical gap={0} style={{ marginBottom: 16 }}>
             <ToggleItem name="reservationEnabled" label="예약 접수" desc="끄면 새로운 예약을 받지 않아요. 기존 예약은 유지돼요" />
             <ToggleItem name="autoApprovalEnabled"       label="예약 자동 승인" desc="ON 시 예약 요청이 즉시 확정돼요" />
+            <ToggleItem name="autoCompletionEnabled" label="이용 자동 완료" desc="QR 체크인한 예약을 이용 종료 후 완료하고 보증금을 전액 환불해요" />
+            <Form.Item name="serviceDurationMinutes" label="이용 시간" rules={[{ required: true, type: 'number', min: 1, max: 1440, message: '1~1,440분 사이로 입력해주세요.' }]}>
+                <FormInput type="number" min={1} max={1440} precision={0} suffix="분" />
+            </Form.Item>
             <ToggleItem name="allowLatePayment"          label="나중 결제 허용"  desc="예약 후 결제 가능 · 미결제 자동 취소 없음" />
             <ToggleItem name="allowDuplicateReservation" label="중복 예약 허용"  desc="OFF 시 한 손님은 같은 날 1건만 (한 건에 여러 명은 가능)" />
             <ToggleItem name="emailNotificationEnabled"  label="예약 알림 메일"  desc="새 예약 접수 시 이메일로 알림 받기" />

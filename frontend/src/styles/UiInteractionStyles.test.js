@@ -17,6 +17,27 @@ const findRule = (root, selector, media) => {
 };
 
 describe('scoped UI interaction styles', () => {
+    it('preserves each retry button variant press rule and the shared reduced-motion gates', () => {
+        const buttons = parse('components-and-forms.css');
+        const element = document.createElement('button');
+        for (const [variant, transform, opacity] of [['ghost', 'scale(0.94)', '0.5'], ['ghost-sm', 'scale(0.95)', '0.5'], ['outline', 'scale(0.96)', '0.88']]) {
+            element.className = `reserve-btn reserve-btn--${variant} reserve-retry-button`;
+            const matching = [];
+            buttons.walkRules(rule => {
+                if (rule.parent.type === 'root' && rule.selectors.some(selector => selector.includes(':active')
+                    && element.matches(selector.replaceAll(':active', '')))) matching.push(rule);
+            });
+            // An extra retry-specific rule must not override the variant through specificity or order.
+            expect(matching).toHaveLength(1);
+            expect(declarations(matching[0])).toMatchObject({ transform, opacity });
+        }
+        expect(findRule(buttons, '.reserve-retry-button:active:not(:disabled)')).toBeUndefined();
+        const reduced = findRule(parse('feature-surfaces.css'), '.reserve-btn:active:not(:disabled)', '(prefers-reduced-motion: reduce)');
+        expect(declarations(reduced).transform).toBe('none');
+        expect(reduced.nodes.find(node => node.prop === 'transform').important).toBe(true);
+        expect(declarations(findRule(parse('icons.css'), '.anticon.reserve-ui-icon.anticon-spin > svg', '(prefers-reduced-motion: reduce)')).animation).toBe('none');
+    });
+
     it('does not overlay theme-colored AntD progress bars on the white carousel indicators', () => {
         const css = parse('navigation-and-media.css');
         const overlay = findRule(css, '.reserve-carousel .slick-dots li::after');
@@ -48,16 +69,18 @@ describe('scoped UI interaction styles', () => {
         expect(declarations(findRule(css, '.reserve-store-gallery .ant-image-img'))['border-radius']).toBe('inherit');
     });
 
-    it('does not apply route entry motion to any page that still contains data skeletons', () => {
+    it('owns route entry motion on the stable parent including skeletons and suppresses child entrances', () => {
         const css = parse('discovery-motion.css');
         for (const direction of ['right', 'left']) {
-            const child = ' > :not(.reserve-route-skeleton):not(.reserve-data-skeleton):not(:has(.reserve-skeleton-block:not(.reserve-skeleton-block--local)))';
             const parent = `.reserve-route-entry--from-${direction}`;
-            const selector = `${parent}:not([data-skeleton-shown="true"])${child}`;
-            expect(declarations(findRule(css, selector, '(prefers-reduced-motion: no-preference)')).animation).toContain(`reserve-discovery-page-from-${direction}`);
-            expect(findRule(css, `${parent}${child}`, '(prefers-reduced-motion: no-preference)')).toBeUndefined();
-            expect(declarations(findRule(css, `${parent}${child}`, '(prefers-reduced-motion: reduce)')).animation).toBe('none');
+            const entry = findRule(css, parent, '(prefers-reduced-motion: no-preference)');
+            expect(entry.selectors).toEqual([parent]);
+            expect(declarations(entry).animation).toContain(`reserve-discovery-page-from-${direction}`);
+            expect(declarations(findRule(css, parent, '(prefers-reduced-motion: reduce)')).animation).toBe('none');
         }
+        const childEntrance = findRule(css, '.ant-layout-content .fade-in-up');
+        expect(declarations(childEntrance).animation).toBe('none');
+        expect(childEntrance.nodes.find(node => node.prop === 'animation').important).toBe(true);
     });
 
     it('keeps date fields stable and shares button press feedback with guest steps and store links', () => {
@@ -78,6 +101,13 @@ describe('scoped UI interaction styles', () => {
         const cardPressedSelector = '.reserve-card:has(.reserve-store-card-hit:active)';
         const card = declarations(buttons.nodes.find(node => node.type === 'rule' && node.selectors.includes(cardPressedSelector)));
         expect(card).toMatchObject({ transform: 'scale(0.98)', opacity: '0.88' });
+        const reservationCard = '.reserve-reservation-summary-card:has(.reserve-tap-card__trigger:active)';
+        const reservationRow = '.reserve-reservation-row:has(.reserve-tap-card__trigger:active)';
+        expect(buttons.nodes.find(node => node.type === 'rule' && node.selectors.includes(reservationCard)).selectors).toContain(cardPressedSelector);
+        expect(normalRule(reservationRow)).toBe(normalRule(link + ':active'));
+        expect(declarations(findRule(surfaces, reservationRow, '(min-width: 768px)')).transform).toBe('scale(0.995)');
+        expect(declarations(findRule(buttons, reservationCard, '(prefers-reduced-motion: reduce)')).transform).toBe('none');
+        expect(declarations(findRule(surfaces, reservationRow, '(prefers-reduced-motion: reduce)')).transform).toBe('none');
         expect(findRule(surfaces, '.reserve-store-card-shell:has(.reserve-store-card-hit:active)')).toBeUndefined();
         expect(declarations(findRule(buttons, cardSelector, '(prefers-reduced-motion: reduce)')).transition).toBe('none');
         expect(declarations(findRule(buttons, cardPressedSelector, '(prefers-reduced-motion: reduce)')).transform).toBe('none');

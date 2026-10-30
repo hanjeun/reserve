@@ -114,7 +114,7 @@ public class AdPaymentLedgerService {
                     .anyMatch(value -> !value.getId().equals(attempt.getId())
                             && (AdPaymentAttempt.UNRESOLVED.contains(value.getState()) || value.getState() == State.PAID));
             if (otherUnresolved) throw conflict("이전 결제 시도의 확인이 필요해요.");
-            ad.setMerchantUid("AD-" + UUID.randomUUID());
+            ad.setMerchantUid("AD" + UUID.randomUUID().toString().replace("-", ""));
             attempts.save(AdPaymentAttempt.create(ad, false));
         }
         ad.setStatus(AdStatus.PENDING_PAYMENT);
@@ -248,7 +248,10 @@ public class AdPaymentLedgerService {
     private void applyUnpaidPayment(String status, Advertisement ad, AdPaymentAttempt attempt, boolean currentAttempt) {
         if ("FAILED".equals(status) && !attempt.isEverPaid() && attempt.getRefundDispatchedAt() == null) {
             attempt.reviewed(State.FAILED, null);
-            if (currentAttempt) ad.setStatus(attempt.isCancelRequested() ? AdStatus.CANCELLED : AdStatus.PAYMENT_FAILED);
+            if (currentAttempt) {
+                boolean cancelled = attempt.isCancelRequested() || ad.getStatus() == AdStatus.CANCELLED;
+                ad.setStatus(cancelled ? AdStatus.CANCELLED : AdStatus.PAYMENT_FAILED);
+            }
         } else if ("READY".equals(status) && !attempt.isEverPaid() && attempt.getRefundDispatchedAt() == null) {
             boolean stopped = attempt.isCancelRequested() || ad.getStatus() != AdStatus.PENDING_PAYMENT
                     || ad.isDeleted() || ad.getStore().isDeleted() || ad.getStore().isSuspended();
@@ -262,8 +265,15 @@ public class AdPaymentLedgerService {
         lockByUid(claim.merchantUid());
         AdPaymentAttempt attempt = attempts.findForUpdate(claim.merchantUid()).orElseThrow();
         if (!attempt.ownsLease(claim.token())) return;
-        attempt.observed(notFound ? "NOT_FOUND" : "UNAVAILABLE", null, LocalDateTime.now(Clock.systemDefaultZone()));
-        attempt.requireReview(notFound ? "PG_NOT_FOUND_NOT_TERMINAL" : "PG_LOOKUP_FAILED");
+        attempt.lookupFailed(notFound, LocalDateTime.now(Clock.systemDefaultZone()));
+        attempt.release();
+    }
+
+    public void deferUnsentRefund(RefundCommand command) {
+        lockByUid(command.merchantUid());
+        AdPaymentAttempt attempt = attempts.findForUpdate(command.merchantUid()).orElseThrow();
+        if (!attempt.ownsLease(command.token())) return;
+        attempt.deferUnsentRefund();
         attempt.release();
     }
 
@@ -297,7 +307,11 @@ public class AdPaymentLedgerService {
             ad.setStatus(AdStatus.EXPIRED);
         } else if ((ad.getStatus() == AdStatus.PENDING_PAYMENT || ad.getStatus() == AdStatus.PAYMENT_FAILED)
                 && ad.getStartDate().isBefore(ServiceTime.today())) {
-            current(ad).requireReview("EXPIRED_PAYMENT_RECHECK_REQUIRED");
+            AdPaymentAttempt attempt = current(ad);
+            // 기한 경과만으로 확정 원장을 미결로 되돌리지 않는다.
+            if (attempt.getState() != State.FAILED && attempt.getState() != State.REFUNDED) {
+                attempt.requireReview("EXPIRED_PAYMENT_RECHECK_REQUIRED");
+            }
             ad.setStatus(AdStatus.CANCELLED);
         }
     }

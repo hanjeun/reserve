@@ -47,7 +47,21 @@ class PaymentPreparedAmountTest {
     void aPaidReservationKeepsItsOriginalAmountEvenWhenTheStoreOrClientRequestsMore() {
         stubReservation(3000);
         when(payments.findAllByReservationIdForUpdate(31L)).thenReturn(List.of());
-        assertThat(service.preparePayment(request(), 7L).getAmount()).isEqualTo(3000);
+        var prepared = service.preparePayment(request(), 7L);
+        assertThat(prepared.getAmount()).isEqualTo(3000);
+        assertThat(prepared.getMerchantUid()).matches("[A-Za-z0-9]{1,40}");
+    }
+
+    @Test
+    void anExistingReadyOrderKeepsItsIdentityForLookupAndRefund() {
+        var reservation = stubReservation(3000);
+        var existing = kr.it.reserve.payment.entity.Payment.builder().id(51L).reservation(reservation)
+                .member(reservation.getMember()).merchantUid("ORD-legacy-identity").amount(3000)
+                .status(kr.it.reserve.payment.entity.Payment.PaymentStatus.READY).build();
+        when(payments.findAllByReservationIdForUpdate(31L)).thenReturn(List.of(existing));
+        assertThat(service.preparePayment(request(), 7L).getMerchantUid()).isEqualTo("ORD-legacy-identity");
+        verify(payments, never()).save(any());
+        verify(portone, never()).getPaymentInfo(anyString());
     }
 
     @Test
@@ -57,7 +71,19 @@ class PaymentPreparedAmountTest {
         assertThat(service.preparePayment(request(), 7L).getAmount()).isEqualTo(9000);
     }
 
-    private void stubReservation(Integer amount) {
+    @Test
+    void expiredPaymentCannotOpenOrReuseAPgOrder() {
+        var reservation = stubReservation(3000);
+        reservation.setCreatedAt(java.time.LocalDateTime.now().minusHours(1));
+        reservation.getStore().setPaymentTimeoutMinutes(10);
+        assertThatThrownBy(() -> service.preparePayment(request(), 7L))
+                .isInstanceOf(PaymentException.class).hasMessageContaining("결제 기한");
+        verify(payments, never()).save(any());
+        verifyNoInteractions(portone);
+        assertThat(reservation.getStatus()).isEqualTo(Reservation.ReservationStatus.PENDING);
+    }
+
+    private Reservation stubReservation(Integer amount) {
         Member member = Member.builder().id(7L).name("금액 검증").build();
         Reservation reservation = Reservation.builder().id(31L).member(member)
                 .store(Store.builder().noShowDeposit(9000).build()).depositAmount(amount)
@@ -65,6 +91,7 @@ class PaymentPreparedAmountTest {
         when(reservations.findMemberIdById(31L)).thenReturn(Optional.of(7L));
         when(reservations.findByIdForPaymentUpdate(31L)).thenReturn(Optional.of(reservation));
         when(members.findByIdForPaymentUpdate(7L)).thenReturn(Optional.of(member));
+        return reservation;
     }
 
     private PaymentRequestDto request() {

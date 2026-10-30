@@ -17,6 +17,19 @@ public class PortoneV2PaymentResponse {
     @JsonAlias("id")
     private String paymentId;
     private String currency;
+    private Channel channel;
+    private String storeId;
+    private java.util.List<Dispute> disputes;
+    @Getter @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Dispute { private String status; }
+
+    @Getter @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Channel {
+        private String type;
+        private String id;
+        private String pgProvider;
+        private String pgMerchantId;
+    }
 
     // V2 status: READY, PAID, FAILED, CANCELLED, PARTIAL_CANCELLED
     private String status;
@@ -48,12 +61,15 @@ public class PortoneV2PaymentResponse {
     public static class Method {
         // "EasyPay", "Card", "Transfer" 등
         private String type;
+        private String provider;
 
+        // 이전 응답의 중첩 제공사도 읽는다.
         // EasyPay 제공사: "KakaoPay", "NaverPay" 등
         @JsonProperty("easyPay")
         private EasyPay easyPay;
 
         public String getProvider() {
+            if (provider != null && !provider.isBlank()) return provider;
             if (easyPay != null && easyPay.getProvider() != null) {
                 return easyPay.getProvider();
             }

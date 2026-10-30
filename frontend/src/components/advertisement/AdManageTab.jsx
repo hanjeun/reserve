@@ -240,7 +240,7 @@ const createModalText = (createStep) => {
 const AdManageTab = () => {
     const { message, confirm } = useMessage();
     const queryClient = useQueryClient();
-    const { pay, payExisting, paying, payingId } = useAdPayment();
+    const { pay, payExisting, paying, payingId, paymentDialog } = useAdPayment();
     // SDK 모바일 리다이렉트를 beforeunload로 막지 않는다. 메뉴·뒤로가기 이동은 처리 중 계속 막는다.
     useWorkspaceDraftGuard({ busy: paying, allowUnload: paying });
     const { stores: myStores, loading: storesLoading, error: storesError, refetch: refetchStores } = useMyStores();
@@ -506,7 +506,7 @@ const AdManageTab = () => {
     });
 
     const adsContent = renderAdsContent({
-        adsError, refetch, isFetching, loading, isPlaceholderData, totalElements, page, columns, ads,
+        adsError, refetch, isFetching, loading: loading || search.trim() !== debouncedSearch.trim(), isPlaceholderData, totalElements, page, columns, ads,
         onPageChange: (nextPage) => setAdListParams({ advertisementPage: String(nextPage - 1) }),
     });
 
@@ -564,6 +564,7 @@ const AdManageTab = () => {
              */}
             {adsContent}
 
+            {paymentDialog}
             <FormModal
                 title={createChrome.title}
                 open={modalOpen}

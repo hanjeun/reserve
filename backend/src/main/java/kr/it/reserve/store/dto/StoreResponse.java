@@ -65,6 +65,8 @@ public class StoreResponse {
 
     private Integer maxCapacityPerSlot;
     private Boolean autoApprovalEnabled;
+    private Boolean autoCompletionEnabled;
+    private Integer serviceDurationMinutes;
     private Integer bookingDeadlineHours;
     private Integer paymentTimeoutMinutes;
     private Integer reservationSlotMinutes;
@@ -185,6 +187,8 @@ public class StoreResponse {
                 .partialRefundRate(store.getPartialRefundRate())
                 .maxCapacityPerSlot(store.getMaxCapacityPerSlot())
                 .autoApprovalEnabled(store.getAutoApprovalEnabled())
+                .autoCompletionEnabled(store.getAutoCompletionEnabled())
+                .serviceDurationMinutes(kr.it.reserve.reservation.service.ReservationCompletionPolicy.storedDuration(store.getServiceDurationMinutes()))
                 .bookingDeadlineHours(store.getBookingDeadlineHours())
                 .paymentTimeoutMinutes(store.getPaymentTimeoutMinutes())
                 .reservationSlotMinutes(store.getReservationSlotMinutes())

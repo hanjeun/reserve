@@ -19,4 +19,4 @@
 
 ## 코드 위치
 
-backend의 advertisement 영역에서 광고 주문·결제·환불을 처리해요. 결제사의 결과를 확인하는 기본 원칙은 [예약금과 환불](payments.md), 기록 보존은 [데이터 보관과 삭제](data-lifecycle.md)를 보세요.
+backend의 advertisement 영역에서 광고 주문·결제·환불을 처리해요. 거래 기록은 광고 삭제와 별도로 보존해요.

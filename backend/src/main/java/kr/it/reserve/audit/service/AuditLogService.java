@@ -9,6 +9,7 @@ import kr.it.reserve.global.error.AuditException;
 import kr.it.reserve.mailbox.entity.AdminSentMail;
 import kr.it.reserve.mailbox.repository.AdminSentMailRepository;
 import kr.it.reserve.member.entity.Member;
+import kr.it.reserve.payment.service.PaymentService;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.reservation.service.ReservationUpdates;
@@ -24,6 +25,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -46,6 +48,7 @@ public class AuditLogService {
     private final AdvertisementRepository advertisementRepository;
     private final ObjectMapper objectMapper;
     private final AuditCleanupWorker auditCleanupWorker;
+    private final PaymentService paymentService;
     @Autowired(required = false)
     private ReservationUpdates reservationUpdates;
     @Autowired(required = false)
@@ -70,21 +73,25 @@ public class AuditLogService {
     public void logReservationDelete(Reservation reservation) {
         saveAuditLog(RESERVATION_ENTITY_TYPE, reservation.getId(), SOFT_DELETE_ACTION, Map.of(
                 "가게",   reservation.getStore().getName(),
-                "예약자", nullSafe(reservation.getMember().getName()),
+                "예약번호", nullSafe(reservation.getReservationCode()),
                 "날짜",   reservation.getReservationDate().toString(),
                 "상태",   reservation.getStatus().name()
         ));
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public void softDeleteReservation(Long reservationId) {
-        Reservation reservation = reservationRepository.findById(reservationId)
+        paymentService.lockReservationForStateChange(reservationId);
+        Reservation reservation = reservationRepository.findByIdForUpdate(reservationId)
                 .orElseThrow(() -> AuditException.notFound("Reservation not found: " + reservationId));
+        kr.it.reserve.reservation.service.ReservationRemovalPolicy.requireFinished(reservation);
+        paymentService.requireReservationRemovable(reservation);
+        if (reservation.isDeleted()) return;
         reservation.softDelete();
         if (reservationUpdates != null) reservationUpdates.deleted(reservation);
         saveAuditLog(RESERVATION_ENTITY_TYPE, reservationId, SOFT_DELETE_ACTION, Map.of(
                 "가게",   reservation.getStore().getName(),
-                "예약자", nullSafe(reservation.getMember().getName()),
+                "예약번호", nullSafe(reservation.getReservationCode()),
                 "날짜",   reservation.getReservationDate().toString(),
                 "상태",   reservation.getStatus().name()
         ));
@@ -123,11 +130,17 @@ public class AuditLogService {
 
     // 복구 (예약/리뷰/메일만 해당)
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public void restore(String entityType, Long entityId) {
         switch (entityType.toUpperCase()) {
             case "SENT_MAIL"      -> adminSentMailRepository.restoreById(entityId);
-            case RESERVATION_ENTITY_TYPE    -> reservationRepository.restoreById(entityId);
+            case RESERVATION_ENTITY_TYPE    -> {
+                paymentService.lockReservationForStateChange(entityId);
+                Reservation reservation = reservationRepository.findByIdForUpdate(entityId)
+                        .orElseThrow(() -> AuditException.notFound("Reservation not found: " + entityId));
+                kr.it.reserve.reservation.service.ReservationRemovalPolicy.requireFinished(reservation);
+                reservation.setDeletedAt(null);
+            }
             case "REVIEW"         -> reviewRepository.restoreById(entityId);
             case "ADVERTISEMENT"  -> advertisementRepository.restoreById(entityId);
             default -> throw new AuditException("휴지통 복구가 지원되지 않는 항목이에요: " + entityType);
@@ -214,6 +227,11 @@ public class AuditLogService {
     }
 
     // 목록 조회
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void recordReservationRetention(Long id, String action, String purpose) {
+        saveAuditLog(RESERVATION_ENTITY_TYPE, id, action, Map.of("목적", purpose));
+    }
 
     @Transactional(readOnly = true)
     public Page<AuditLog> getTrashItems(String entityType, Pageable pageable) {

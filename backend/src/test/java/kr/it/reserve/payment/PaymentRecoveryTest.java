@@ -187,6 +187,37 @@ class PaymentRecoveryTest {
         when(entityManager.getLockMode(payment.getReservation())).thenReturn(LockModeType.PESSIMISTIC_WRITE);
     }
 
+    @Test void expiryReleasesOnlyAnAuthoritativelyMissingPayment() {
+        Payment payment = readyPayment(20L, payableReservation(Reservation.ReservationStatus.PENDING));
+        stubReadyPaymentForExpiry(payment);
+        when(portoneService.getPaymentInfo(MERCHANT_UID)).thenThrow(PaymentException.notFound());
+        assertThat(paymentService.reconcileBeforeReservationExpiry(100L))
+                .isEqualTo(PaymentService.ExpiryPaymentDecision.NOT_PAID);
+        assertThat(payment.getStatus()).isEqualTo(Payment.PaymentStatus.FAILED);
+    }
+
+    @Test void expiryKeepsMultipleUnresolvedPaymentsEvenWhenOneIsMissing() {
+        Payment payment = readyPayment(21L, payableReservation(Reservation.ReservationStatus.PENDING));
+        stubReadyPaymentForExpiry(payment);
+        Payment other = Payment.builder().id(22L).status(Payment.PaymentStatus.REFUND_PENDING).build();
+        when(paymentRepository.findAllByReservationIdForUpdate(100L)).thenReturn(List.of(payment, other));
+        when(portoneService.getPaymentInfo(MERCHANT_UID)).thenThrow(PaymentException.notFound());
+        assertThat(paymentService.reconcileBeforeReservationExpiry(100L))
+                .isEqualTo(PaymentService.ExpiryPaymentDecision.UNCERTAIN);
+        assertThat(payment.getStatus()).isEqualTo(Payment.PaymentStatus.READY);
+    }
+
+    @Test void aLaterMissingResponseDoesNotEraseEarlierFinancialEvidence() {
+        Payment payment = readyPayment(23L, payableReservation(Reservation.ReservationStatus.PENDING));
+        stubReadyPaymentForExpiry(payment);
+        when(reconciliationIssueService.hasFinancialConflict(100L)).thenReturn(true);
+        when(portoneService.getPaymentInfo(MERCHANT_UID)).thenThrow(PaymentException.notFound());
+        assertThat(paymentService.reconcileBeforeReservationExpiry(100L))
+                .isEqualTo(PaymentService.ExpiryPaymentDecision.UNCERTAIN);
+        assertThat(payment.getStatus()).isEqualTo(Payment.PaymentStatus.READY);
+        verify(reconciliationIssueService, org.mockito.Mockito.never()).resolveForPayment(any());
+    }
+
     private Reservation payableReservation(Reservation.ReservationStatus status) {
         Store store = Store.builder()
                 .autoApprovalEnabled(false)

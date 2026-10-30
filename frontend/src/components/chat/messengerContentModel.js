@@ -6,6 +6,7 @@ import { STORE_EMPTY_TEXT } from '../../hooks/useChatIntro';
 import { conversationTitle, SUPPORT_LABEL } from './messengerIdentity';
 import { chatKeys } from '../../hooks/queryKeys';
 import { chatService } from '../../services';
+import { messengerSelectionKey } from '../../utils/messengerSelection';
 
 const contentOf = listRows;
 const flattenPages = (data) => data?.pages?.flatMap(contentOf) ?? [];
@@ -17,10 +18,7 @@ const nextPage = (last, pages) => {
 };
 
 export const selectionKeyOf = (selection) => {
-    if (selection?.kind === 'admin') return `admin:${selection.roomId}`;
-    if (selection?.kind === 'store') return `store:${selection.storeId}`;
-    if (selection?.kind === 'owner') return `owner:${selection.roomId}`;
-    return 'support';
+    return messengerSelectionKey(selection);
 };
 
 export const matchesSelection = (row, selection) => {

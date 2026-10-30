@@ -33,6 +33,7 @@ async function setup(page) {
         const ok = data => route.fulfill({ json: { success: true, data } });
         if (/^\/api\/feed\/media\/\d+$/.test(pathname) || /\/messages\/\d+\/image$/.test(pathname))
             return route.fulfill({ body: photo, contentType: 'image/webp' });
+        if (pathname === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: user, refreshPossible: false } } }); }
         if (pathname === '/api/member/me') return ok(user);
         if (pathname === '/api/stores/81') return ok(store);
         if (pathname.includes('favorite')) return ok({ isFavorite: false });

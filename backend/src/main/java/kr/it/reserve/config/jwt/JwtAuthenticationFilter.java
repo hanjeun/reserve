@@ -42,7 +42,7 @@ public class JwtAuthenticationFilter implements Filter {
                         Collections.singletonList(new SimpleGrantedAuthority(role))
                 );
                 authentication.setDetails(new SecurityUtil.OAuthAuthenticationDetails(
-                        verified.oauthAuthenticatedAt(), verified.loginMethod(), verified.sessionId()));
+                        verified.oauthAuthenticatedAt(), verified.loginMethod(), verified.sessionId(), verified.persistent()));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
         } catch (AuthException e) {

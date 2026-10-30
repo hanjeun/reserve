@@ -10,7 +10,8 @@ import java.time.LocalDateTime;
 public class SecurityUtil {
 
     /** 서명 검증한 토큰의 원인증 문맥만 보관한다. 현재 회원의 최신 로그인 시각으로 대체하지 않는다. */
-    public record OAuthAuthenticationDetails(LocalDateTime authenticatedAt, String loginMethod, String sessionId) {
+    public record OAuthAuthenticationDetails(LocalDateTime authenticatedAt, String loginMethod, String sessionId, boolean persistent) {
+        public OAuthAuthenticationDetails(LocalDateTime at, String method, String sid) { this(at, method, sid, true); }
         public OAuthAuthenticationDetails(LocalDateTime authenticatedAt) { this(authenticatedAt, null, null); }
         public OAuthAuthenticationDetails(LocalDateTime authenticatedAt, String loginMethod) { this(authenticatedAt, loginMethod, null); }
     }
@@ -58,6 +59,12 @@ public class SecurityUtil {
         return authentication != null && authentication.isAuthenticated()
                 && authentication.getDetails() instanceof OAuthAuthenticationDetails details
                 ? details.sessionId() : null;
+    }
+
+    public static boolean isPersistentLogin() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null && authentication.isAuthenticated()
+                && authentication.getDetails() instanceof OAuthAuthenticationDetails details && details.persistent();
     }
 
     // 커뮤니티 등에서 비로그인 여부 확인할 때 사용

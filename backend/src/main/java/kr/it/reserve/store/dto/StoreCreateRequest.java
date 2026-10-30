@@ -69,6 +69,8 @@ public class StoreCreateRequest {
 
     // 자동 승인 여부 (기본 false)
     private Boolean autoApprovalEnabled = false;
+    private Boolean autoCompletionEnabled = false;
+    private Integer serviceDurationMinutes = 60;
 
     // 예약 가능 마감 시간
     private Integer bookingDeadlineHours;

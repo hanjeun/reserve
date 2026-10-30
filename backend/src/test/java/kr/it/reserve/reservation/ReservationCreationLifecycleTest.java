@@ -44,6 +44,25 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 class ReservationCreationLifecycleTest {
+    @Test
+    void legacyZeroDurationCreatesAValidSnapshotWithoutChangingTheStore() {
+        Fixture fixture = fixture();
+        Store store = bookableStore();
+        store.setServiceDurationMinutes(0);
+        prepareCreation(fixture, store);
+        when(fixture.reservations().save(any(Reservation.class))).thenAnswer(invocation -> {
+            Reservation saved = invocation.getArgument(0); saved.setId(20L); return saved;
+        });
+        var date = ServiceTime.today().plusDays(1);
+        fixture.service().createReservation(new ReservationCreateRequest(10L, date, LocalTime.of(11,0), 1, null, false), fixture.member());
+        var captured = ArgumentCaptor.forClass(Reservation.class);
+        verify(fixture.reservations()).save(captured.capture());
+        assertThat(captured.getValue().getServiceDurationMinutes()).isEqualTo(60);
+        assertThat(captured.getValue().getUsageEndsAt()).isEqualTo(date.atTime(12,0));
+        assertThat(kr.it.reserve.store.dto.StoreResponse.fromEntity(store).getServiceDurationMinutes()).isEqualTo(60);
+        assertThat(store.getServiceDurationMinutes()).isZero();
+    }
+
 
     @Test
     @DisplayName("탈퇴와 직렬화된 최신 회원 행이 없으면 예약 생성을 시작하지 않는다")
@@ -59,7 +78,7 @@ class ReservationCreationLifecycleTest {
                 mock(EmailService.class),
                 memberRepository,
                 mock(AuditLogService.class),
-                mock(QrCheckinTokenProvider.class), creationGuard());
+                mock(QrCheckinTokenProvider.class), creationGuard(), org.mockito.Mockito.mock(kr.it.reserve.reservation.service.ReservationConsentService.class));
 
         Member stalePrincipal = Member.builder().id(1L).email("withdrawn@example.com").build();
         ReservationCreateRequest request = new ReservationCreateRequest(
@@ -91,7 +110,7 @@ class ReservationCreationLifecycleTest {
                 mock(EmailService.class),
                 memberRepository,
                 mock(AuditLogService.class),
-                mock(QrCheckinTokenProvider.class), creationGuard());
+                mock(QrCheckinTokenProvider.class), creationGuard(), org.mockito.Mockito.mock(kr.it.reserve.reservation.service.ReservationConsentService.class));
 
         Member activeMember = Member.builder()
                 .id(1L)
@@ -316,7 +335,7 @@ class ReservationCreationLifecycleTest {
         Member member = Member.builder().id(1L).email("active@example.com").termsAgreed(true).build();
         ReservationService service = new ReservationService(
                 reservations, stores, mock(HolidayService.class), payments, emails, members,
-                audits, mock(QrCheckinTokenProvider.class), creationGuard());
+                audits, mock(QrCheckinTokenProvider.class), creationGuard(), org.mockito.Mockito.mock(kr.it.reserve.reservation.service.ReservationConsentService.class));
         return new Fixture(service, reservations, stores, members, payments, emails, audits, member);
     }
 

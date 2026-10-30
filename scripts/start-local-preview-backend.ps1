@@ -1,23 +1,36 @@
 param(
     [string]$JarPath = '',
-    [string]$JavaPath = 'C:\Program Files\Java\jdk-21\bin\java.exe'
+    [string]$JavaPath = '',
+    [ValidateRange(1024, 65535)][int]$Port = 8080,
+    [switch]$StartupCheck,
+    [switch]$DisableBackgroundJobs,
+    [switch]$EnableUnpaidExpiry
 )
 
 $ErrorActionPreference = 'Stop'
+if ($EnableUnpaidExpiry -and (-not $DisableBackgroundJobs -or $StartupCheck)) {
+    throw 'Unpaid expiry requires -DisableBackgroundJobs and cannot run during StartupCheck.'
+}
 $repoRoot = Split-Path -Parent $PSScriptRoot
+if (-not $PSBoundParameters.ContainsKey('JavaPath')) {
+    $JavaPath = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.cache/reserve-java/v21.0.13/jdk21.0.13_0/bin/java.exe'
+}
 if (-not $JarPath) {
-    $JarPath = Join-Path $repoRoot 'backend/build/libs/reserve-2.11.0.jar'
+    $buildFile = Get-Content -LiteralPath (Join-Path $repoRoot 'backend/build.gradle') -Raw
+    $versionMatch = [regex]::Match($buildFile, "(?m)^version\s*=\s*'([^']+)'")
+    if (-not $versionMatch.Success) { throw 'Cannot determine the current backend version. Supply -JarPath.' }
+    $JarPath = Join-Path $repoRoot ('backend/build/libs/reserve-{0}.jar' -f $versionMatch.Groups[1].Value)
 }
 $sourceJar = (Resolve-Path -LiteralPath $JarPath).Path
 $buildRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot 'backend/build/libs')) + [IO.Path]::DirectorySeparatorChar
 if (-not $sourceJar.StartsWith($buildRoot, [StringComparison]::OrdinalIgnoreCase)) {
     throw 'The preview JAR must be an existing build from this checkout.'
 }
-if (-not (Test-Path -LiteralPath $JavaPath -PathType Leaf)) {
-    throw 'Java 21 is required. Supply the installed Java executable with -JavaPath.'
+if ([string]::IsNullOrWhiteSpace($JavaPath) -or -not (Test-Path -LiteralPath $JavaPath -PathType Leaf)) {
+    throw 'The selected Java executable is unavailable. Prepare the verified Corretto 21.0.13 preview cache or select an installed runtime explicitly with -JavaPath; no fallback runtime was selected.'
 }
-if (Get-NetTCPConnection -State Listen -LocalPort 8080 -ErrorAction SilentlyContinue) {
-    throw 'Port 8080 is already in use. Stop the intended local preview before starting another one.'
+if (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue) {
+    throw "Port $Port is already in use. Stop the intended local preview before starting another one."
 }
 
 $jarHash = (Get-FileHash -LiteralPath $sourceJar -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -55,12 +68,27 @@ try {
     $logStamp = Get-Date -Format 'yyyyMMddTHHmmssfff'
     $stdout = Join-Path $runtimeDir "$logStamp.out.log"
     $stderr = Join-Path $runtimeDir "$logStamp.err.log"
-    $process = Start-Process -FilePath $JavaPath -ArgumentList @('-jar', ('"{0}"' -f $runtimeJar),
+    $launchArguments = @('-jar', ('"{0}"' -f $runtimeJar),
         '--spring.profiles.active=local', '--spring.jpa.hibernate.ddl-auto=validate',
-        '--spring.devtools.restart.enabled=false', '--server.address=127.0.0.1', '--server.port=8080') `
+        '--spring.devtools.restart.enabled=false', '--server.address=127.0.0.1', "--server.port=$Port")
+    if ($StartupCheck -or $DisableBackgroundJobs) {
+        $launchArguments += @('--reserve.scheduling.enabled=false', '--reservation.code-backfill.enabled=false',
+            '--reserve.reservation-retention.enabled=false', '--reserve.reservation-retention.purge-enabled=false',
+            '--reserve.reservation-consent.enabled=false')
+    }
+    if ($EnableUnpaidExpiry) {
+        $launchArguments += '--reserve.preview.unpaid-expiry-enabled=true'
+    }
+    if ($StartupCheck) {
+        # 진단 기동은 데이터 보정·예약·환불 작업을 실행하지 않는다.
+        $launchArguments += @('--spring.datasource.hikari.read-only=true', '--reserve.redis.enabled=false',
+            '--reserve.admission.enabled=false', '--reserve.service-admission.enabled=false',
+            '--feed.media.local-enabled=false', '--sentry.dsn=')
+    }
+    $process = Start-Process -FilePath $JavaPath -ArgumentList $launchArguments `
         -WorkingDirectory (Join-Path $repoRoot 'backend') -WindowStyle Hidden `
         -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
-    [pscustomobject]@{ ProcessId = $process.Id; JarSha256 = $jarHash; RuntimeJar = $runtimeJar;
+    [pscustomobject]@{ ProcessId = $process.Id; Port = $Port; JarSha256 = $jarHash; RuntimeJar = $runtimeJar;
         StandardOutput = $stdout; StandardError = $stderr }
 } finally {
     foreach ($name in $environmentBefore.Keys) {

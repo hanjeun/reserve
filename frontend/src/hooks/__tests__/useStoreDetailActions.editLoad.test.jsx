@@ -52,6 +52,23 @@ describe('useStoreDetailActions edit lookup', () => {
         message = { error: vi.fn(), warning: vi.fn(), info: vi.fn(), success: vi.fn() };
     });
 
+    it.each([false, true])('scrolls to the loaded edit form once with reduced motion %s', async reduced => {
+        const media = vi.spyOn(window, 'matchMedia').mockImplementation(query => ({ matches: query === '(prefers-reduced-motion: reduce)' && reduced,
+            addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+        let resolveReservation;
+        reservationService.getReservation.mockReturnValue(new Promise(resolve => { resolveReservation = resolve; }));
+        const { result, rerender, unmount } = renderEditHook(message);
+        try {
+            const scrollIntoView = vi.fn();
+            result.current.bookingSectionRef.current = { scrollIntoView };
+            expect(scrollIntoView).not.toHaveBeenCalled();
+            await act(async () => resolveReservation(editable));
+            await waitFor(() => expect(scrollIntoView).toHaveBeenCalledExactlyOnceWith({ behavior: reduced ? 'instant' : 'smooth', block: 'start' }));
+            rerender({ store: { id: 12, name: '합성 가게' } });
+            expect(scrollIntoView).toHaveBeenCalledTimes(1);
+        } finally { unmount(); media.mockRestore(); }
+    });
+
     it('updates only the loaded reservation with normalized date and time', async () => {
         reservationService.getReservation.mockResolvedValue(editable);
         const { result } = renderEditHook(message);

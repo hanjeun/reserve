@@ -51,6 +51,32 @@ describe('route chunk loading patterns', () => {
         expect(container.querySelector('input,button')).toBeNull();
     });
 
+    it.each(['', '?storeId=42'])('opens the first mobile messages skeleton once at %s', search => {
+        setWidth(390);
+        const presentation = createLoadingPresentation(`messages-entry:${search}`);
+        const view = () => <LoadingPresentationContext.Provider value={presentation}>
+            <RouteSkeletonPreview pathname="/messages" search={search} />
+        </LoadingPresentationContext.Provider>;
+        const first = render(view());
+        const page = first.container.querySelector('.reserve-messages-route');
+        expect(page).toHaveClass('is-opening');
+        act(() => presentation.markSkeletonShown());
+        expect(first.container.querySelector('.reserve-messages-route')).toBe(page);
+        expect(page).toHaveClass('is-opening');
+        first.unmount();
+        const replacement = render(view());
+        expect(replacement.container.querySelector('.reserve-messages-route')).not.toHaveClass('is-opening');
+    });
+
+    it('does not animate a messages skeleton on a document reload', () => {
+        setWidth(390);
+        const presentation = createLoadingPresentation('messages-document', { documentEntry: true });
+        const { container } = render(<LoadingPresentationContext.Provider value={presentation}>
+            <RouteSkeletonPreview pathname="/messages" />
+        </LoadingPresentationContext.Provider>);
+        expect(container.querySelector('.reserve-messages-route')).not.toHaveClass('is-opening');
+    });
+
     it('keeps the first search skeleton entrance and does not replay it on boot replacement', () => {
         const presentation = createLoadingPresentation('search-entry');
         const view = () => <LoadingPresentationContext.Provider value={presentation}>
@@ -63,6 +89,12 @@ describe('route chunk loading patterns', () => {
         first.unmount();
         const replacement = render(view());
         expect(replacement.container.querySelector('.reserve-search-page')).not.toHaveClass('reserve-search-page--entering');
+    });
+
+    it('keeps the search skeleton still on a direct document load or refresh', () => {
+        const presentation = createLoadingPresentation('document-search', { documentEntry: true });
+        const { container } = render(<LoadingPresentationContext.Provider value={presentation}><RouteSkeletonPreview pathname="/search" /></LoadingPresentationContext.Provider>);
+        expect(container.querySelector('.reserve-search-page')).not.toHaveClass('reserve-search-page--entering');
     });
 
     it('mirrors the search header, six domains and quick choices without a text input', () => {
@@ -153,7 +185,8 @@ describe('route chunk loading patterns', () => {
         expect(container.querySelector('.reserve-discovery-home')).toBeInTheDocument();
         rerender(<RouteSkeletonPreview pathname="/login" />);
         expect(container.querySelector('.reserve-discovery-home')).toBeNull();
-        expect(container.querySelector('.reserve-page-title')).toHaveTextContent('로그인');
+        expect(container.querySelector('.reserve-page-title')).toHaveAttribute('aria-label', '로그인');
+        expect(container.querySelector('.reserve-page-title').textContent.trim()).toBe('');
         rerender(<RouteSkeletonPreview pathname="/" />);
         expect(container.querySelector('.reserve-discovery-home')).toBeInTheDocument();
         expect(container.querySelector('.reserve-page-title')).toBeNull();
@@ -188,7 +221,12 @@ describe('route chunk loading patterns', () => {
     ])('draws %s at the real auth frame with its own title and input count', (path, top, title, inputs) => {
         const { container } = render(<RouteSkeletonPreview pathname={path} />);
         expect(container.querySelector('.reserve-page-container')).toHaveStyle({ maxWidth: '420px', padding: `${top} 24px 80px`, minHeight: 'calc(100svh - 64px)' });
-        expect(container.querySelector('h2')).toHaveTextContent(title);
+        const heading = container.querySelector('h2');
+        if (path === '/forgot-password') expect(heading).toHaveTextContent(title);
+        else {
+            expect(heading).toHaveAttribute('aria-label', title);
+            expect(heading.querySelector('svg')).toBeInTheDocument();
+        }
         expect(Array.from(container.querySelectorAll('.reserve-skeleton-block')).filter(bone => bone.style.height === '54px')).toHaveLength(inputs);
     });
 
@@ -232,7 +270,8 @@ describe('route chunk loading patterns', () => {
     it('mirrors the payment verifying screen inside the 420px payment frame', () => {
         const { container } = render(<RouteSkeletonPreview pathname="/payment/result" />);
         expect(container.querySelector('.reserve-payment-result-page')).toHaveStyle({ maxWidth: '420px', padding: '56px 24px 80px' });
-        expect(container.querySelector('.reserve-payment-result__content .reserve-payment-result__hint')).toBeInTheDocument();
+        expect(container.querySelector('.reserve-payment-result__content .reserve-payment-result__recovery')).toBeInTheDocument();
+        expect(container.querySelector('.reserve-payment-result__hint')).toBeNull();
     });
 
     it('draws the admin workspace menu, search toolbar and verification table', () => {
@@ -245,10 +284,11 @@ describe('route chunk loading patterns', () => {
         expect(container.textContent).toContain('사업자번호');
     });
 
-    it('draws the seven partner functions and the selected reservations or statistics body', () => {
+    it('draws the partner functions including settlement and the selected reservations or statistics body', () => {
         const { container, rerender } = render(<RouteSkeletonPreview pathname="/business" />);
         expect(container.querySelector('h1')).toHaveTextContent('예약 관리');
-        expect(container.querySelectorAll('.reserve-workspace-sider nav .reserve-workspace-menu-placeholder')).toHaveLength(7);
+        expect(container.querySelectorAll('.reserve-workspace-sider nav .reserve-workspace-menu-placeholder')).toHaveLength(8);
+        expect(container.querySelector('.reserve-workspace-sider')).toHaveTextContent('TEST 가상 정산');
         expect(container.querySelector('.reserve-workspace button,.reserve-workspace a')).toBeNull();
         expect(container.querySelector('.reserve-explore-filters')).toBeInTheDocument();
         // 사업자 예약 목록 뼈대(ReservationCardSkeleton): 행 5개 + 구분선 4개

@@ -38,7 +38,8 @@ class ReservationRecoveryControllerTest {
 
     @BeforeEach
     void prepare() {
-        mvc = standaloneSetup(new ReservationApiController(service, limiter)).setControllerAdvice(new GlobalExceptionHandler())
+        mvc = standaloneSetup(new ReservationApiController(service, limiter,
+                mock(kr.it.reserve.reservation.service.ReservationRemovalService.class))).setControllerAdvice(new GlobalExceptionHandler())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(mapper)).build();
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(member, null, List.of()));
         request = new ReservationCreateRequest(10L, LocalDate.now().plusDays(2), LocalTime.NOON, 1, null, false);
@@ -53,12 +54,22 @@ class ReservationRecoveryControllerTest {
     }
 
     @Test
-    void missingCommittedResultIsSuccessfulNullAndUsesTheMemberReadQuota() throws Exception {
+    void missingCommittedResultHasAnExplicitOutcomeAndUsesTheMemberReadQuota() throws Exception {
+        when(service.recoverReservation(any(), eq(member))).thenReturn(kr.it.reserve.reservation.dto.ReservationRequestResult.notSubmitted());
         mvc.perform(post("/api/reservations/requests/result").contentType("application/json").content(mapper.writeValueAsString(request)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data").value(org.hamcrest.Matchers.nullValue()));
+                .andExpect(jsonPath("$.data.outcome").value("NOT_SUBMITTED"))
+                .andExpect(jsonPath("$.data.reservation").value(org.hamcrest.Matchers.nullValue()));
         verify(limiter).tryConsume("reservation-result:1", RateLimiter.Policy.PROFILE_READ);
         verify(service).recoverReservation(any(ReservationCreateRequest.class), eq(member));
+    }
+
+    @Test
+    void closedRequestReturnsNoReservationContent() throws Exception {
+        when(service.recoverReservation(any(), eq(member))).thenReturn(kr.it.reserve.reservation.dto.ReservationRequestResult.closed());
+        mvc.perform(post("/api/reservations/requests/result").contentType("application/json").content(mapper.writeValueAsString(request)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.outcome").value("CLOSED"))
+                .andExpect(jsonPath("$.data.reservation").value(org.hamcrest.Matchers.nullValue()));
     }
 
     @Test

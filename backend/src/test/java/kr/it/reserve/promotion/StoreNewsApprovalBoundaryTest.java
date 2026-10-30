@@ -186,6 +186,18 @@ class StoreNewsApprovalBoundaryTest {
     }
 
     private void editing() { reviewing(); when(feeds.mediaProfile(owner)).thenReturn(profile); }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"news", "post", "timestamp"})
+    void deletedApplicationsCannotBeReadDirectly(String deleted) {
+        news.setBenefitState(Promotion.BenefitState.PENDING);
+        if (deleted.equals("news")) news.deleteNews(StoreNewsPolicy.now());
+        else if (deleted.equals("post")) post.delete(StoreNewsPolicy.now());
+        else news.setDeletedAt(StoreNewsPolicy.now());
+        when(promotions.findForRead(11L)).thenReturn(Optional.of(news));
+        assertStatus(() -> service.application(1L, 11L), HttpStatus.NOT_FOUND);
+        verifyNoInteractions(audits, media);
+    }
     private void reviewing() {
         when(feeds.activeWriter(7L)).thenReturn(owner);
         when(promotions.findById(11L)).thenReturn(Optional.of(news));

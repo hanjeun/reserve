@@ -137,6 +137,13 @@ public class RefundAttempt {
         failureReason = DISPATCH_STARTED;
     }
 
+    /** 외부 통신 전 거절이 확인된 발신만 같은 원장으로 다시 대기한다. */
+    public void deferUnsentDispatch() {
+        if (status != Status.PENDING || !DISPATCH_STARTED.equals(failureReason)) return;
+        status = Status.REQUESTED;
+        failureReason = READY_TO_DISPATCH;
+    }
+
     public void markSucceeded(String cancellationId, Integer cancelledAmount) {
         this.status = Status.SUCCEEDED;
         this.cancellationId = cancellationId;

@@ -23,7 +23,28 @@ public class AsyncConfig implements AsyncConfigurer {
                         method.getDeclaringClass().getSimpleName(), method.getName(),
                         ex.getClass().getSimpleName());
     }
-    // 비동기 이메일 발송을 위한 설정
+    /** 메일 지연이 이미지 처리 풀까지 점유하지 않도록 분리한다. */
+    @Bean(name = "mailExecutor")
+    public ThreadPoolTaskExecutor mailExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(2);
+        executor.setQueueCapacity(32);
+        executor.setThreadNamePrefix("mail-");
+        executor.setRejectedExecutionHandler(new java.util.concurrent.ThreadPoolExecutor.AbortPolicy());
+        executor.initialize();
+        return executor;
+    }
+
+    /** 커밋한 환불 의도를 요청 스레드 밖에서 발신한다. */
+    @Bean(name = "refundExecutor")
+    public ThreadPoolTaskExecutor refundExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2); executor.setMaxPoolSize(2); executor.setQueueCapacity(32);
+        executor.setThreadNamePrefix("refund-");
+        executor.setRejectedExecutionHandler(new java.util.concurrent.ThreadPoolExecutor.AbortPolicy());
+        executor.initialize(); return executor;
+    }
 
     /** 이미지 업로드의 블로킹 I/O를 제한된 크기의 전용 스레드 풀에서 병렬 처리한다. */
     @Bean(name = "imageUploadExecutor")

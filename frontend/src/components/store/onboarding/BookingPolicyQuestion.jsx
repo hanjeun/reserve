@@ -24,6 +24,13 @@ export function BookingPolicyQuestion({ onEdit }) {
                 <FormSelect options={BOOKING_DEADLINE_OPTIONS} placeholder="제한 없음" />
             </Form.Item>
             <Form.Item label="예약 자동 승인" name="autoApprovalEnabled" valuePropName="checked" extra="끄면 사업자가 확인한 뒤 승인해요."><Switch /></Form.Item>
+            <Form.Item label="이용 자동 완료" name="autoCompletionEnabled" valuePropName="checked"
+                extra="QR 체크인한 예약을 이용 종료 후 완료하고 보증금을 전액 환불해요. 끄면 직접 완료해요."><Switch /></Form.Item>
+            {values.bookingType !== 'DAY' && <Form.Item label="이용 시간" name="serviceDurationMinutes"
+                rules={onboardingFieldRules('serviceDurationMinutes', values)} extra="예약 시간부터 이용하는 시간이에요.">
+                <FormInput type="number" min={1} max={1440} precision={0} suffix="분" />
+            </Form.Item>}
+            {values.bookingType === 'DAY' && <p>날짜 예약은 예약일 영업 종료 시각에 이용이 끝나요.</p>}
             <Form.Item label="중복 예약 허용" name="allowDuplicateReservation" valuePropName="checked" extra="끄면 한 손님은 같은 날 한 건만 예약할 수 있어요."><Switch /></Form.Item>
             <Form.Item label="예약 알림 메일" name="emailNotificationEnabled" valuePropName="checked"><Switch /></Form.Item>
         </div>

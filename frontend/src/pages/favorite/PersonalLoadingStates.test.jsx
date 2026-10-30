@@ -16,6 +16,7 @@ vi.mock('../../hooks', () => ({
     usePayment: () => ({ pay: vi.fn(), paying: false }),
 }));
 vi.mock('../../hooks/useDocumentTitle', () => ({ default: () => {} }));
+vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: state.message, modal: { info: vi.fn() } }) }));
 vi.mock('../../hooks/feedInteractionQueries', () => ({ useFeedInteractions: () => ({ data: { enabled: false, newsEnabled: false } }) }));
 vi.mock('../../store/useAuthStore', () => ({ default: selector => typeof selector === 'function' ? selector({ user: { id: 7 } }) : { user: { id: 7 } } }));
 vi.mock('../../components/store', () => ({ StoreCard: ({ store }) => <div>{store.name}</div> }));
@@ -127,6 +128,7 @@ describe('personal page loading presentation', () => {
     it('shows a genuinely empty favorites list only after a successful query', () => {
         show(<MyFavorites />);
         expect(screen.getByText('아직 즐겨찾기한 가게가 없어요.')).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: '가게 둘러보기' })).toHaveAttribute('href', '/stores');
     });
 
     it('does not present a failed store query as no registered stores', () => {
@@ -164,22 +166,22 @@ describe('personal page loading presentation', () => {
         show(<PaymentResult />, '/payment/result?type=reservation&merchant_uid=order-1');
         expect(screen.getByRole('status', { name: '결제 상태를 확인하는 중' })).toBeInTheDocument();
         expect(screen.getByText('결제 처리 중')).toBeInTheDocument();
-        expect(screen.getByText(/같은 결제를 다시 시작하지 마세요/)).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: '내 예약에서 다시 열기' })).toBeInTheDocument();
+        expect(screen.getByText('결제 내역을 확인하고 있어요. 잠시 기다려주세요.')).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: '내 예약' })).toHaveAttribute('href', '/my-reservations');
         expect(screen.queryByText('결제 완료')).toBeNull();
     });
 
-    it('does not display cached paid success while payment is being reverified', () => {
+    it('keeps the matching server result visible during background verification', () => {
         state.query = { data: { type: 'reservation', merchantUid: 'order-1', status: 'PAID' }, isPending: false, isFetching: true, isError: false };
         show(<PaymentResult />, '/payment/result?type=reservation&merchant_uid=order-1');
-        expect(screen.getByRole('status', { name: '결제 상태를 확인하는 중' })).toBeInTheDocument();
-        expect(screen.queryByText('결제 완료')).toBeNull();
+        expect(screen.queryByRole('status', { name: '결제 상태를 확인하는 중' })).toBeNull();
+        expect(screen.getByText('결제 완료')).toBeInTheDocument();
     });
 
     it('preserves payment failure guidance and does not invent a successful payment', () => {
         state.query = { isPending: false, isFetching: false, isError: true, refetch: state.refetch };
         show(<PaymentResult />, '/payment/result?type=reservation&merchant_uid=order-1');
-        expect(screen.getByText(/이미 금액이 결제됐다면 다시 결제하지 말고/)).toBeInTheDocument();
+        expect(screen.getByText('서버에서 결제 내역을 확인하지 못했어요. 다시 결제하기 전에 상태를 확인해주세요.')).toBeInTheDocument();
         expect(screen.queryByText('결제 완료')).toBeNull();
     });
 
@@ -192,8 +194,8 @@ describe('personal page loading presentation', () => {
         };
         show(<PaymentResult />, '/payment/result?type=reservation&merchant_uid=order-1');
         expect(screen.getByText('결제가 완료되지 않았어요')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: '내 예약에서 다시 결제' })).toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: '상태 다시 확인' })).toBeNull();
+        expect(screen.getByRole('button', { name: '내 예약' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: '다시 확인' })).toBeNull();
     });
 
     it('does not offer a new payment while the server still reports an unresolved status', () => {
@@ -206,8 +208,8 @@ describe('personal page loading presentation', () => {
         };
         show(<PaymentResult />, '/payment/result?type=reservation&merchant_uid=order-1');
         expect(screen.getByText('결제 상태를 확인하고 있어요')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: '상태 다시 확인' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: '내 예약에서 다시 열기' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '다시 확인' })).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: '내 예약' })).toHaveClass('reserve-text-link');
         expect(screen.queryByRole('button', { name: '내 예약에서 다시 결제' })).toBeNull();
     });
 });

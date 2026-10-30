@@ -17,14 +17,19 @@ public class OAuthSessionIssuer {
     private final TokenProvider tokens;
     private final MemberRepository members;
     private final OAuthSubjectSecurityService subjects;
+    @org.springframework.beans.factory.annotation.Autowired private kr.it.reserve.member.mfa.MfaService mfa;
 
-    public record SessionTokens(String accessToken, String refreshToken, java.time.Duration refreshMaxAge) {
-        public SessionTokens(String accessToken, String refreshToken) { this(accessToken, refreshToken, null); }
+    public record SessionTokens(String accessToken, String refreshToken, java.time.Duration refreshMaxAge, String mfaTicket, boolean persistent) {
+        public SessionTokens(String access, String refresh, java.time.Duration maxAge, String ticket) { this(access, refresh, maxAge, ticket, true); }
+        public SessionTokens(String access, String refresh, java.time.Duration maxAge) { this(access, refresh, maxAge, null); }
+        public SessionTokens(String accessToken, String refreshToken) { this(accessToken, refreshToken, null, null); }
         @Override public String toString() { return "SessionTokens[credentials=redacted]"; }
     }
 
     @Transactional
-    public SessionTokens issue(CustomOAuth2User principal) {
+    public SessionTokens issue(CustomOAuth2User principal) { return issue(principal, true); }
+    @Transactional
+    public SessionTokens issue(CustomOAuth2User principal, boolean persistent) {
         CustomOAuth2User.OAuthAuthentication authentication = principal.getOauthAuthentication();
         if (authentication == null || authentication.memberId() == null) throw reauthenticate();
         OAuthSubjectSecurity subject = subjects.lock(authentication.provider(), authentication.providerId());
@@ -36,8 +41,14 @@ public class OAuthSessionIssuer {
         subjects.requireFreshAuthentication(authentication.authenticatedAt(), authentication.tokenExpiresAt());
         if (!subject.acceptsAuthentication(authentication.authenticatedAt())
                 || !current.acceptsOAuthAuthentication(authentication.authenticatedAt())) throw reauthenticate();
-        TokenProvider.IssuedSession issued = tokens.issueSession(current, authentication.authenticatedAt());
-        SessionTokens pair = new SessionTokens(issued.accessToken(), issued.refreshToken(), issued.refreshMaxAge());
+        var ticket = mfa == null ? null : mfa.beginLogin(current, authentication.authenticatedAt(), authentication.tokenExpiresAt(), persistent);
+        if (ticket != null) {
+            members.flush();
+            subjects.requireFreshAuthentication(authentication.authenticatedAt(), authentication.tokenExpiresAt());
+            return new SessionTokens(null, null, null, ticket.value(), persistent);
+        }
+        TokenProvider.IssuedSession issued = tokens.issueSession(current, authentication.authenticatedAt(), persistent);
+        SessionTokens pair = new SessionTokens(issued.accessToken(), issued.refreshToken(), issued.refreshMaxAge(), null, issued.persistent());
         members.flush();
         subjects.requireFreshAuthentication(authentication.authenticatedAt(), authentication.tokenExpiresAt());
         return pair;

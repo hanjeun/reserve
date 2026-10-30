@@ -23,7 +23,7 @@ const svg = (avatar, second) => avatar
     : `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="640"><rect width="960" height="640" fill="${second ? '#e0e8e2' : '#e7ded1'}"/><rect x="70" y="55" width="285" height="335" rx="8" fill="#faf8f2"/><path d="M210 55v335M70 220h285" stroke="#b4a58c" stroke-width="10"/><path d="M0 455h960v185H0" fill="#b79b7b"/><path d="M455 443c-35-71-37-174 28-194h72c65 20 63 123 28 194z" fill="${second ? '#648879' : '#b96949'}"/><ellipse cx="519" cy="247" rx="37" ry="10" fill="#7e4e3c"/><path d="M672 447c-28-51-30-123 18-145h58c48 22 46 94 18 145z" fill="#f0e9dd"/><ellipse cx="719" cy="301" rx="30" ry="9" fill="#bbb0a2"/><path d="M805 447c-6-91 29-138 55-172" stroke="#597764" stroke-width="9" fill="none"/><path d="M846 303c-61 11-57-42-56-58 47-2 62 30 56 58M842 325c55-5 64-46 60-62-47 0-65 35-60 62" fill="#698a75"/><text x="68" y="588" font-family="sans-serif" font-size="28" fill="#fff">RESERVE · LOCAL UI PREVIEW</text></svg>`;
 
 /* 모든 API는 합성 응답을 사용하고 외부 출처 요청은 차단한다. */
-export async function installReleasePreview(page) {
+export async function installReleasePreview(page, { port = '4173', theme = 'light' } = {}) {
     const state = { admissionState: 'WAITING', admissionPosition: 3, admissionDate: null, statusErrors: 0, cancelErrors: 0, joins: 0, polls: 0, cancels: 0,
         reservations: [], roomOpens: 0, writes: [], external: [], unknown: [], errors: [], lastProfileSave: null,
         ticket: TICKET, admittedExpiresAt: 0, storeListError: 0, waitingListError: 0,
@@ -32,9 +32,9 @@ export async function installReleasePreview(page) {
         profile: { publicId: PUBLIC_ID, nickname: '흙빛 산책', bio: '천천히 만드는 시간을 좋아해요.',
             avatarSource: 'ACCOUNT', useAccountAvatar: true, avatarUrl: account.profileImageUrl } };
     page.on('pageerror', error => state.errors.push(error.message));
-    await page.addInitScript(() => {
-        localStorage.setItem('reserve:theme', 'light');
-    });
+    await page.addInitScript(theme => {
+        localStorage.setItem('reserve:theme', theme);
+    }, theme);
     const admissionStatus = () => {
         if (state.admissionState === 'ADMITTED') {
             state.admittedExpiresAt ||= Date.now() + 180000;
@@ -62,7 +62,7 @@ export async function installReleasePreview(page) {
         const request = route.request();
         const url = new URL(request.url());
         const pathname = url.pathname.replace(/^\/api\/v1(?=\/|$)/, '/api');
-        if (!pathname.startsWith('/api/') && (!['127.0.0.1', 'localhost'].includes(url.hostname) || url.port !== '4173')) {
+        if (!pathname.startsWith('/api/') && (!['127.0.0.1', 'localhost'].includes(url.hostname) || url.port !== port)) {
             state.external.push(`${request.method()} ${url.origin}${url.pathname}`);
             return route.abort('blockedbyclient');
         }
@@ -77,6 +77,7 @@ export async function installReleasePreview(page) {
             if (method === 'DELETE') state.serviceState = 'CANCELLED';
             return ok(route, serviceStatus());
         }
+        if (pathname === '/api/auth/session') return ok(route, { member: account, refreshPossible: false });
         if (pathname === '/api/member/me') return ok(route, account);
         if (pathname === '/api/member/login-methods') return ok(route, { memberId: account.id, email: account.email,
             passwordEnabled: true, socialProvider: 'GOOGLE', linkableSocialProvider: 'GOOGLE', socialProofFresh: true });
@@ -164,6 +165,9 @@ export async function installReleasePreview(page) {
         if (/^\/api\/reservations\/my\/store\/\d+\/completed$/.test(pathname)) return ok(route, null);
         if (pathname.startsWith('/api/reservations') || pathname.startsWith('/api/reviews/')) return ok(route, pageOf([]));
         if (pathname === '/api/chat/unread' || pathname === '/api/chat/my/unread') return ok(route, 0);
+        if (pathname === '/api/chat/search' && method === 'POST') return ok(route, {
+            conversations: [], messages: [], moreConversations: false, moreMessages: false, page: request.postDataJSON().page,
+        });
         if (pathname === '/api/chat/images/config') return ok(route, { enabled: true, maxBytes: 7340032 });
         if (pathname.startsWith('/api/chat/intro/')) return ok(route, { configured: false, displayName: 'RESERVE 고객지원', items: [] });
         if (/^\/api\/chat\/stores\/\d+\/open$/.test(pathname)) {

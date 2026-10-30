@@ -25,7 +25,7 @@ public class ReservationElapsedProcessor {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Result processOne(Long reservationId, LocalDateTime now) {
         Reservation reservation = payments.lockReservationPayments(reservationId);
-        if (reservation == null || reservation.getDeletedAt() != null
+        if (reservation == null || reservation.getDeletedAt() != null || reservation.getCheckedInAt() != null
                 || (reservation.getStatus() != Reservation.ReservationStatus.PENDING
                     && reservation.getStatus() != Reservation.ReservationStatus.CONFIRMED)
                 || !LocalDateTime.of(reservation.getReservationDate(), reservation.getReservationTime()).isBefore(now)) {

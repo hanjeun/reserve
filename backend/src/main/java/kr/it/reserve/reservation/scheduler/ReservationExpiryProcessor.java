@@ -64,7 +64,7 @@ public class ReservationExpiryProcessor {
             return ExpiryResult.DEFERRED;
         }
 
-        LocalDateTime expireAt = reservation.getCreatedAt().plusMinutes(getTimeoutMinutes(reservation));
+        LocalDateTime expireAt = kr.it.reserve.reservation.service.ReservationPaymentPolicy.deadline(reservation);
         log.info("[ExpiryScheduler] Unpaid reservation auto-cancelled: reservationId={}, storeId={}, memberId={}, createdAt={}, expireAt={}",
                 reservation.getId(),
                 reservation.getStore().getId(),
@@ -78,8 +78,7 @@ public class ReservationExpiryProcessor {
 
     private boolean isDue(Reservation reservation, LocalDateTime now) {
         if (!isStillCandidate(reservation)) return false;
-        Integer timeout = getTimeoutMinutes(reservation);
-        return timeout != null && now.isAfter(reservation.getCreatedAt().plusMinutes(timeout));
+        return kr.it.reserve.reservation.service.ReservationPaymentPolicy.expiredAt(reservation, now);
     }
 
     private boolean isStillCandidate(Reservation reservation) {
@@ -91,17 +90,6 @@ public class ReservationExpiryProcessor {
                 && reservation.getStore() != null
                 && !Boolean.TRUE.equals(reservation.getStore().getAllowLatePayment())
                 && reservation.getCreatedAt() != null;
-    }
-
-    /**
-     * @return 만료 분. {@code null}이면 제한 없음. 값이 없는 예전 데이터는 기본 30분.
-     */
-    private Integer getTimeoutMinutes(Reservation reservation) {
-        Integer timeout = reservation.getStore().getPaymentTimeoutMinutes();
-        if (timeout == null) {
-            return 30;
-        }
-        return timeout <= 0 ? null : timeout;
     }
 
     public enum ExpiryResult {

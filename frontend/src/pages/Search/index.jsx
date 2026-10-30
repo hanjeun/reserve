@@ -11,7 +11,6 @@ import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import SearchControls from '../../components/common/SearchControls';
 import useRecentSearches from '../../hooks/useRecentSearches';
-import Tooltip from '../../components/common/Tooltip';
 import { SEARCH_MOTION_DURATION_MS } from '../../components/layout/searchTransition';
 import { useSkeletonShown } from '../../components/layout/loadingPresentation';
 
@@ -204,9 +203,9 @@ export default function SearchPage() {
                                         <SearchOutlined aria-hidden="true" />
                                         <span>{term}</span>
                                     </button>
-                                    <Tooltip title={`최근 검색 삭제: ${term}`}><button type="button" className="reserve-search-recent-remove" aria-label={`최근 검색 삭제: ${term}`} onClick={() => removeSearch(term)}>
+                                    <button type="button" className="reserve-search-recent-remove" aria-label={`최근 검색 삭제: ${term}`} onClick={() => removeSearch(term)}>
                                         <CloseOutlined aria-hidden="true" />
-                                    </button></Tooltip>
+                                    </button>
                                 </li>
                             ))}
                         </ul>

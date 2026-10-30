@@ -13,7 +13,7 @@ import useMessengerStore, { messengerIdentityOf } from '../../store/useMessenger
 import { breakpoints } from '../../styles/tokens';
 import MessengerLauncherVisual from './MessengerLauncherVisual';
 import { chatListQueryPolicy, shouldAutoRefreshChatMetadata } from './chatListQueryPolicy';
-import ConversationListSkeleton from './ConversationListSkeleton';
+import MessengerPanelSkeleton from './MessengerPanelSkeleton';
 import Tooltip from '../common/Tooltip';
 import { LoadingPresentationContext, createLoadingPresentation } from '../layout/loadingPresentation';
 
@@ -43,7 +43,7 @@ function MessengerPanelBody({ coverImageSrc }) {
     const navigationKey = `${identity}:${view}:${activeThread}:${selection.kind}:${selection.storeId ?? selection.roomId ?? ''}`;
     const presentation = useMemo(() => createLoadingPresentation(navigationKey), [navigationKey]);
     return <LoadingPresentationContext.Provider value={presentation}>
-        <Suspense fallback={<div className="reserve-messenger-shell-loading"><div style={{ width: '100%', padding: 24 }}><ConversationListSkeleton /></div></div>}>
+        <Suspense fallback={<MessengerPanelSkeleton view={view} thread={view === 'conversations' && activeThread} />}>
             <MessengerContent surface="panel" coverImageSrc={coverImageSrc} />
         </Suspense>
     </LoadingPresentationContext.Provider>;
@@ -229,14 +229,14 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
                     aria-modal="false"
                     aria-label="메시지"
                 >
-                    <Tooltip title="메시지 닫기"><button
+                    <button
                         type="button"
                         className="reserve-chat-close reserve-messenger-shell-close"
                         onClick={closePanel}
                         aria-label="메시지 닫기"
                     >
                         <CloseOutlined />
-                    </button></Tooltip>
+                    </button>
                     <MessengerPanelBody coverImageSrc={coverImageSrc} />
                 </div>
             )}

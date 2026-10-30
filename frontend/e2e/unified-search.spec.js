@@ -15,6 +15,7 @@ async function setup(page, signedIn = false) {
         if (!path.startsWith('/api/')) return route.fallback();
         requests.push({ path, method: request.method(), keyword: url.searchParams.get('keyword'), limit: url.searchParams.get('limit') });
         const ok = data => route.fulfill({ json: { success: true, data } });
+        if (path === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: signedIn ? user : null, refreshPossible: false } } }); }
         if (path === '/api/member/me' || path === '/api/auth/refresh') return signedIn ? ok(user)
             : route.fulfill({ status: 401, json: { success: false, message: '로그인이 필요해요.' } });
         if (path === '/api/service-admission') return ok({ campaignId: 'service-entry', mode: 'OFF', state: 'BYPASS',

@@ -22,7 +22,7 @@ import waitingService from '../../services/waitingService';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
 import useLiveUpdatesStatus from '../../hooks/useLiveUpdatesStatus';
 import useWaitingEvents from '../../hooks/useWaitingEvents';
-import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
+import { isBlockingListReadError, isListQueryLoading } from '../../hooks/liveUpdateQueries';
 import { writeQuerySelection } from '../../utils/querySelection';
 
 const PAGE_SIZE = 12;
@@ -45,8 +45,9 @@ export default function Waiting() {
     const term = useDebounce(keyword, 300);
     const rawPage = Number(params.get('page') || 1);
     const page = Number.isSafeInteger(rawPage) && rawPage > 0 && rawPage <= 100_000 ? rawPage - 1 : 0;
-    const result = useQuery({ queryKey: ['waiting-stores', term, region, status, sort, page],
-        queryFn: ({ signal }) => waitingService.getStores({ keyword: term, region, status, sort, page, size: PAGE_SIZE }, signal),
+    const result = useQuery({ queryKey: ['waiting-stores', keyword, region, status, sort, page],
+        enabled: keyword === term,
+        queryFn: ({ signal }) => waitingService.getStores({ keyword, region, status, sort, page, size: PAGE_SIZE }, signal),
         placeholderData: keepPreviousData, retry: false, staleTime: 30_000,
         refetchInterval: live.connected && live.domains.includes('WAITING') ? false : 30_000,
         refetchIntervalInBackground: false, refetchOnWindowFocus: live.present ? false : 'always' });
@@ -67,7 +68,7 @@ export default function Waiting() {
     };
     const stores = result.data?.content || [];
     const blockingError = isBlockingListReadError(result.error, stores);
-    useListRefreshAnchor(listRef, `${term}:${region}:${status}:${sort}:${page}:${view}`, result.isFetching, result.data);
+    useListRefreshAnchor(listRef, `${keyword}:${region}:${status}:${sort}:${page}:${view}`, result.isFetching, result.data);
     const total = result.data?.page?.totalElements ?? result.data?.totalElements ?? 0;
     useEffect(() => {
         const lastPage = Math.max(0, Math.ceil(total / PAGE_SIZE) - 1);
@@ -87,12 +88,12 @@ export default function Waiting() {
         <FilterToolbar search={{ value: keyword, onChange: event => change('keyword', event.target.value),
             placeholder: '웨이팅 가게 검색' }} onReload={reload} loading={refreshing} />
         <ListingContent notice={result.error && result.data && !blockingError && <DataState compact state="error" subject="웨이팅 가게 갱신" error={result.error} onRetry={reload} retrying={result.isFetching} />}>
-        {result.isPending ? <LoadingStatus aria-label="웨이팅 가게를 불러오는 중" aria-busy="true">
+        {isListQueryLoading(result) ? <LoadingStatus aria-label="웨이팅 가게를 불러오는 중" aria-busy="true">
             <WaitingStoresContentSkeleton view={view} />
         </LoadingStatus> : blockingError ? <DataState state="error" subject="웨이팅 가게" error={result.error} onRetry={reload} retrying={result.isFetching} />
                 : stores.length ? <div ref={listRef} className={view === 'cards' ? 'rsv-store-grid' : 'reserve-store-list-rows'} aria-busy={result.isFetching}>
                     {stores.map(store => <Item key={store.id} store={store} extraTools={<WaitingStoreSummary store={store} />} />)}
-                </div> : <DataState state="empty" kind="waiting" title={term ? '검색에 맞는 웨이팅 가게가 없어요.' : '접수 가능한 가게가 없어요.'}
+                </div> : <DataState state="empty" kind="waiting" title={keyword ? '검색에 맞는 웨이팅 가게가 없어요.' : '접수 가능한 가게가 없어요.'}
                     description="가게가 웨이팅 접수를 켜면 여기에 표시돼요." />}
         </ListingContent>
         {!blockingError && total > PAGE_SIZE && <nav className="reserve-listing-pagination" aria-label="웨이팅 가게 목록 페이지">

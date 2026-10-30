@@ -55,8 +55,41 @@ class AuthRefreshCookieContractTest {
         AuthApiController controller = new AuthApiController(
                 memberService, tokenProvider, passwordEncoder, properties, tokenService, rateLimiter, new CookieUtil("prod"));
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
+                .setCustomArgumentResolvers(new org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
+    }
+
+    @Test
+    void anonymousSessionProbeDoesNotAttemptRefreshOrIssueCookies() throws Exception {
+        var response = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/auth/session"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.member").doesNotExist())
+                .andExpect(jsonPath("$.data.refreshPossible").value(false)).andReturn().getResponse();
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(response.getHeaders("Set-Cookie")).isEmpty();
+        org.mockito.Mockito.verifyNoInteractions(tokenProvider, tokenService);
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = TokenProvider.RefreshTokenState.class)
+    void sessionRefreshHintRequiresAValidSignedRefreshToken(TokenProvider.RefreshTokenState state) throws Exception {
+        when(tokenProvider.inspectRefreshToken("synthetic-refresh")).thenReturn(new TokenProvider.RefreshTokenInspection(state, 1L, 0));
+        var response = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/auth/session")
+                        .cookie(new Cookie("refresh_token", "synthetic-refresh")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.refreshPossible").value(state == TokenProvider.RefreshTokenState.VALID))
+                .andReturn().getResponse();
+        assertThat(response.getContentAsString()).doesNotContain("synthetic-refresh");
+        assertThat(response.getHeaders("Set-Cookie")).isEmpty();
+        org.mockito.Mockito.verifyNoInteractions(tokenService);
+    }
+
+    @Test
+    void publicLoginPolicyReturnsConfiguredDurationsWithoutIssuingCookies() throws Exception {
+        var response = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/auth/login-policy"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.idleSeconds").value(1209600))
+                .andExpect(jsonPath("$.data.absoluteSeconds").value(2592000)).andReturn().getResponse();
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(response.getHeaders("Set-Cookie")).isEmpty();
+        org.mockito.Mockito.verifyNoInteractions(memberService, tokenProvider, passwordEncoder, tokenService, rateLimiter);
     }
 
     @Test
@@ -69,18 +102,51 @@ class AuthRefreshCookieContractTest {
         when(rateLimiter.tryConsume("member@example.test", RateLimiter.Policy.LOGIN_ACCOUNT)).thenReturn(true);
         when(memberService.findByEmailOrNull("member@example.test")).thenReturn(member);
         when(passwordEncoder.matches("test-password", "stored-test-hash")).thenReturn(true);
-        when(tokenProvider.issueSession(member, null)).thenReturn(
+        when(tokenProvider.issueSession(member, null, true)).thenReturn(
                 new TokenProvider.IssuedSession("login-access", "login-refresh", Duration.ofDays(14)));
         var response = mockMvc.perform(post("/api/auth/login").contentType("application/json")
-                        .content("{\"email\":\"member@example.test\",\"password\":\"test-password\"}"))
+                        .content("{\"email\":\"member@example.test\",\"password\":\"test-password\",\"rememberMe\":true}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.id").value(7))
                 .andReturn().getResponse();
         assertThat(response.getContentAsString()).doesNotContain("login-access", "login-refresh");
-        assertThat(response.getHeaders(HttpHeaders.SET_COOKIE)).hasSize(4)
+        assertThat(response.getHeaders(HttpHeaders.SET_COOKIE)).hasSize(5)
+                .anySatisfy(cookie -> assertThat(cookie).startsWith("mfa_ticket=;").contains("Max-Age=0", "Secure", "HttpOnly"))
                 .anySatisfy(cookie -> assertThat(cookie).startsWith("access_token=login-access;")
                         .contains("Max-Age=1800", "Secure", "HttpOnly", "SameSite=Lax"))
                 .anySatisfy(cookie -> assertThat(cookie).startsWith("refresh_token=login-refresh;")
                         .contains("Max-Age=1209600", "Secure", "HttpOnly", "SameSite=Lax"));
+    }
+
+    @Test
+    void uncheckedLoginUsesSessionCookiesAndDoesNotReturnCredentials() throws Exception {
+        var member = kr.it.reserve.member.entity.Member.builder().id(7L).name("시험 회원")
+                .email("member@example.test").password("stored-test-hash")
+                .role(kr.it.reserve.member.entity.Role.USER).build();
+        when(rateLimiter.tryConsume(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        when(memberService.findByEmailOrNull("member@example.test")).thenReturn(member);
+        when(passwordEncoder.matches("test-password", "stored-test-hash")).thenReturn(true);
+        when(tokenProvider.issueSession(member, null, false)).thenReturn(
+                new TokenProvider.IssuedSession("login-access", "login-refresh", Duration.ofDays(14), false));
+        var response = mockMvc.perform(post("/api/auth/login").contentType("application/json")
+                        .content("{\"email\":\"member@example.test\",\"password\":\"test-password\",\"rememberMe\":false}"))
+                .andExpect(status().isOk()).andReturn().getResponse();
+        assertThat(response.getContentAsString()).doesNotContain("login-access", "login-refresh");
+        var credentials = response.getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .filter(value -> value.startsWith("access_token=login-access;") || value.startsWith("refresh_token=login-refresh;")).toList();
+        assertThat(credentials).hasSize(3).allSatisfy(value ->
+                assertThat(value).contains("Secure", "HttpOnly", "SameSite=Lax").doesNotContain("Max-Age=", "Expires="));
+    }
+
+    @Test
+    void uncheckedRefreshDoesNotMakeASessionCookiePersistent() throws Exception {
+        when(tokenService.refresh("refresh-value")).thenReturn(
+                new TokenService.RefreshResult("new-access", "new-refresh", Duration.ofDays(14), false));
+        var response = mockMvc.perform(post("/api/auth/refresh").cookie(new Cookie("refresh_token", "refresh-value")))
+                .andExpect(status().isOk()).andReturn().getResponse();
+        assertThat(response.getHeaders(HttpHeaders.SET_COOKIE).stream().filter(value ->
+                value.startsWith("access_token=new-access;") || value.startsWith("refresh_token=new-refresh;")).toList())
+                .hasSize(3).allSatisfy(value -> assertThat(value).doesNotContain("Max-Age=", "Expires=").contains("HttpOnly", "Secure"));
+        assertThat(response.getContentAsString()).doesNotContain("new-access", "new-refresh");
     }
 
     @Test

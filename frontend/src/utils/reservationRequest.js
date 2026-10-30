@@ -17,8 +17,11 @@ export function newReservationRequestId() {
 export async function reservationRequestAttempt(scope, payload, submittedRequestId = null) {
     if (submittedRequestId !== null && !UUID.test(submittedRequestId)) throw new Error('예약 요청 번호를 확인해주세요.');
     const time = /^\d{2}:\d{2}:00$/.test(payload.reservationTime) ? payload.reservationTime.slice(0, 5) : payload.reservationTime;
-    const canonical = JSON.stringify([payload.storeId, payload.reservationDate, time,
-        payload.guestCount, payload.specialRequest ?? null, payload.skipPayment === true]);
+    const fields = [payload.storeId, payload.reservationDate, time,
+        payload.guestCount, payload.specialRequest ?? null, payload.skipPayment === true];
+    const proof = payload.legalConsent;
+    if (proof) fields.push([proof.version, proof.noticeHash, proof.privacyAccepted === true, proof.conditionsAccepted === true]);
+    const canonical = JSON.stringify(fields);
     const canPersist = !!crypto.subtle;
     const digest = canPersist ? await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical)) : null;
     // WebCrypto가 없는 로컬 HTTP에서는 폼 내용을 저장하지 않고 메모리로 재시도한다.
@@ -41,7 +44,11 @@ export async function reservationRequestId(scope, payload) {
     return (await reservationRequestAttempt(scope, payload)).requestId;
 }
 
-export function completeReservationRequest(scope) {
-    pending.delete(scope);
-    try { sessionStorage.removeItem(keyFor(scope)); } catch { /* 저장소 정리 실패를 예약 실패로 처리하지 않는다. */ }
+export function completeReservationRequest(scope, expectedRequestId = null) {
+    const saved = pending.get(scope);
+    if (!expectedRequestId || saved?.requestId === expectedRequestId) pending.delete(scope);
+    try {
+        const persisted = JSON.parse(sessionStorage.getItem(keyFor(scope)) || 'null');
+        if (!expectedRequestId || persisted?.requestId === expectedRequestId) sessionStorage.removeItem(keyFor(scope));
+    } catch { /* 저장소 정리 실패를 예약 실패로 처리하지 않는다. */ }
 }

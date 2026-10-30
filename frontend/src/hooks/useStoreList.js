@@ -13,7 +13,7 @@ import { STORE_LIST_PAGE_SIZE } from '../constants/storeListPageSize';
 import { normalizeListQueryParams } from '../utils/listQueryParams';
 import useDiscoveryRegion from './useDiscoveryRegion';
 import useDebounce from './useDebounce';
-import { queryErrorStatus } from './liveUpdateQueries';
+import { isListQueryLoading, queryErrorStatus } from './liveUpdateQueries';
 import { readQuerySelection, writeQuerySelection } from '../utils/querySelection';
 
 export { STORE_LIST_PAGE_SIZE };
@@ -45,6 +45,7 @@ const useStoreList = () => {
     const {
         data,
         isLoading,
+        isPending,
         isFetching,
         isPlaceholderData,
         isSuccess,
@@ -54,13 +55,13 @@ const useStoreList = () => {
         // 페이지·크기도 키에 포함한다. 늦게 도착한 이전 페이지 응답은 현재 목록을 덮지 않는다.
         queryKey: storeKeys.list({ keyword, sort, lat, lng, domain, region, page: page - 1, size: STORE_LIST_PAGE_SIZE }),
         enabled: keyword === searchKeyword,
-        queryFn: () =>
+        queryFn: ({ signal }) =>
             storeService.getStores({
                 keyword, sort, page: page - 1, size: STORE_LIST_PAGE_SIZE,
                 ...(sort === 'distance' && hasDistanceCoordinates(lat, lng) ? { lat, lng } : {}),
                 ...(domain ? { domain } : {}),
                 ...(region ? { region } : {}),
-            }),
+            }, signal),
         staleTime: 1000 * 60 * 3,
         // 이동 중 건수·페이지 컨트롤은 유지하고 화면은 기존 스켈레톤으로 진행 상태를 표시한다.
         placeholderData: keepPreviousData,
@@ -126,7 +127,7 @@ const useStoreList = () => {
         totalPages,
         page,
         pageSize: STORE_LIST_PAGE_SIZE,
-        loading: isLoading || keyword !== searchKeyword || pageOutOfRange || isPlaceholderData,
+        loading: isListQueryLoading({ isPending, isPlaceholderData }) || pageOutOfRange,
         initialLoading: isLoading,
         refetching: isFetching && !isLoading,
         hasData,

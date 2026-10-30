@@ -252,8 +252,13 @@
     line-height: 20px;
     white-space: nowrap;
 }
+.reserve-reservation-summary-card-price-group {
+    display: inline-flex;
+    align-items: baseline;
+    justify-self: end;
+    gap: 6px;
+}
 .reserve-reservation-summary-card-timeout {
-    grid-column: 1 / -1;
     color: var(--c-warning);
     font-size: 12px;
     line-height: 18px;

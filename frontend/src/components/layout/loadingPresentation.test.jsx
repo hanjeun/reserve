@@ -91,6 +91,7 @@ describe('one loading presentation per navigation', () => {
         expect(suppression).not.toContain('messenger');
         expect(suppression).not.toContain('reserve-messages-route');
         expect(css).toContain('prefers-reduced-motion: reduce');
-        expect(css).toContain('from-right:not([data-skeleton-shown="true"])');
+        expect(css).toContain('.reserve-route-entry--from-right {');
+        expect(css).not.toContain('from-right:not([data-skeleton-shown="true"])');
     });
 });

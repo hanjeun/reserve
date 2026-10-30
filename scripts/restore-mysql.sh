@@ -135,13 +135,13 @@ fi
 
 # 복원
 echo "recreating target database..."
-docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER" \
+MYSQL_PWD="$DB_PASSWORD" docker exec -e MYSQL_PWD "$MYSQL_CONTAINER" \
     mysql --user="$DB_USER" \
     -e "DROP DATABASE IF EXISTS \`${TARGET_DB}\`; CREATE DATABASE \`${TARGET_DB}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
 echo "restoring... (크기에 따라 수 분 걸릴 수 있습니다)"
 set +e
-gunzip -c "$WORK_FILE" | docker exec -i -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER" \
+gunzip -c "$WORK_FILE" | MYSQL_PWD="$DB_PASSWORD" docker exec -i -e MYSQL_PWD "$MYSQL_CONTAINER" \
     mysql --user="$DB_USER" --default-character-set=utf8mb4 "$TARGET_DB"
 PIPE_STATUSES=("${PIPESTATUS[@]}")
 GUNZIP_STATUS="${PIPE_STATUSES[0]}"
@@ -152,7 +152,7 @@ set -e
 [[ "$RESTORE_STATUS" -eq 0 ]] || die "restore failed with status $RESTORE_STATUS"
 
 # 복원 명령의 성공과 별개로 실제 테이블 수를 확인한다.
-RESTORED_TABLES="$(docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER" \
+RESTORED_TABLES="$(MYSQL_PWD="$DB_PASSWORD" docker exec -e MYSQL_PWD "$MYSQL_CONTAINER" \
     mysql --user="$DB_USER" -N -B \
     -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='${TARGET_DB}';")"
 

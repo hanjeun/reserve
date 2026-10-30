@@ -140,8 +140,8 @@ test('messenger home, store search, room entry, and search restoration', async (
     await expect(messenger.getByRole('button', { name: '가게에 문의', exact: true })).toHaveCount(0);
 
     await messenger.getByRole('button', { name: '대화', exact: true }).click();
-    await messenger.getByRole('button', { name: '가게 찾기', exact: true }).click();
-    const search = messenger.getByRole('searchbox', { name: '가게 이름 또는 주소' });
+    await messenger.getByRole('button', { name: '채팅 검색', exact: true }).click();
+    const search = messenger.getByRole('searchbox', { name: '대화 상대, 메시지, 가게 검색' });
     await search.fill('공방');
     const result = messenger.getByRole('button', { name: `${store.name}, 문의 시작`, exact: true });
     await expect(result).toBeVisible();
@@ -152,7 +152,7 @@ test('messenger home, store search, room entry, and search restoration', async (
     await expect(messenger.getByText('안녕하세요. 궁금한 점을 편하게 남겨주세요.', { exact: true })).toBeVisible();
     await expect(messenger).not.toHaveClass(/is-opening-thread/);
 
-    await messenger.getByRole('button', { name: '가게 검색으로 돌아가기', exact: true }).click();
+    await messenger.getByRole('button', { name: '검색 결과로 돌아가기', exact: true }).click();
     await expect(search).toHaveValue('공방');
     await expect(result).toBeFocused();
 

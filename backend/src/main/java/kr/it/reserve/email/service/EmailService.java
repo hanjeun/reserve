@@ -40,12 +40,12 @@ public class EmailService {
     @Value("${mail.admin-notify:hanjeun111@gmail.com}")
     private String adminNotifyEmail;
 
-    @Async
+    @Async("mailExecutor")
     public void sendVerificationEmail(String toEmail, String verificationCode) {
         sendVerificationMessage(toEmail, verificationCode, false);
     }
 
-    @Async
+    @Async("mailExecutor")
     public void sendLoginMethodVerificationEmail(String toEmail, String verificationCode) {
         sendVerificationMessage(toEmail, verificationCode, true);
     }
@@ -66,7 +66,7 @@ public class EmailService {
         }
     }
 
-    @Async
+    @Async("mailExecutor")
     public void sendLoginMethodChangedEmail(String toEmail) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -74,9 +74,7 @@ public class EmailService {
             helper.setFrom(fromEmail, fromName);
             helper.setTo(toEmail);
             helper.setSubject("[RESERVE] 로그인 방법이 변경됐어요");
-            helper.setText(HTML_HEAD_OPEN + "</head><body style=\"font-family:" + FONT_FAMILY + ";line-height:1.8;\">"
-                    + "<h1>로그인 방법이 변경됐어요.</h1><p>마이페이지의 로그인 및 보안에서 현재 로그인 방법을 확인할 수 있어요.</p>"
-                    + "<p>본인이 변경하지 않았다면 계정 접근을 확인하고 RESERVE에 문의해주세요.</p></body></html>", true);
+            helper.setText(buildLoginMethodChangedContent(), true);
             mailSender.send(message);
             log.info("Login method notification sent");
         } catch (MessagingException | UnsupportedEncodingException | MailException exception) {
@@ -85,8 +83,25 @@ public class EmailService {
         }
     }
 
+    private String buildLoginMethodChangedContent() {
+        return HTML_HEAD_OPEN + FONT_IMPORT + "</head>"
+            + "<body style=\"margin:0;padding:0;font-family:" + FONT_FAMILY + ";background:#f9fafb;\">"
+            + "<div style=\"width:100%;background:#f9fafb;padding:40px 0;\">"
+            + "  <div style=\"max-width:500px;margin:0 auto;background:#fff;border-radius:24px;padding:48px 32px;box-shadow:0 4px 12px rgba(0,0,0,0.05);\">"
+            + "    <div style=\"margin-bottom:24px;\"><span style=\"font-size:20px;font-weight:800;color:#3182f6;font-family:" + FONT_FAMILY + ";\">RESERVE</span></div>"
+            + "    <div style=\"display:inline-block;background:#3182f6;color:#fff;font-size:13px;font-weight:700;border-radius:20px;padding:4px 14px;margin-bottom:16px;\">보안 알림</div>"
+            + "    <h1 style=\"font-size:22px;font-weight:700;color:#191f28;line-height:1.4;margin:0 0 12px;font-family:" + FONT_FAMILY + ";\">로그인 방법이 변경됐어요.</h1>"
+            + "    <p style=\"font-size:15px;color:#4e5968;line-height:1.8;margin:0 0 28px;\">마이페이지의 로그인 및 보안에서 현재 로그인 방법을 확인할 수 있어요.</p>"
+            + "    <div style=\"background:#f2f4f6;border-radius:16px;padding:24px;margin-bottom:28px;\">"
+            + "      <p style=\"font-size:15px;color:#191f28;line-height:1.8;margin:0;\">본인이 변경하지 않았다면 계정 접근을 확인하고 RESERVE에 문의해주세요.</p>"
+            + "    </div>"
+            + "    <div style=\"font-size:13px;color:#b0b8c1;border-top:1px solid #f2f4f6;padding-top:20px;\">© 2026 RESERVE. All rights reserved.</div>"
+            + "  </div>"
+            + "</div></body></html>";
+    }
+
     /** 예약 승인 알림 → 유저 */
-    @Async
+    @Async("mailExecutor")
     public void sendReservationConfirmedEmail(String toEmail, String memberName,
                                               String storeName, String reservationDate,
                                               String reservationTime, int guestCount) {
@@ -103,7 +118,7 @@ public class EmailService {
      * 취소는 "이미 확정된 약속을 가게가 깬 것"이다. 사용자가 받는 충격이 다르므로
      * 문구도 다르고, 환불 안내가 반드시 들어가야 한다.
      */
-    @Async
+    @Async("mailExecutor")
     public void sendReservationCancelledByStoreEmail(String toEmail, String memberName,
                                                      String storeName, String reservationDate,
                                                      String reservationTime, int guestCount,
@@ -117,7 +132,7 @@ public class EmailService {
     }
 
     /** 예약 거절 알림 → 유저 */
-    @Async
+    @Async("mailExecutor")
     public void sendReservationRejectedEmail(String toEmail, String memberName,
                                              String storeName, String reservationDate,
                                              String reservationTime, int guestCount,
@@ -130,7 +145,7 @@ public class EmailService {
     }
 
     /** 승인 취소 시 예약이 다시 대기 상태임을 알린다. */
-    @Async
+    @Async("mailExecutor")
     public void sendReservationApprovalRevokedEmail(String toEmail, String memberName,
                                                     String storeName, String reservationDate,
                                                     String reservationTime, int guestCount) {
@@ -146,7 +161,7 @@ public class EmailService {
                                          String reservationTime, int guestCount) {}
 
     /** 신규 예약 알림 → 사장님 */
-    @Async
+    @Async("mailExecutor")
     public void sendNewReservationAlertToOwner(String ownerEmail, String ownerName,
                                                String memberName, String memberEmail,
                                                ReservationMailDetails details) {
@@ -263,7 +278,7 @@ public class EmailService {
     }
 
     /** 사업자 인증 승인 알림 → 신청자 */
-    @Async
+    @Async("mailExecutor")
     public void sendBusinessApprovedEmail(String toEmail, String memberName, String businessName) {
         String name = resolveName(memberName, toEmail);
         try {
@@ -286,7 +301,7 @@ public class EmailService {
         }
     }
 
-    @Async
+    @Async("mailExecutor")
     public void sendBusinessRejectedEmail(String toEmail, String memberName, String businessName, String rejectionReason) {
         String name = resolveName(memberName, toEmail);
         try {
@@ -319,7 +334,7 @@ public class EmailService {
     }
 
     /** 신규 문의 알림 → 운영자(개인 이메일) */
-    @Async
+    @Async("mailExecutor")
     public void sendNewInquiryAlert(String memberName, String memberEmail, String categoryDisplayName, String title, String content) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -413,7 +428,7 @@ public class EmailService {
         return (value == null ? "" : value).replaceAll("[\\r\\n]+", " ").trim();
     }
 
-    @Async
+    @Async("mailExecutor")
     public void sendPasswordResetEmail(String toEmail, String code) {
         try {
             MimeMessage message = mailSender.createMimeMessage();

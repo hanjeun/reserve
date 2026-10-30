@@ -47,6 +47,8 @@ const initialValuesFromStore = initialData => {
         reservationEnabled: initialData.reservationEnabled !== false,
         maxCapacityPerSlot: initialData.maxCapacityPerSlot ?? undefined,
         autoApprovalEnabled: initialData.autoApprovalEnabled ?? false,
+        autoCompletionEnabled: initialData.autoCompletionEnabled ?? false,
+        serviceDurationMinutes: initialData.serviceDurationMinutes === 0 ? 60 : initialData.serviceDurationMinutes ?? 60,
         allowLatePayment: initialData.allowLatePayment ?? false,
         allowDuplicateReservation: initialData.allowDuplicateReservation ?? false,
         emailNotificationEnabled: initialData.emailNotificationEnabled ?? true,

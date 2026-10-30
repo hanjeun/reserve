@@ -1,295 +1,189 @@
 import { PageTitle, PageDescription } from '../../components/common/PageTypography';
 import LoadingStatus from '../../components/common/LoadingStatus';
 import StateIllustration from '../../components/common/StateIllustration';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-    CheckOutlined,
-    InfoCircleOutlined,
-    WarningOutlined,
+    CheckOutlined, InfoCircleOutlined, WarningOutlined, CalendarOutlined, ClockCircleOutlined,
+    CreditCardOutlined, FileTextOutlined, TeamOutlined, UserOutlined, DollarOutlined, UndoOutlined, ShopOutlined,
 } from '../../components/common/icons';
 import { invalidateAdData, invalidateReservationData } from '../../hooks/invalidateAfterWrite';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import PageContainer from '../../components/common/PageContainer';
 import Button from '../../components/common/Button';
+import TextLink from '../../components/common/TextLink';
+import DetailInfoRows from '../../components/common/DetailInfoRows';
 import { SpinIndicator } from '../../components/common/Loading';
 import CopyableText from '../../components/common/CopyableText';
 import paymentService from '../../services/paymentService';
 import useAuthStore from '../../store/useAuthStore';
+import { useDocumentEntry } from '../../components/layout/loadingPresentation';
+import { consumePaymentReturn } from '../../utils/paymentReturnContext';
 import { formatCurrency } from '../../utils';
 
 const FINAL_FAILURE_STATUSES = {
     ad: new Set(['PAYMENT_FAILED', 'CANCELLED']),
     reservation: new Set(['FAILED', 'CANCELLED']),
 };
+const AD_PAID_STATUSES = new Set(['ACTIVE', 'EXPIRED', 'SUSPENDED']);
+const REFUND_STATUSES = new Set(['REFUNDED', 'PARTIAL_REFUNDED']);
+const validMerchantUid = value => typeof value === 'string' && Boolean(value.trim()) && value.length <= 255;
+const recordsPath = isAd => isAd ? '/business?tab=ads' : '/my-reservations';
 
-// 조회 전제 — 로그인, 알려진 결제 종류, 비어 있지 않고 255자 이하인 주문번호.
-const canLookupPayment = (memberId, type, merchantUid) => Boolean(memberId)
-    && ['ad', 'reservation'].includes(type)
-    && Boolean(merchantUid?.trim())
-    && merchantUid.length <= 255;
+function statusCopy({ canLookup, isError, status, confirmed, finalFailure, isAd }) {
+    if (!canLookup) return { title: '결제 정보를 확인할 수 없어요',
+        description: '결제 내역에서 해당 건을 확인해주세요.', illustration: 'payment-pending' };
+    if (isError) return { title: '결제 상태를 불러오지 못했어요',
+        description: '서버에서 결제 내역을 확인하지 못했어요. 다시 결제하기 전에 상태를 확인해주세요.', illustration: 'retry' };
+    if (confirmed) return { title: '결제 완료', description: isAd ? '광고 결제를 확인했어요.' : '예약금 결제를 확인했어요.', illustration: 'payment-success' };
+    if (status === 'REFUNDED') return { title: '환불 완료', description: '결제 취소를 확인했어요. 실제 입금 시점은 결제 수단에 따라 달라요.', illustration: 'payment-success' };
+    if (status === 'PARTIAL_REFUNDED') return { title: '부분 환불 완료', description: '결제 금액 중 일부가 환불됐어요.', illustration: 'payment-success' };
+    if (status === 'REFUND_PENDING') return { title: '환불 확인 중', description: '환불 요청의 처리 결과를 확인하고 있어요.', illustration: 'payment-pending' };
+    if (status === 'REVIEW_REQUIRED') return { title: '결제 내역 확인이 필요해요', description: '같은 결제를 다시 시작하지 말고 결제 내역을 확인해주세요.', illustration: 'payment-pending' };
+    if (finalFailure) return { title: '결제가 완료되지 않았어요', description: '결제 내역에서 결제 가능한 상태를 확인해주세요.', illustration: 'payment-failure' };
+    return { title: '결제 상태를 확인하고 있어요', description: '아직 결제 결과가 확정되지 않았어요. 확인 중에는 다시 결제하지 마세요.', illustration: 'payment-pending' };
+}
 
-const recordsPath = (isAd) => (isAd ? '/business?tab=ads' : '/my-reservations');
-
-// 조회 불가·오류·미확정을 완료·실패 상태와 구분한다.
-const unavailableCopy = (canLookup, isError) => {
-    if (!canLookup) {
-        return {
-            title: '결제 정보를 확인할 수 없어요',
-            description: '결제 정보가 충분하지 않아요. 결제 내역에서 해당 건을 확인해주세요.',
-        };
-    }
-    if (isError) {
-        return {
-            title: '결제 상태를 불러오지 못했어요',
-            description: '서버에서 결제 내역을 확인하지 못했어요. 이미 금액이 결제됐다면 다시 결제하지 말고 상태를 다시 확인하세요.',
-        };
-    }
-    return {
-        title: '결제 상태를 확인하고 있어요',
-        description: '아직 완료 또는 실패로 확정된 결제가 아니에요. 상태가 확정될 때까지 같은 결제를 다시 시작하지 마세요.',
-    };
-};
-
-/** URL의 success/error 문구는 증거가 아니다. 본인 DB 기록을 읽고, 이 화면에서는 PG 쓰기를 실행하지 않는다. */
+/** URL의 성공 문구 대신 본인 주문의 서버 상태만 사용한다. */
 const PaymentResult = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     useDocumentTitle('결제 결과');
-
     const type = searchParams.get('type') || 'reservation';
     const isAd = type === 'ad';
     const merchantUid = searchParams.get('merchant_uid');
     const memberId = useAuthStore(state => state.user?.id);
-    const canLookup = canLookupPayment(memberId, type, merchantUid);
+    const canLookup = Boolean(memberId) && ['ad', 'reservation'].includes(type) && validMerchantUid(merchantUid);
+    const checkoutReturn = !isAd && searchParams.get('checkout_return') === 'true';
+    const returnResult = useQuery({
+        queryKey: ['payment-checkout-return', memberId, merchantUid],
+        queryFn: () => paymentService.checkReturn(merchantUid),
+        enabled: canLookup && checkoutReturn, retry: false, staleTime: 0, refetchOnMount: 'always',
+        refetchOnWindowFocus: false,
+    });
+    const returnMatches = returnResult.data?.merchantUid === merchantUid && !returnResult.isError
+        && ['INCOMPLETE', 'STATUS', 'REVIEW_REQUIRED'].includes(returnResult.data?.outcome);
+    const returnReady = returnMatches && !returnResult.isFetching;
+    const incomplete = checkoutReturn && returnReady && returnResult.data.outcome === 'INCOMPLETE'
+        && Number.isSafeInteger(returnResult.data.storeId) && returnResult.data.storeId > 0;
+    const checkingReturn = canLookup && checkoutReturn && (returnResult.isPending || returnResult.isFetching);
     const result = useQuery({
         queryKey: ['payment-result', memberId, type, merchantUid],
         queryFn: () => paymentService.getStatus(type, merchantUid),
-        enabled: canLookup,
-        retry: false,
-        staleTime: 0,
-        refetchOnMount: 'always',
+        enabled: canLookup && !checkingReturn && !incomplete, retry: false, staleTime: 0, refetchOnMount: 'always',
     });
-    const paymentDetail = result.data;
-    const hasMatchingDetail = canLookup
-        && !result.isError
-        && paymentDetail?.type === type
-        && paymentDetail?.merchantUid === merchantUid;
-    const status = hasMatchingDetail ? paymentDetail.status : null;
-    const confirmed = status === (isAd ? 'ACTIVE' : 'PAID');
-    const finalFailure = Boolean(status) && FINAL_FAILURE_STATUSES[type].has(status);
-    const verifying = canLookup && (result.isPending || result.isFetching);
+    const hasMatchingDetail = canLookup && !result.isError && result.data?.type === type && result.data?.merchantUid === merchantUid;
+    const detail = hasMatchingDetail ? result.data : undefined;
+    const status = checkoutReturn && returnMatches && returnResult.data.outcome === 'REVIEW_REQUIRED' ? 'REVIEW_REQUIRED' : detail?.status;
+    const confirmed = isAd ? AD_PAID_STATUSES.has(status) : status === 'PAID';
+    const finalFailure = Boolean(status) && FINAL_FAILURE_STATUSES[type]?.has(status);
+    const refunded = REFUND_STATUSES.has(status);
+    const settled = confirmed || finalFailure || refunded;
+    const verifying = checkingReturn || incomplete || (canLookup && result.isPending);
+    const lookupError = result.isError || (result.isSuccess && !hasMatchingDetail);
     const queryClient = useQueryClient();
-    const goToRecords = () => navigate(
-        recordsPath(isAd),
-        { replace: true, state: isAd ? undefined : { refetch: true } },
-    );
-    const recoverPayment = () => navigate(
-        recordsPath(isAd),
-        {
-            replace: true,
-            state: isAd
-                ? { reserveRouteMotion: 'from-left' }
-                : { refetch: true, reserveRouteMotion: 'from-left' },
-        },
-    );
-
+    const incompleteNotice = useRef(null);
+    const goToRecords = () => navigate(recordsPath(isAd), { replace: true,
+        state: { ...(!isAd && { refetch: true }), reserveRouteMotion: 'from-left' } });
     useEffect(() => {
-        if (!confirmed) return;
-        // 내 목록뿐 아니라 예약 달력의 빈자리·공개 광고·통계도 결제로 바뀐다(invalidateAfterWrite.js).
+        const notice = memberId + ':' + merchantUid;
+        if (!incomplete || incompleteNotice.current === notice) return;
+        incompleteNotice.current = notice;
+        void invalidateReservationData(queryClient);
+        navigate(consumePaymentReturn(merchantUid, memberId, returnResult.data.storeId), { replace: true,
+            state: { refetch: true, reserveRouteMotion: 'from-left', paymentIncomplete: { merchantUid, memberId } } });
+    }, [incomplete, returnResult.data, merchantUid, memberId, navigate, queryClient]);
+    useEffect(() => {
+        if (!confirmed && !refunded && !finalFailure) return;
         void (isAd ? invalidateAdData : invalidateReservationData)(queryClient);
-    }, [confirmed, isAd, queryClient]);
+    }, [confirmed, refunded, finalFailure, isAd, queryClient]);
 
-    if (verifying) {
-        return <PaymentVerifying isAd={isAd} onRecover={recoverPayment} />;
-    }
-
-    if (confirmed) {
-        return (
-            <PaymentConfirmed isAd={isAd} detail={paymentDetail} merchantUid={merchantUid}
-                onGoToRecords={goToRecords} onBrowseStores={() => navigate('/stores')} />
-        );
-    }
-
-    if (finalFailure) {
-        return (
-            <PaymentFailed isAd={isAd} detail={paymentDetail} merchantUid={merchantUid}
-                onGoToRecords={goToRecords} />
-        );
-    }
-
-    return (
-        <PaymentUnavailable isAd={isAd} canLookup={canLookup} result={result} detail={paymentDetail}
-            merchantUid={merchantUid} onRecover={recoverPayment} onGoToRecords={goToRecords} />
-    );
+    const copy = statusCopy({ canLookup, isError: lookupError, status, confirmed, finalFailure, isAd });
+    const canRefresh = canLookup && !settled;
+    return <PaymentResultFrame busy={verifying}>
+        {verifying ? <PaymentVerifying isAd={isAd} checkoutReturn={checkoutReturn} /> : <section className="reserve-payment-result__content" aria-live="polite">
+            <StateIllustration name={copy.illustration} size="lg"
+                fallback={confirmed || refunded ? <CheckOutlined /> : finalFailure ? <WarningOutlined /> : <InfoCircleOutlined />}
+                interactive={settled || lookupError} />
+            <PageTitle level={1} className="reserve-payment-result__title">{copy.title}</PageTitle>
+            <PageDescription className="reserve-payment-result__description">{copy.description}</PageDescription>
+            <PaymentSummary detail={detail} merchantUid={validMerchantUid(merchantUid) ? merchantUid : null} />
+            <div className="reserve-payment-result__actions">
+                <Button variant="primary" size="lg" block onClick={goToRecords}>{isAd ? '광고 관리' : '내 예약'}</Button>
+                {canRefresh ? <Button variant="secondary" size="lg" block loading={result.isFetching}
+                    onClick={() => checkoutReturn ? returnResult.refetch().then(() => result.refetch()) : result.refetch()}>다시 확인</Button>
+                    : <Button variant="secondary" size="lg" block onClick={() => navigate('/stores')}>가게 둘러보기</Button>}
+            </div>
+            {canRefresh && !lookupError && status !== 'REFUND_PENDING' && status !== 'REVIEW_REQUIRED'
+                && <PaymentRecoveryLink isAd={isAd} />}
+        </section>}
+    </PaymentResultFrame>;
 };
 
-const PaymentVerifying = ({ isAd, onRecover }) => (
-    <PaymentResultFrame busy>
+const PaymentVerifying = ({ isAd, checkoutReturn = false }) => (
         <LoadingStatus as="section" className="reserve-payment-result__content" aria-label="결제 상태를 확인하는 중">
-            <StateIllustration name="payment-pending" size="lg" fallback={<SpinIndicator />} />
+            {checkoutReturn ? <SpinIndicator /> : <StateIllustration name="payment-pending" size="lg" fallback={<SpinIndicator />} />}
             <PageTitle level={1} className="reserve-payment-result__title">결제 처리 중</PageTitle>
-            <PageDescription className="reserve-payment-result__description">
-                결제 완료 여부를 안전하게 확인하고 있어요. 화면을 닫거나 같은 결제를 다시 시작하지 마세요.
-            </PageDescription>
-            <p className="reserve-payment-result__hint">
-                결제 수단 화면에서 돌아온 뒤에도 확인이 끝날 때까지 잠시 기다려주세요.
-            </p>
-            <PaymentRecoveryLink isAd={isAd} onRecover={onRecover} />
+            <PageDescription className="reserve-payment-result__description">결제 내역을 확인하고 있어요. 잠시 기다려주세요.</PageDescription>
+            {!checkoutReturn && <PaymentRecoveryLink isAd={isAd} />}
         </LoadingStatus>
-    </PaymentResultFrame>
 );
+PaymentVerifying.propTypes = { isAd: PropTypes.bool.isRequired, checkoutReturn: PropTypes.bool };
 
-const PaymentConfirmed = ({ isAd, detail, merchantUid, onGoToRecords, onBrowseStores }) => (
-    <PaymentResultFrame>
-        <section className="reserve-payment-result__content">
-            <StateIllustration name="payment-success" size="lg" fallback={<CheckOutlined />} interactive />
-            <PageTitle level={1} className="reserve-payment-result__title">결제 완료</PageTitle>
-            <PageDescription className="reserve-payment-result__description">
-                {isAd ? '광고 등록을 확인했어요.' : '예약금 결제를 확인했어요.'}
-            </PageDescription>
-            <PaymentSummary detail={detail} merchantUid={merchantUid} />
-            <p className="reserve-payment-result__hint">
-                {isAd
-                    ? '광고 노출 상태와 상세 내역은 광고 관리에서 확인할 수 있어요.'
-                    : '예약 확정 여부와 취소·환불 내역은 내 예약에서 확인할 수 있어요.'}
-            </p>
-            <div className="reserve-payment-result__actions">
-                <Button variant="primary" size="lg" block onClick={onGoToRecords}>
-                    {isAd ? '내 광고 확인하기' : '내 예약 확인하기'}
-                </Button>
-                {!isAd && (
-                    <Button variant="secondary" size="lg" block onClick={onBrowseStores}>
-                        다른 가게 둘러보기
-                    </Button>
-                )}
-            </div>
-        </section>
-    </PaymentResultFrame>
-);
-
-const PaymentFailed = ({ isAd, detail, merchantUid, onGoToRecords }) => (
-    <PaymentResultFrame>
-        <section className="reserve-payment-result__content">
-            <StateIllustration name="payment-failure" size="lg" fallback={<WarningOutlined />} interactive />
-            <PageTitle level={1} className="reserve-payment-result__title">결제가 완료되지 않았어요</PageTitle>
-            <PageDescription className="reserve-payment-result__description">
-                {isAd
-                    ? '광고 관리에서 결제 가능한 상태를 확인한 뒤 다시 진행할 수 있어요.'
-                    : '내 예약에서 결제 가능한 예약을 확인한 뒤 다시 진행할 수 있어요.'}
-            </PageDescription>
-            <PaymentSummary detail={detail} merchantUid={merchantUid} />
-            <div className="reserve-payment-result__actions">
-                <Button variant="primary" size="lg" block onClick={onGoToRecords}>
-                    {isAd ? '내 광고에서 다시 결제' : '내 예약에서 다시 결제'}
-                </Button>
-            </div>
-        </section>
-    </PaymentResultFrame>
-);
-
-const PaymentUnavailable = ({ isAd, canLookup, result, detail, merchantUid, onRecover, onGoToRecords }) => {
-    const { title, description } = unavailableCopy(canLookup, result.isError);
-    return (
-        <PaymentResultFrame>
-            <section className="reserve-payment-result__content" aria-live="polite">
-                <StateIllustration name={result.isError ? 'retry' : 'payment-pending'} size="lg" fallback={<InfoCircleOutlined />} interactive={result.isError} />
-                <PageTitle level={1} className="reserve-payment-result__title">{title}</PageTitle>
-                <PageDescription className="reserve-payment-result__description">{description}</PageDescription>
-                {merchantUid && <PaymentSummary detail={detail} merchantUid={merchantUid} />}
-                {canLookup && !result.isError && <PaymentRecoveryLink isAd={isAd} onRecover={onRecover} />}
-                <div className="reserve-payment-result__actions">
-                    {canLookup && (
-                        <Button
-                            variant="outline"
-                            size="lg"
-                            block
-                            loading={result.isFetching}
-                            onClick={() => result.refetch?.()}
-                        >
-                            상태 다시 확인
-                        </Button>
-                    )}
-                    <Button variant={canLookup ? 'secondary' : 'primary'} size="lg" block onClick={onGoToRecords}>
-                        {isAd ? '내 광고 확인하기' : '내 예약 확인'}
-                    </Button>
-                </div>
-            </section>
-        </PaymentResultFrame>
-    );
-};
-
-const PaymentResultFrame = ({ children, busy = false }) => (
-    <PageContainer size="sm" paddingTop="56px" className="reserve-payment-result-page" aria-busy={busy || undefined}>
+const PaymentResultFrame = ({ children, busy = false }) => {
+    const documentEntry = useDocumentEntry();
+    return <PageContainer size="sm" paddingTop="56px"
+        className={'reserve-payment-result-page' + (documentEntry ? ' reserve-route-entry--from-right' : '')} aria-busy={busy || undefined}>
         <main className="reserve-payment-result">{children}</main>
-    </PageContainer>
-);
+    </PageContainer>;
+};
+PaymentResultFrame.propTypes = { children: PropTypes.node.isRequired, busy: PropTypes.bool };
 
-const PaymentRecoveryLink = ({ isAd, onRecover }) => (
-    <p className="reserve-payment-result__recovery">
-        결제창으로 이동하지 못하셨나요?{' '}
-        <button type="button" className="reserve-text-link" onClick={onRecover}>
-            {isAd ? '광고 관리에서 다시 열기' : '내 예약에서 다시 열기'}
-        </button>
+const PaymentRecoveryLink = ({ isAd }) => (
+    <p className="reserve-payment-result__recovery">결제창으로 이동하지 못하셨나요?{' '}
+        <TextLink to={recordsPath(isAd)} replace state={{ ...(!isAd && { refetch: true }), reserveRouteMotion: 'from-left' }}>
+            {isAd ? '광고 관리' : '내 예약'}
+        </TextLink>에서 다시 열기
     </p>
 );
+PaymentRecoveryLink.propTypes = { isAd: PropTypes.bool.isRequired };
 
 const PaymentSummary = ({ detail, merchantUid }) => {
-    const displayMerchantUid = detail?.merchantUid || merchantUid;
-    const displayPayMethod = formatPayMethod(detail?.payMethod);
+    const reservation = detail?.reservation;
     const rows = [
-        displayMerchantUid && { label: '주문번호', value: displayMerchantUid, muted: true, copyable: true },
-        detail?.amount != null && { label: '결제금액', value: formatCurrency(detail.amount), strong: true },
-        displayPayMethod && { label: '결제수단', value: displayPayMethod },
+        reservation?.storeName && { Icon: ShopOutlined, label: '가게', value: reservation.storeName },
+        reservation?.reservationCode && { Icon: FileTextOutlined, label: '예약번호', value: <CopyableText value={reservation.reservationCode} label="예약번호" /> },
+        reservation?.reservationDate && { Icon: CalendarOutlined, label: '예약 날짜', value: reservation.reservationDate },
+        reservation?.reservationTime && { Icon: ClockCircleOutlined, label: '예약 시간', value: reservation.reservationTime.slice(0, 5) },
+        reservation?.guestCount != null && { Icon: TeamOutlined, label: '인원', value: reservation.guestCount + '명' },
+        reservation?.memberName && { Icon: UserOutlined, label: '예약자', value: reservation.memberName },
+        merchantUid && { Icon: FileTextOutlined, label: '주문번호', value: <CopyableText value={merchantUid} label="주문번호" wrap /> },
+        detail?.amount != null && { Icon: DollarOutlined, label: '결제 금액', value: formatCurrency(detail.amount), highlight: true },
+        detail?.refundedAmount > 0 && { Icon: UndoOutlined, label: '환불 금액', value: formatCurrency(detail.refundedAmount), highlight: true },
+        detail?.payMethod && { Icon: CreditCardOutlined, label: '결제 수단', value: formatPayMethod(detail.payMethod, detail.payProvider) },
     ].filter(Boolean);
-
-    if (rows.length === 0) return null;
-
-    return (
-        <dl className="reserve-payment-result__summary">
-            {rows.map(({ label, value, muted, strong, copyable }) => (
-                <div className="reserve-payment-result__summary-row" key={label}>
-                    <dt>{label}</dt>
-                    <dd className={[
-                        muted && 'reserve-payment-result__summary-value--muted',
-                        strong && 'reserve-payment-result__summary-value--strong',
-                    ].filter(Boolean).join(' ')}
-                    >
-                        {copyable ? <CopyableText value={value} label={label} /> : value}
-                    </dd>
-                </div>
-            ))}
-        </dl>
-    );
+    if (!rows.length) return null;
+    return <section className="reserve-payment-result__summary" aria-label="예약 및 결제 내역">
+        <DetailInfoRows rows={rows} />
+    </section>;
 };
+PaymentSummary.propTypes = { detail: PropTypes.object, merchantUid: PropTypes.string };
 
-PaymentRecoveryLink.propTypes = {
-    isAd: PropTypes.bool.isRequired,
-    onRecover: PropTypes.func.isRequired,
-};
-
-// PortOne V2와 이전 V1 기록을 함께 읽는다.
-function formatPayMethod(method) {
-    if (!method) return null;
+function formatPayMethod(method, provider) {
     const map = {
-        PaymentMethodEasyPay: '간편결제',
-        PaymentMethodCard: '신용/체크카드',
-        PaymentMethodTransfer: '실시간 계좌이체',
-        PaymentMethodVirtualAccount: '가상계좌',
-        PaymentMethodMobile: '휴대폰 소액결제',
-        KakaoPay: '카카오페이',
-        NaverPay: '네이버페이',
-        TossPay: '토스페이',
-        card: '신용/체크카드',
-        vbank: '가상계좌',
-        trans: '실시간 계좌이체',
-        phone: '휴대폰 소액결제',
-        kakaopay: '카카오페이',
-        naverpay: '네이버페이',
+        PaymentMethodEasyPay: '간편결제', EasyPay: '간편결제',
+        PaymentMethodCard: '카드결제', Card: '카드결제', card: '카드결제',
+        PaymentMethodTransfer: '계좌이체', Transfer: '계좌이체', trans: '계좌이체',
+        PaymentMethodVirtualAccount: '가상계좌', VirtualAccount: '가상계좌', vbank: '가상계좌',
+        PaymentMethodMobile: '휴대폰 결제', Mobile: '휴대폰 결제', phone: '휴대폰 결제',
+        KakaoPay: '카카오페이', KAKAOPAY: '카카오페이', kakaopay: '카카오페이',
+        NaverPay: '네이버페이', NAVERPAY: '네이버페이', naverpay: '네이버페이',
+        TossPay: '토스페이', TOSSPAY: '토스페이', tosspay: '토스페이',
+        SAMSUNGPAY: '삼성페이', APPLEPAY: 'Apple Pay',
     };
-    return map[method] || method;
+    if (['PaymentMethodEasyPay', 'EasyPay'].includes(method) && map[provider]) return map[provider];
+    return map[method] || '기타 결제';
 }
-
 export default PaymentResult;

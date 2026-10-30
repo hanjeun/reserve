@@ -52,7 +52,9 @@ class GlobalExceptionHandlerTest {
     @Test
     void closedEventStreamDoesNotTryToWriteAJsonErrorIntoTheEventResponse() throws Exception {
         mvc.perform(get("/error-probe/closed-stream"))
-                .andExpect(content().contentType(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(result -> org.assertj.core.api.Assertions.assertThat(result.getResponse().isCommitted()).isTrue())
+                .andExpect(result -> org.assertj.core.api.Assertions.assertThat(result.getResolvedException())
+                        .isInstanceOf(AsyncRequestNotUsableException.class))
                 .andExpect(content().string(""));
     }
 
@@ -68,8 +70,9 @@ class GlobalExceptionHandlerTest {
         void fail() { throw new IllegalStateException("private-error"); }
 
         @GetMapping("/error-probe/closed-stream")
-        void closedStream(HttpServletResponse response) throws AsyncRequestNotUsableException {
+        void closedStream(HttpServletResponse response) throws java.io.IOException {
             response.setContentType(MediaType.TEXT_EVENT_STREAM_VALUE);
+            response.flushBuffer();
             throw new AsyncRequestNotUsableException("Response is no longer usable");
         }
     }

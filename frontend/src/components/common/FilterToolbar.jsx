@@ -7,6 +7,7 @@ import FilterToolbarSkeleton from './FilterToolbarSkeleton';
 import { SearchOutlined } from './icons';
 import { colors, fontSize } from '../../styles/tokens';
 import useLiveUpdatesStatus from '../../hooks/useLiveUpdatesStatus';
+import useInitialLoading from '../../hooks/useInitialLoading';
 
 const { Text } = Typography;
 
@@ -26,9 +27,10 @@ const FilterToolbar = ({
     spread = false,
     style,
 }) => {
+    const firstLoading = useInitialLoading(initialLoading);
     const live = useLiveUpdatesStatus();
     const showRefresh = Boolean(onReload) && !live.domains.includes(autoRefreshDomain);
-    if (initialLoading) return <FilterToolbarSkeleton selects={selects} count={count} search={search} extra={extra} extraSkeleton={extraSkeleton} spread={spread} style={style} showRefresh={showRefresh} />;
+    if (firstLoading) return <FilterToolbarSkeleton selects={selects} count={count} search={search} extra={extra} extraSkeleton={extraSkeleton} spread={spread} style={style} showRefresh={showRefresh} />;
     /*
      * 새로고침 대기·스피너 수명은 RefreshButton에서 관리한다.
      */
@@ -132,13 +134,13 @@ FilterToolbar.propTypes = {
         width: PropTypes.number,
         mobileWidth: PropTypes.number,
         disabled: PropTypes.bool,
-        loading: PropTypes.bool,
         placeholder: PropTypes.string,
         ariaLabel: PropTypes.string,
         className: PropTypes.string,
     })),
     count: PropTypes.number,
     search: PropTypes.shape({
+        loading: PropTypes.bool,
         placeholder: PropTypes.string,
         value: PropTypes.string,
         onChange: PropTypes.func,

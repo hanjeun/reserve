@@ -56,6 +56,7 @@ public class MemberService {
 
     private final MemberRepository memberRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    @org.springframework.beans.factory.annotation.Autowired private kr.it.reserve.member.mfa.MfaService mfa;
     private final PasswordEncoder bCryptPasswordEncoder;
     private final EmailVerificationService emailVerificationService;
     private final FavoriteRepository favoriteRepository;
@@ -350,6 +351,7 @@ public class MemberService {
         paymentRepository.anonymizeBuyerByMemberId(memberId);
 
         refreshTokenRepository.deleteByMemberId(memberId);
+        if (mfa != null) mfa.erase(memberId);
         passwordResetTokenRepository.deleteByEmail(originalEmail);
         emailVerificationRepository.deleteByEmail(originalEmail);
 

@@ -20,6 +20,7 @@ test('banner enters with a soft scale rise and keeps a large close target', asyn
         const url = new URL(route.request().url());
         const path = url.pathname;
         if (!path.startsWith('/api/')) return route.continue();
+        if (path === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: null, refreshPossible: false } } }); }
         if (path === '/api/member/me' || path === '/api/auth/refresh') {
             return route.fulfill({ status: 401, json: { success: false, message: '로그인이 필요합니다.' } });
         }
@@ -81,6 +82,7 @@ test('selected 3D motion starts nearly flat and settles upright', async ({ page 
     await page.route('**/api/**', route => {
         const url = new URL(route.request().url());
         if (!url.pathname.startsWith('/api/')) return route.continue();
+        if (url.pathname === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: null, refreshPossible: false } } }); }
         if (url.pathname === '/api/member/me' || url.pathname === '/api/auth/refresh') {
             return route.fulfill({ status: 401, json: { success: false, message: '로그인이 필요합니다.' } });
         }

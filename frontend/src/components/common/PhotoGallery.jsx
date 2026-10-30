@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Carousel, Image } from 'antd';
 import LoadingAntImage from './LoadingAntImage';
@@ -7,7 +7,23 @@ import { photoPreviewClassNames, rememberPhotoPreviewOrigin } from '../../utils/
 /** 가게 상세·피드·소식이 같은 슬라이드, 확대 보기와 모바일 스와이프를 쓴다. */
 export default function PhotoGallery({ label, sources, imageSizes, autoplay = false, wrapperStyle, imageStyle, previewEnabled = true, dots = true, adaptiveHeight = false, onSlideChange }) {
     const [loadedSources, setLoadedSources] = useState(() => new Set());
+    const gallery = useRef(null);
+    const carousel = useRef(null);
+    const [previewOpen, setPreviewOpen] = useState(false);
     const gesture = useRef(null);
+    useLayoutEffect(() => {
+        const node = gallery.current;
+        if (!node) return undefined;
+        const updateSlides = () => node.querySelectorAll('.slick-slide').forEach(slide => { slide.inert = slide.getAttribute('aria-hidden') === 'true'; });
+        updateSlides();
+        const observer = new MutationObserver(updateSlides);
+        observer.observe(node, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-hidden'] });
+        return () => observer.disconnect();
+    }, [sources.length]);
+    const beforeSlideChange = () => {
+        const focused = document.activeElement;
+        if (gallery.current?.contains(focused) && focused.closest('.slick-slide')) gallery.current.focus({ preventScroll: true });
+    };
     const suppressClick = useRef(false);
     const rememberLoadedImage = event => {
         const image = event.target;
@@ -23,9 +39,9 @@ export default function PhotoGallery({ label, sources, imageSizes, autoplay = fa
     };
     if (!sources.length) return null;
     return <div style={{ position: 'relative' }} data-discovery-swipe-ignore="true">
-        <div className="reserve-store-gallery" style={wrapperStyle} onLoadCapture={rememberLoadedImage}
+        <div ref={gallery} className="reserve-store-gallery" tabIndex={-1} role="group" aria-label={`${label} 사진`} style={wrapperStyle} onLoadCapture={rememberLoadedImage}
             onPointerDownCapture={event => {
-                if (!event.isPrimary || event.button !== 0) return;
+                if (!event.isPrimary || event.button !== 0 || event.target.closest('button')) return;
                 suppressClick.current = false;
                 gesture.current = { id: event.pointerId, x: event.clientX, y: event.clientY };
             }}
@@ -33,17 +49,27 @@ export default function PhotoGallery({ label, sources, imageSizes, autoplay = fa
                 const start = gesture.current;
                 if (start?.id === event.pointerId && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 8) suppressClick.current = true;
             }}
-            onPointerUpCapture={() => { gesture.current = null; }}
+            onPointerUpCapture={event => {
+                const start = gesture.current;
+                gesture.current = null;
+                if (start?.id !== event.pointerId) return;
+                const dx = event.clientX - start.x;
+                const dy = event.clientY - start.y;
+                if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy) * 1.25 || sources.length < 2) return;
+                suppressClick.current = true;
+                if (dx < 0) carousel.current?.next();
+                else carousel.current?.prev();
+            }}
             onPointerCancelCapture={() => { gesture.current = null; suppressClick.current = true; }}
             onClickCapture={event => {
                 if (suppressClick.current && event.detail > 0) { event.preventDefault(); event.stopPropagation(); suppressClick.current = false; return; }
                 suppressClick.current = false;
                 rememberPhotoPreviewOrigin(event);
             }}>
-            <Image.PreviewGroup items={sources} classNames={photoPreviewClassNames}>
-                <Carousel className="reserve-carousel" infinite draggable swipe touchMove swipeToSlide touchThreshold={12}
+            <Image.PreviewGroup items={sources} classNames={photoPreviewClassNames} preview={{ onOpenChange: setPreviewOpen }}>
+                <Carousel ref={carousel} className="reserve-carousel" infinite draggable={false} swipe={false} touchMove={false}
                     lazyLoad="ondemand" adaptiveHeight={adaptiveHeight}
-                    dots={dots && sources.length > 1} dotPlacement="bottom" autoplay={autoplay} afterChange={onSlideChange}>
+                    dots={dots && sources.length > 1} dotPlacement="bottom" autoplay={autoplay && !previewOpen} beforeChange={beforeSlideChange} afterChange={onSlideChange}>
                     {sources.map((src, index) => <div key={`${src}:${index}`}>
                         <LoadingAntImage src={src} alt={`${label} 사진 ${index + 1}`} referrerPolicy="no-referrer"
                             imageSize={imageSizes?.[index]}

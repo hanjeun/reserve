@@ -17,7 +17,7 @@ import BusinessPanel from '../../pages/business/BusinessPanel';
 
 const state = vi.hoisted(() => ({
     query: {}, stores: {}, thread: {}, reload: vi.fn(), apiGet: vi.fn(), renderBusinessRows: false,
-    queryOptions: null, dataTableProps: null, setQueryParams: vi.fn(), queryParams: null, manage: {}, width: 390,
+    delayedSearch: null, queryOptions: null, dataTableProps: null, setQueryParams: vi.fn(), queryParams: null, manage: {}, width: 390,
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -39,7 +39,7 @@ vi.mock('../../hooks', () => ({
     useImagePreview: () => ({ handlePreview: vi.fn(), suppressLinkNavigation: vi.fn(), previewNode: null }),
     useFormErrors: () => ({ errors: {}, validate: vi.fn(), clearError: vi.fn(), resetErrors: vi.fn() }),
 }));
-vi.mock('../../hooks/useDebounce', () => ({ default: (value) => value }));
+vi.mock('../../hooks/useDebounce', () => ({ default: value => state.delayedSearch ?? value }));
 vi.mock('../../hooks/useChatThread', () => ({ default: () => state.thread }));
 vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: { error: vi.fn(), success: vi.fn() }, confirm: vi.fn() }) }));
 vi.mock('../../hooks/useWindowWidth', () => ({ useWindowWidth: () => state.width }));
@@ -107,6 +107,7 @@ beforeEach(() => {
     state.queryOptions = null;
     state.dataTableProps = null;
     state.queryParams = null;
+    state.delayedSearch = null;
     state.renderBusinessRows = false;
     state.manage = {};
     state.width = 390;
@@ -165,6 +166,20 @@ describe.each(PLACEHOLDER_TABLE_TABS)('%s query transitions', (_label, Component
         render(<Component />);
         expect(screen.getByTestId('table-skeleton')).toBeInTheDocument();
         expect(screen.queryByTestId('data-table')).not.toBeInTheDocument();
+    });
+});
+
+describe.each([['광고', AdminAdsTab], ['사업자 인증', BusinessVerificationTab], ['회원', MembersTab],
+    ['가게', StoresAdminTab], ['예약', ReservationsAllTab], ['사업자 광고', AdManageTab]])('%s 검색 입력 대기', (_label, Component) => {
+    it('서버 요청 지연 중에는 이전 결과 대신 결과 영역의 골격을 표시해요', () => {
+        void _label;
+        state.delayedSearch = '';
+        state.queryParams = { search: '새 검색', page: '1', status: 'ALL', sort: 'recent', view: 'list',
+            advertisementSearch: '새 검색', advertisementPage: '0' };
+        state.query.data = { content: [], ads: [], items: [], members: [], stores: [], reservations: [], totalElements: 12 };
+        render(<MemoryRouter><Component /></MemoryRouter>);
+        expect(screen.getByTestId('table-skeleton')).toBeInTheDocument();
+        expect(screen.queryByTestId('data-table')).toBeNull();
     });
 });
 

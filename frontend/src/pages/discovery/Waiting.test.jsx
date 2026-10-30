@@ -22,8 +22,8 @@ function Probe() {
 }
 const page = (name, total = 1) => ({ content: [{ id: 1, name }], page: { totalElements: total } });
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
-const show = (url = '/waiting') => {
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+const show = (url = '/waiting', options = {}) => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0, ...options } } });
     return { ...render(<QueryClientProvider client={client}>
         <MemoryRouter initialEntries={[url]}><Probe /><Routes><Route path="/waiting" element={<Waiting />} />
             <Route path="/other" element={<div>다른 탭</div>} /></Routes></MemoryRouter></QueryClientProvider>), client };
@@ -117,8 +117,30 @@ it('retains the focused search field during a new query without normalizing its 
     show(); await screen.findByText('이전 가게');
     const input = screen.getByPlaceholderText('웨이팅 가게 검색'); input.focus();
     fireEvent.change(input, { target: { value: '새 가게' } });
+    expect(screen.getByRole('status', { name: '웨이팅 가게를 불러오는 중' })).toBeInTheDocument();
+    expect(screen.queryByText('이전 가게')).toBeNull();
     await waitFor(() => expect(waitingService.getStores).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: '새 가게', page: 0 }), expect.any(AbortSignal)));
     expect(screen.getByPlaceholderText('웨이팅 가게 검색')).toBe(input); expect(input).toHaveFocus(); expect(input).toBeEnabled();
     await act(async () => request.resolve(page('새 가게', 1)));
     expect(await screen.findByText('새 가게')).toBeInTheDocument();
+});
+
+it('reuses cached search results immediately and preserves rows during background refresh', async () => {
+    waitingService.getStores.mockResolvedValue(page('초기 가게'));
+    const { client } = show('/waiting', { gcTime: 60_000 }); await screen.findByText('초기 가게');
+    client.setQueryData(['waiting-stores', '기억한 검색', '', 'ALL', 'recommended', 0], page('캐시 가게'));
+    fireEvent.change(screen.getByPlaceholderText('웨이팅 가게 검색'), { target: { value: '기억한 검색' } });
+    expect(screen.getByText('캐시 가게')).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: '웨이팅 가게를 불러오는 중' })).toBeNull();
+    await waitFor(() => expect(client.getQueryCache().find({ queryKey: ['waiting-stores', '기억한 검색', '', 'ALL', 'recommended', 0] }).isActive()).toBe(true));
+    const refresh = deferred(); waitingService.getStores.mockReturnValue(refresh.promise);
+    await act(async () => { void client.refetchQueries({ queryKey: ['waiting-stores', '기억한 검색'], type: 'active' }); });
+    expect(screen.getByText('캐시 가게')).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: '웨이팅 가게를 불러오는 중' })).toBeNull();
+    await act(async () => refresh.resolve(page('갱신 가게')));
+    expect(await screen.findByText('갱신 가게')).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText('웨이팅 가게 검색'), { target: { value: '' } });
+    expect(screen.getByText('초기 가게')).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: '웨이팅 가게를 불러오는 중' })).toBeNull();
+    client.clear();
 });

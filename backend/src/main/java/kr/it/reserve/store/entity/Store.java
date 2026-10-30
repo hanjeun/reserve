@@ -214,6 +214,16 @@ public class Store {
     @Builder.Default
     private Boolean autoApprovalEnabled = false;
 
+    @Column(name = "auto_completion_enabled", nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private Boolean autoCompletionEnabled = false;
+
+    @Column(name = "service_duration_minutes", nullable = false)
+    @ColumnDefault("60")
+    @Builder.Default
+    private Integer serviceDurationMinutes = 60;
+
     // 예약 가능 마감 시간 (예약 시간 N시간 전까지만 예약 가능, null = 제한 없음)
     @Column(name = "booking_deadline_hours")
     private Integer bookingDeadlineHours;

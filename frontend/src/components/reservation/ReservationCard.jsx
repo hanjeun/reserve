@@ -49,6 +49,7 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
 
     const isOpenConfirmed = status === 'CONFIRMED' || status === 'UNCONFIRMED';
     const hasAction = status === 'PENDING' || isOpenConfirmed;
+    const requiresAdvancePayment = reservation.depositAmount > 0 && !reservation.depositPaid && !reservation.allowLatePayment;
 
     const closeReasonModal = () => { setReasonModal(null); setReason(''); };
 
@@ -75,9 +76,9 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
         if (hasAction) {
             if (status === 'PENDING') {
                 return [
-                    <Button key="approve" variant="ghost-sm-primary" loading={isActing('approve')} onClick={() => onApprove(id)}>
+                    ...(!requiresAdvancePayment ? [<Button key="approve" variant="ghost-sm-primary" loading={isActing('approve')} onClick={() => onApprove(id)}>
                         <CheckOutlined /> 승인
-                    </Button>,
+                    </Button>] : []),
                     <Button key="reject" variant="ghost-sm-danger" loading={isActing('reject')} onClick={() => setReasonModal('reject')}>
                         <CloseOutlined /> 거절
                     </Button>,

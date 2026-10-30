@@ -19,6 +19,7 @@ async function mockAuth(page, initialUser = null) {
             current = user;
         }
         if (endpoint === '/api/auth/logout') current = null;
+        if (endpoint === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: current, refreshPossible: false } } }); }
         if (['/api/member/me', '/api/auth/refresh'].includes(endpoint) && !current) {
             return route.fulfill({ status: 401, json: { success: false } });
         }

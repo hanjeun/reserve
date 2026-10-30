@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import useAuthStore from './useAuthStore';
+import { messengerSelectionKey, messengerSearchResultKey } from '../utils/messengerSelection';
 
 const memberSupport = () => ({ kind: 'support' });
 export const messengerIdentityOf = ({ user, sessionRevision }) => user
@@ -45,12 +46,13 @@ const useMessengerStore = create((set, get) => ({
     select: (selection, { fromStoreSearch = false } = {}) => set(state => ({
         selection, view: 'conversations', activeThread: true,
         storeSearch: fromStoreSearch && state.storeSearch
-            ? { ...state.storeSearch, visible: false, selectedStoreId: selection.storeId } : null,
+            ? { ...state.storeSearch, visible: false, selectedStoreId: selection.storeId ?? null,
+                selectedThreadKey: messengerSelectionKey(selection), selectedResultKey: messengerSearchResultKey(selection) } : null,
     })),
     openStoreSearch: () => set(state => ({
         view: 'conversations', activeThread: false,
         storeSearch: { visible: true, origin: state.view === 'home' ? 'home' : 'conversations',
-            keyword: '', page: 0, scrollTop: 0, selectedStoreId: null },
+            keyword: '', category: 'all', page: 0, scrollTop: 0, selectedStoreId: null, selectedResultKey: null, selectedThreadKey: null },
     })),
     updateStoreSearch: (patch, identity = get().sessionIdentity) => {
         if (identity !== get().sessionIdentity || !get().storeSearch) return;

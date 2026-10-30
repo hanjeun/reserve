@@ -12,6 +12,7 @@ import ReservationCard from '../../components/reservation/ReservationCard';
 import ReservationListingToolbar from '../../components/reservation/ReservationListingToolbar';
 import QrScannerSheet from '../../components/reservation/QrScannerSheet';
 import AdManageTab from '../../components/advertisement/AdManageTab';
+import TestSettlementTab from '../../components/business/TestSettlementTab';
 import StatisticsTab from '../../components/business/StatisticsTab';
 import ChatIntroTab from '../../components/business/ChatIntroTab';
 import StoreNewsSkeleton from '../../components/store-news/StoreNewsSkeleton';
@@ -19,6 +20,7 @@ import useManageReservations from '../../hooks/useManageReservations';
 import { useMyStores, useQueryParamsState } from '../../hooks';
 import useDebounce from '../../hooks/useDebounce';
 import useMessage from '../../hooks/useMessage';
+import { handleApiError } from '../../utils/errorHandler';
 import useViewModeParam from '../../hooks/useViewModeParam';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
 import { resolveViewMode } from '../../utils/viewMode';
@@ -175,13 +177,14 @@ const ReservationTab = () => {
                     await reservationService.removeReservation(id);
                     message.success('목록에서 제거됐어요.');
                     void refetch();
-                } catch { message.error('제거에 실패했어요.'); }
+                } catch (error) { handleApiError(error, message, '제거에 실패했어요.'); }
             },
         });
     };
 
+    const resultsLoading = loading || keyword.trim() !== debouncedKeyword.trim();
     const listBody = <ReservationListBody
-        {...{ loading, view, reservations, statusFilter, debouncedKeyword, listRef }}
+        {...{ loading: resultsLoading, view, reservations, statusFilter, debouncedKeyword, listRef }}
         cardProps={{
             actionLoading,
             onApprove: approve,
@@ -274,6 +277,7 @@ const BusinessPanel = () => {
         { key: 'news', label: '가게 소식', children: <Suspense fallback={<StoreNewsSkeleton />}><StoreNewsTab /></Suspense> },
         { key: 'ads', label: '광고 관리', children: <AdManageTab /> },
         { key: 'analytics', label: '통계 · 분석', children: <StatisticsTab /> },
+        { key: 'settlements', label: 'TEST 가상 정산', children: <TestSettlementTab /> },
         { key: 'chat-intro', label: '채팅 관리', children: <ChatIntroTab /> },
     ];
 

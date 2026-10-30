@@ -27,7 +27,7 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 docker inspect "$MYSQL_CONTAINER" >/dev/null 2>&1 \
     || die "container '$MYSQL_CONTAINER' not found"
 
-ROW_COUNT="$(docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER" \
+ROW_COUNT="$(MYSQL_PWD="$DB_PASSWORD" docker exec -e MYSQL_PWD "$MYSQL_CONTAINER" \
     mysql --user="$DB_USER" --batch --skip-column-names "$DB_NAME" \
     -e "SELECT COUNT(*) FROM payment WHERE payment_id = ${PAYMENT_ID};")"
 [[ "$ROW_COUNT" = "1" ]] || die "payment ${PAYMENT_ID} does not exist"
@@ -48,7 +48,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER" \
+MYSQL_PWD="$DB_PASSWORD" docker exec -e MYSQL_PWD "$MYSQL_CONTAINER" \
     mysql --user="$DB_USER" "$DB_NAME" \
     -e "START TRANSACTION; SELECT payment_id FROM payment WHERE payment_id = ${PAYMENT_ID} FOR UPDATE; DO SLEEP(5); ROLLBACK;" \
     >"$FIRST_OUTPUT" 2>&1 &
@@ -56,7 +56,7 @@ FIRST_PID=$!
 
 sleep 1
 set +e
-docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER" \
+MYSQL_PWD="$DB_PASSWORD" docker exec -e MYSQL_PWD "$MYSQL_CONTAINER" \
     mysql --user="$DB_USER" "$DB_NAME" \
     -e "SET SESSION innodb_lock_wait_timeout = 2; START TRANSACTION; SELECT payment_id FROM payment WHERE payment_id = ${PAYMENT_ID} FOR UPDATE; ROLLBACK;" \
     >"$SECOND_OUTPUT" 2>&1

@@ -129,7 +129,7 @@ const AdminAdsTab = () => {
                     onRetry={refetch} retrying={isFetching} />
             );
         }
-        if (loading || isPlaceholderData) {
+        if (loading || isPlaceholderData || search.trim() !== debouncedSearch.trim()) {
             return (
                 <AdminTableSkeleton
                     rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
@@ -161,7 +161,7 @@ const AdminAdsTab = () => {
         <div>
             <FilterToolbar
                 count={totalElements}
-                search={{ value: search, onChange: handleSearchChange, placeholder: '가게명으로 검색 (현재 페이지 내)', disabled: loading }}
+                search={{ value: search, onChange: handleSearchChange, placeholder: '가게명으로 검색' }}
                 onReload={refetch}
                 loading={loading || isFetching}
                 initialLoading={loading}

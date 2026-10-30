@@ -17,6 +17,21 @@ public class PaymentReconciliationIssueService {
 
     private final PaymentReconciliationIssueRepository issueRepository;
 
+    @Transactional(readOnly = true)
+    public boolean hasOpenReservationIssues(Long reservationId) {
+        return issueRepository.existsOpenForReservation(reservationId);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean hasFinancialConflict(Long reservationId) {
+        return issueRepository.existsOpenConflictForReservation(reservationId, java.util.EnumSet.of(
+                PaymentReconciliationIssue.IssueType.LATE_PAID_RESERVATION,
+                PaymentReconciliationIssue.IssueType.PAID_STATE_CONFLICT,
+                PaymentReconciliationIssue.IssueType.PAID_AMOUNT_MISMATCH,
+                PaymentReconciliationIssue.IssueType.REFUND_LEDGER_MISSING,
+                PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN));
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordIssue(
             String issueKey,

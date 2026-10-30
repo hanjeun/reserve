@@ -29,7 +29,7 @@ const copyText = async (text) => {
 };
 
 /** 코드·주문번호처럼 복사가 필요한 값을 같은 아이콘·안내 문구로 표시한다. */
-const CopyableText = ({ value, label = '내용', fallback = '-', className = '', style, ...spanProps }) => {
+const CopyableText = ({ value, label = '내용', fallback = '-', wrap = false, className = '', style, ...spanProps }) => {
     const text = value == null ? '' : String(value);
     const hasText = Boolean(text.trim());
     const [copied, setCopied] = useState(false);
@@ -47,19 +47,24 @@ const CopyableText = ({ value, label = '내용', fallback = '-', className = '',
         resetTimerRef.current = globalThis.setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
     };
 
+    const copyControl = hasText && (
+        <Tooltip title={`${label} ${copied ? '복사됨' : '복사'}`}><button
+            className="reserve-copyable-text__button"
+            type="button"
+            aria-label={`${label} ${copied ? '복사됨' : '복사'}`}
+            onClick={handleCopy}
+        >
+            {copied ? <CheckOutlined aria-hidden="true" /> : <CopyOutlined aria-hidden="true" />}
+        </button></Tooltip>
+    );
+    const lastCharacter = wrap && hasText ? Array.from(text).at(-1) : '';
+
     return (
-        <span {...spanProps} className={className ? `reserve-copyable-text ${className}` : 'reserve-copyable-text'} style={style}>
-            <span className="reserve-copyable-text__value">{hasText ? text : fallback}</span>
-            {hasText && (
-                <Tooltip title={`${label} ${copied ? '복사됨' : '복사'}`}><button
-                    className="reserve-copyable-text__button"
-                    type="button"
-                    aria-label={`${label} ${copied ? '복사됨' : '복사'}`}
-                    onClick={handleCopy}
-                >
-                    {copied ? <CheckOutlined aria-hidden="true" /> : <CopyOutlined aria-hidden="true" />}
-                </button></Tooltip>
-            )}
+        <span {...spanProps} className={['reserve-copyable-text', wrap && 'reserve-copyable-text--wrap', className].filter(Boolean).join(' ')} style={style}>
+            <span className="reserve-copyable-text__value">{lastCharacter ? <>
+                {text.slice(0, -lastCharacter.length)}<span className="reserve-copyable-text__tail">{lastCharacter}{copyControl}</span>
+            </> : hasText ? text : fallback}</span>
+            {!wrap && copyControl}
             <output className="reserve-copyable-text__status">
                 {copied ? `${label}를 복사했어요.` : ''}
             </output>
@@ -71,6 +76,7 @@ CopyableText.propTypes = {
     value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     label: PropTypes.string,
     fallback: PropTypes.node,
+    wrap: PropTypes.bool,
     className: PropTypes.string,
     style: PropTypes.object,
 };

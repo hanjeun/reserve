@@ -6,6 +6,8 @@ import LoadingImage from '../common/LoadingImage';
 import Card from '../common/Card';
 import { getThumbnailUrl } from '../../utils';
 import PhotoGallery from '../common/PhotoGallery';
+import IconTool from '../common/IconTool';
+import InterfaceIcon from '../common/InterfaceIcon';
 import { feedDate, feedMediaUrl } from '../../utils/feed';
 import { storeNewsPeriodLabel, storeNewsTypeLabel } from '../../utils/storeNews';
 import { BENEFIT_IMAGE_FALLBACK, formatBenefitDate, getBenefitImageUrl } from '../../pages/discovery/benefitPresentation';
@@ -57,7 +59,7 @@ function BenefitPhotos({ pictures }) {
 }
 BenefitPhotos.propTypes = { pictures: PropTypes.array.isRequired };
 
-export function BenefitDetailContent({ item, preview = false, actions, status }) {
+export function BenefitDetailContent({ item, preview = false, actions, status, notice }) {
     const pictures = (item.images || []).map(image => ({ ...image, src: feedMediaUrl(image.url) })).filter(image => image.src);
     const mainImage = getBenefitImageUrl(item.mainImageUrl);
     const design = ['PHOTO', 'COMPACT'].includes(item.design) ? item.design.toLowerCase() : 'standard';
@@ -74,8 +76,14 @@ export function BenefitDetailContent({ item, preview = false, actions, status })
                 onError={event => { if (!event.currentTarget.src.endsWith(BENEFIT_IMAGE_FALLBACK)) { event.currentTarget.src = BENEFIT_IMAGE_FALLBACK; event.currentTarget.alt = '가게 사진을 불러오지 못했어요'; event.currentTarget.classList.add('reserve-benefit-detail-image--placeholder'); } }} />}
         <div className="reserve-benefit-detail-content">{item.content}</div>
         {item.conditions && <section className="reserve-store-news-conditions" aria-label="이용 조건"><h2>이용 조건</h2><p>{item.conditions}</p></section>}
-        {!preview && <footer className="reserve-benefit-detail-links"><Link className="reserve-benefits-text-link reserve-text-link" to="/benefits">소식 목록</Link>
-            <Link className="reserve-benefits-text-link reserve-text-link" to={`/store/${item.storeId}`}>가게 보기 →</Link>{actions}</footer>}
+        {notice}
+        {!preview && <footer className="reserve-benefit-detail-links">
+            <nav className="reserve-benefit-detail-navigation" aria-label="소식 이동">
+                <IconTool label="소식 목록" icon={<InterfaceIcon name="chevronLeft" />} kind="navigation" tooltip to="/benefits" />
+                <IconTool label="가게 보기" icon={<InterfaceIcon name="store" />} to={`/store/${item.storeId}`} />
+            </nav>
+            {actions && <div className="reserve-benefit-detail-actions">{actions}</div>}
+        </footer>}
     </article>;
 }
-BenefitDetailContent.propTypes = { item: PropTypes.object.isRequired, preview: PropTypes.bool, actions: PropTypes.node, status: PropTypes.string };
+BenefitDetailContent.propTypes = { item: PropTypes.object.isRequired, preview: PropTypes.bool, actions: PropTypes.node, status: PropTypes.string, notice: PropTypes.node };

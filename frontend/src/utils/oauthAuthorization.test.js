@@ -21,6 +21,12 @@ it.each([
     }
 });
 
+it.each([false, true])('keeps the login preference on the application authorization URL (%s)', async rememberMe => {
+    const authorizationUrl = await load('https://app.reserve.it.kr');
+    expect(authorizationUrl('google', undefined, rememberMe)).toBe('https://app.reserve.it.kr/oauth2/authorization/google?rememberMe=' + rememberMe);
+    expect(() => authorizationUrl('google', undefined, 'true')).toThrow('로그인 유지 선택을 확인해주세요.');
+});
+
 it('does not turn an unexpected provider or malformed challenge into a browser destination', async () => {
     const authorizationUrl = await load('http://localhost:8080');
     for (const provider of ['https://other.example', '../google', '__proto__', null, {}]) {

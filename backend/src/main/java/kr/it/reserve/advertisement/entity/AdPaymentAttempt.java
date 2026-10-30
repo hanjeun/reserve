@@ -103,6 +103,19 @@ public class AdPaymentAttempt {
         nextCheckAt = LocalDateTime.now(Clock.systemDefaultZone()).plusMinutes(5);
     }
 
+    /** 조회 장애는 이미 확인한 실패·환불을 다시 미결 상태로 바꾸지 않아요. */
+    public void lookupFailed(boolean notFound, LocalDateTime now) {
+        String code = notFound ? "PG_NOT_FOUND_NOT_TERMINAL" : "PG_LOOKUP_FAILED";
+        if (state == State.FAILED || state == State.REFUNDED) {
+            issueCode = code;
+            lastCheckedAt = now;
+            nextCheckAt = null;
+            return;
+        }
+        observed(notFound ? "NOT_FOUND" : "UNAVAILABLE", null, now);
+        requireReview(code);
+    }
+
     public void requestCancel(Long actorId) {
         cancelRequested = true;
         if (cancelRequestedBy == null) cancelRequestedBy = actorId;
@@ -119,6 +132,14 @@ public class AdPaymentAttempt {
         reviewed(State.REFUND_PENDING, "REFUND_DISPATCHED");
         nextCheckAt = now.plusMinutes(5);
         return true;
+    }
+
+    /** 로컬 상한으로 발신 전 거절된 요청만 기존 키를 유지해 다시 대기한다. */
+    public void deferUnsentRefund() {
+        if (state != State.REFUND_PENDING || !"REFUND_DISPATCHED".equals(issueCode)
+                || refundConfirmedAt != null || cancellationId != null) return;
+        refundDispatchedAt = null;
+        requireReview("REFUND_NOT_SENT_RETRY");
     }
 
     public void cancellationObserved(String cancellationId) { this.cancellationId = cancellationId; }

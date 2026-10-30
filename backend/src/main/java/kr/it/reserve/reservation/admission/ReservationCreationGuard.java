@@ -85,6 +85,12 @@ public class ReservationCreationGuard {
                 if (value == null) out.writeInt(-1);
                 else { byte[] field = value.getBytes(StandardCharsets.UTF_8); out.writeInt(field.length); out.write(field); }
             }
+            var consent = r.getLegalConsent();
+            if (consent != null) {
+                out.writeUTF(java.util.Objects.toString(consent.version(), ""));
+                out.writeUTF(java.util.Objects.toString(consent.noticeHash(), ""));
+                out.writeBoolean(consent.privacyAccepted()); out.writeBoolean(consent.conditionsAccepted());
+            }
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes.toByteArray()));
         } catch (java.io.IOException | java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
     }

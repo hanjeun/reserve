@@ -15,7 +15,7 @@ const { Text } = Typography;
 /*
  * 손님·사업자가 같은 읽기 전용 예약 상세를 사용하며 실행 도구는 각 화면이 담당한다.
  */
-const ReservationDetailModal = ({ reservation, open, onClose }) => {
+const ReservationDetailModal = ({ reservation, open, onClose, tools }) => {
     // 닫힘 중에도 마지막 예약 내용을 유지해 모달이 일찍 사라지지 않게 한다.
 
     const [cached, setCached] = React.useState(reservation);
@@ -26,7 +26,7 @@ const ReservationDetailModal = ({ reservation, open, onClose }) => {
 
     const {
         storeName, reservationCode, memberName, memberEmail, reservationDate, reservationTime,
-        guestCount, depositAmount, status, specialRequest, rejectionReason, cancelReason, checkedInAt,
+        guestCount, depositAmount, status, specialRequest, rejectionReason, cancelReason, checkedInAt, personalInfoHidden,
     } = displayed;
 
     // 거절·취소는 각각의 사유 필드와 라벨을 사용한다.
@@ -52,7 +52,7 @@ const ReservationDetailModal = ({ reservation, open, onClose }) => {
             <div style={styles.detailRow}>
                 <UserOutlined style={styles.detailIcon} />
                 <Text style={styles.detailLabel}>예약자</Text>
-                <Text style={styles.detailValue}>{memberName}</Text>
+                <Text style={styles.detailValue}>{personalInfoHidden ? '개인정보 조회 기간이 지났어요' : memberName}</Text>
             </div>
             {memberEmail && (
                 <div style={styles.detailRow}>
@@ -106,6 +106,7 @@ const ReservationDetailModal = ({ reservation, open, onClose }) => {
                     <Text style={{ fontSize: fontSize.sm, color: colors.error.main }}>{reasonBlock.value}</Text>
                 </>
             )}
+            {typeof tools === 'function' ? tools(displayed, open) : tools}
         </ResponsiveModal>
     );
 };

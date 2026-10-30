@@ -33,6 +33,8 @@ public class RateLimiter {
         LOGIN_METHOD_EMAIL(5, Duration.ofMinutes(10)),
         LOGIN_METHOD_VERIFY(20, Duration.ofMinutes(10)),
         RESERVATION_CREATE(5, Duration.ofMinutes(1)),   // 1분에 5회 예약
+        RESERVATION_REMOVE(30, Duration.ofMinutes(1)),
+        PAYMENT_VERIFY(30, Duration.ofMinutes(1)),
         WAITING_JOIN(5, Duration.ofMinutes(1)),         // 회원·IP별 고객 웨이팅 접수 제한
         SIGNUP(5, Duration.ofMinutes(10)),              // 10분에 5회 회원가입
         /**

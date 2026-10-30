@@ -1,10 +1,18 @@
 import api from '../api/axios';
+import { invalidateChatImages } from '../utils/chatImageCache';
 import { API_ENDPOINTS } from '../constants';
 import { normalizeListPage } from '../utils/listResponse';
 
 const messageBody = (content, clientMessageId) => ({ content, clientMessageId });
 
 const chatService = {
+    search: (keyword, scope, page, signal) => api.post('/api/chat/search', { keyword, scope, page }, { signal }).then(result => {
+        if (!result || !Array.isArray(result.conversations) || !Array.isArray(result.messages)
+            || typeof result.moreConversations !== 'boolean' || typeof result.moreMessages !== 'boolean')
+            throw new Error('채팅 검색 응답을 확인하지 못했어요.');
+        return result;
+    }),
+    getSearchContext: (roomId, messageId, signal) => api.get('/api/chat/search/context', { params: { roomId, messageId }, signal }),
     listConversations: (page = 0, hidden = false) => api.get(
         API_ENDPOINTS.CHAT.CONVERSATIONS, { params: { page, ...(hidden ? { hidden } : {}) } }).then(data => normalizeListPage(data, page)),
     listStoreInbox: (page = 0, hidden = false) => api.get(
@@ -25,12 +33,23 @@ const chatService = {
         API_ENDPOINTS.CHAT.ADMIN_POLL(roomId), { params: { afterId } }),
     sendAdminSupportRoom: (roomId, content, clientMessageId, config) => api.post(
         API_ENDPOINTS.CHAT.ADMIN_REPLY(roomId), messageBody(content, clientMessageId), config),
-    retract: (roomId, messageId, config) => config
-        ? api.post(`/api/chat/rooms/${roomId}/messages/${messageId}/retract`, undefined, config)
-        : api.post(`/api/chat/rooms/${roomId}/messages/${messageId}/retract`),
-    hideMessage: (roomId, messageId, config) => api.post(`/api/chat/rooms/${roomId}/messages/${messageId}/hide`, undefined, config),
+    retract: async (roomId, messageId, config) => {
+        const response = await (config
+            ? api.post(`/api/chat/rooms/${roomId}/messages/${messageId}/retract`, undefined, config)
+            : api.post(`/api/chat/rooms/${roomId}/messages/${messageId}/retract`));
+        invalidateChatImages([messageId]);
+        return response;
+    },
+    hideMessage: async (roomId, messageId, config) => {
+        const response = await api.post(`/api/chat/rooms/${roomId}/messages/${messageId}/hide`, undefined, config);
+        invalidateChatImages([messageId]);
+        return response;
+    },
     pollRetractions: (roomId, afterRevision = 0, afterHiddenId = 0) => api.get(`/api/chat/rooms/${roomId}/retractions`,
-        { params: { afterRevision, ...(afterHiddenId ? { afterHiddenId } : {}) } }),
+        { params: { afterRevision, ...(afterHiddenId ? { afterHiddenId } : {}) } }).then(response => {
+            invalidateChatImages([...(response?.messages ?? []).map(message => message.id), ...(response?.hiddenMessageIds ?? [])]);
+            return response;
+        }),
     markAdminSupportRead: (roomId, readThroughId) => readThroughId == null
         ? api.post(API_ENDPOINTS.CHAT.ADMIN_READ(roomId))
         : api.post(API_ENDPOINTS.CHAT.ADMIN_READ(roomId), undefined, { params: { readThroughId } }),
@@ -61,6 +80,7 @@ const chatService = {
         form.append('clientMessageId', clientMessageId);
         return api.post(`/api/chat/rooms/${roomId}/images`, form, config);
     },
+    checkImageAccess: (url, signal) => api.head(url, { signal }),
     getImage: (url, signal) => api.get(url, { responseType: 'blob', signal }),
     getSupportIntro: () => api.get(API_ENDPOINTS.CHAT.INTRO_SUPPORT),
     getStoreIntro: (storeId) => api.get(API_ENDPOINTS.CHAT.INTRO_STORE(storeId)),

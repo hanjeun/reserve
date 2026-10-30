@@ -134,7 +134,7 @@ public class AdvertisementService {
 
         List<String> imageUrls = uploadRequiredBannerImages(adType, request, owner.getId(), store.getId());
 
-        String merchantUid = "AD-" + UUID.randomUUID();
+        String merchantUid = "AD" + UUID.randomUUID().toString().replace("-", "");
 
         Advertisement ad = Advertisement.builder()
                 .store(store)

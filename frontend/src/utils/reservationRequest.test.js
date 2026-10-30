@@ -77,3 +77,30 @@ it('persists the actual campaign submission key for recovery after the campaign 
     await expect(fresh.reservationRequestAttempt(scope, payload, 'invalid')).rejects.toThrow('예약 요청 번호');
     await expect(fresh.reservationRequestAttempt(scope, payload)).resolves.toEqual({ requestId: submitted, reused: true });
 });
+
+it('종료된 신청 키만 지우고 같은 입력을 새 신청으로 시작해요', async () => {
+    const first = await reservationRequestAttempt('closed-request', payload);
+    completeReservationRequest('closed-request', first.requestId);
+    const next = await reservationRequestAttempt('closed-request', payload);
+    expect(next.reused).toBe(false);
+    expect(next.requestId).not.toBe(first.requestId);
+});
+
+it('이전 신청의 늦은 완료는 더 최근 신청 키를 지우지 않아요', async () => {
+    const first = await reservationRequestAttempt('changed-request', payload);
+    const next = await reservationRequestAttempt('changed-request', { ...payload, guestCount: 2 });
+    completeReservationRequest('changed-request', first.requestId);
+    expect(await reservationRequestAttempt('changed-request', { ...payload, guestCount: 2 })).toEqual({ ...next, reused: true });
+    expect(JSON.parse(sessionStorage.getItem('reserve:reservation-request:changed-request')).requestId).toBe(next.requestId);
+});
+
+it('동의 버전과 결정을 요청에 묶고 필드 순서는 같은 내용으로 처리해요', async () => {
+    const proof = { privacyAccepted: true, conditionsAccepted: true, version: 'fixture-version', noticeHash: 'a'.repeat(64) };
+    const first = await reservationRequestId('consent-scope', { ...payload, legalConsent: proof });
+    const reordered = { noticeHash: proof.noticeHash, version: proof.version, conditionsAccepted: true, privacyAccepted: true };
+    expect(await reservationRequestId('consent-scope', { ...payload, legalConsent: reordered })).toBe(first);
+    expect(await reservationRequestId('consent-scope', { ...payload, legalConsent: { ...proof, conditionsAccepted: false } })).not.toBe(first);
+    const stored = sessionStorage.getItem('reserve:reservation-request:consent-scope');
+    expect(stored).not.toContain(proof.noticeHash);
+    expect(stored).not.toContain(proof.version);
+});

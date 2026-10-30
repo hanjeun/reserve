@@ -79,6 +79,66 @@ describe('HTTP session boundary', () => {
         }
     });
 
+    it.each([401, 403])('a protected retry with %s expires only an unauthorized session', async status => {
+        const user = { id: 1, email: 'session@example.test', role: 'USER' };
+        useAuthStore.getState().login(user);
+        const calls = [];
+        try {
+            api.defaults.adapter = config => {
+                calls.push(config.url);
+                if (config.url === '/api/auth/refresh') return Promise.resolve(response(config, null));
+                return Promise.reject({ config, response: { status: config._retry ? status : 401 } });
+            };
+            const error = await api.get('/api/chat/unread').catch(failure => failure);
+            expect(calls).toEqual(['/api/chat/unread', '/api/auth/refresh', '/api/chat/unread']);
+            if (status === 401) {
+                expect(error.isSessionExpired).toBe(true);
+                expect(useAuthStore.getState().isLoggedIn).toBe(false);
+            } else {
+                expect(error.status).toBe(403);
+                expect(useAuthStore.getState().user).toEqual(user);
+            }
+        } finally { useAuthStore.getState().logout(); }
+    });
+
+    it.each([
+        'session-probe-first', 'protected-read-first',
+    ])('session probes and protected reads share one pending refresh (%s)', async order => {
+        const user = { id: 1, email: 'session@example.test', role: 'USER' };
+        useAuthStore.getState().login(user);
+        const refresh = deferred();
+        const calls = [];
+        let fresh = false;
+        api.defaults.adapter = config => {
+            calls.push(config.url);
+            if (config.url === '/api/auth/refresh') return refresh.promise.then(() => {
+                fresh = true; return response(config, null);
+            });
+            if (config.url === '/api/auth/session') return Promise.resolve(response(config, { member: fresh ? user : null, refreshPossible: !fresh }));
+            return fresh ? Promise.resolve(response(config, 0)) : Promise.reject({ config, response: { status: 401 } });
+        };
+        const probe = () => useAuthStore.getState().checkAuth(true, { rethrowTransient: true });
+        const read = () => api.get('/api/chat/unread');
+        const first = order === 'session-probe-first' ? probe() : read();
+        let second;
+        try {
+            await vi.waitFor(() => expect(calls).toContain('/api/auth/refresh'));
+            second = order === 'session-probe-first' ? read() : probe();
+            await vi.waitFor(() => {
+                expect(calls).toContain('/api/auth/session');
+                expect(calls).toContain('/api/chat/unread');
+            });
+            refresh.resolve();
+            const results = await Promise.all([first, second]);
+            expect(results).toEqual(order === 'session-probe-first' ? [user, 0] : [0, user]);
+            expect(calls.filter(path => path === '/api/auth/refresh')).toHaveLength(1);
+        } finally {
+            refresh.resolve();
+            await Promise.allSettled([first, second]);
+            useAuthStore.getState().logout();
+        }
+    });
+
     it.each([
         { name: 'connection loss', failure: {}, message: '서버에 연결할 수 없어요. 잠시 후 다시 시도해주세요.' },
         { name: 'timeout', failure: { code: 'ECONNABORTED' }, message: '응답이 너무 늦어요. 잠시 후 다시 시도해주세요.' },
@@ -97,15 +157,15 @@ describe('HTTP session boundary', () => {
         try {
             api.defaults.adapter = config => {
                 configs.push(config);
-                return Promise.reject(config.url === '/api/auth/refresh'
-                    ? { ...failure, config }
-                    : { config, response: { status: 401 } });
+                return config.url === '/api/auth/session'
+                    ? Promise.resolve(response(config, { member: null, refreshPossible: true }))
+                    : Promise.reject({ ...failure, config });
             };
 
             const error = await useAuthStore.getState().checkAuth(true, { rethrowTransient: true })
                 .catch(rejection => rejection);
 
-            expect(errors).toHaveLength(2);
+            expect(errors).toHaveLength(1);
             expect(error).toBe(errors[0]);
             expect(error.message).toBe(message);
             expect(error.status).toBe(failure.response?.status);
@@ -114,13 +174,13 @@ describe('HTTP session boundary', () => {
             expect(useAuthStore.getState().isLoggedIn).toBe(true);
             expect(JSON.parse(localStorage.getItem('auth-storage')).state.isLoggedIn).toBe(true);
             expect(currentSession().epoch).toBe(scope);
-            expect(configs.map(config => config.url)).toEqual(['/api/member/me', '/api/auth/refresh']);
+            expect(configs.map(config => config.url)).toEqual(['/api/auth/session', '/api/auth/refresh']);
 
             api.defaults.adapter = config => {
                 configs.push(config);
                 if (config.url === '/api/auth/refresh') return Promise.resolve(response(config, null));
-                if (!config._retry) return Promise.reject({ config, response: { status: 401 } });
-                return Promise.resolve(response(config, user));
+                const refreshed = configs.filter(value => value.url === '/api/auth/refresh').length === 2;
+                return Promise.resolve(response(config, { member: refreshed ? user : null, refreshPossible: !refreshed }));
             };
             expect(await useAuthStore.getState().checkAuth(true)).toEqual(user);
             expect(configs.filter(config => config.url === '/api/auth/refresh')).toHaveLength(2);
@@ -138,7 +198,9 @@ describe('HTTP session boundary', () => {
         try {
             api.defaults.adapter = config => {
                 calls.push(config.url);
-                return Promise.reject({ config, response: { status: config.url === '/api/auth/refresh' ? status : 401 } });
+                return config.url === '/api/auth/session'
+                    ? Promise.resolve(response(config, { member: null, refreshPossible: true }))
+                    : Promise.reject({ config, response: { status } });
             };
 
             expect(await useAuthStore.getState().checkAuth(true, { rethrowTransient: true })).toBeNull();
@@ -146,7 +208,7 @@ describe('HTTP session boundary', () => {
             expect(useAuthStore.getState().isLoggedIn).toBe(false);
             expect(JSON.parse(localStorage.getItem('auth-storage')).state.isLoggedIn).toBe(false);
             expect(currentSession().epoch).toBeGreaterThan(scope);
-            expect(calls).toEqual(['/api/member/me', '/api/auth/refresh']);
+            expect(calls).toEqual(['/api/auth/session', '/api/auth/refresh']);
         } finally {
             useAuthStore.getState().logout();
         }
@@ -198,6 +260,19 @@ describe('HTTP session boundary', () => {
             useAuthStore.getState().expireSession();
             window.history.replaceState({}, '', previousUrl);
         }
+    });
+
+    it.each([200, 204])('handles body-free HEAD status %s inside the session boundary', async status => {
+        api.defaults.adapter = config => Promise.resolve({ status, headers: {}, config, data: '' });
+        expect(await api.head('/api/chat/images/1')).toBeNull();
+        const pending = deferred();
+        let captured;
+        api.defaults.adapter = config => { captured = config; return pending.promise; };
+        const request = api.head('/api/chat/images/1').catch(error => error);
+        await vi.waitFor(() => expect(captured).toBeDefined());
+        advanceSession();
+        pending.resolve({ status, headers: {}, config: captured, data: '' });
+        expect((await request).isStaleSession).toBe(true);
     });
 
     it('returns authenticated image blobs without JSON unwrapping and rejects old-session blobs', async () => {

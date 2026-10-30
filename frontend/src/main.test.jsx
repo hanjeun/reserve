@@ -24,12 +24,9 @@ describe('Sentry 11 production collection boundary', () => {
             expect(options.dataCollection).toEqual({
                 userInfo: false,
                 cookies: false,
-                httpHeaders: {
-                    request: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] },
-                    response: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] },
-                },
+                httpHeaders: false,
                 httpBodies: [],
-                urlQueryParams: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] },
+                urlQueryParams: false,
                 genAI: { inputs: false, outputs: false },
                 databaseQueryData: false,
                 queues: false,

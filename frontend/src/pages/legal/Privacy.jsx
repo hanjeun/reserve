@@ -48,12 +48,12 @@ const FeedPrivacy = () => {
     const interactions = useFeedInteractions();
     if (!data?.enabled && !news.data?.enabled) return null;
     return <Section title="피드·가게 소식의 공개 정보와 보관">
-        {data?.enabled && <Paragraph>피드를 이용하면 공개 닉네임·소개, 직접 공개에 동의한 프로필 사진, 게시물 글·사진과 선택한 지역·가게 연결 정보를 처리해요. 공개 프로필과 게시물은 로그인하지 않아도 볼 수 있어요. 계정의 이름·이메일을 공개 프로필에 자동으로 표시하지 않아요.</Paragraph>}
-        <Paragraph>게시물과 임시저장한 글은 삭제할 때까지 보관해요. 삭제하면 공개 조회에서 즉시 숨기고, 30일 후 원문과 사진을 파기해요. 회원 탈퇴 후에는 공개 프로필·게시물을 노출하지 않고 게시물 파기 절차를 적용해요. 채팅의 90일 보관 기간은 피드에 적용하지 않아요.</Paragraph>
-        {interactions.data?.enabled && <Paragraph>댓글·답글의 글과 사진은 공개 닉네임으로 표시해요. 수정할 수 있으며 삭제하면 즉시 숨기고 30일 후 원문·사진을 파기해요. 글·소식·댓글의 좋아요는 대상별로 저장하고, 삭제되거나 숨겨진 내용은 종합 좋아요에서도 표시하지 않아요. 댓글·답글·댓글 좋아요 알림은 수신자에게만 보여주며 생성일부터 90일 동안 보관해요. 탈퇴하면 해당 회원이 주고받은 피드 알림을 제거해요. 신고 당시 댓글·사진은 원문과 별도로 보존해요.</Paragraph>}
-        {news.data?.enabled && <><Paragraph>사업자의 가게 소식은 제목·본문·사진·종류·행사나 혜택의 기간·조건을 혜택의 별도 원문으로 처리해요. 관리자가 해당 글·사진·기간·조건을 심사하고 승인 후 혜택 탭과 상세에서 공개해요. 공개 닉네임은 필요하지 않으며 가게 이름을 표시해요. 피드와 글·사진·게시 상태를 연결하지 않아요. 신청·심사 사유와 처리·열람 기록을 보관해요. 기간 종료는 삭제가 아니며 승인된 공개 상세에는 종료 표시로 남겨요.</Paragraph>
-            <Paragraph>혜택 신청의 글·사진 열람과 승인·반려·철회·수정 재심사 기록은 각 기록일부터 최소 1년(2년 보관 대상이면 2년) 보관하며, 연결된 신고 자료가 남아 있으면 함께 보존해요. 혜택 반려·삭제는 피드 글에 영향을 주지 않으며 소식의 삭제·원문 및 사진 파기에는 같은 30일 정책을 적용해요.</Paragraph></>}
-        <Paragraph>신고 시점의 글·사진, 신고 내용과 관리자 처리 기록은 원래 게시물과 분리해 보관해요. 처리 중인 신고 자료는 검토를 마칠 때까지, 처리 완료한 일반 신고 자료는 완료 후 365일 동안 보관해요. 분쟁 등으로 관리자가 파기를 보류한 자료는 보류가 해제될 때까지 파기하지 않아요. 보류를 해제하면 해제일을 기준으로 보관 기간을 다시 계산해요. 신고 원문·사진 열람과 숨김·복원·보류·해제의 처리 기록은 각 기록일부터 최소 1년(2년 보관 대상이면 2년) 보관하며, 연결된 신고 자료가 남아 있으면 함께 보존해요.</Paragraph>
+        {data?.enabled && <Paragraph>피드를 이용하면 공개 닉네임·소개, 직접 공개에 동의한 프로필 사진, 게시물 글·사진과 선택한 지역·가게 연결 정보를 처리합니다. 공개 프로필과 게시물은 로그인하지 않아도 볼 수 있습니다. 계정의 이름·이메일을 공개 프로필에 자동으로 표시하지 않습니다.</Paragraph>}
+        <Paragraph>게시물과 임시저장한 글은 삭제할 때까지 보관합니다. 삭제하면 공개 조회에서 즉시 숨기고, 30일 후 원문과 사진을 파기합니다. 회원 탈퇴 후에는 공개 프로필·게시물을 노출하지 않고 게시물 파기 절차를 적용합니다. 채팅의 90일 보관 기간은 피드에 적용하지 않습니다.</Paragraph>
+        {interactions.data?.enabled && <Paragraph>댓글·답글의 글과 사진은 공개 닉네임으로 표시합니다. 수정할 수 있으며 삭제하면 즉시 숨기고 30일 후 원문·사진을 파기합니다. 글·소식·댓글의 좋아요는 대상별로 저장하고, 삭제되거나 숨겨진 내용은 종합 좋아요에서도 표시하지 않습니다. 댓글·답글·댓글 좋아요 알림은 수신자에게만 보여주며 생성일부터 90일 동안 보관합니다. 탈퇴하면 해당 회원이 주고받은 피드 알림을 제거합니다. 신고 당시 댓글·사진은 원문과 별도로 보존합니다.</Paragraph>}
+        {news.data?.enabled && <><Paragraph>사업자의 가게 소식은 제목·본문·사진·종류·행사나 혜택의 기간·조건을 혜택의 별도 원문으로 처리합니다. 관리자가 해당 글·사진·기간·조건을 심사하고 승인 후 혜택 탭과 상세에서 공개합니다. 공개 닉네임은 필요하지 않으며 가게 이름을 표시합니다. 피드와 글·사진·게시 상태를 연결하지 않습니다. 신청·심사 사유와 처리·열람 기록을 보관합니다. 기간 종료는 삭제가 아니며 승인된 공개 상세에는 종료 표시로 남깁니다.</Paragraph>
+            <Paragraph>혜택 신청의 글·사진 열람과 승인·반려·철회·수정 재심사 기록은 각 기록일부터 최소 1년(2년 보관 대상이면 2년) 보관하며, 연결된 신고 자료가 남아 있으면 함께 보존합니다. 혜택 반려·삭제는 피드 글에 영향을 주지 않으며 소식의 삭제·원문 및 사진 파기에는 같은 30일 정책을 적용합니다.</Paragraph></>}
+        <Paragraph>신고 시점의 글·사진, 신고 내용과 관리자 처리 기록은 원래 게시물과 분리해 보관합니다. 처리 중인 신고 자료는 검토를 마칠 때까지, 처리 완료한 일반 신고 자료는 완료 후 365일 동안 보관합니다. 분쟁 등으로 관리자가 파기를 보류한 자료는 보류가 해제될 때까지 파기하지 않습니다. 보류를 해제하면 해제일을 기준으로 보관 기간을 다시 계산합니다. 신고 원문·사진 열람과 숨김·복원·보류·해제의 처리 기록은 각 기록일부터 최소 1년(2년 보관 대상이면 2년) 보관하며, 연결된 신고 자료가 남아 있으면 함께 보존합니다.</Paragraph>
     </Section>;
 };
 
@@ -64,19 +64,20 @@ const Privacy = () => {
         <PageContainer size="md" paddingTop="60px">
             <div style={{ marginBottom: 40 }}>
                 <PageTitle>개인정보 처리방침</PageTitle>
-                <Text style={{ color: colors.text.tertiary, fontSize: fontSize.sm }}>시행일: 2026년 5월 17일 · 최종 수정: 2026년 10월 14일</Text>
+                <Text style={{ color: colors.text.tertiary, fontSize: fontSize.sm }}>시행일: 2026년 5월 17일 · 최종 수정: 2026년 10월 27일</Text>
             </div>
 
             <Section title="1. 수집하는 개인정보 항목">
                 <Paragraph>RESERVE는 서비스 제공을 위해 다음과 같은 정보를 수집합니다.</Paragraph>
                 <ul style={{ paddingLeft: 20 }}>
-                    <li style={{ marginBottom: 6 }}><strong>회원가입 시:</strong> 이메일 주소, 이름, 비밀번호(암호화 저장)</li>
+                    <li style={{ marginBottom: 6 }}><strong>회원가입 시:</strong> 이메일 주소, 이름, 비밀번호(일방향 해시 저장)</li>
                     <li style={{ marginBottom: 6 }}><strong>소셜 로그인 시:</strong> 이메일, 이름, 프로필 사진 (Google/Naver/Kakao 제공 정보)</li>
                     <li style={{ marginBottom: 6 }}><strong>예약 시:</strong> 예약 정보(날짜, 시간, 인원), 요청사항</li>
                     <li style={{ marginBottom: 6 }}><strong>채팅·신고 시:</strong> 대화 내용, 첨부 사진과 원래 파일명, 신고 내용·처리 기록 및 검토에 필요한 대화 증거</li>
                     <li style={{ marginBottom: 6 }}><strong>가게 소식 작성 시:</strong> 작성자와 가게 연결, 제목·본문·사진·소식 종류·기간·조건, 공개 여부와 작성·수정·삭제 시각</li>
                     <li style={{ marginBottom: 6 }}><strong>웨이팅 접수 시:</strong> 회원 식별자와 이름(고객 접수), 선택한 팀 표시명(직원 접수), 접수 방식, 인원, 접수 번호와 접수·호출·입장·취소 시각. 대기 명단에서 연락처는 수집하지 않습니다.</li>
-                    <li style={{ marginBottom: 6 }}><strong>결제 시:</strong> 결제 수단 정보 (카카오페이 처리, 카드·계좌 정보는 서버에 저장하지 않음)</li>
+                    <li style={{ marginBottom: 6 }}><strong>결제 시:</strong> 포트원을 통한 결제 처리 정보입니다. 카드·계좌 정보는 RESERVE 서버에 저장하지 않습니다.</li>
+                    <li style={{ marginBottom: 6 }}><strong>추가 인증 사용 시:</strong> 패스키 공개키·식별자·사용 기록, 암호화한 인증 앱 비밀키와 일회용 복구코드의 해시를 처리합니다. 기기의 지문·얼굴 정보와 PIN은 수집하지 않습니다.</li>
                     <li style={{ marginBottom: 6 }}><strong>자동 수집:</strong> 서비스 이용 기록, IP 주소, 접속 로그</li>
                 </ul>
             </Section>
@@ -99,8 +100,8 @@ const Privacy = () => {
                     <li style={{ marginBottom: 6 }}>소비자 불만·거래 분쟁 처리 기록: 처리 완료일로부터 3년</li>
                     <li style={{ marginBottom: 6 }}>계약·청약철회·대금결제·재화 공급 기록: 해당 거래일을 기준으로 5년. 관련 채팅 증거는 일반 채팅과 구분하여 보관합니다.</li>
                     <li style={{ marginBottom: 6 }}>관리자의 신고 원문·사진 열람 기록: 각 열람일부터 1년 이상. 법령상 2년 보관 대상이면 2년 이상 보관합니다.</li>
-                    <li style={{ marginBottom: 6 }}>웨이팅: 입장·취소가 끝난 팀의 표시명과 회원 연결은 다음 한국 시간 날짜에 제거하고, 접수 방식·인원·번호·처리 시각과 고객이 동의한 고지 버전 등 종료 접수 기록은 7일 후 파기해요. 진행 중인 접수는 처리할 때까지 보관해요. 회원 탈퇴 시 해당 회원의 진행 접수를 취소하고 이름과 회원 연결을 제거하며, 가게가 삭제되면 남은 접수를 취소하고 표시명과 회원 연결을 제거해요.</li>
-                    <li style={{ marginBottom: 6 }}>가게 소식과 임시저장한 소식: 삭제할 때까지 보관해요. 작성자 삭제·가게 폐업·회원 탈퇴 시 혜택과 연결된 피드에서 즉시 숨기고 30일 후 원문·사진을 파기해요. 신고 당시 원문·사진은 별도 보관하며 처리 중에는 유지하고, 처리 완료 후 365일 또는 파기 보류가 해제된 날부터 365일 동안 보관해요.</li>
+                    <li style={{ marginBottom: 6 }}>웨이팅: 입장·취소가 끝난 팀의 표시명과 회원 연결은 다음 한국 시간 날짜에 제거하고, 접수 방식·인원·번호·처리 시각과 고객이 동의한 고지 버전 등 종료 접수 기록은 7일 후 파기합니다. 진행 중인 접수는 처리할 때까지 보관합니다. 회원 탈퇴 시 해당 회원의 진행 접수를 취소하고 이름과 회원 연결을 제거하며, 가게가 삭제되면 남은 접수를 취소하고 표시명과 회원 연결을 제거합니다.</li>
+                    <li style={{ marginBottom: 6 }}>가게 소식과 임시저장한 소식: 삭제할 때까지 보관합니다. 작성자 삭제·가게 폐업·회원 탈퇴 시 혜택과 연결된 피드에서 즉시 숨기고 30일 후 원문·사진을 파기합니다. 신고 당시 원문·사진은 별도 보관하며 처리 중에는 유지하고, 처리 완료 후 365일 또는 파기 보류가 해제된 날부터 365일 동안 보관합니다.</li>
                     <li style={{ marginBottom: 6 }}>예약 자유 입력 요청사항 및 결제 구매자 이름·이메일·전화번호: 탈퇴 처리 시 제거 또는 비식별화</li>
                     <li style={{ marginBottom: 6 }}>법령에 따라 보존이 필요한 경우 해당 기간 동안 별도 보관</li>
                 </ul>
@@ -119,7 +120,7 @@ const Privacy = () => {
             <Section title="5. 개인정보의 안전성 확보 조치">
                 <Paragraph>RESERVE는 이용자의 개인정보를 안전하게 보호하기 위해 다음과 같은 기술적 조치를 취하고 있습니다.</Paragraph>
                 <ul style={{ paddingLeft: 20 }}>
-                    <li style={{ marginBottom: 6 }}><strong>암호화:</strong> 비밀번호는 BCrypt 알고리즘으로 암호화하여 저장하며, 평문으로 저장하지 않습니다.</li>
+                    <li style={{ marginBottom: 6 }}><strong>암호화:</strong> 비밀번호는 BCrypt 일방향 해시로 저장하며, 평문으로 저장하지 않습니다.</li>
                     <li style={{ marginBottom: 6 }}><strong>통신 암호화:</strong> 모든 데이터 통신은 SSL/TLS(HTTPS)를 통해 암호화됩니다.</li>
                     <li style={{ marginBottom: 6 }}><strong>인증 토큰:</strong> JWT 기반 인증을 사용하며 HttpOnly 쿠키로 저장하여 XSS 공격을 방어합니다.</li>
                     <li style={{ marginBottom: 6 }}><strong>접근 제어:</strong> 역할 기반 접근 제어(RBAC)를 적용하여 불필요한 데이터 접근을 차단합니다.</li>
@@ -128,8 +129,9 @@ const Privacy = () => {
             </Section>
 
             <Section title="6. 개인정보의 제3자 제공">
-                <Paragraph>고객 웨이팅을 접수하면 이용자가 선택한 가게의 운영자에게 회원 이름, 인원, 접수 번호·상태와 처리 시각을 제공해요. 접수·호출·입장 관리에 사용하며, 연락처와 회원 식별자는 명단에 표시하지 않아요. 진행 접수는 처리할 때까지 보관하고, 종료 팀 이름은 다음 한국 시간 날짜에 제거하며 종료 기록은 7일 후 파기해요. 접수 화면에서 제공 동의를 받으며, 동의하지 않으면 앱에서 고객 웨이팅을 접수할 수 없어요.</Paragraph>
-                <Paragraph>위 고객 웨이팅 제공과 다음 경우를 제외하고 이용자의 개인정보를 외부에 제공하지 않아요.</Paragraph>
+                <Paragraph>고객 웨이팅을 접수하면 이용자가 선택한 가게의 운영자에게 회원 이름, 인원, 접수 번호·상태와 처리 시각을 제공합니다. 접수·호출·입장 관리에 사용하며, 연락처와 회원 식별자는 명단에 표시하지 않습니다. 진행 접수는 처리할 때까지 보관하고, 종료 팀 이름은 다음 한국 시간 날짜에 제거하며 종료 기록은 7일 후 파기합니다. 접수 화면에서 제공 동의를 받으며, 동의하지 않으면 앱에서 고객 웨이팅을 접수할 수 없습니다.</Paragraph>
+                <Paragraph>예약을 접수하면 선택한 가게 운영자에게 예약자 이름, 예약 일시·인원·요청사항과 예약·결제 상태를 예약 접수·이용 관리를 위해 제공합니다. 일반 공개 화면에는 예약자의 개인정보를 표시하지 않습니다.</Paragraph>
+                <Paragraph>위 예약·고객 웨이팅 제공과 다음 경우를 제외하고 이용자의 개인정보를 외부에 제공하지 않습니다.</Paragraph>
                 <ul style={{ paddingLeft: 20 }}>
                     <li style={{ marginBottom: 6 }}>이용자가 사전에 동의한 경우</li>
                     <li style={{ marginBottom: 6 }}>법령의 규정에 의거하거나 수사 목적으로 법령에 정해진 절차에 따른 수사기관 요구 시</li>
@@ -148,7 +150,9 @@ const Privacy = () => {
                     <tbody>
                         {[
                             ['AWS (Amazon Web Services)', '서버 인프라 운영 및 데이터 저장 (Lightsail, S3)'],
-                            ['주식회사 카카오페이', '결제 처리 및 인증'],
+                            ['포트원', '결제 연동 및 결과 확인'],
+                            ['토스페이먼츠', '선택한 카드·간편결제 처리'],
+                            ['주식회사 카카오페이', '선택한 간편결제 처리'],
                         ].map(([company, task]) => (
                             <tr key={company} style={{ borderBottom: `1px solid ${colors.border.light}` }}>
                                 <td style={{ padding: '10px 14px', color: colors.text.primary }}>{company}</td>
@@ -181,15 +185,15 @@ const Privacy = () => {
                 <ul style={{ paddingLeft: 20 }}>
                     <li style={{ marginBottom: 8 }}>
                         <strong>개인정보침해신고센터</strong><br />
-                        <span style={{ color: colors.text.tertiary }}>국번없이 118 ·{' '}<TextLink href="https://privacy.kisa.or.kr" target="_blank" rel="noopener noreferrer">privacy.kisa.or.kr</TextLink></span>
+                        <span style={{ color: colors.text.tertiary }}>국번없이 <TextLink href="tel:118" style={{ color: colors.primary.main }}>118</TextLink> ·{' '}<TextLink href="https://privacy.kisa.or.kr" target="_blank" rel="noopener noreferrer">privacy.kisa.or.kr</TextLink></span>
                     </li>
                     <li style={{ marginBottom: 8 }}>
                         <strong>개인정보분쟁조정위원회</strong><br />
-                        <span style={{ color: colors.text.tertiary }}>국번없이 1833-6972 ·{' '}<TextLink href="https://www.koprc.go.kr" target="_blank" rel="noopener noreferrer">koprc.go.kr</TextLink></span>
+                        <span style={{ color: colors.text.tertiary }}>국번없이 <TextLink href="tel:1833-6972" style={{ color: colors.primary.main }}>1833-6972</TextLink> ·{' '}<TextLink href="https://www.koprc.go.kr" target="_blank" rel="noopener noreferrer">koprc.go.kr</TextLink></span>
                     </li>
                     <li style={{ marginBottom: 8 }}>
                         <strong>대검찰청 사이버범죄수사단</strong><br />
-                        <span style={{ color: colors.text.tertiary }}>02-3480-3573 ·{' '}<TextLink href="https://www.spo.go.kr" target="_blank" rel="noopener noreferrer">spo.go.kr</TextLink></span>
+                        <span style={{ color: colors.text.tertiary }}><TextLink href="tel:02-3480-3573" style={{ color: colors.primary.main }}>02-3480-3573</TextLink> ·{' '}<TextLink href="https://www.spo.go.kr" target="_blank" rel="noopener noreferrer">spo.go.kr</TextLink></span>
                     </li>
                 </ul>
             </Section>

@@ -81,6 +81,7 @@ class EmailServiceEnvelopeTest {
         assertThat(meta.find()).as("HTML head declares its charset").isTrue();
         assertThat(meta.group(1)).isEqualToIgnoringCase(StandardCharsets.UTF_8.name());
         assertThat(html)
+                .contains("max-width:500px", "border-radius:24px", "color:#3182f6")
                 .contains(mail.expectedHtml().toArray(String[]::new))
                 .doesNotContain("<script>", "<b>홍길동</b>", "<b>김사장</b>", "<b>계정</b>");
     }
@@ -90,6 +91,12 @@ class EmailServiceEnvelopeTest {
                 new MailCase("이메일 인증", service -> service.sendVerificationEmail(MEMBER_EMAIL, "742915"),
                         MEMBER_EMAIL, "[RESERVE] 이메일 인증 코드", null,
                         List.of("이메일 인증을", "742915")),
+                new MailCase("이메일 로그인 설정 인증", service -> service.sendLoginMethodVerificationEmail(MEMBER_EMAIL, "742915"),
+                        MEMBER_EMAIL, "[RESERVE] 이메일 로그인 설정 인증 코드", null,
+                        List.of("기존 계정의 이메일 로그인 설정", "742915")),
+                new MailCase("로그인 방법 변경", service -> service.sendLoginMethodChangedEmail(MEMBER_EMAIL),
+                        MEMBER_EMAIL, "[RESERVE] 로그인 방법이 변경됐어요", null,
+                        List.of("RESERVE</span>", "보안 알림", "로그인 방법이 변경됐어요.", "마이페이지의 로그인 및 보안", "본인이 변경하지 않았다면")),
                 new MailCase("예약 취소", service -> service.sendReservationCancelledByStoreEmail(
                         MEMBER_EMAIL, MEMBER_NAME, STORE_NAME, "2026-10-03", "오후 2시", 3, REASON),
                         MEMBER_EMAIL, "[RESERVE] 예약이 취소됐어요", null,

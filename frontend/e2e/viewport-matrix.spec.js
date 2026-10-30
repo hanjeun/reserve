@@ -38,6 +38,7 @@ async function mockApi(page) {
             await route.continue();
             return;
         }
+        if (url.pathname === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: admin, refreshPossible: false } } }); }
         if (url.pathname === '/api/member/me') return ok(route, admin);
         if (url.pathname === '/api/payment/status') {
             return ok(route, {

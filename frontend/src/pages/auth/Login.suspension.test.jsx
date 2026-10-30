@@ -10,7 +10,8 @@ vi.mock('../../api/axios', () => ({ default: api }));
 vi.mock('../../store/useAuthStore', () => ({ default: () => ({ isLoggedIn: false, login: vi.fn() }) }));
 vi.mock('../../hooks', () => ({ useMessage: () => feedback }));
 vi.mock('../../hooks/useDocumentTitle', () => ({ default: () => {} }));
-vi.mock('../../components/common/icons', () => ({ ExclamationCircleFilled: () => null }));
+vi.mock('../../components/common/icons', async importOriginal => ({ ...await importOriginal(), ExclamationCircleFilled: () => null }));
+vi.mock('../../components/common/IconTool', () => ({ default: ({ label, onClick }) => <button type="button" aria-label={label} onClick={onClick} /> }));
 vi.mock('../../components/common', () => ({
     PageContainer: ({ children }) => <main>{children}</main>,
     FormInput: () => <input />,
@@ -28,6 +29,7 @@ vi.mock('antd', () => {
             Text: ({ children }) => <span>{children}</span>,
         },
         Divider: ({ children }) => <div>{children}</div>, Flex: ({ children }) => <div>{children}</div>,
+        Checkbox: ({ children, ...props }) => <label><input type="checkbox" {...props} />{children}</label>,
         Modal: ({ title, open, children, onOk }) => open ? <section role="dialog">{title}{children}
             <button type="button" onClick={onOk}>확인</button></section> : null,
     };

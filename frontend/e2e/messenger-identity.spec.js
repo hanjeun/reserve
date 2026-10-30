@@ -61,6 +61,7 @@ async function mockApi(page, user, memberRows, ownerRows = []) {
     await page.route('**/api/**', async route => {
         const path = new URL(route.request().url()).pathname;
         if (!path.startsWith('/api/')) return route.continue();
+        if (path === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: user, refreshPossible: false } } }); }
         if (path === '/api/member/me') return ok(route, user);
         if (path === '/api/chat/unread' || path === '/api/chat/my/unread') return ok(route, 0);
         if (path === '/api/chat/conversations') return ok(route, pageOf(memberRows));

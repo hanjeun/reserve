@@ -48,12 +48,12 @@ STATUS_GREEN=$(curl -o /dev/null -w "%{http_code}" -s --connect-timeout 5 --max-
 echo "routed=$CURRENT_UPSTREAM blue=$STATUS_BLUE green=$STATUS_GREEN"
 ACTIVE_IMAGE=$(sudo docker inspect --format '{{.Image}}' "$CURRENT_UPSTREAM")
 SCHEMA_COMPAT=$(sudo docker image inspect --format '{{index .Config.Labels "reserve.schema-compat"}}' "$ACTIVE_IMAGE")
-if [ "$SCHEMA_COMPAT" != 'v270-refund-v1' ]; then
+if [ "$SCHEMA_COMPAT" != 'v280-mfa-completion-settlement-v1' ]; then
   echo "Active backend image is not schema/refund compatible; refusing automatic deployment"
   exit 1
 fi
 FEATURE_COMPAT=$(sudo docker image inspect --format '{{index .Config.Labels "reserve.feature-compat"}}' "$ACTIVE_IMAGE")
-if [ "$FEATURE_COMPAT" != 'waiting-signup-hidden-feed-oauth-login-session-admission-v10' ]; then
+if [ "$FEATURE_COMPAT" != 'waiting-signup-hidden-feed-oauth-login-session-admission-mfa-completion-test-settlement-v11' ]; then
   echo "Active recovery image does not support the current login-session and admission contract; prepare an approved compatible baseline before automatic deployment"
   exit 1
 fi

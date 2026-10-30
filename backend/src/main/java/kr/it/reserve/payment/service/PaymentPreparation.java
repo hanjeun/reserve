@@ -60,6 +60,10 @@ final class PaymentPreparation {
             throw new PaymentException("이미 결제가 완료된 예약이에요.", HttpStatus.CONFLICT);
         }
 
+        if (kr.it.reserve.reservation.service.ReservationPaymentPolicy.expiredAt(reservation, LocalDateTime.now(Clock.systemDefaultZone()))) {
+            throw new PaymentException("결제 기한이 지났어요. 내 예약에서 상태를 확인해주세요.", HttpStatus.CONFLICT);
+        }
+
         // 결제 금액은 요청값이 아니라 예약 당시 서버에서 확정한 금액을 사용한다.
         int amount = resolveDepositAmount(reservation);
         if (amount <= 0) {
@@ -134,6 +138,6 @@ final class PaymentPreparation {
     }
 
     private String generateMerchantUid() {
-        return "ORD-" + LocalDateTime.now(Clock.systemDefaultZone()).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) + "-" + UUID.randomUUID().toString().substring(0, 6);
+        return "ORD" + LocalDateTime.now(Clock.systemDefaultZone()).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) + UUID.randomUUID().toString().replace("-", "").substring(0, 20);
     }
 }

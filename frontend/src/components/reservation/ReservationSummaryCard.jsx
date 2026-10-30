@@ -1,8 +1,11 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { FileTextOutlined } from '../common/icons';
+import { FileTextOutlined, ClockCircleOutlined } from '../common/icons';
 import { Card } from '../common';
 import ReservationStatusBadge from './ReservationStatusBadge';
+import PaymentCountdown from './PaymentCountdown';
+import useReservationPaymentState from '../../hooks/useReservationPaymentState';
+import { filterReservationActions, reservationActionNotice } from './reservationActions';
 import { formatCurrency, formatTime, getThumbnailUrl } from '../../utils';
 
 /*
@@ -18,21 +21,18 @@ export default function ReservationSummaryCard({
     const {
         storeName, storeMainImageUrl, depositAmount, depositPaid, status, specialRequest,
         reservationCode, reservationDate, reservationTime, memberName, guestCount,
-        allowLatePayment, paymentTimeoutMinutes,
     } = reservation;
     const unpaid = depositAmount > 0 && !depositPaid && status === 'PENDING';
-    const timeout = paymentTimeoutMinutes ?? 30;
-    const timeoutNote = unpaid && !allowLatePayment && timeout > 0
-        ? `${timeout}분 내 결제`
-        : null;
 
-    const cardActions = React.Children.toArray(actions).map((action) => {
+    const paymentState = useReservationPaymentState(reservation);
+    const cardActions = React.Children.toArray(filterReservationActions(actions, paymentState.expired)).map((action) => {
         if (!React.isValidElement(action)) return action;
         return React.cloneElement(action, {
             className: [action.props.className, 'reserve-card-action', 'reserve-reservation-card-action']
                 .filter(Boolean).join(' '),
         });
     });
+    const notice = reservationActionNotice(reservation, paymentState.expired, cardActions.length > 0);
 
     return (
         <Card
@@ -67,9 +67,9 @@ export default function ReservationSummaryCard({
                             {reservationCode || '예약번호 없음'}
                         </span>
                         <div className="reserve-reservation-summary-card-meta reserve-reservation-summary-card-party">
-                            {showMemberInfo && memberName && (
+                            {showMemberInfo && (memberName || reservation.personalInfoHidden) && (
                                 <>
-                                    <span>{memberName}</span>
+                                    <span>{reservation.personalInfoHidden ? '조회 기간 만료' : memberName}</span>
                                     <span aria-hidden="true">·</span>
                                 </>
                             )}
@@ -80,13 +80,14 @@ export default function ReservationSummaryCard({
                             <span aria-hidden="true">·</span>
                             <span>{formatTime(reservationTime)}</span>
                         </div>
-                        <strong className="reserve-reservation-summary-card-price">
-                            {formatCurrency(depositAmount)}
-                        </strong>
-                        {timeoutNote && (
-                            <span className="reserve-reservation-summary-card-timeout">{timeoutNote}</span>
-                        )}
+                        <span className="reserve-reservation-summary-card-price-group">
+                            <PaymentCountdown reservation={reservation} state={paymentState} className="reserve-reservation-summary-card-timeout" />
+                            <strong className="reserve-reservation-summary-card-price">{formatCurrency(depositAmount)}</strong>
+                        </span>
                     </div>
+                    {notice && <div className="reserve-reservation-summary-card-note">
+                        <span role="status" className="reserve-reservation-action-notice"><ClockCircleOutlined aria-hidden="true" />{notice}</span>
+                    </div>}
                     {extraNote && <div className="reserve-reservation-summary-card-note">{extraNote}</div>}
                 </div>
             </div>
@@ -109,6 +110,7 @@ ReservationSummaryCard.propTypes = {
         guestCount: PropTypes.number,
         allowLatePayment: PropTypes.bool,
         paymentTimeoutMinutes: PropTypes.number,
+        paymentDeadline: PropTypes.string,
     }).isRequired,
     onOpenDetail: PropTypes.func.isRequired,
     actions: PropTypes.node,

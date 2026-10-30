@@ -7,6 +7,7 @@ test.beforeEach(async ({ page }) => {
     await page.route('**/api/**', route => {
         const path = new URL(route.request().url()).pathname;
         if (!path.startsWith('/api/')) return route.continue();
+        if (path === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: user, refreshPossible: false } } }); }
         const data = path === '/api/member/me' ? user
             : /\/unread$/.test(path) ? 0
                 : path === '/api/business/my/status' ? { status: 'NONE' }
@@ -154,10 +155,10 @@ test('search authentication bootstrap avoids a second blank header above the sea
     let requested = false;
     let release;
     const gate = new Promise(resolve => { release = resolve; });
-    await page.route('**/api/member/me', async route => {
+    await page.route('**/api/auth/session', async route => {
         requested = true;
         await gate;
-        await route.fulfill({ json: { success: true, data: user } });
+        await route.fulfill({ json: { success: true, data: { member: user, refreshPossible: false } } });
     });
     try {
         await page.goto('/search', { waitUntil: 'domcontentloaded' });

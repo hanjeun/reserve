@@ -219,10 +219,12 @@ export default function StoreNewsComposer({ open, news, initialStoreId, stores, 
             dirty.current = true;
             if ('newsType' in changed && !timedStoreNews(changed.newsType)) form.setFieldsValue({ startsAt: '', endsAt: '' });
         }}>
+            <div className="reserve-store-news-selectors">
             <Form.Item name="storeId" label="소식을 올릴 가게" rules={[{ required: true, message: '가게를 선택해주세요.' }]}>
                 <FormSelect options={stores.map(item => ({ value: item.id, label: item.name }))} disabled={Boolean(target) || busy} aria-label="소식을 올릴 내 가게" />
             </Form.Item>
             <Form.Item name="newsType" label="소식 종류"><FormSelect options={STORE_NEWS_TYPES} aria-label="가게 소식 종류" /></Form.Item>
+            </div>
             {config.benefitDesignEnabled && <Form.Item name="design" label="디자인"><SegmentedControl options={designOptions} disabled={busy} aria-label="혜택 디자인" /></Form.Item>}
             <PhotoAttachControl images={images} onSelect={addPhotos} onRemove={removePhoto} onReorder={reorderPhotos}
                 maxImages={maxImages} maxBytes={maxBytes} busy={busy} enabled={config.imageEnabled}

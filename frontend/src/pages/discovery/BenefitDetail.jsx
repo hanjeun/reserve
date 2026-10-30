@@ -1,7 +1,10 @@
 import { lazy, Suspense, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Button, DataState } from '../../components/common';
+import { DataState } from '../../components/common';
+import IconTool from '../../components/common/IconTool';
+import InterfaceIcon from '../../components/common/InterfaceIcon';
+import { StoreNewsManageAction } from '../../components/store-news/StoreNewsActions';
 import BenefitDetailSkeleton from '../../components/common/BenefitDetailSkeleton';
 import { BenefitDetailContent } from '../../components/store-news/StoreNewsPresentation';
 import PostInteractionBar from '../../components/feed/PostInteractionBar';
@@ -49,7 +52,10 @@ export default function BenefitDetail() {
     if (isPending) return <BenefitDetailSkeleton role="status" aria-label="가게 소식을 불러오는 중" aria-busy="true" />;
     if (isError && !item) return <section className="reserve-benefits-page"><DataState state="error" requestType="detail" kind="news" subject="가게 소식" error={error}
         title="가게 소식을 불러오지 못했어요." onRetry={refetch} retrying={isFetching} /></section>;
-    return <><BenefitDetailContent item={item} actions={<>{isError && <DataState compact state="error" title="최신 내용을 확인하지 못했어요. 현재 내용은 유지했어요." error={error} onRetry={refetch} retrying={isFetching} />}<PostInteractionBar type="NEWS" targetId={Number(id)} />{config.data?.enabled && <Button variant="ghost-sm" onClick={report}>소식 신고</Button>}
-        {user?.role === 'BUSINESS' && <Link className="reserve-benefits-text-link reserve-text-link" to="/business?tab=news">내 소식 관리</Link>}</>} />
+    return <><BenefitDetailContent item={item}
+        notice={isError && <DataState compact state="error" title="최신 내용을 확인하지 못했어요. 현재 내용은 유지했어요." error={error} onRetry={refetch} retrying={isFetching} />}
+        actions={<><PostInteractionBar type="NEWS" targetId={Number(id)} />
+            {config.data?.enabled && <IconTool label="소식 신고" icon={<InterfaceIcon name="report" />} onClick={report} />}
+            {user?.role === 'BUSINESS' && <StoreNewsManageAction />}</>} />
         <Suspense fallback={null}>{reportMounted && <FeedReportModal newsId={reportOpen ? Number(id) : null} onClose={() => setReportOpen(false)} />}</Suspense></>;
 }

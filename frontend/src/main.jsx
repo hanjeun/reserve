@@ -18,12 +18,9 @@ Sentry.init({
   dataCollection: {
     userInfo: false,
     cookies: false,
-    httpHeaders: {
-      request: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] },
-      response: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] },
-    },
+    httpHeaders: false,
     httpBodies: [],
-    urlQueryParams: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] },
+    urlQueryParams: false,
     genAI: { inputs: false, outputs: false },
     databaseQueryData: false,
     queues: false,

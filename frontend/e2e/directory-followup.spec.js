@@ -48,6 +48,7 @@ async function setup(page, { holdInteractions = false } = {}) {
         requests.push({ endpoint, search: url.search, method: request.method() });
         const ok = data => route.fulfill({ json: { success: true, data } });
         if (/^\/api\/feed\/media\/\d+$/.test(endpoint)) return route.fulfill({ body: photo, contentType: 'image/webp' });
+        if (endpoint === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: user, refreshPossible: false } } }); }
         if (endpoint === '/api/member/me') return ok(user);
         if (endpoint === '/api/waiting/stores') return ok(pageOf([{ ...store, waitingTeams: teams }]));
         if (endpoint === '/api/stores') return ok(pageOf([store]));
@@ -80,7 +81,7 @@ test('waiting reuses exploration geometry and refreshes an open information bubb
     const state = await setup(page);
     await page.goto('/stores?region=');
     await expect(page).toHaveURL(/region=all/);
-    const title = page.locator('.reserve-store-card-title-line');
+    const title = page.locator('.reserve-store-card-title-line:not(.reserve-store-card-skeleton-title-line)');
     await expect(title).toBeVisible();
     const cardHeight = (await title.boundingBox()).height;
     const toolbarTop = (await page.locator('.reserve-explore-filters').boundingBox()).y;

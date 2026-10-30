@@ -6,18 +6,25 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import StoreList from './StoreList';
 import storeService from '../../services/storeService';
 import adService from '../../services/adService';
+import { createLoadingPresentation, LoadingPresentationContext } from '../../components/layout/loadingPresentation';
 
-const { viewport } = vi.hoisted(() => ({ viewport: { width: 390 } }));
+const { viewport, locationState, locationRequest, setLiveLocation, messageInfo } = vi.hoisted(() => ({
+    viewport: { width: 390 },
+    locationState: { user: null },
+    locationRequest: vi.fn(),
+    setLiveLocation: vi.fn(),
+    messageInfo: vi.fn(),
+}));
 
 vi.mock('../../services/storeService', () => ({ default: { getStores: vi.fn(), getRegions: vi.fn() } }));
 vi.mock('../../services/adService', () => ({ default: { getActiveAds: vi.fn(), recordImpression: vi.fn() } }));
 vi.mock('../../hooks/useDocumentTitle', () => ({ default: vi.fn() }));
-vi.mock('../../store/useAuthStore', () => ({ default: () => ({ user: null }) }));
-vi.mock('../../store/useLocationStore', () => ({ default: () => ({ liveLocation: null, setLiveLocation: vi.fn() }) }));
+vi.mock('../../store/useAuthStore', () => ({ default: () => ({ user: locationState.user }) }));
+vi.mock('../../store/useLocationStore', () => ({ default: () => ({ liveLocation: null, setLiveLocation }) }));
 vi.mock('../../hooks', async () => ({
     useStoreList: (await import('../../hooks/useStoreList')).default,
-    useGeolocation: () => ({ request: vi.fn(), requesting: false }),
-    useMessage: () => ({ message: { error: vi.fn() } }),
+    useGeolocation: () => ({ request: locationRequest, requesting: false }),
+    useMessage: () => ({ message: { error: vi.fn(), info: messageInfo } }),
     useWindowWidth: () => viewport.width,
 }));
 vi.mock('../../components/common/FilterMenu', () => ({
@@ -60,9 +67,11 @@ function RouteProbe() {
     return <><output data-testid="route">{location.search}</output><button type="button" onClick={() => navigate(-1)}>이전 보기</button></>;
 }
 
-const renderList = (url = '/stores') => render(
+const renderList = (url = '/stores', presentation = null) => render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <LoadingPresentationContext.Provider value={presentation}>
         <MemoryRouter initialEntries={[url]}><StoreList /><RouteProbe /></MemoryRouter>
+        </LoadingPresentationContext.Provider>
     </QueryClientProvider>,
 );
 const routeParams = () => new URLSearchParams(screen.getByTestId('route').textContent);
@@ -71,6 +80,10 @@ describe('store list view selection with real URL pagination', () => {
     beforeEach(() => {
         sessionStorage.clear();
         viewport.width = 390;
+        locationState.user = null;
+        locationRequest.mockReset().mockResolvedValue(null);
+        setLiveLocation.mockReset();
+        messageInfo.mockReset();
         storeService.getStores.mockReset();
         adService.getActiveAds.mockReset().mockResolvedValue([]);
         adService.recordImpression.mockReset();
@@ -79,6 +92,57 @@ describe('store list view selection with real URL pagination', () => {
             page: { totalElements: 36, totalPages: 3 },
         }));
         vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    });
+
+    it('uses a clicked live position for distance sort while preserving the selected domain', async () => {
+        const user = userEvent.setup();
+        const coordinates = { latitude: 12.345678, longitude: 67.891234 };
+        locationRequest.mockResolvedValue(coordinates);
+        renderList('/stores?domain=FOOD&sort=recommended&page=2');
+        await screen.findByTestId('original-card');
+        expect(locationRequest).not.toHaveBeenCalled();
+
+        await user.selectOptions(screen.getByRole('combobox', { name: '가게 정렬' }), 'distance');
+
+        await waitFor(() => expect(routeParams().get('sort')).toBe('distance'));
+        expect(locationRequest).toHaveBeenCalledWith({ showError: true });
+        expect(routeParams().get('lat')).toBe('12.346');
+        expect(routeParams().get('lng')).toBe('67.891');
+        expect(routeParams().get('domain')).toBe('FOOD');
+        expect(routeParams().get('page')).toBe('1');
+        expect(setLiveLocation).toHaveBeenCalledWith(coordinates);
+        expect(messageInfo).not.toHaveBeenCalled();
+    });
+
+    it('silences the live failure only when a valid saved address can supply distance sort', async () => {
+        const user = userEvent.setup();
+        locationState.user = { latitude: 23.456789, longitude: 45.678912 };
+        renderList();
+        await screen.findByTestId('original-card');
+
+        await user.selectOptions(screen.getByRole('combobox', { name: '가게 정렬' }), 'distance');
+
+        await waitFor(() => expect(routeParams().get('sort')).toBe('distance'));
+        expect(locationRequest).toHaveBeenCalledWith({ showError: false });
+        expect(messageInfo).toHaveBeenCalledExactlyOnceWith('마이페이지에 등록된 위치 기준으로 정렬할게요.');
+        expect(routeParams().get('lat')).toBe('23.457');
+        expect(routeParams().get('lng')).toBe('45.679');
+        expect(setLiveLocation).not.toHaveBeenCalled();
+    });
+
+    it.each([null, { latitude: 120, longitude: 45 }])('keeps the original sort and failure feedback without a usable saved location', async stored => {
+        const user = userEvent.setup();
+        locationState.user = stored;
+        renderList('/stores?sort=recommended');
+        await screen.findByTestId('original-card');
+
+        await user.selectOptions(screen.getByRole('combobox', { name: '가게 정렬' }), 'distance');
+
+        expect(locationRequest).toHaveBeenCalledWith({ showError: true });
+        await waitFor(() => expect(screen.getByRole('combobox', { name: '가게 정렬' })).toHaveValue('recommended'));
+        expect(routeParams().get('sort')).toBe('recommended');
+        expect(messageInfo).not.toHaveBeenCalled();
+        expect(setLiveLocation).not.toHaveBeenCalled();
     });
 
     it('writes both views without refetching or resetting filters/page', async () => {
@@ -96,7 +160,7 @@ describe('store list view selection with real URL pagination', () => {
         expect(screen.getByRole('button', { name: '사진형 보기로 전환' }).querySelector('.anticon-appstore')).toBeInTheDocument();
         expect(Object.fromEntries(routeParams())).toEqual({ keyword: '카페', domain: 'FOOD', sort: 'reviewCount', page: '3', utm_source: 'yes', view: 'list', region: 'all' });
         expect(storeService.getStores).toHaveBeenCalledTimes(1);
-        expect(storeService.getStores).toHaveBeenLastCalledWith({ keyword: '카페', domain: 'FOOD', sort: 'reviewCount', page: 2, size: 12 });
+        expect(storeService.getStores).toHaveBeenLastCalledWith({ keyword: '카페', domain: 'FOOD', sort: 'reviewCount', page: 2, size: 12 }, expect.any(AbortSignal));
         await user.click(screen.getByRole('button', { name: '사진형 보기로 전환' }));
         expect(screen.getByTestId('original-card')).toBeInTheDocument();
         expect(routeParams().get('view')).toBe('cards');
@@ -147,14 +211,20 @@ describe('store list view selection with real URL pagination', () => {
         expect(container.querySelector('.reserve-store-list-rows')).toHaveClass('reserve-explore-result--page-previous');
     });
 
-    it('limits home-banner entrance motion to its store destination and clears it after result animation', async () => {
+    it('leaves home-banner entry to the route without starting a second result entrance', async () => {
         const { container } = renderList({ pathname: '/stores', search: '?domain=FOOD', state: { reserveDiscoveryEntry: 'featured-banner' } });
         await screen.findByTestId('original-card');
-        expect(container.querySelector('.reserve-explore-page')).toHaveClass('reserve-explore-page--banner-entry');
+        expect(container.querySelector('.reserve-explore-page')).not.toHaveClass('reserve-explore-page--banner-entry');
         const results = container.querySelector('.rsv-store-grid');
-        expect(results).toHaveClass('reserve-explore-result--banner-entry');
-        fireEvent(results, new Event('webkitAnimationEnd', { bubbles: true }));
-        await waitFor(() => expect(container.querySelector('.reserve-explore-page')).not.toHaveClass('reserve-explore-page--banner-entry'));
+        expect(results).not.toHaveClass('reserve-explore-result--banner-entry');
+    });
+
+    it('does not replay a persisted banner entry after refreshing the store results', async () => {
+        const presentation = createLoadingPresentation('restored-results', { documentEntry: true });
+        const { container } = renderList({ pathname: '/stores', search: '?domain=FOOD', state: { reserveDiscoveryEntry: 'featured-banner' } }, presentation);
+        await screen.findByTestId('original-card');
+        expect(container.querySelector('.reserve-explore-page')).not.toHaveClass('reserve-explore-page--banner-entry');
+        expect(container.querySelector('.rsv-store-grid')).not.toHaveClass('reserve-explore-result--banner-entry');
     });
 
     it.each([
@@ -199,7 +269,7 @@ describe('store list view selection with real URL pagination', () => {
         expect(storeService.getStores).toHaveBeenCalledTimes(1);
         await waitFor(() => expect(storeService.getStores).toHaveBeenLastCalledWith({
             keyword: '카페', domain: 'FOOD', sort: 'reviewCount', page: 0, size: 12,
-        }));
+        }, expect.any(AbortSignal)));
         expect(storeService.getStores).toHaveBeenCalledTimes(2);
         expect(screen.getByPlaceholderText('가게 검색')).toBe(input);
         expect(input).toHaveFocus();

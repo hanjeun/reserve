@@ -1,4 +1,4 @@
-import { createRef } from 'react';
+import { createRef, useLayoutEffect, useRef, useState } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { ConfigProvider, Dropdown } from 'antd';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -9,16 +9,39 @@ import { uiIconConfig } from './uiIconConfig';
 import { CopyOutlined } from './icons';
 
 const settle = async () => { await act(async () => { vi.advanceTimersByTime(500); }); };
-const pointer = (target, type, pointerType) => {
-    const event = new Event(type, { bubbles: true });
-    Object.defineProperty(event, 'pointerType', { value: pointerType });
+const pointer = (target, type, pointerType, coordinates = {}) => {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    for (const [key, value] of Object.entries({ pointerType, pointerId: 1, clientX: 0, clientY: 0, ...coordinates })) Object.defineProperty(event, key, { value });
     fireEvent(target, event);
 };
 const setup = child => render(<ConfigProvider {...uiIconConfig} theme={{ token: { motion: false } }}>{child}</ConfigProvider>);
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
+function FocusHandoff() {
+    const [open, setOpen] = useState(false);
+    const target = useRef(null);
+    useLayoutEffect(() => { if (open) target.current.focus(); }, [open]);
+    return <><Tooltip title="소식 작성"><button onClick={() => setOpen(true)}>작성</button></Tooltip>
+        {open && <div role="dialog"><button ref={target}>작성 본문</button></div>}</>;
+}
+
 describe('shared explanation tooltips', () => {
+    it('moves keyboard focus into an opening dialog without flushing during its layout', async () => {
+        const errors = vi.spyOn(console, 'error');
+        try {
+            setup(<FocusHandoff />);
+            fireEvent.keyDown(document, { key: 'Tab' });
+            act(() => screen.getByRole('button', { name: '작성', exact: true }).focus());
+            await settle();
+            expect(screen.getByRole('tooltip')).toBeVisible();
+            fireEvent.click(screen.getByRole('button', { name: '작성', exact: true }));
+            await settle();
+            expect(screen.getByRole('button', { name: '작성 본문' })).toHaveFocus();
+            expect(screen.queryByRole('tooltip')).toBeNull();
+            expect(errors.mock.calls.filter(args => String(args[0]).includes('flushSync'))).toEqual([]);
+        } finally { errors.mockRestore(); }
+    });
     it('opens on mouse hover and closes on leave without changing the action or ref', async () => {
         const click = vi.fn(), ref = createRef();
         setup(<Tooltip title="작성 설명"><button ref={ref} onClick={click}>작성</button></Tooltip>);
@@ -78,7 +101,7 @@ describe('shared explanation tooltips', () => {
         const button = screen.getByRole('button', { name: '지역' });
         fireEvent.mouseEnter(button); await settle();
         expect(screen.getByRole('tooltip')).toBeVisible();
-        pointer(button, 'pointerdown', 'touch'); await settle();
+        pointer(button, 'pointerdown', 'touch'); pointer(button, 'pointerup', 'touch'); await settle();
         expect(screen.queryByRole('tooltip')).toBeNull();
         fireEvent.mouseLeave(button);
         pointer(document, 'pointermove', 'mouse'); await settle();
@@ -115,4 +138,62 @@ describe('shared explanation tooltips', () => {
         expect(screen.getByLabelText('정지, 사유: 확인이 필요해요.')).toHaveAttribute('tabindex', '0');
         expect(document.querySelector('.ant-tag-close-icon')).toBeNull();
     });
+});
+
+it('shows a held touch description only until release and consumes that gesture click', async () => {
+    const click = vi.fn();
+    setup(<Tooltip title="신고 검토 설명"><button onClick={click}>검토</button></Tooltip>);
+    const button = screen.getByRole('button', { name: '검토' });
+    pointer(button, 'pointerdown', 'touch');
+    await act(async () => { vi.advanceTimersByTime(499); });
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    await act(async () => { vi.advanceTimersByTime(1); });
+    expect(screen.getByRole('tooltip')).toHaveTextContent('신고 검토 설명');
+    pointer(document, 'pointerup', 'touch'); await settle();
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    fireEvent.click(button);
+    expect(click).not.toHaveBeenCalled();
+    pointer(button, 'pointerdown', 'touch'); pointer(document, 'pointerup', 'touch'); fireEvent.click(button);
+    expect(click).toHaveBeenCalledTimes(1);
+});
+
+it.each(['move', 'scroll', 'cancel'])('cancels a pending long press on %s without blocking a short tap', async reason => {
+    const click = vi.fn();
+    setup(<Tooltip title="상태 설명"><button onClick={click}>상태</button></Tooltip>);
+    const button = screen.getByRole('button', { name: '상태' });
+    pointer(button, 'pointerdown', 'touch');
+    if (reason === 'move') pointer(document, 'pointermove', 'touch', { clientY: 20 });
+    if (reason === 'scroll') fireEvent.scroll(window);
+    if (reason === 'cancel') pointer(document, 'pointercancel', 'touch');
+    await settle();
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    pointer(button, 'pointerdown', 'touch'); pointer(document, 'pointerup', 'touch'); fireEvent.click(button);
+    expect(click).toHaveBeenCalledTimes(1);
+});
+
+it('keeps native link long presses and does not open a dropdown after a held button', async () => {
+    const view = setup(<Tooltip title="외부 링크 설명"><a href="/help">도움말</a></Tooltip>);
+    pointer(screen.getByRole('link'), 'pointerdown', 'touch'); await settle();
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    view.unmount();
+    setup(<Dropdown trigger={['click']} menu={{ items: [{ key: 'edit', label: '수정' }] }}>
+        <Tooltip title="관리 설명"><button>관리</button></Tooltip></Dropdown>);
+    const button = screen.getByRole('button', { name: '관리' });
+    pointer(button, 'pointerdown', 'touch'); await settle();
+    expect(screen.getByRole('tooltip')).toHaveTextContent('관리 설명');
+    pointer(button, 'pointerup', 'touch'); fireEvent.click(button); await settle();
+    expect(screen.queryByRole('menuitem')).toBeNull();
+});
+
+it('does not explain mouse focus or resurrect a tooltip after it becomes unavailable', async () => {
+    const view = setup(<Tooltip title="도구 설명"><button>도구</button></Tooltip>);
+    const button = screen.getByRole('button', { name: '도구' });
+    pointer(button, 'pointerdown', 'mouse'); fireEvent.focus(button); await settle();
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    fireEvent.mouseEnter(button); await settle();
+    expect(screen.getByRole('tooltip')).toHaveTextContent('도구 설명');
+    view.rerender(<ConfigProvider {...uiIconConfig} theme={{ token: { motion: false } }}><Tooltip title="도구 설명" disabled><button>도구</button></Tooltip></ConfigProvider>);
+    await settle(); expect(screen.queryByRole('tooltip')).toBeNull();
+    view.rerender(<ConfigProvider {...uiIconConfig} theme={{ token: { motion: false } }}><Tooltip title="도구 설명"><button>도구</button></Tooltip></ConfigProvider>);
+    await settle(); expect(screen.queryByRole('tooltip')).toBeNull();
 });

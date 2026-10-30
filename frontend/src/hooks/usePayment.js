@@ -1,109 +1,89 @@
-import { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import PortOne from '@portone/browser-sdk/v2';
 import paymentService from '../services/paymentService';
 import useMessage from './useMessage';
+import usePaymentMethodDialog from './usePaymentMethodDialog';
+import useAuthStore from '../store/useAuthStore';
+import usePaymentHandoff, { PAYMENT_HANDOFF } from './usePaymentHandoff';
+import { configuredPaymentMethods, paymentMethodRequest, paymentWasCancelled } from '../utils/paymentMethods';
+import { clearPaymentReturns, rememberPaymentReturn } from '../utils/paymentReturnContext';
 
-/*
- * 예약금 결제는 서버 준비 값으로 요청하고 PC 검증·모바일 리다이렉트의 서버 검증으로 확정한다. SDK 응답이나 창 포커스 복귀만으로 성공·취소를 판단하지 않는다.
- */
 const usePayment = () => {
-    const navigate  = useNavigate();
+    const navigate = useNavigate();
+    const location = useLocation();
     const { message } = useMessage();
+    const { choosePayment, paymentDialog } = usePaymentMethodDialog();
     const [paying, setPaying] = useState(false);
-
-    const pay = useCallback(async (reservation, buyer) => {
-        setPaying(true);
-        try {
-            // 1. 서버에서 merchantUid(= V2 paymentId) 발급.
-            //    amount 는 서버가 가게 정책으로 다시 계산한다(PR #123). 여기서 보내는 값은 참고용이다.
-            const prepared = await paymentService.prepare({
-                reservationId: reservation.id,
-                amount:        reservation.depositAmount,
-                productName:   `${reservation.storeName} 노쇼 예약금`,
-                buyerName:     buyer.name,
-                buyerEmail:    buyer.email,
-                buyerTel:      buyer.phone || '',
-                pgProvider:    'kakaopay',
-            });
-
-            const { merchantUid, storeId, amount, productName,
-                    buyerName, buyerEmail, buyerTel } = prepared;
-
-            if (!storeId) {
-                message.error('결제 설정을 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
-                setPaying(false);
-                return { success: false };
-            }
-
-            // 2. 결제창 — PC 는 IFRAME, 모바일은 redirectUrl 로 이탈
-            const payment = await PortOne.requestPayment({
-                storeId,
-                channelKey:  import.meta.env.VITE_PORTONE_CHANNEL_KEY,
-                paymentId:   merchantUid,
-                orderName:   productName,
-                totalAmount: amount,
-                currency:    'KRW',
-                payMethod:   'EASY_PAY',
-                customer: {
-                    fullName:    buyerName,
-                    email:       buyerEmail,
-                    phoneNumber: buyerTel || undefined,
-                },
-                redirectUrl: `${window.location.origin}/api/payment/mobile-redirect`,
-            });
-
-            // 모바일: 이미 redirectUrl 로 넘어갔다. 여기부터는 실행되지 않거나 payment 가 없다.
-            if (payment == null) {
-                return { success: false, redirected: true };
-            }
-
-            // V2는 성공 시 code를 보내지 않으므로 값이 있으면 실패·취소로 처리한다.
-            if (payment.code !== undefined) {
-                const isCancelled = payment.code === 'Cancelled'
-                    || (payment.message || '').includes('취소')
-                    || (payment.message || '').toLowerCase().includes('cancel');
-                if (!isCancelled) {
-                    message.error(payment.message || '결제에 실패했어요.');
-                }
-                setPaying(false);
-                return { success: false, cancelled: isCancelled };
-            }
-
-            // 4. 서버 검증
-            try {
-                await paymentService.verify({
-                    merchantUid:   payment.paymentId,
-                    reservationId: reservation.id,
-                });
-                // 검증이 끝났으므로 결과 페이지는 재검증하지 않는다(imp_uid 를 넘기지 않는다).
-                navigate(
-                    `/payment/result?success=true` +
-                    `&merchant_uid=${encodeURIComponent(payment.paymentId)}` +
-                    `&reservation_id=${reservation.id}`
-                );
-                return { success: true };
-            } catch (err) {
-                const msg = err instanceof Error ? err.message : '결제 검증에 실패했어요.';
-                navigate(
-                    `/payment/result?success=false` +
-                    `&merchant_uid=${encodeURIComponent(payment.paymentId)}` +
-                    `&error_msg=${encodeURIComponent(msg)}`
-                );
-                return { success: false };
-            } finally {
-                setPaying(false);
-            }
-        } catch (err) {
-            // requestPayment 는 결제창이 뜨기 전 단계의 오류(파라미터 형식·네트워크)만 throw 한다.
-            const msg = err instanceof Error ? err.message : '결제 준비에 실패했어요.';
-            message.error(msg);
-            setPaying(false);
-            return { success: false };
+    const active = useRef(false);
+    const attempt = useRef(0);
+    useEffect(() => useAuthStore.subscribe((state, before) => {
+        if (state.sessionRevision !== before.sessionRevision) {
+            clearPaymentReturns(); attempt.current++; active.current = false; setPaying(false);
         }
-    }, [navigate, message]);
-
-    return { pay, paying };
+    }), []);
+    const beginHandoff = usePaymentHandoff(order => {
+        active.current = false; setPaying(false);
+        navigate('/payment/result?checkout_return=true&merchant_uid=' + encodeURIComponent(order.merchantUid));
+    });
+    const pay = useCallback(async (reservation, buyer) => {
+        if (active.current) return { success: false };
+        active.current = true;
+        const operation = ++attempt.current;
+        setPaying(true);
+        const revision = useAuthStore.getState().sessionRevision;
+        const current = () => revision === useAuthStore.getState().sessionRevision;
+        let handedOff = false;
+        let checkoutUid = null;
+        try {
+            if (!configuredPaymentMethods().length) throw new Error('사용 가능한 결제 수단을 불러오지 못했어요.');
+            const prepared = await paymentService.prepare({
+                reservationId: reservation.id, amount: reservation.depositAmount,
+                productName: reservation.storeName + ' 예약금',
+                buyerName: buyer.name, buyerEmail: buyer.email, buyerTel: buyer.phone || '',
+            });
+            if (!current()) return { success: false, stale: true };
+            const method = await choosePayment(prepared, { ...reservation, kind: 'RESERVATION' });
+            if (!method || !current()) return { success: false, cancelled: true };
+            const { merchantUid, storeId, amount, productName, buyerName, buyerEmail, buyerTel } = prepared;
+            checkoutUid = merchantUid;
+            rememberPaymentReturn(merchantUid, useAuthStore.getState().user?.id, location);
+            const payment = await beginHandoff({ merchantUid }, () => PortOne.requestPayment({
+                storeId, paymentId: merchantUid, orderName: productName, totalAmount: amount, currency: 'KRW',
+                ...paymentMethodRequest(method, prepared),
+                customer: { fullName: buyerName, email: buyerEmail, phoneNumber: buyerTel || undefined },
+                redirectUrl: window.location.origin + '/api/payment/mobile-redirect',
+            })).catch(error => {
+                if (paymentWasCancelled(error, method)) return { code: 'PAY_PROCESS_CANCELED' };
+                throw error;
+            });
+            if (payment === PAYMENT_HANDOFF) return { success: false, interrupted: true };
+            if (!current()) return { success: false, stale: true };
+            if (payment == null) { handedOff = true; beginHandoff({ merchantUid }); return { success: false, redirected: true }; }
+            if (payment.code !== undefined) {
+                const cancelled = paymentWasCancelled(payment, method);
+                navigate('/payment/result?checkout_return=true&merchant_uid=' + encodeURIComponent(merchantUid));
+                return { success: false, cancelled };
+            }
+            if (payment.paymentId !== merchantUid) throw new Error('결제 결과를 확인하지 못했어요. 다시 결제하지 말고 내 예약을 확인해주세요.');
+            try {
+                // SDK 완료 뒤에도 원장의 주문·금액·상태를 서버에서 확인해요.
+                await paymentService.verify({ merchantUid, reservationId: reservation.id });
+                if (!current()) return { success: false, stale: true };
+                navigate('/payment/result?success=true&merchant_uid=' + encodeURIComponent(merchantUid) + '&reservation_id=' + reservation.id);
+                return { success: true };
+            } catch {
+                if (current()) navigate('/payment/result?success=false&checkout_return=true&merchant_uid=' + encodeURIComponent(merchantUid));
+                return { success: false };
+            }
+        } catch (error) {
+            if (current()) {
+                if (checkoutUid) navigate('/payment/result?checkout_return=true&merchant_uid=' + encodeURIComponent(checkoutUid));
+                else message.error(error instanceof Error ? error.message : '결제를 준비하지 못했어요.');
+            }
+            return { success: false };
+        } finally { if (!handedOff && operation === attempt.current) { active.current = false; setPaying(false); } }
+    }, [navigate, location, message, choosePayment, beginHandoff]);
+    return { pay, paying, paymentDialog };
 };
-
 export default usePayment;

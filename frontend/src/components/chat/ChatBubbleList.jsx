@@ -28,7 +28,7 @@ const inSameGroup = (a, b) => {
  * @param {Array}  messages 시간순 메시지
  * @param {string} mine     내 메시지로 볼 senderRole ('MEMBER' | 'ADMIN')
  */
-const ChatBubbleList = ({ messages, mine, roomId, onRetracted, onHidden = onRetracted, reportRole }) => {
+const ChatBubbleList = ({ messages, mine, roomId, onRetracted, onHidden = onRetracted, reportRole, searchMessageId }) => {
     const { palette } = useChatPreferences();
     const visibleMessages = messages.filter(message => !message.hidden);
     return (
@@ -48,7 +48,7 @@ const ChatBubbleList = ({ messages, mine, roomId, onRetracted, onHidden = onRetr
             if (i === 0) marginTop = 0;
 
             return (
-                <div key={m.id} className="reserve-chat-message-row"
+                <div key={m.id} className="reserve-chat-message-row" data-message-id={m.id}
                     style={{
                         display: 'flex',
                         justifyContent: isMine ? 'flex-end' : 'flex-start',
@@ -73,6 +73,7 @@ const ChatBubbleList = ({ messages, mine, roomId, onRetracted, onHidden = onRetr
                             // 아직 서버가 받았는지 모르는 상태. 자리는 잡되 "확정 아님"이 보여야 한다.
                             ...(m.pending ? styles.bubblePending : null),
                             ...(m.retracted || m.expired ? { background: colors.background.subtle, color: colors.text.secondary, border: `1px solid ${colors.border.default}` } : null),
+                            ...(m.id === searchMessageId ? { outline: '2px solid ' + colors.primary.main, outlineOffset: 2 } : null),
                         }}>
                             <span>{m.content}</span>
                         </div>}

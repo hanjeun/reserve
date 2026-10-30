@@ -55,6 +55,18 @@ public class Payment {
     @Column(name = "pg_provider", length = 50)
     private String pgProvider;
 
+    @Column(name = "verified_channel_type", length = 16)
+    private String verifiedChannelType;
+
+    @Column(name = "verified_channel_id", length = 80)
+    private String verifiedChannelId;
+
+    @Column(name = "verified_store_id", length = 80)
+    private String verifiedStoreId;
+
+    @Column(name = "verified_disputed")
+    private Boolean verifiedDisputed;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default

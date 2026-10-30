@@ -17,6 +17,9 @@ const sha = 'a'.repeat(40);
 
 test('every image is scanned before registry credentials and the same image is pushed only on main', () => {
   const workflow = yaml.load(read('.github/workflows/CICD.yml'));
+  const validation = workflow.jobs['test-frontend'].steps;
+  const install = validation.findIndex(s => s.name === 'Install dependencies');
+  assert.ok(install >= 0 && install < validation.findIndex(s => s.name === 'Validate operations scripts'));
   const steps = workflow.jobs['build-backend'].steps;
   const build = steps.findIndex(s => s.name === 'Build Docker image');
   const scan = steps.findIndex(s => s.name === 'Scan backend image vulnerabilities');

@@ -105,6 +105,9 @@ jobs:
       - name: Verify immutable design-system snapshot
         shell: pwsh
         run: ./scripts/design-system-snapshot.ps1 -Stage Verify -InstallGitGuard
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
       - name: Validate operations scripts
         run: |
           node --test scripts/tests/observability-config.test.mjs scripts/tests/deployment-memory.test.mjs scripts/tests/release-schema-readonly.test.mjs scripts/tests/backup-engine.test.mjs
@@ -123,9 +126,6 @@ jobs:
           bash -n scripts/domain-release.sh
           bash scripts/test-frontend-assets.sh
           bash scripts/test-frontend-release-swap.sh
-      - name: Install dependencies
-        working-directory: frontend
-        run: npm ci
       - name: Run ESLint
         working-directory: frontend
         run: npm run lint:ci

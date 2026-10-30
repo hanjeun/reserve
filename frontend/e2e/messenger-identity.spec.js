@@ -296,6 +296,11 @@ test('composer keeps neutral controls and scopes retraction and private deletion
     await expect(page.getByRole('menuitem', { name: '전송 취소' })).toHaveCount(0);
     const hideMenuItem = page.getByRole('menuitem', { name: '나에게만 삭제' });
     await expect(hideMenuItem).toBeVisible();
+    await expect.poll(() => hideMenuItem.evaluate(element => {
+        const popup = element.closest('.ant-dropdown');
+        return popup && getComputedStyle(popup).opacity === '1'
+            && popup.getAnimations({ subtree: true }).every(animation => ['finished', 'idle'].includes(animation.playState));
+    })).toBe(true);
     await hideMenuItem.click();
     const hideDialog = page.getByRole('dialog', { name: '이 메시지를 나에게만 삭제할까요?' });
     await expect(hideDialog).toContainText('상대방 대화와 신고·분쟁 검토 원본은 유지');

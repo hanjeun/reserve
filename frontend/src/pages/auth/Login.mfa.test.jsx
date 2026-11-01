@@ -1,11 +1,11 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { App as AntApp } from 'antd';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Login from './Login';
 import PrivateRoute from '../../components/PrivateRoute';
 
-const fixture = vi.hoisted(() => ({ state: {}, post: vi.fn(), get: vi.fn(), authenticate: vi.fn(), finish: vi.fn(), login: vi.fn(),
+const fixture = vi.hoisted(() => ({ state: {}, member: null, post: vi.fn(), get: vi.fn(), authenticate: vi.fn(), finish: vi.fn(), login: vi.fn(),
     message: { warning: vi.fn(), error: vi.fn(), success: vi.fn(), info: vi.fn() } }));
 vi.mock('../../api/axios', () => ({ default: { post: fixture.post, get: fixture.get } }));
 vi.mock('../../utils/mfaAuthentication', () => ({ authenticateWithPasskey: fixture.authenticate, finishMfaSession: fixture.finish }));
@@ -13,9 +13,10 @@ vi.mock('../../store/useAuthStore', () => ({ default: selector => typeof selecto
 vi.mock('../../hooks', () => ({ useMessage: () => ({ message: fixture.message }) }));
 vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: fixture.message }) }));
 vi.mock('../../hooks/useDocumentTitle', () => ({ default: () => {} }));
-vi.mock('../../components/member/MfaFlow', () => ({ default: ({ onDone, initialView }) => <button data-method={initialView?.preferredFactor} onClick={onDone}>추가 인증 완료</button> }));
+vi.mock('../../components/member/MfaFlow', () => ({ default: ({ onDone, initialView }) => <button data-method={initialView?.preferredFactor} onClick={() => onDone(fixture.member)}>추가 인증 완료</button> }));
 
-const show = path => render(<MemoryRouter initialEntries={[path]}><AntApp><Routes>
+const DestinationPath = () => { const location = useLocation(); return <span aria-label="도착 주소">{location.pathname + location.search}</span>; };
+const show = path => render(<MemoryRouter initialEntries={[path]}><AntApp><DestinationPath /><Routes>
     <Route path="/login" element={<Login />} /><Route element={<PrivateRoute />}>
         <Route path="/my-page" element={<span>보안 설정</span>} /></Route>
     <Route path="/" element={<span>홈 화면</span>} />
@@ -35,6 +36,7 @@ const enableRememberMe = async () => {
 describe('로그인과 기본 인증 인계', () => {
     beforeEach(() => {
         vi.resetAllMocks(); sessionStorage.clear(); fixture.state = { isLoggedIn: false, login: fixture.login };
+        fixture.member = { id: 7, name: '합성 회원', role: 'USER', termsAgreed: true };
         fixture.login.mockImplementation(user => { fixture.state = { ...fixture.state, isLoggedIn: true, isLoggingOut: false, user }; });
         fixture.get.mockResolvedValue({ idleSeconds: 1209600, absoluteSeconds: 2592000 });
         fixture.authenticate.mockResolvedValue({ verified: true });
@@ -81,6 +83,7 @@ describe('로그인과 기본 인증 인계', () => {
         expect(fixture.authenticate).toHaveBeenCalledExactlyOnceWith(false, expect.any(AbortSignal));
         expect(fixture.finish).toHaveBeenCalledTimes(1);
         expect(fixture.login).toHaveBeenCalledExactlyOnceWith({ id: 7, name: '합성 회원' });
+        expect(fixture.message.success).toHaveBeenCalledExactlyOnceWith('합성 회원님, 로그인됐어요!');
     });
     it('패스키 선택을 취소하면 임시 인증을 폐기하고 로그인 화면을 유지해요', async () => {
         fixture.post.mockResolvedValue({ purpose: 'PASSKEY_LOGIN' });
@@ -90,6 +93,7 @@ describe('로그인과 기본 인증 인계', () => {
         await waitFor(() => expect(fixture.message.info).toHaveBeenCalledTimes(1));
         expect(fixture.post).toHaveBeenCalledWith('/api/auth/mfa/cancel', undefined, { skipAuthRefresh: true });
         expect(fixture.finish).not.toHaveBeenCalled(); expect(fixture.login).not.toHaveBeenCalled();
+        expect(fixture.message.success).not.toHaveBeenCalled();
         expect(screen.getByPlaceholderText('이메일 주소')).toBeEnabled();
     });
     it('비밀번호 이후에도 패스키를 바로 요청하고 취소하면 인증 앱으로 인계해요', async () => {
@@ -136,6 +140,23 @@ describe('로그인과 기본 인증 인계', () => {
         show('/login?enroll=passkey');
         expect(await screen.findByText('보안 설정')).toBeInTheDocument();
         expect(screen.queryByText('홈 화면')).toBeNull(); expect(fixture.post).not.toHaveBeenCalled();
+    });
+    it.each([
+        { path: '/login?mfa=1', destination: '홈 화면', name: '합성 회원' },
+        { path: '/login?mfa=1&security=1', destination: '보안 설정', name: '합성 회원' },
+        { path: '/login?mfa=1', destination: '홈 화면', name: null },
+    ])('추가 인증은 실제 로그인과 설정 확인의 안내를 구분해 이동해요 ($path, $name)', async ({ path, destination, name }) => {
+        fixture.member = { ...fixture.member, name };
+        show(path);
+        expect(fixture.message.success).not.toHaveBeenCalled();
+        fixture.state = { ...fixture.state, isLoggedIn: true, user: fixture.member };
+        fireEvent.click(screen.getByRole('button', { name: '추가 인증 완료' }));
+        expect(await screen.findByText(destination)).toBeInTheDocument();
+        if (path.includes('security=1')) {
+            expect(fixture.message.success).not.toHaveBeenCalled();
+            expect(screen.getByLabelText('도착 주소')).toHaveTextContent('/my-page?security=verified');
+        } else expect(fixture.message.success).toHaveBeenCalledExactlyOnceWith(name ? `${name}님, 로그인됐어요!` : '로그인됐어요.');
+        expect(fixture.login).not.toHaveBeenCalled();
     });
     it('캐시된 로그인 상태가 OAuth 추가 인증을 건너뛰지 않아요', async () => {
         fixture.state.isLoggedIn = true;

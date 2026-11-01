@@ -15,6 +15,11 @@ public final class LoginAuthorizationRequestRepository implements AuthorizationR
     }
     @Override public void saveAuthorizationRequest(OAuth2AuthorizationRequest value, HttpServletRequest request, HttpServletResponse response) {
         delegate.saveAuthorizationRequest(value, request, response);
+        if (value != null) {
+            var session = request.getSession(false);
+            if (session != null && (session.getMaxInactiveInterval() <= 0 || session.getMaxInactiveInterval() > 600))
+                session.setMaxInactiveInterval(600);
+        }
     }
     @Override public OAuth2AuthorizationRequest removeAuthorizationRequest(HttpServletRequest request, HttpServletResponse response) {
         request.removeAttribute(PERSISTENT);

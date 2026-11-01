@@ -8,6 +8,15 @@ import useLocationStore from './useLocationStore';
 const STARTUP_AUTH_RETRY_DELAYS_MS = [400, 1200];
 let authRestoreRuns = 0;
 let sessionProbe;
+const restoringDuring = async (set, action) => {
+    authRestoreRuns += 1;
+    set({ authRestoring: true });
+    try { return await action(); }
+    finally {
+        authRestoreRuns -= 1;
+        if (authRestoreRuns === 0) set({ authRestoring: false });
+    }
+};
 const readSession = (epoch, timeout) => {
     if (sessionProbe?.epoch === epoch) return sessionProbe.promise;
     const config = { skipAuthRefresh: true, ...(timeout ? { timeout } : {}) };
@@ -49,6 +58,7 @@ const useAuthStore = create(
             authRestoring: false,
 
             setLoggingOut: (val) => set({ isLoggingOut: val }),
+            withAuthTransition: (action) => restoringDuring(set, action),
 
             expireSession: () => { set({ authRestoring: false }); applyUser(set, get, null); },
 
@@ -98,26 +108,19 @@ const useAuthStore = create(
             /**
              * 앱 초기화 시 인증 상태 복구
              */
-            initializeAuth: async () => {
-                authRestoreRuns += 1;
-                set({ authRestoring: true });
-                try {
-                    for (let attempt = 0; attempt <= STARTUP_AUTH_RETRY_DELAYS_MS.length; attempt += 1) {
-                        if (attempt > 0) await wait(STARTUP_AUTH_RETRY_DELAYS_MS[attempt - 1]);
-                        try {
-                            return await get().checkAuth(true, { rethrowTransient: true, timeout: 8000 });
-                        } catch (error) {
-                            if (!isTransientAuthError(error) || attempt === STARTUP_AUTH_RETRY_DELAYS_MS.length) {
-                                return null;
-                            }
+            initializeAuth: () => restoringDuring(set, async () => {
+                for (let attempt = 0; attempt <= STARTUP_AUTH_RETRY_DELAYS_MS.length; attempt += 1) {
+                    if (attempt > 0) await wait(STARTUP_AUTH_RETRY_DELAYS_MS[attempt - 1]);
+                    try {
+                        return await get().checkAuth(true, { rethrowTransient: true, timeout: 8000 });
+                    } catch (error) {
+                        if (!isTransientAuthError(error) || attempt === STARTUP_AUTH_RETRY_DELAYS_MS.length) {
+                            return null;
                         }
                     }
-                    return null;
-                } finally {
-                    authRestoreRuns -= 1;
-                    if (authRestoreRuns === 0) set({ authRestoring: false });
                 }
-            },
+                return null;
+            }),
         }),
         {
             name: 'auth-storage',

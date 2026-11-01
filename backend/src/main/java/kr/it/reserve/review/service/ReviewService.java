@@ -125,6 +125,7 @@ public class ReviewService {
     @Transactional(readOnly = true)
     public ReviewResponse getReviewByReservationId(Long reservationId) {
         return reviewRepository.findByReservationId(reservationId)
+                .filter(review -> !review.isDeleted())
                 .map(ReviewResponse::fromEntity)
                 .orElse(null);
     }
@@ -158,6 +159,7 @@ public class ReviewService {
 
     private Review findReviewByIdOrThrow(Long id) {
         return reviewRepository.findById(id)
+                .filter(review -> !review.isDeleted())
                 .orElseThrow(() -> new ReviewException("리뷰를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
     }
 

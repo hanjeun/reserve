@@ -1589,13 +1589,7 @@ a.reserve-store-list-row-link[href]:active, .reserve-reservation-row:has(.reserv
 }
 .reserve-header-logo-wordmark { display: block; font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, sans-serif; font-size: 22px; font-weight: 850; letter-spacing: -0.8px; line-height: 1; white-space: nowrap; }
 @media (max-width: 767px) {
-    /* 검색의 클릭 영역은 유지하고 게스트 로그인과의 시각 간격만 조정한다. */
     .reserve-header-is-guest .reserve-header-actions { gap: 0; }
-    .reserve-header-is-guest .reserve-header-guest-actions .reserve-btn--ghost {
-        min-width: 44px;
-        padding-left: 0 !important;
-        padding-right: 13px !important;
-    }
 }
 @media (max-width: 359px) {
     .reserve-header-is-guest.reserve-header-has-back .reserve-header-inner { padding-inline: 12px !important; gap: 4px; }
@@ -2355,7 +2349,6 @@ a.reserve-store-list-row-link[href]:active, .reserve-reservation-row:has(.reserv
     /* 하위 화면의 뒤로가기는 PC에서도 브랜드 영역에 표시한다. */
     .reserve-header-actions { justify-content: flex-end; }
     /* 게스트 버튼 간격은 PC와 모바일의 기존 배치를 구분해 조정한다. */
-    .reserve-header-guest-actions { gap: 12px !important; }
     .reserve-discovery-featured { margin-inline: var(--reserve-home-gutter); }
     .reserve-discovery-banner-track { padding-inline: 0; scroll-padding-inline: 0; }
     .reserve-discovery-banner-copy { left: 40px; right: 40px; }

@@ -8,13 +8,24 @@ export async function performPasskey(json, registration, signal) {
     const publicKey = options.publicKey;
     if (!publicKey) throw new Error('패스키 요청을 확인하지 못했어요.');
     publicKey.challenge = decode(publicKey.challenge);
-    if (registration) publicKey.user.id = decode(publicKey.user.id);
+    if (registration) {
+        publicKey.user.id = decode(publicKey.user.id);
+        publicKey.hints ??= ['client-device'];
+    }
     for (const name of ['allowCredentials', 'excludeCredentials']) {
         if (publicKey[name]) publicKey[name] = publicKey[name].map(value => ({ ...value, id: decode(value.id) }));
     }
-    const credential = registration
-        ? await navigator.credentials.create({ publicKey, signal })
-        : await navigator.credentials.get({ publicKey, signal });
+    let credential;
+    try {
+        credential = registration
+            ? await navigator.credentials.create({ publicKey, signal })
+            : await navigator.credentials.get({ publicKey, signal });
+    } catch (failure) {
+        if (registration && failure?.name === 'InvalidStateError') {
+            throw new DOMException('이미 등록된 패스키예요. 기존 키를 사용하거나 다른 저장 위치를 선택해주세요.', 'InvalidStateError');
+        }
+        throw failure;
+    }
     if (!credential) throw new Error('패스키 인증을 취소했어요.');
     const response = { clientDataJSON: encode(credential.response.clientDataJSON) };
     if (registration) {

@@ -74,7 +74,9 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         OAuthSessionIssuer.SessionTokens pair;
         try {
             if (mfa != null) mfa.cancel(CookieUtil.getCookie(request, "mfa_ticket"));
-            pair = sessionIssuer.issue(oAuth2User, LoginAuthorizationRequestRepository.persistent(request));
+            pair = kr.it.reserve.member.service.LoginMethodService.consumeReauthentication(request)
+                    ? sessionIssuer.issueReauthenticated(oAuth2User, CookieUtil.getCookie(request, "access_token"))
+                    : sessionIssuer.issue(oAuth2User, LoginAuthorizationRequestRepository.persistent(request));
         } catch (org.springframework.security.oauth2.core.OAuth2AuthenticationException exception) {
             org.springframework.security.core.context.SecurityContextHolder.clearContext();
             clearSessionAndCookies(request, response);
@@ -105,7 +107,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         // 4. 리액트 앱으로 리다이렉트
         // 신규 유저(약관 미동의)면 newUser=true 파라미터 추가
         String baseUrl = destination + "/oauth2/callback";
-        String redirectUrl = oAuth2User.isLoginMethodAction() ? destination + "/my-page"
+        String redirectUrl = oAuth2User.isLoginMethodAction() ? destination + "/my-page?security=verified"
                 : oAuth2User.isNewUser() ? baseUrl + "?newUser=true" : baseUrl;
         log.info("OAuth2 redirect: url={}, env={}, newUser={}", redirectUrl, serverEnv, oAuth2User.isNewUser());
         getRedirectStrategy().sendRedirect(request, response, redirectUrl);

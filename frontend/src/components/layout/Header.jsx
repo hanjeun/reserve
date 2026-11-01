@@ -10,12 +10,11 @@ import useWorkspaceAction from '../../hooks/useWorkspaceAction';
 import useExitAnimation from '../../hooks/useExitAnimation';
 import { isDiscoveryRootPath } from '../../constants/discovery';
 import useAuthStore from '../../store/useAuthStore';
-import Button from '../common/Button';
 import Tooltip from '../common/Tooltip';
 import { requestMessengerRouteClose } from '../chat/messengerRouteTransition';
 import { requestRegistrationStepBack } from '../../utils/storeRegistrationNavigation';
 import { useDocumentEntry, useSkeletonShown } from './loadingPresentation';
-import { colors, heights, fontWeight, radius } from '../../styles/tokens';
+import { colors, heights, radius } from '../../styles/tokens';
 import { WorkspaceMenuContext } from './workspaceMenu';
 import { SEARCH_MOTION_DURATION_MS } from './searchTransition';
 
@@ -133,6 +132,12 @@ const Header = () => {
         void requestAction(() => runHeaderNavigation('search', () => navigate(searchTarget, { state: { searchEntry: true } })));
     };
 
+    const handleAccountEntry = (event, target) => {
+        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        void navigate(target);
+    };
+
     // 로고 자체는 정적으로 두고 목적지의 진입 모션만 사용한다.
 
     const handleLogoClick = (e) => {
@@ -186,8 +191,8 @@ const Header = () => {
                         </Suspense>
                     ) : (
                         <div className="reserve-header-guest-actions" style={styles.guestActions}>
-                            <Button variant="ghost" size="md" icon={<LockOutlined />} onClick={() => navigate('/login')} style={styles.navBtn}>로그인</Button>
-                            <Button variant="primary" size="md" icon={<UserOutlined />} onClick={() => navigate('/signup')} style={styles.actionBtn}>회원가입</Button>
+                            <Tooltip title="로그인"><Link to="/login" className="reserve-header-search" aria-label="로그인" onClick={event => handleAccountEntry(event, '/login')}><LockOutlined aria-hidden="true" /></Link></Tooltip>
+                            <Tooltip title="회원가입"><Link to="/signup" className="reserve-header-search" aria-label="회원가입" onClick={event => handleAccountEntry(event, '/signup')}><UserOutlined aria-hidden="true" /></Link></Tooltip>
                         </div>
                     )}
                 </div>
@@ -254,8 +259,6 @@ const styles = {
     },
     actions: { display: 'flex', alignItems: 'center' },
     guestActions: { display: 'flex', alignItems: 'center', gap: 4 },
-    navBtn: { color: colors.text.secondary, fontWeight: fontWeight.semibold, borderRadius: radius.md, height: heights.buttonMd, padding: '0 4px', whiteSpace: 'nowrap' },
-    actionBtn: { borderRadius: radius.md, fontWeight: fontWeight.semibold, border: 'none', height: heights.buttonMd, padding: '0 12px', whiteSpace: 'nowrap' },
     avatarFallback: { width: 36, height: 36, borderRadius: radius.full, background: colors.primary.light },
 };
 

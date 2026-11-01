@@ -22,6 +22,27 @@ class SecurityConfigAuthorizationTest {
     private MockMvc mockMvc;
 
     @Test
+    void environmentEmailProofRequiresItsTicketAndTheExistingCsrfBoundary() throws Exception {
+        for (String prefix : new String[]{"/api", "/api/v1"}) {
+            mockMvc.perform(post(prefix + "/auth/mfa/email/send")).andExpect(status().isUnauthorized());
+            mockMvc.perform(post(prefix + "/auth/mfa/email/send")
+                    .cookie(new jakarta.servlet.http.Cookie("mfa_ticket", "synthetic-invalid-ticket"))).andExpect(status().isForbidden());
+        }
+    }
+
+    @Test
+    void reusedOAuthStartUsesTheSameSafeFailureNoticeWithoutDiscardingTheExistingSession() throws Exception {
+        var session = new org.springframework.mock.web.MockHttpSession();
+        session.setAttribute("existing-session-marker", "keep");
+        var response = mockMvc.perform(get("/oauth2/authorization/google").session(session)
+                        .param("account_link", "reused-ui-proof"))
+                .andExpect(status().is3xxRedirection()).andReturn().getResponse();
+        org.assertj.core.api.Assertions.assertThat(response.getRedirectedUrl()).contains("/login?error=oauth2")
+                .doesNotContain("reused-ui-proof");
+        org.assertj.core.api.Assertions.assertThat(session.getAttribute("existing-session-marker")).isEqualTo("keep");
+    }
+
+    @Test
     void neutralSessionReadIsPublicWhilePersonalDetailsAndWritesStayProtected() throws Exception {
         for (String prefix : new String[]{"/api", "/api/v1"}) {
             mockMvc.perform(get(prefix + "/auth/session")).andExpect(status().isOk())

@@ -14,6 +14,7 @@ import kr.it.reserve.file.service.FileDeletionOutboxService;
 import kr.it.reserve.file.service.FileStorageService;
 import kr.it.reserve.file.util.FileStoragePaths;
 import kr.it.reserve.global.error.MemberException;
+import kr.it.reserve.global.ratelimit.RateLimiter;
 import kr.it.reserve.global.security.PasswordPolicy;
 import kr.it.reserve.global.security.PwnedPasswordChecker;
 import kr.it.reserve.lifecycle.dto.MemberWithdrawalReadiness;
@@ -55,6 +56,7 @@ public class MemberService {
     private static final String PROFILE_IMAGE_DELETION_SOURCE = "MEMBER_PROFILE_IMAGE";
 
     private final MemberRepository memberRepository;
+    private final RateLimiter rateLimiter;
     private final RefreshTokenRepository refreshTokenRepository;
     @org.springframework.beans.factory.annotation.Autowired private kr.it.reserve.member.mfa.MfaService mfa;
     private final PasswordEncoder bCryptPasswordEncoder;
@@ -176,6 +178,9 @@ public class MemberService {
     @Transactional
     public void changePassword(Long memberId, PasswordChangeRequest request) {
         Member member = findByIdForUpdate(memberId);
+        // 이전 API도 같은 회원 축을 지나며 IP 변경으로 재인증 제한을 우회할 수 없다.
+        if (!rateLimiter.tryConsume("login-method:member:" + memberId, RateLimiter.Policy.LOGIN_METHOD_CHANGE))
+            throw new MemberException("시도가 너무 많아요. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
         if (member.getPassword() == null) {
             throw new MemberException("이메일 로그인을 먼저 설정해주세요.", HttpStatus.FORBIDDEN);
         }
@@ -196,6 +201,7 @@ public class MemberService {
         member.setPassword(bCryptPasswordEncoder.encode(request.getNewPassword()));
         member.rotateAuthVersion();
         refreshTokenRepository.deleteByMemberId(memberId);
+        passwordResetTokenRepository.invalidateForEmail(member.getEmail());
         log.info("Member password changed and sessions invalidated: memberId={}", memberId);
     }
 

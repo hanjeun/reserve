@@ -60,4 +60,17 @@ class StoreDirectoryWaitingTest {
         }
         verifyNoInteractions(entries);
     }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = WaitingIntakeMode.class, names = {"OFF", "BOTH"})
+    void expiredSuspensionNeverExposesInternalReasonsToPublicVisitors(WaitingIntakeMode mode) {
+        var owner = kr.it.reserve.member.entity.Member.builder().id(7L).build();
+        var store = Store.builder().id(31L).owner(owner).status(StoreStatus.SUSPENDED)
+                .suspendedUntil(LocalDateTime.now().minusDays(1)).suspendReason("synthetic internal moderation note")
+                .waitingIntakeMode(mode).build();
+        when(stores.findById(31L)).thenReturn(Optional.of(store));
+        assertThat(directory.getStore(31L).getSuspendReason()).isNull();
+        assertThat(directory.getStoreForEdit(31L, owner).getSuspendReason()).isEqualTo("synthetic internal moderation note");
+        assertThat(store.getSuspendReason()).isEqualTo("synthetic internal moderation note");
+    }
 }

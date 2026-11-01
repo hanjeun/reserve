@@ -2,12 +2,19 @@ package kr.it.reserve.member.mfa;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
+import jakarta.servlet.http.Cookie;
 import kr.it.reserve.config.jwt.TokenProvider;
+import kr.it.reserve.config.jwt.entity.RefreshToken;
+import kr.it.reserve.config.jwt.repository.RefreshTokenRepository;
+import kr.it.reserve.config.oauth2.*;
+import kr.it.reserve.config.oauth2.subject.OAuthSubjectSecurityService;
+import kr.it.reserve.config.service.TokenService;
 import kr.it.reserve.email.service.EmailService;
 import kr.it.reserve.global.common.ServiceTime;
 import kr.it.reserve.global.error.AuthException;
 import kr.it.reserve.member.entity.*;
 import kr.it.reserve.member.repository.MemberRepository;
+import kr.it.reserve.member.service.LoginMethodService;
 import kr.it.reserve.payment.dto.*;
 import kr.it.reserve.payment.entity.*;
 import kr.it.reserve.payment.repository.*;
@@ -19,6 +26,11 @@ import kr.it.reserve.store.entity.Store;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.*;
@@ -30,7 +42,7 @@ import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
 
 @SpringBootTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:security-completion-test;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=5000",
+        "spring.datasource.url=jdbc:h2:mem:security-completion-test;MODE=MySQL;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=5000",
         "reserve.mfa.enabled=true", "reserve.mfa.encryption-key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
         "reserve.settlement.test-enabled=true"})
 class SecurityCompletionSettlementTest {
@@ -42,8 +54,18 @@ class SecurityCompletionSettlementTest {
     @Autowired MfaProperties properties;
     @Autowired MfaChallengeRepository challenges;
     @Autowired MfaRecoveryCodeRepository recovery;
+    @Autowired MfaCredentialRepository credentials;
     @Autowired TokenProvider tokens;
     @Autowired MemberRepository members;
+    @Autowired kr.it.reserve.member.service.MemberService memberService;
+    @Autowired kr.it.reserve.member.repository.PasswordResetTokenRepository passwordResets;
+    @Autowired kr.it.reserve.global.ratelimit.RateLimiter limiter;
+    @Autowired LoginMethodService loginMethods;
+    @Autowired OAuthSessionIssuer oauthSessions;
+    @Autowired OAuth2AuthenticationSuccessHandler oauthSuccess;
+    @Autowired OAuthSubjectSecurityService subjects;
+    @Autowired TokenService tokenService;
+    @Autowired RefreshTokenRepository sessions;
     @Autowired ReservationRepository reservations;
     @Autowired ReservationService reservationService;
     @Autowired ReservationAutoCompletion completion;
@@ -54,6 +76,8 @@ class SecurityCompletionSettlementTest {
     @Autowired ObjectMapper json;
     @MockitoBean PortoneService pg;
     @MockitoBean EmailService email;
+    @MockitoBean kr.it.reserve.global.security.PwnedPasswordChecker passwordBreaches;
+    @MockitoBean LocalAdminMfaReset localAdminReset;
     private TransactionTemplate tx;
     private Member owner, customer;
     private Long storeId, reservationId, paymentId;
@@ -110,7 +134,7 @@ class SecurityCompletionSettlementTest {
         var manage=mfa.beginManage(current(owner),session.sessionId(),null,null);
         assertThatThrownBy(()->mfa.status(manage.value(),current(owner),"wrong-session")).isInstanceOf(AuthException.class);
         String code=MfaCrypto.code(enrollment.secret(),Instant.now().getEpochSecond()/30+1,6);
-        assertThat(mfa.verify(manage.value(),current(owner),session.sessionId(),"TOTP",code).verified()).isTrue();
+        assertThat(mfa.verify(manage.value(),current(owner),session.sessionId(),"TOTP",code).view().verified()).isTrue();
         assertThatThrownBy(()->mfa.disable(manage.value(),current(owner),session.sessionId())).isInstanceOf(AuthException.class);
         String last = mfa.settings(current(owner)).credentials().getFirst().id();
         assertThatThrownBy(() -> mfa.remove(manage.value(), current(owner), session.sessionId(), last)).isInstanceOf(AuthException.class);
@@ -248,10 +272,12 @@ class SecurityCompletionSettlementTest {
         var sid = tokens.verifyAuthentication(session.accessToken()).sessionId();
         var manage = mfa.beginManage(current(owner), sid, at, null, false);
         assertThat(mfa.status(manage.value(), current(owner), sid).verified()).isTrue();
-        assertThat(mfa.regenerateRecovery(manage.value(), current(owner), sid)).hasSize(10);
-        var renewed = mfa.finish(manage.value(), null, null).session();
+        var recoveryResult = mfa.regenerateRecovery(manage.value(), current(owner), sid);
+        assertThat(recoveryResult.codes()).hasSize(10);
+        var renewed = recoveryResult.session();
         assertThat(tokens.verifyAuthentication(renewed.accessToken()).loginMethod()).isEqualTo("OAUTH");
         assertThat(renewed.persistent()).isFalse();
+        assertThat(mfa.finish(manage.value(), current(owner), tokens.getSessionId(renewed.accessToken())).session()).isNull();
     }
 
     @Test void ordinaryMemberCanOptIntoPasskeyRegistrationAfterPrimaryAuthentication() throws Exception {
@@ -338,6 +364,355 @@ class SecurityCompletionSettlementTest {
         assertThatThrownBy(() -> mfa.beginManage(current(owner), sid, at, null)).isInstanceOf(AuthException.class);
     }
 
+    @Test void passkeyNameChangesPreserveCredentialsAndVerifiedSession() {
+        var manage = nameManagement(owner, true);
+        var phone = namedPasskey(owner, "패스키");
+        var pc = namedPasskey(owner, "개인 PC");
+        long version = current(owner).getAuthVersion();
+        var result = mfa.rename(manage.ticket().value(), current(owner), manage.sid(), phone.getId(), "  아이폰  ");
+        assertThat(result.credentials()).extracting(MfaService.CredentialView::name).contains("아이폰", "개인 PC", "인증 앱");
+        var saved = credentials.findById(phone.getId()).orElseThrow();
+        assertThat(saved.getCredentialId()).isEqualTo(phone.getCredentialId());
+        assertThat(saved.getPublicKeyCose()).isEqualTo(phone.getPublicKeyCose());
+        assertThat(credentials.findById(pc.getId())).isPresent();
+        assertThat(current(owner).getAuthVersion()).isEqualTo(version);
+        assertThat(tokens.verifyAuthentication(manage.session().accessToken()).sessionId()).isEqualTo(manage.sid());
+        assertThat(mfa.status(manage.ticket().value(), current(owner), manage.sid()).verified()).isTrue();
+    }
+    @Test void passkeyNameRejectsBlankOversizedAndControlNames() {
+        var manage = nameManagement(owner, true);
+        var key = namedPasskey(owner, "원래 이름");
+        for (String name : Arrays.asList(null, "", "   ", "n".repeat(81), "bad\nname"))
+            assertThatThrownBy(() -> mfa.rename(manage.ticket().value(), current(owner), manage.sid(), key.getId(), name)).isInstanceOf(AuthException.class);
+        assertThat(credentials.findById(key.getId()).orElseThrow().getName()).isEqualTo("원래 이름");
+    }
+    @Test void passkeyNameRequiresExistingAdministratorFactor() {
+        administrator(owner);
+        var manage = nameManagement(owner, false);
+        var key = namedPasskey(owner, "원래 이름");
+        assertThat(mfa.status(manage.ticket().value(), current(owner), manage.sid()).verified()).isFalse();
+        assertThatThrownBy(() -> mfa.rename(manage.ticket().value(), current(owner), manage.sid(), key.getId(), "새 이름")).isInstanceOf(AuthException.class);
+        assertThat(credentials.findById(key.getId()).orElseThrow().getName()).isEqualTo("원래 이름");
+    }
+    @Test void passkeyNameRejectsAnotherMemberAndTotpCredential() {
+        var manage = nameManagement(owner, true);
+        var foreign = namedPasskey(customer, "다른 계정");
+        var totp = credentials.findByMemberIdOrderByCreatedAtAsc(owner.getId()).stream()
+                .filter(value -> value.getKind() == MfaCredential.Kind.TOTP).findFirst().orElseThrow();
+        assertThatThrownBy(() -> mfa.rename(manage.ticket().value(), current(owner), manage.sid(), foreign.getId(), "새 이름")).isInstanceOf(AuthException.class);
+        assertThatThrownBy(() -> mfa.rename(manage.ticket().value(), current(owner), manage.sid(), totp.getId(), "새 이름")).isInstanceOf(AuthException.class);
+        assertThat(credentials.findById(foreign.getId()).orElseThrow().getName()).isEqualTo("다른 계정");
+        assertThat(credentials.findById(totp.getId()).orElseThrow().getName()).isEqualTo("인증 앱");
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void passkeyNameRequiresLiveTicket(boolean cancelled) {
+        var manage = nameManagement(owner, true);
+        var key = namedPasskey(owner, "원래 이름");
+        if (cancelled) mfa.cancel(manage.ticket().value());
+        else tx.executeWithoutResult(ignored -> challenges.findById(MfaCrypto.digest(manage.ticket().value())).orElseThrow()
+                .limitExpiry(LocalDateTime.now(Clock.systemUTC()).minusSeconds(1)));
+        assertThatThrownBy(() -> mfa.rename(manage.ticket().value(), current(owner), manage.sid(), key.getId(), "새 이름")).isInstanceOf(AuthException.class);
+        assertThat(credentials.findById(key.getId()).orElseThrow().getName()).isEqualTo("원래 이름");
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"ADMIN,false", "ADMIN,true", "BUSINESS,false", "BUSINESS,true", "USER,false", "USER,true"})
+    void oauthReauthenticationKeepsTheVerifiedDeviceAndLoginPreference(Role role, boolean persistent) throws Exception {
+        var original = socialSession(role, persistent, null);
+        var before = tokens.verifyAuthentication(original.accessToken());
+        var lifetime = sessions.findBySessionIdAndMemberId(before.sessionId(), owner.getId()).orElseThrow().getAbsoluteExpiresAt();
+        var devices = sessions.findByMemberId(owner.getId()).stream().map(RefreshToken::getSessionId).toList();
+        var proof = socialProof(original);
+        var response = new MockHttpServletResponse();
+
+        oauthSuccess.onAuthenticationSuccess(proof.request(), response,
+                UsernamePasswordAuthenticationToken.authenticated(proof.principal(), null, proof.principal().getAuthorities()));
+
+        assertThat(response.getRedirectedUrl()).endsWith("/my-page?security=verified");
+        assertThat(response.getHeaders("Set-Cookie").stream().anyMatch(value -> value.startsWith("mfa_ticket=") && !value.contains("Max-Age=0"))).isFalse();
+        String access = responseCookie(response, "access_token");
+        var after = tokens.verifyAuthentication(access);
+        assertThat(after.sessionId()).isEqualTo(before.sessionId());
+        assertThat(after.persistent()).isEqualTo(persistent);
+        assertThat(after.loginMethod()).isEqualTo(role == Role.ADMIN ? "OAUTH_MFA" : "OAUTH");
+        assertThat(sessions.findBySessionIdAndMemberId(after.sessionId(), owner.getId()).orElseThrow().getAbsoluteExpiresAt()).isEqualTo(lifetime);
+        assertThat(sessions.findByMemberId(owner.getId()).stream().map(RefreshToken::getSessionId)).containsExactlyInAnyOrderElementsOf(devices);
+        assertThat(loginMethods.status(current(owner), after.oauthAuthenticatedAt()).socialProofFresh()).isTrue();
+        assertThatThrownBy(() -> tokens.verifyAuthentication(original.accessToken())).isInstanceOf(AuthException.class);
+        assertThatThrownBy(() -> tokenService.refresh(original.refreshToken())).isInstanceOf(AuthException.class);
+        assertThat(tokens.verifyAuthentication(access).sessionId()).isEqualTo(before.sessionId());
+        var refreshed = tokenService.refresh(responseCookie(response, "refresh_token"));
+        assertThat(refreshed.persistent()).isEqualTo(persistent);
+        assertThat(tokens.verifyAuthentication(refreshed.accessToken()).sessionId()).isEqualTo(before.sessionId());
+        assertThat(LoginMethodService.consumeReauthentication(proof.request())).isFalse();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"ADMIN,PASSWORD_MFA", "ADMIN,PASSKEY", "BUSINESS,PASSKEY", "USER,PASSKEY"})
+    void oauthReauthenticationPreservesExistingStrongAuthentication(Role role, String method) {
+        var original = socialSession(role, false, method);
+        var proof = socialProof(original);
+        assertThat(LoginMethodService.consumeReauthentication(proof.request())).isTrue();
+        assertThat(LoginMethodService.consumeReauthentication(proof.request())).isFalse();
+        var result = oauthSessions.issueReauthenticated(proof.principal(), original.accessToken());
+        assertThat(result.mfaTicket()).isNull();
+        assertThat(tokens.verifyAuthentication(result.accessToken()).loginMethod()).isEqualTo("OAUTH_MFA");
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = Role.class, names = {"ADMIN", "BUSINESS", "USER"})
+    void oauthReauthenticationDoesNotTurnAQueryIntoMfaBypass(Role role) throws Exception {
+        socialSession(role, true, null);
+        tx.executeWithoutResult(ignored -> members.findById(owner.getId()).orElseThrow().setOauthAuthenticatedAt(subjects.now()));
+        var request = new MockHttpServletRequest();
+        request.setParameter("security", "verified");
+        var response = new MockHttpServletResponse();
+        var principal = new CustomOAuth2User(current(owner), Map.of("sub", current(owner).getProviderId()), "sub", false, Instant.now().plusSeconds(3600));
+        assertThatThrownBy(() -> oauthSessions.issueReauthenticated(principal, "synthetic-access"))
+                .isInstanceOf(OAuth2AuthenticationException.class);
+        oauthSuccess.onAuthenticationSuccess(request, response,
+                UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities()));
+        assertThat(response.getRedirectedUrl()).endsWith(role == Role.ADMIN ? "/login?mfa=1" : "/oauth2/callback");
+        assertThat(response.getHeaders("Set-Cookie").stream().anyMatch(value -> value.startsWith("mfa_ticket=") && !value.contains("Max-Age=0")))
+                .isEqualTo(role == Role.ADMIN);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void oauthReauthenticationCannotRestoreDeletedOrExpiredSession(boolean expired) {
+        var original = socialSession(Role.ADMIN, false, null);
+        var sid = tokens.verifyAuthentication(original.accessToken()).sessionId();
+        var proof = socialProof(original);
+        tx.executeWithoutResult(ignored -> {
+            var row = sessions.findBySessionIdForUpdate(sid, owner.getId()).orElseThrow();
+            if (expired) org.springframework.test.util.ReflectionTestUtils.setField(row, "expiresAt", LocalDateTime.now(Clock.systemUTC()).minusSeconds(1));
+            else sessions.delete(row);
+        });
+        assertThatThrownBy(() -> oauthSessions.issueReauthenticated(proof.principal(), original.accessToken()))
+                .isInstanceOf(OAuth2AuthenticationException.class);
+        assertThat(sessions.findBySessionIdAndMemberId(sid, owner.getId()).filter(row -> row.isLiveAt(LocalDateTime.now(Clock.systemUTC())))).isEmpty();
+    }
+
+    @Test void oauthReauthenticationRejectsAnotherAccountSession() {
+        var original = socialSession(Role.ADMIN, false, null);
+        var proof = socialProof(original);
+        var other = tokens.issueSession(current(customer), null);
+        assertThatThrownBy(() -> oauthSessions.issueReauthenticated(proof.principal(), other.accessToken()))
+                .isInstanceOf(OAuth2AuthenticationException.class);
+        assertThat(tokens.verifyAuthentication(other.accessToken()).member().getId()).isEqualTo(customer.getId());
+        assertThat(tokens.verifyAuthentication(original.accessToken()).member().getId()).isEqualTo(owner.getId());
+    }
+
+    @Test void oauthReauthenticationCannotPromoteAWeakSessionAfterRoleChange() {
+        var original = socialSession(Role.BUSINESS, false, null);
+        var proof = socialProof(original);
+        administrator(owner);
+        assertThatThrownBy(() -> oauthSessions.issueReauthenticated(proof.principal(), original.accessToken()))
+                .isInstanceOf(OAuth2AuthenticationException.class);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void oauthReauthenticationRejectsRevocationAfterTheProviderCallback(boolean versionChanged) {
+        var original = socialSession(Role.ADMIN, false, null);
+        var proof = socialProof(original);
+        tx.executeWithoutResult(ignored -> {
+            var member = members.findById(owner.getId()).orElseThrow();
+            if (versionChanged) member.rotateAuthVersion();
+            else member.setOauthSecurityRevokedAt(subjects.now().plusSeconds(1));
+        });
+        assertThatThrownBy(() -> oauthSessions.issueReauthenticated(proof.principal(), original.accessToken()))
+                .isInstanceOf(OAuth2AuthenticationException.class);
+    }
+
+    private TokenProvider.IssuedSession socialSession(Role role, boolean persistent, String method) {
+        return socialSession(role, persistent, method, AuthProvider.GOOGLE);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = AuthProvider.class, names = {"NAVER", "KAKAO"})
+    void oauthReauthenticationUsesTheSameOwnedSessionForOtherProviders(AuthProvider provider) {
+        var original = socialSession(Role.ADMIN, false, null, provider);
+        var sid = tokens.verifyAuthentication(original.accessToken()).sessionId();
+        var proof = socialProof(original);
+        var result = oauthSessions.issueReauthenticated(proof.principal(), original.accessToken());
+        assertThat(result.mfaTicket()).isNull();
+        assertThat(tokens.verifyAuthentication(result.accessToken()).sessionId()).isEqualTo(sid);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = Role.class, names = {"ADMIN", "BUSINESS", "USER"})
+    void oauthReauthenticationWorksBeforeEmailLoginIsAdded(Role role) {
+        var original = socialSession(role, false, null);
+        tx.executeWithoutResult(ignored -> members.findById(owner.getId()).orElseThrow().setPassword(null));
+        var proof = socialProof(original);
+        var result = oauthSessions.issueReauthenticated(proof.principal(), original.accessToken());
+        assertThat(result.mfaTicket()).isNull();
+        assertThat(loginMethods.status(current(owner), tokens.verifyAuthentication(result.accessToken()).oauthAuthenticatedAt()).socialProofFresh()).isTrue();
+    }
+
+    private TokenProvider.IssuedSession socialSession(Role role, boolean persistent, String method, AuthProvider provider) {
+        tx.executeWithoutResult(ignored -> members.findById(owner.getId()).orElseThrow().setRole(role));
+        enroll(owner);
+        tx.executeWithoutResult(ignored -> {
+            var member = members.findById(owner.getId()).orElseThrow();
+            member.setProvider(provider);
+            member.setProviderId("synthetic-provider-" + UUID.randomUUID());
+            member.setLoginMethodsManaged(true);
+            member.setOauthAuthenticatedAt(subjects.now().minusMinutes(10));
+        });
+        var member = current(owner);
+        String loginMethod = method != null ? method : role == Role.ADMIN ? "OAUTH_MFA" : "OAUTH";
+        LocalDateTime at = loginMethod.startsWith("OAUTH") ? member.getOauthAuthenticatedAt() : null;
+        return MfaPolicy.strong(loginMethod) ? tokens.issueVerifiedSession(member, at, loginMethod, persistent)
+                : tokens.issueSession(member, at, persistent);
+    }
+
+    private record SocialProof(MockHttpServletRequest request, CustomOAuth2User principal) { }
+    private SocialProof socialProof(TokenProvider.IssuedSession original) {
+        var request = new MockHttpServletRequest();
+        request.setCookies(new Cookie("access_token", original.accessToken()));
+        AuthProvider provider = current(owner).getProvider();
+        String registration = provider.name().toLowerCase(Locale.ROOT);
+        String url = loginMethods.beginOAuth(current(owner), provider, null, true, request);
+        request.setParameter("account_link", url.substring(url.indexOf('=') + 1));
+        String state = UUID.randomUUID().toString();
+        loginMethods.bindOAuth(request, OAuth2AuthorizationRequest.authorizationCode().authorizationUri("https://accounts.google.com/o/oauth2/v2/auth")
+                .clientId("synthetic-client").redirectUri("http://localhost/login/oauth2/code/" + registration).state(state)
+                .attributes(values -> values.put("registration_id", registration)).build());
+        request.setParameter("state", state);
+        var info = mock(OAuth2UserInfo.class);
+        when(info.getProviderId()).thenReturn(current(owner).getProviderId());
+        when(info.getEmail()).thenReturn(current(owner).getEmail());
+        Instant expires = Instant.now().plusSeconds(3600);
+        var member = loginMethods.completeOAuth(request, provider, info, "synthetic-provider-token",
+                subjects.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS), expires);
+        return new SocialProof(request, new CustomOAuth2User(member, Map.of("sub", member.getProviderId()), "sub", false, expires, true));
+    }
+
+    private String responseCookie(MockHttpServletResponse response, String name) {
+        String prefix = name + "=";
+        return response.getHeaders("Set-Cookie").stream().filter(value -> value.startsWith(prefix) && !value.contains("Max-Age=0"))
+                .map(value -> value.substring(prefix.length(), value.indexOf(';'))).findFirst().orElseThrow();
+    }
+
+    @Test void requestBoundaryReopeningManagementConsumesOnlyThePreviousOwnedTicket() {
+        administrator(owner);
+        var enrollment = enroll(owner);
+        var sid = tokens.verifyAuthentication(enrollment.session().accessToken()).sessionId();
+        var first = mfa.beginManage(current(owner), sid, null, null);
+        var replacement = mfa.beginManage(current(owner), sid, null, null, false, first.value());
+        assertThatThrownBy(() -> mfa.status(first.value(), current(owner), sid)).isInstanceOf(AuthException.class);
+        assertThat(mfa.status(replacement.value(), current(owner), sid).verified()).isFalse();
+        var secondDevice = tokens.issueVerifiedSession(current(owner), null, "PASSWORD_MFA", false);
+        var otherSid = tokens.verifyAuthentication(secondDevice.accessToken()).sessionId();
+        mfa.beginManage(current(owner), otherSid, null, null, false, replacement.value());
+        assertThat(mfa.status(replacement.value(), current(owner), sid).verified()).isFalse();
+    }
+
+    @Test void requestBoundaryWrongPrimaryProofNeverCancelsTheCurrentManagementTicket() {
+        var state = nameManagement(owner, false);
+        assertThatThrownBy(() -> mfa.beginManage(current(owner), state.sid(), null, "wrong-password", false, state.ticket().value()))
+                .isInstanceOf(AuthException.class);
+        assertThat(mfa.status(state.ticket().value(), current(owner), state.sid()).verified()).isTrue();
+    }
+
+    @Test void requestBoundarySuccessfulProofRefundsOnlyItsAttemptAndKeepsEarlierFailures() {
+        administrator(owner);
+        var enrollment = enroll(owner);
+        var sid = tokens.verifyAuthentication(enrollment.session().accessToken()).sessionId();
+        String key = "mfa-member:" + owner.getId();
+        for (int i = 0; i < kr.it.reserve.global.ratelimit.RateLimiter.Policy.CODE_VERIFY_ACCOUNT.capacity() - 1; i++)
+            assertThat(limiter.tryConsume(key, kr.it.reserve.global.ratelimit.RateLimiter.Policy.CODE_VERIFY_ACCOUNT)).isTrue();
+        var first = mfa.beginManage(current(owner), sid, null, null);
+        String code = MfaCrypto.code(enrollment.secret(), Instant.now().getEpochSecond() / 30 + 1, 6);
+        assertThat(mfa.verify(first.value(), current(owner), sid, "TOTP", code).view().verified()).isTrue();
+        var second = mfa.beginManage(current(owner), sid, null, null);
+        assertThatThrownBy(() -> mfa.verify(second.value(), current(owner), sid, "TOTP", "not-a-code"))
+                .isInstanceOf(MfaService.RejectedProof.class);
+        var third = mfa.beginManage(current(owner), sid, null, null);
+        assertThatThrownBy(() -> mfa.verify(third.value(), current(owner), sid, "TOTP", code))
+                .isInstanceOf(AuthException.class).hasMessageContaining("인증 시도가 많아요");
+    }
+
+    @Test void requestBoundaryChangingPasswordAtomicallyInvalidatesAnEarlierResetCodeAndEverySession() {
+        var session = tokens.issueSession(current(owner), null);
+        tx.executeWithoutResult(ignored -> {
+            var reset = kr.it.reserve.member.entity.PasswordResetToken.builder().email(owner.getEmail()).token("HASHED")
+                    .tokenHash(PASSWORD_HASH).expiresAt(LocalDateTime.now().plusMinutes(5)).build();
+            reset.markVerified();
+            passwordResets.save(reset);
+        });
+        var request = new kr.it.reserve.member.dto.PasswordChangeRequest();
+        request.setCurrentPassword("fixture-password"); request.setNewPassword("FixtureNext123!"); request.setNewPasswordConfirm("FixtureNext123!");
+        memberService.changePassword(owner.getId(), request);
+        assertThat(passwordResets.findIdsByEmail(owner.getEmail())).isEmpty();
+        assertThat(current(owner).getAuthVersion()).isEqualTo(1);
+        assertThatThrownBy(() -> tokens.verifyAuthentication(session.accessToken())).isInstanceOf(AuthException.class);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = Role.class, names = {"USER", "BUSINESS", "ADMIN"})
+    void recoveryRenewalKeepsTheBrowserUsableEvenWhenTheCodesPanelIsClosed(Role role) {
+        tx.executeWithoutResult(ignored -> members.findById(owner.getId()).orElseThrow().setRole(role));
+        var manage = nameManagement(owner, true);
+        var result = mfa.regenerateRecovery(manage.ticket().value(), current(owner), manage.sid());
+        assertThat(result.codes()).hasSize(10);
+        assertThat(result.toString()).isEqualTo("RecoveryRenewal[redacted]");
+        assertThatThrownBy(() -> tokens.verifyAuthentication(manage.session().accessToken())).isInstanceOf(AuthException.class);
+        var renewed = tokens.verifyAuthentication(result.session().accessToken());
+        assertThat(renewed.loginMethod()).isEqualTo(role == Role.ADMIN ? "PASSWORD_MFA" : "PASSWORD");
+        assertThatThrownBy(() -> mfa.status(manage.ticket().value(), current(owner), manage.sid())).isInstanceOf(AuthException.class);
+        assertThat(mfa.status(manage.ticket().value(), current(owner), renewed.sessionId()).verified()).isTrue();
+        mfa.cancel(manage.ticket().value());
+        assertThat(tokens.verifyAuthentication(result.session().accessToken()).sessionId()).isEqualTo(renewed.sessionId());
+        assertThat(mfa.beginManage(current(owner), renewed.sessionId(), null, "fixture-password")).isNotNull();
+    }
+
+    @Test void localLastCredentialResetStillRequiresProofAndNewAdministratorEnrollment() {
+        administrator(owner);
+        var used = new java.util.concurrent.atomic.AtomicBoolean();
+        when(localAdminReset.available()).thenAnswer(ignored -> !used.get());
+        when(localAdminReset.claim()).thenAnswer(ignored -> used.compareAndSet(false, true));
+        var manage = nameManagement(owner, false);
+        String credential = mfa.settings(current(owner)).credentials().getFirst().id();
+        assertThat(mfa.settings(current(owner)).localAdminResetAvailable()).isTrue();
+        assertThatThrownBy(() -> mfa.remove(manage.ticket().value(), current(owner), manage.sid(), credential)).isInstanceOf(AuthException.class);
+        verify(localAdminReset, never()).claim();
+        tx.executeWithoutResult(ignored -> challenges.findById(MfaCrypto.digest(manage.ticket().value())).orElseThrow().verified());
+        mfa.remove(manage.ticket().value(), current(owner), manage.sid(), credential);
+        assertThat(mfa.settings(current(owner)).enabled()).isFalse();
+        assertThat(mfa.settings(current(owner)).required()).isTrue();
+        assertThat(mfa.settings(current(owner)).localAdminResetAvailable()).isFalse();
+        assertThat(mfa.beginLogin(current(owner), null)).isNotNull();
+        assertThatThrownBy(() -> tokens.issueSession(current(owner), null)).isInstanceOf(AuthException.class);
+        var enrollment = enroll(owner);
+        var sid = tokens.getSessionId(enrollment.session().accessToken());
+        var next = mfa.beginManage(current(owner), sid, null, null);
+        tx.executeWithoutResult(ignored -> challenges.findById(MfaCrypto.digest(next.value())).orElseThrow().verified());
+        String remaining = mfa.settings(current(owner)).credentials().getFirst().id();
+        assertThatThrownBy(() -> mfa.remove(next.value(), current(owner), sid, remaining)).isInstanceOf(AuthException.class);
+        assertThat(mfa.settings(current(owner)).credentials()).hasSize(1);
+    }
+
+    private record NameManagement(MfaService.Ticket ticket, String sid, TokenProvider.IssuedSession session) { }
+    private NameManagement nameManagement(Member member, boolean verified) {
+        var enrollment = enroll(member);
+        var sid = tokens.verifyAuthentication(enrollment.session().accessToken()).sessionId();
+        var ticket = mfa.beginManage(current(member), sid, null, "fixture-password");
+        if (verified && current(member).isAdmin()) mfa.verify(ticket.value(), current(member), sid, "TOTP",
+                MfaCrypto.code(enrollment.secret(), Instant.now().getEpochSecond() / 30 + 1, 6));
+        return new NameManagement(ticket, sid, enrollment.session());
+    }
+    private MfaCredential namedPasskey(Member member, String name) {
+        return tx.execute(ignored -> {
+            String id = "synthetic-" + UUID.randomUUID();
+            var value = MfaCredential.passkey(member.getId(), name, id, MfaCrypto.digest(id), "synthetic-public-key", 0,
+                    null, false, false, LocalDateTime.now(Clock.systemUTC()));
+            return credentials.save(value);
+        });
+    }
+
     private Member member(Role role) {
         Member member=Member.builder().name("합성 회원").email(UUID.randomUUID()+"@example.test").password(PASSWORD_HASH)
                 .role(role).termsAgreed(true).emailNotificationEnabled(false).build();
@@ -388,6 +763,34 @@ class SecurityCompletionSettlementTest {
         assertThatThrownBy(()->mfa.verify(replay.value(),null,null,"BACKUP",enrollment.codes().getFirst())).isInstanceOf(MfaService.RejectedProof.class);
         assertThat(recovery.countByMemberId(owner.getId())).isEqualTo(9);
         assertThat(challenges.findById(MfaCrypto.digest(replay.value())).orElseThrow().getFailures()).isEqualTo(1);
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"ADMIN,false", "ADMIN,true", "BUSINESS,false", "USER,true"})
+    void recoveryProofContinuesOnlyTheBoundManagementSession(Role role, boolean persistent) {
+        tx.executeWithoutResult(ignored -> members.findById(owner.getId()).orElseThrow().setRole(role));
+        var enrollment = enroll(owner);
+        var original = current(owner);
+        String oldSid = tokens.getSessionId(enrollment.session().accessToken());
+        var ticket = mfa.beginManage(original, oldSid, null, "fixture-password", persistent);
+        var expiry = mfa.status(ticket.value(), original, oldSid).expiresAt();
+
+        var verified = mfa.verify(ticket.value(), original, oldSid, "BACKUP", enrollment.codes().getFirst());
+
+        assertThat(verified.view().purpose()).isEqualTo("MANAGE");
+        assertThat(verified.view().verified()).isTrue();
+        assertThat(verified.view().expiresAt()).isEqualTo(expiry);
+        assertThat(verified.session().persistent()).isEqualTo(persistent);
+        var replacement = tokens.verifyAuthentication(verified.session().accessToken());
+        assertThat(replacement.loginMethod()).isEqualTo(role == Role.ADMIN ? "PASSWORD_MFA" : "PASSWORD");
+        assertThatThrownBy(() -> tokens.verifyAuthentication(enrollment.session().accessToken())).isInstanceOf(AuthException.class);
+        assertThatThrownBy(() -> mfa.status(ticket.value(), original, oldSid)).isInstanceOf(AuthException.class);
+        assertThat(mfa.status(ticket.value(), current(owner), replacement.sessionId()).verified()).isTrue();
+        assertThatThrownBy(() -> mfa.verify(ticket.value(), current(owner), replacement.sessionId(), "BACKUP", enrollment.codes().getFirst()))
+                .isInstanceOf(MfaService.RejectedProof.class);
+        assertThat(mfa.beginPasskey(ticket.value(), current(owner), replacement.sessionId(), true)).isNotBlank();
+        assertThat(recovery.countByMemberId(owner.getId())).isEqualTo(9);
+        assertThat(challenges.findById(MfaCrypto.digest(ticket.value())).orElseThrow().getBoundSessionId()).isEqualTo(replacement.sessionId());
+        assertThat(mfa.finish(ticket.value(), current(owner), replacement.sessionId()).session()).isNull();
     }
     @Test void concurrentTotpRequestsConsumeOneStepOnly() throws Exception {
         administrator(owner);

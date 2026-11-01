@@ -10,7 +10,7 @@ export default function ChatRetentionNotice({ visible }) {
     const { shouldRender, isClosing } = useExitAnimation(visible, reducedMotion ? 0 : 220);
     if (!shouldRender) return null;
     return <div className={`reserve-chat-retention-notice-wrap${isClosing ? ' is-closing' : ''}`}
-        aria-hidden={!visible || undefined} inert={!visible ? true : undefined}>
+        inert={!visible ? true : undefined}>
         <div className="reserve-chat-retention-notice-inner">
             <p className="reserve-chat-retention-notice">
                 일반 글·사진은 90일 보관해요. 신고·분쟁 자료는 별도 보관하며,

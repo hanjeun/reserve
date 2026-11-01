@@ -16,9 +16,9 @@ async function mockStorePreview(page, { authenticated = false, storeOverrides = 
     await page.route('**/api/**', route => {
         const path = new URL(route.request().url()).pathname;
         if (!path.startsWith('/api/')) return route.continue();
-        if (path === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: authenticated ? { id: 41, name: '레이아웃 확인 사용자', role: 'USER', termsAgreed: true } : null, refreshPossible: false } } }); }
+        if (path === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: authenticated ? { id: 41, name: '레이아웃 확인 사용자', email: 'layout@example.test', role: 'USER', termsAgreed: true } : null, refreshPossible: false } } }); }
         if (path === '/api/member/me') return route.fulfill(authenticated
-            ? { json: { success: true, data: { id: 41, name: '레이아웃 확인 사용자', role: 'USER', termsAgreed: true } } }
+            ? { json: { success: true, data: { id: 41, name: '레이아웃 확인 사용자', email: 'layout@example.test', role: 'USER', termsAgreed: true } } }
             : { status: 401, json: { success: false, message: '로그인이 필요합니다.' } });
         if (path === '/api/auth/refresh') return route.fulfill({ status: 401, json: { success: false, message: '로그인이 필요합니다.' } });
         return route.fulfill({ json: { success: true, data: path === '/api/stores/81' ? responseStore : [] } });
@@ -149,8 +149,9 @@ test('first-open motion survives a lost appear-active class', async ({ page }) =
     }), JSON.stringify(result)).toBe(true);
 });
 
-test('store quick actions share one horizontal title row without covering a long description', async ({ page }) => {
+for (const authenticated of [false, true]) test(`store quick actions respect authentication and share one title row (${authenticated})`, async ({ page }) => {
     await mockStorePreview(page, {
+        authenticated,
         storeOverrides: {
             name: '아주 긴 이름을 가진 예약 가게 레이아웃 확인점',
             description: '가게 소개가 길어져도 제목 옆의 빠른 작업 아이콘과 겹치지 않아야 합니다. '.repeat(4),
@@ -167,7 +168,9 @@ test('store quick actions share one horizontal title row without covering a long
     const titleRow = page.locator('.reserve-store-identity-title-row');
     const actions = titleRow.locator('.reserve-store-identity-actions');
     const actionItems = actions.locator('.reserve-favorite-button, .reserve-store-contact-action');
-    await expect(actionItems).toHaveCount(2);
+    await expect(actionItems).toHaveCount(authenticated ? 3 : 1);
+    await expect(actions.locator('.reserve-favorite-button')).toHaveCount(authenticated ? 1 : 0);
+    await expect(actions.getByRole('button', { name: '가게에 채팅 문의하기' })).toHaveCount(authenticated ? 1 : 0);
     await expect(actions).toHaveCSS('flex-direction', 'row');
     for (const item of await actionItems.all()) {
         const box = await item.boundingBox();

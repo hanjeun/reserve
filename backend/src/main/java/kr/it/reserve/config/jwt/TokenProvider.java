@@ -74,6 +74,7 @@ public class TokenProvider {
     private final MemberRepository memberRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     @org.springframework.beans.factory.annotation.Autowired private kr.it.reserve.member.mfa.MfaPolicy mfaPolicy;
+    @org.springframework.beans.factory.annotation.Autowired(required = false) private kr.it.reserve.global.security.ip.IpLoginProtection ipProtection;
     @PersistenceContext private EntityManager entityManager;
     private SecretKey cachedSecretKey;
     private Map<String, SecretKey> verificationKeys = Map.of();
@@ -135,6 +136,9 @@ public class TokenProvider {
                 || method.startsWith("OAUTH") && (current.getProvider() != provider
                     || !Objects.equals(current.getProviderId(), providerId))) throw expired();
 
+        Runnable rememberNetwork = ipProtection == null ? () -> { }
+                : ipProtection.beforeSession(current, kr.it.reserve.member.mfa.MfaPolicy.strong(method));
+
         LocalDateTime now = utcNow().truncatedTo(ChronoUnit.SECONDS);
         LocalDateTime absolute = now.plus(jwtProperties.getAbsoluteSessionLifetime());
         LocalDateTime expires = earlier(now.plus(jwtProperties.getRefreshTokenExpiration()), absolute);
@@ -146,6 +150,12 @@ public class TokenProvider {
         List<RefreshToken> devices = refreshTokenRepository.findByMemberIdForUpdate(current.getId());
         for (int i = 0; i < devices.size() - 5; i++) refreshTokenRepository.delete(devices.get(i));
         refreshTokenRepository.flush();
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override public void afterCommit() { rememberNetwork.run(); }
+                    });
+        } else rememberNetwork.run();
         return new IssuedSession(accessForSession(row, persistence), refresh, Duration.between(now, expires), !Boolean.FALSE.equals(persistence));
     }
 
@@ -173,6 +183,27 @@ public class TokenProvider {
         return new RefreshToken(member.getId(), UUID.randomUUID().toString(), UUID.randomUUID().toString(),
                 jwtProperties.getActiveKeyId(), now, earlier(now.plus(jwtProperties.getRefreshTokenExpiration()), absolute),
                 absolute, member.getAuthVersion(), at, method == null ? loginMethod(member, at) : method);
+    }
+
+    /** 기존 세션의 인증 강도·기기 수·절대 만료를 보존하며 소셜 계정 확인 정보만 갱신한다. */
+    @Transactional
+    public IssuedSession reauthenticateOAuth(Member authenticated, String accessToken, LocalDateTime at) {
+        VerifiedAuthentication previous = verifyAuthentication(accessToken);
+        if (!Objects.equals(authenticated.getId(), previous.member().getId()) || at == null) throw expired();
+        int expectedVersion = authenticated.getAuthVersion();
+        Member current = memberRepository.findActiveByIdForUpdate(authenticated.getId()).orElseThrow(TokenProvider::expired);
+        entityManager.flush();
+        entityManager.refresh(current, LockModeType.PESSIMISTIC_WRITE);
+        RefreshToken row = refreshTokenRepository.findBySessionIdForUpdate(previous.sessionId(), current.getId()).orElseThrow(TokenProvider::expired);
+        entityManager.refresh(row, LockModeType.PESSIMISTIC_WRITE);
+        if (current.isDeleted() || current.isSuspended() || current.getAuthVersion() != expectedVersion
+                || row.getAuthVersion() != current.getAuthVersion() || !row.isLiveAt(utcNow())
+                || !Objects.equals(row.getLoginMethod(), previous.loginMethod())
+                || !Objects.equals(row.getOauthAuthenticatedAt(), previous.oauthAuthenticatedAt())
+                || !isLoginSessionCurrent(current, row.getOauthAuthenticatedAt(), row.getLoginMethod())
+                || !isOAuthMember(current) || !isOAuthSessionCurrent(current, at)) throw expired();
+        row.reauthenticateOAuth(at, kr.it.reserve.member.mfa.MfaPolicy.strong(row.getLoginMethod()));
+        return rotateSession(row, previous.persistent());
     }
 
     /** 호출부가 회원→세션 잠금을 보유해야 한다. 저장된 메타데이터로 현재 리프레시 토큰을 동일하게 재구성한다. */

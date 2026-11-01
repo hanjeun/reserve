@@ -134,6 +134,77 @@ class ImageFileValidatorTest {
         return new MockMultipartFile("image", "photo.webp", "image/webp", chunk("RIFF", body.toByteArray()));
     }
 
+    @Test
+    void acceptsAnimatedGifAndPreservesItsOriginalFrames() throws Exception {
+        byte[] bytes = animatedGif();
+        var image = ImageFileValidator.inspect(new MockMultipartFile("image", "animated.gif", "image/gif", bytes));
+        assertThat(image.bytes()).isEqualTo(bytes);
+        assertThat(image.width()).isEqualTo(2);
+        assertThat(image.height()).isEqualTo(2);
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints = {8193, 65535})
+    void rejectsOversizedGifFramesAfterTheFirstImage(int dimension) throws Exception {
+        byte[] bytes = animatedGif();
+        int second = secondGifFrame(bytes);
+        littleEndian(bytes, second + 5, dimension, 2);
+        assertThatThrownBy(() -> ImageFileValidator.inspect(new MockMultipartFile("image", "hidden-frame.gif", "image/gif", bytes)))
+                .isInstanceOf(FileException.class);
+        assertThatThrownBy(() -> ImageFileValidator.readDimensions(new MockMultipartFile("image", "hidden-frame.gif", "image/gif", bytes)))
+                .isInstanceOf(FileException.class);
+    }
+
+    @Test
+    void rejectsGifFrameOffsetsOutsideTheLogicalCanvas() throws Exception {
+        byte[] bytes = animatedGif();
+        littleEndian(bytes, secondGifFrame(bytes) + 1, 2, 2);
+        assertThatThrownBy(() -> ImageFileValidator.inspect(new MockMultipartFile("image", "outside.gif", "image/gif", bytes)))
+                .isInstanceOf(FileException.class);
+    }
+
+    @Test
+    void validatesGifLogicalCanvasEvenWhenTheFirstFrameIsSmall() throws Exception {
+        byte[] bytes = animatedGif();
+        littleEndian(bytes, 6, ImageFileValidator.MAX_DIMENSION + 1, 2);
+        assertThatThrownBy(() -> ImageFileValidator.inspect(new MockMultipartFile("image", "canvas.gif", "image/gif", bytes)))
+                .isInstanceOf(FileException.class);
+    }
+
+    @Test
+    void acceptsPartialGifFramesWithinALargerLogicalCanvas() throws Exception {
+        byte[] bytes = animatedGif();
+        littleEndian(bytes, 6, 4, 2);
+        littleEndian(bytes, 8, 4, 2);
+        assertThat(ImageFileValidator.inspect(new MockMultipartFile("image", "partial.gif", "image/gif", bytes)).contentType()).isEqualTo("image/gif");
+    }
+
+    @Test
+    void rejectsGifWithATruncatedLaterFrame() throws Exception {
+        byte[] bytes = animatedGif();
+        byte[] truncated = java.util.Arrays.copyOf(bytes, bytes.length - 3);
+        assertThatThrownBy(() -> ImageFileValidator.inspect(new MockMultipartFile("image", "truncated.gif", "image/gif", truncated)))
+                .isInstanceOf(FileException.class);
+    }
+
+    private byte[] animatedGif() throws Exception {
+        var output = new ByteArrayOutputStream();
+        ImageIO.write(new BufferedImage(2, 2, BufferedImage.TYPE_INT_RGB), "gif", output);
+        byte[] single = output.toByteArray();
+        int first = 13 + ((single[10] & 0x80) == 0 ? 0 : 3 * (1 << ((single[10] & 7) + 1)));
+        if (single[first] != 0x2c || single[single.length - 1] != 0x3b) throw new IllegalStateException("Synthetic GIF layout changed");
+        output.reset();
+        output.write(single, 0, single.length - 1);
+        output.write(single, first, single.length - first);
+        return output.toByteArray();
+    }
+
+    private int secondGifFrame(byte[] bytes) throws Exception {
+        var output = new ByteArrayOutputStream();
+        ImageIO.write(new BufferedImage(2, 2, BufferedImage.TYPE_INT_RGB), "gif", output);
+        return output.size() - 1;
+    }
+
     private byte[] canvas(int width, int height) {
         byte[] payload = new byte[10];
         littleEndian(payload, 4, width - 1, 3);

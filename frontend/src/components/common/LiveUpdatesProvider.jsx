@@ -22,7 +22,7 @@ export default function LiveUpdatesProvider({ children }) {
         let serverOffset = 0;
         const versions = new Map();
         const current = () => !stopped && isCurrentSession(session)
-            && useAuthStore.getState().sessionRevision === revision;
+            && useAuthStore.getState().sessionRevision === revision && !useAuthStore.getState().authRestoring;
         const refreshQueries = createLiveQueryRefresh(client, current);
         const scheduleBoundary = () => {
             clearTimeout(boundary); boundary = undefined;
@@ -35,7 +35,7 @@ export default function LiveUpdatesProvider({ children }) {
         };
         const flush = () => {
             pending = undefined;
-            if (!current() || document.hidden) return;
+            if (!current() || document.hidden || recovering) return;
             const updates = queued; queued = [];
             const mode = resync; resync = undefined;
             if (mode === 'periodic') refreshQueries(updates, true, { periodic: true });
@@ -55,14 +55,17 @@ export default function LiveUpdatesProvider({ children }) {
             const delay = Math.min(60_000, 5_000 * 2 ** Math.min(failures++, 4));
             reconnect = setTimeout(recover, delay + Math.floor(Math.random() * 1_000));
         };
-        const recover = async () => {
+        const recover = async (refreshOnReturn = false) => {
             reconnect = undefined;
             if (!available() || stream || recovering) return;
             recovering = true;
             try {
                 // EventSource는 401 상태를 알려주지 않으므로 기존 인증 관문에서 갱신·만료를 확인해요.
                 if (signedIn && !await useAuthStore.getState().checkAuth(true, { rethrowTransient: true, timeout: 8000 })) return;
-                if (available() && !stream) connect();
+                if (available() && !stream) {
+                    if (refreshOnReturn) { schedule('full'); scheduleBoundary(); }
+                    connect();
+                }
             } catch {
                 if (available()) retry();
             } finally { recovering = false; }
@@ -106,7 +109,10 @@ export default function LiveUpdatesProvider({ children }) {
             connection.addEventListener('session-ended', () => {
                 if (!active()) return;
                 connection.close();
-                useAuthStore.getState().expireSession();
+                if (!signedIn) { useAuthStore.getState().expireSession(); return; }
+                stream = undefined;
+                setStatus(previous => previous.connected ? { ...previous, connected: false } : previous);
+                void recover(true);
             });
             connection.onerror = () => {
                 if (!active()) return;
@@ -123,10 +129,9 @@ export default function LiveUpdatesProvider({ children }) {
             stream?.close(); stream = undefined;
             setStatus(previous => previous.connected ? { ...previous, connected: false } : previous);
             if (document.hidden) return;
-            schedule('full'); scheduleBoundary();
             if (recovering) return;
-            if (failures) void recover();
-            else connect();
+            if (signedIn || failures) void recover(true);
+            else { schedule('full'); scheduleBoundary(); connect(); }
         };
         const unsubscribe = client.getQueryCache().subscribe(event => {
             if (event.type === 'updated' && ['public-promotions', 'store-news'].includes(event.query.queryKey[0])) scheduleBoundary();

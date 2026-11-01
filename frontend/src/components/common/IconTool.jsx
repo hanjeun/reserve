@@ -6,7 +6,7 @@ import useMessage from '../../hooks/useMessage';
 import { SpinIndicator } from './Loading';
 
 /** 44px 터치 영역 안에 20px 아이콘·32px 면을 표시한다. 모양은 명시한 역할로 정한다. */
-export default function IconTool({ label, icon, onClick, to, unavailableReason = '', active = false, expanded, controls, disabled = false, loading = false, kind = 'tool', tooltip = kind !== 'navigation' }) {
+export default function IconTool({ label, icon, onClick, to, unavailableReason = '', active = false, expanded, controls, disabled = false, loading = false, htmlType = 'button', kind = 'tool', tooltip = kind !== 'navigation' }) {
     const descriptionId = useId();
     const { message } = useMessage();
     const blocked = disabled || loading;
@@ -25,7 +25,7 @@ export default function IconTool({ label, icon, onClick, to, unavailableReason =
     const content = loading ? <span className="reserve-icon-tool-loading" aria-hidden="true"><SpinIndicator /></span> : icon;
     return <Tooltip title={unavailableReason || label} disabled={expanded === true || !tooltip && !unavailableReason}>
         <span className="reserve-icon-tool-wrapper">
-            {to && !blocked ? <Link {...props} to={to} onClick={click}>{content}</Link> : <button {...props} type="button"
+            {to && !blocked ? <Link {...props} to={to} onClick={click}>{content}</Link> : <button {...props} type={htmlType}
                 disabled={blocked} onClick={click}>{content}</button>}
             {unavailableReason && <span id={descriptionId} className="reserve-discovery-visually-hidden">{unavailableReason}</span>}
         </span>
@@ -33,4 +33,4 @@ export default function IconTool({ label, icon, onClick, to, unavailableReason =
 }
 IconTool.propTypes = { label: PropTypes.string.isRequired, icon: PropTypes.node.isRequired,
     onClick: PropTypes.func, to: PropTypes.string, unavailableReason: PropTypes.string, active: PropTypes.bool, expanded: PropTypes.bool, controls: PropTypes.string,
-    disabled: PropTypes.bool, loading: PropTypes.bool, kind: PropTypes.oneOf(['navigation', 'tool']), tooltip: PropTypes.bool };
+    disabled: PropTypes.bool, loading: PropTypes.bool, htmlType: PropTypes.oneOf(['button', 'submit']), kind: PropTypes.oneOf(['navigation', 'tool']), tooltip: PropTypes.bool };

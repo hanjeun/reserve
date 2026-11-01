@@ -36,6 +36,66 @@ test('target app creation checks physical RAM immediately before compose and nev
 });
 
 
+test('IP protection deployment keeps activation explicit and rejects missing prerequisites before pull', () => {
+    const start = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
+    const names = ['RESERVE_SECURITY_IP_PROTECTION_ENABLED',
+        'RESERVE_SECURITY_IP_PROTECTION_FINGERPRINT_KEY', 'RESERVE_SECURITY_IP_PROTECTION_TRUSTED_PROXIES'];
+    assert.match(start.env[names[0]], /vars\.RESERVE_SECURITY_IP_PROTECTION_ENABLED \|\| 'false'/);
+    assert.match(start.env[names[1]], /secrets\.RESERVE_SECURITY_IP_PROTECTION_FINGERPRINT_KEY/);
+    assert.match(start.env[names[2]], /vars\.RESERVE_SECURITY_IP_PROTECTION_TRUSTED_PROXIES/);
+    for (const name of names) {
+        assert.ok(start.with.envs.split(',').includes(name));
+        for (const side of ['blue', 'green']) {
+            assert.ok(read(`docker-compose-${side}.yml`).includes(`${name}=\${${name}:-`));
+        }
+    }
+    const source = start.with.script;
+    const beginning = source.indexOf('case "$RESERVE_SECURITY_IP_PROTECTION_ENABLED"');
+    const ending = source.indexOf('case "$OAUTH_PROVIDER_TOKEN_ENCRYPTION_ENABLED"', beginning);
+    assert.ok(beginning >= 0 && ending > beginning && ending < source.indexOf('sudo docker pull'));
+    const run = overrides => spawnSync(process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash',
+        ['-c', 'set -eu\n' + source.slice(beginning, ending)], { encoding: 'utf8', timeout: 5000,
+            env: { ...process.env, RESERVE_SECURITY_IP_PROTECTION_ENABLED: 'false', RESERVE_REDIS_ENABLED: 'false',
+                RESERVE_SECURITY_IP_PROTECTION_FINGERPRINT_KEY: '', RESERVE_SECURITY_IP_PROTECTION_TRUSTED_PROXIES: '', ...overrides } });
+    assert.equal(run({}).status, 0);
+    assert.notEqual(run({ RESERVE_SECURITY_IP_PROTECTION_ENABLED: 'unknown' }).status, 0);
+    const enabled = { RESERVE_SECURITY_IP_PROTECTION_ENABLED: 'true', RESERVE_REDIS_ENABLED: 'true', RESERVE_REDIS_USERNAME: 'reserve_app',
+        RESERVE_SECURITY_IP_PROTECTION_FINGERPRINT_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+        RESERVE_SECURITY_IP_PROTECTION_TRUSTED_PROXIES: '172.30.30.2/32' };
+    assert.equal(run(enabled).status, 0);
+    for (const [name, value] of [[names[1], ''], [names[2], ''], [names[2], '172.30.30.0/29'],
+        ['RESERVE_REDIS_ENABLED', 'false'], ['RESERVE_REDIS_USERNAME', 'default']]) {
+        assert.notEqual(run({ ...enabled, [name]: value }).status, 0);
+    }
+});
+
+test('proxy boundary and Redis readiness run before target startup without replacing the memory guard', () => {
+    const step = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
+    for (const action of ['check-network', 'check-redis']) {
+        const check = step.with.script.indexOf('prepare-ip-protection.py ' + action);
+        assert.ok(check > 0 && check < step.with.script.indexOf('check-deployment-memory.sh'));
+    }
+    for (const side of ['blue', 'green']) {
+        const compose = require('js-yaml').load(read(`docker-compose-${side}.yml`));
+        const port = side === 'blue' ? 8080 : 8081;
+        assert.deepEqual(compose.services[side].ports, [`127.0.0.1:${port}:${port}`]);
+        assert.equal(compose.networks['reserve-ingress'].external, true);
+        assert.deepEqual(compose.services[side].networks['reserve-ingress'].aliases, [`reserve-${side}-ingress`]);
+        assert.match(read('nginx/default.conf'), new RegExp(`server reserve-${side}-ingress:${port} resolve;`));
+    }
+    const nginx = read('nginx/default.conf');
+    assert.match(nginx, /resolver 127\.0\.0\.11 valid=5s ipv6=off;/);
+    assert.doesNotMatch(nginx, /server PRIVATE_IP/);
+    const redis = require('js-yaml').load(read('docker-compose-redis.yml')).services.redis;
+    assert.ok(redis.command.includes('--aclfile'));
+    assert.ok(redis.volumes.some(volume => volume.target === '/usr/local/etc/redis/users.acl' && volume.read_only));
+    const boundary = deployment.steps.findIndex(entry => entry.name === 'Verify target network boundary');
+    assert.ok(boundary > deployment.steps.indexOf(step));
+    assert.ok(boundary < deployment.steps.findIndex(entry => entry.name === 'Health check (new server)'));
+    assert.match(deployment.steps[boundary].with.script, /check-target --target/);
+    assert.equal(deployment.steps[boundary]['continue-on-error'], undefined);
+});
+
 test('v11 deployment forwards disabled feature flags and requires a dedicated MFA recovery key', () => {
     const start = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
     for (const name of ['RESERVE_MFA_ENABLED', 'RESERVE_MFA_RP_ID', 'RESERVE_MFA_ORIGINS', 'RESERVE_MFA_ENCRYPTION_KEY',

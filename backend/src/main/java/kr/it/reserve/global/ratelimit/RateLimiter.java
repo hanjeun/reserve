@@ -44,6 +44,11 @@ public class RateLimiter {
         CODE_VERIFY(30, Duration.ofMinutes(10)),
         /** IP·계정별 제한을 함께 적용한다. 계정 이메일은 소문자로 정규화해 대소문자 변경으로 우회하지 못하게 한다. */
         CODE_VERIFY_ACCOUNT(20, Duration.ofMinutes(10)),
+        /** 화면 열기·조회·취소는 실제 인증 응답의 한도를 소모하지 않는다. */
+        MFA_LIFECYCLE(120, Duration.ofMinutes(1)),
+        MFA_LIFECYCLE_ACCOUNT(30, Duration.ofMinutes(1)),
+        MFA_CANCEL(60, Duration.ofMinutes(1)),
+        OAUTH_START(30, Duration.ofMinutes(1)),
         // 주소 검색은 서버가 보관한 Kakao REST 키로 카카오 로컬 API를 프록시하는 엔드포인트다.
         // 인증은 걸려 있지만(SecurityConfig) 계정 하나만 있으면 카카오 API 쿼터를 무제한 소진시킬 수
         // 있었기 때문에 IP 기준 상한을 둔다. 주소 검색은 타이핑 중 디바운스(300ms)로 호출되는 UI라
@@ -99,20 +104,18 @@ public class RateLimiter {
     // 이메일·IP·내부 식별자보다 긴 요청 원문을 버킷 키로 보관하지 않는다.
     private static final int MAX_KEY_LENGTH = 512;
 
-    /**
-     * 스윕이 못 따라갈 만큼 폭증했을 때의 안전밸브 임계.
-     *
-     * <p>엔트리 하나는 키(문자열 ~40B) + Bucket4j 버킷(~100B) 수준이라 50만 개라도 대략 70MB다.
-     * {@code -Xmx512m}에서 감당할 수 있는 범위이므로, 임계를 낮게 잡고 공격적으로 비우는 것보다
-     * 높게 잡고 최소한만 비우는 쪽이 안전하다.
-     */
+    /** 메모리 상한에서는 기존 제한을 보존하고 새 키를 거절한다. */
     private static final int MAX_ENTRIES = 500_000;
-
-    /** 활성 공격자의 제한을 초기화하지 않도록 버킷 전체를 비우지 않고 오래된 일부만 제거한다. */
-    private static final int EVICTION_DIVISOR = 2;
 
     // key = "POLICY_NAME:IP주소"
     private final ConcurrentHashMap<String, Entry> buckets = new ConcurrentHashMap<>();
+    private final int maxEntries;
+
+    public RateLimiter() { this(MAX_ENTRIES); }
+    RateLimiter(int maxEntries) {
+        if (maxEntries < 1) throw new IllegalArgumentException("Rate limiter capacity must be positive");
+        this.maxEntries = maxEntries;
+    }
 
     @Autowired(required = false)
     private RedisRequestLimiter sharedWaitingLimits;
@@ -134,11 +137,19 @@ public class RateLimiter {
      */
     public boolean tryConsume(String key, Policy policy) {
         if (key == null || key.length() > MAX_KEY_LENGTH) return false;
-        Entry entry = buckets.computeIfAbsent(
-                policy.name() + ":" + key,
-                k -> new Entry(newBucket(policy))
-        );
-        entry.lastAccessMs.set(System.currentTimeMillis());
+        String bucketKey = policy.name() + ":" + key;
+        Entry entry = touchEntry(bucketKey);
+        if (entry == null) {
+            // 새 키만 직렬화한다. 상한에서 활성 제한을 버리지 않고 새 키를 거절한다.
+            synchronized (buckets) {
+                entry = touchEntry(bucketKey);
+                if (entry == null) {
+                    if (buckets.size() >= maxEntries) return false;
+                    entry = new Entry(newBucket(policy));
+                    buckets.put(bucketKey, entry);
+                }
+            }
+        }
         if (!entry.bucket.tryConsume(1)) return false;
         if (sharedWaitingLimits == null || (policy != Policy.WAITING_JOIN && policy != Policy.QR_CHECKIN)) return true;
         Boolean shared = sharedWaitingLimits.tryConsume(key, policy, policy.capacity, policy.refillDuration);
@@ -157,58 +168,27 @@ public class RateLimiter {
         });
     }
 
-    /**
-     * 유휴 버킷 정리. 10분마다 돈다.
-     *
-     * <p>{@code ConcurrentHashMap}은 순회 중 제거가 안전하므로 별도 락이 필요 없다.
-     * 스윕과 {@code tryConsume}이 겹쳐 방금 만들어진 버킷이 지워지는 최악의 경우에도
-     * 결과는 "버킷이 하나 새로 만들어진다" 뿐이라 정합성 문제가 없다.
-     */
+    /** 접근 시각 갱신과 제거를 키별로 직렬화해 사용 중인 제한이 초기화되지 않게 한다. */
+    private Entry touchEntry(String key) {
+        return buckets.computeIfPresent(key, (ignored, entry) -> {
+            entry.lastAccessMs.set(System.currentTimeMillis());
+            return entry;
+        });
+    }
+
+    /** 최장 제한 창보다 오래 유휴 상태인 버킷만 정리한다. */
     @Scheduled(fixedDelay = 10 * 60 * 1000)
     public void evictIdleBuckets() {
         int before = buckets.size();
 
         long threshold = System.currentTimeMillis() - IDLE_TTL.toMillis();
-        buckets.entrySet().removeIf(e -> e.getValue().lastAccessMs.get() < threshold);
+        buckets.keySet().forEach(key -> buckets.computeIfPresent(key,
+                (ignored, entry) -> entry.lastAccessMs.get() < threshold ? null : entry));
 
         int idleRemoved = before - buckets.size();
         if (idleRemoved > 0) {
             log.debug("Evicted {} idle rate limiter buckets ({} remaining)", idleRemoved, buckets.size());
         }
-
-        // TTL 스윕으로도 안 줄었다면 = 대부분이 "최근에 접근된" 버킷이다.
-        // 정상 트래픽으로는 도달할 수 없는 수치이므로 분산 스캐닝을 의심한다.
-        if (buckets.size() > MAX_ENTRIES) {
-            evictOldestPortion();
-        }
-    }
-
-    /**
-     * 마지막 접근이 오래된 것부터 일부만 제거한다(안전밸브).
-     *
-     * <p>정렬 기준이 {@code lastAccessMs}이므로 <b>지금 활발히 요청을 보내는 IP는 살아남고</b>,
-     * 잠잠해진 IP의 버킷이 먼저 나간다. 살아남는 쪽이 곧 제한을 걸어야 할 대상이라
-     * fail-open이 되지 않는다({@link #EVICTION_DIVISOR} 주석 참고).
-     */
-    private void evictOldestPortion() {
-        int size = buckets.size();
-        int target = size / EVICTION_DIVISOR;
-        if (target <= 0) {
-            return;
-        }
-
-        // 제거 경계가 될 접근 시각을 구한다. 전체 정렬 대신 k번째 값만 뽑아 부하를 줄인다.
-        long[] times = buckets.values().stream()
-                .mapToLong(e -> e.lastAccessMs.get())
-                .sorted()
-                .toArray();
-        long cutoff = times[Math.min(target, times.length - 1)];
-
-        buckets.entrySet().removeIf(e -> e.getValue().lastAccessMs.get() <= cutoff);
-
-        log.warn("Rate limiter bucket map exceeded {} entries ({}); evicted oldest portion, {} remaining. "
-                        + "This usually means distributed scanning.",
-                MAX_ENTRIES, size, buckets.size());
     }
 
     private Bucket newBucket(Policy policy) {

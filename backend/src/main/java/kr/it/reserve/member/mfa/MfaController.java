@@ -34,10 +34,13 @@ public class MfaController {
     public record Registration(@NotBlank @Size(max = 65_536) String credential, @Size(max = 80) String name) {
         @Override public String toString() { return "Registration[redacted]"; }
     }
-    public record Proof(@NotBlank @Pattern(regexp = "TOTP|PASSKEY|BACKUP") String kind, @NotBlank @Size(max = 65_536) String proof) {
+    public record Proof(@NotBlank @Pattern(regexp = "TOTP|PASSKEY|BACKUP|EMAIL") String kind, @NotBlank @Size(max = 65_536) String proof) {
         @Override public String toString() { return "Proof[redacted]"; }
     }
     public record Removal(@NotBlank @Size(max = 36) String id) { }
+    public record Rename(@NotBlank @Size(max = 36) String id, @NotBlank @Size(max = 80) String name) {
+        @Override public String toString() { return "Rename[redacted]"; }
+    }
     public record Recovery(java.util.List<String> codes) {
         @Override public String toString() { return "Recovery[redacted]"; }
     }
@@ -45,25 +48,26 @@ public class MfaController {
     void noStore(HttpServletResponse response) { response.setHeader("Cache-Control", "no-store"); }
 
     @GetMapping("/api/member/mfa")
-    public ApiResponse<MfaService.Settings> settings(@AuthenticationPrincipal Member member) {
+    public ApiResponse<MfaService.Settings> settings(@AuthenticationPrincipal Member member, HttpServletRequest request) {
+        limit(request, member, false);
         return ok(mfa.settings(member));
     }
     @PostMapping("/api/member/mfa/manage")
     public ApiResponse<MfaService.View> manage(@AuthenticationPrincipal Member member, @Valid @RequestBody Manage body,
             HttpServletRequest request, HttpServletResponse response) {
-        limit(request);
-        var ticket = mfa.beginManage(member, SecurityUtil.getSessionId(), SecurityUtil.getOAuthAuthenticationAt(), body.password(), SecurityUtil.isPersistentLogin());
+        limit(request, member, body.password() != null && !body.password().isBlank());
+        var ticket = mfa.beginManage(member, SecurityUtil.getSessionId(), SecurityUtil.getOAuthAuthenticationAt(), body.password(), SecurityUtil.isPersistentLogin(), ticket(request));
         cookies.addCookie(response, "mfa_ticket", ticket.value(), ticket.persistent() ? 300 : -1);
         return ok(mfa.status(ticket.value(), member, SecurityUtil.getSessionId()));
     }
     @PostMapping("/api/auth/mfa/status")
     public ApiResponse<MfaService.View> status(HttpServletRequest request, @AuthenticationPrincipal Member member) {
-        limit(request);
+        limit(request, member, false);
         return ok(mfa.status(ticket(request), member, SecurityUtil.getSessionId()));
     }
     @PostMapping("/api/auth/mfa/passkey/login")
     public ApiResponse<MfaService.View> passkeyLogin(HttpServletRequest request, HttpServletResponse response, @RequestBody(required = false) Login body) {
-        limit(request);
+        limit(request, null, false);
         mfa.cancel(ticket(request));
         var ticket = mfa.beginPasskeyLogin(body != null && Boolean.TRUE.equals(body.rememberMe()));
         cookies.deleteCookie(response, "access_token");
@@ -73,32 +77,45 @@ public class MfaController {
     }
     @PostMapping("/api/auth/mfa/totp/setup")
     public ApiResponse<MfaService.TotpSetup> setup(HttpServletRequest request, @AuthenticationPrincipal Member member) {
-        limit(request);
+        limit(request, member, false);
         return ok(mfa.beginTotp(ticket(request), member, SecurityUtil.getSessionId()));
     }
     @PostMapping("/api/auth/mfa/totp/confirm")
     public ApiResponse<Recovery> confirmTotp(HttpServletRequest request, @AuthenticationPrincipal Member member, @Valid @RequestBody Code body) {
-        limit(request);
+        limit(request, member, true);
         return ok(new Recovery(mfa.confirmTotp(ticket(request), member, SecurityUtil.getSessionId(), body.code())));
     }
     @PostMapping("/api/auth/mfa/passkey/options")
     public ApiResponse<String> options(HttpServletRequest request, @AuthenticationPrincipal Member member, @RequestBody Options body) {
-        limit(request);
+        limit(request, member, false);
         return ok(mfa.beginPasskey(ticket(request), member, SecurityUtil.getSessionId(), body.registration()));
     }
     @PostMapping("/api/auth/mfa/passkey/confirm")
     public ApiResponse<Recovery> confirmPasskey(HttpServletRequest request, @AuthenticationPrincipal Member member, @Valid @RequestBody Registration body) {
-        limit(request);
+        limit(request, member, true);
         return ok(new Recovery(mfa.confirmPasskey(ticket(request), member, SecurityUtil.getSessionId(), body.credential(), body.name())));
     }
     @PostMapping("/api/auth/mfa/verify")
-    public ApiResponse<MfaService.View> verify(HttpServletRequest request, @AuthenticationPrincipal Member member, @Valid @RequestBody Proof body) {
-        limit(request);
-        return ok(mfa.verify(ticket(request), member, SecurityUtil.getSessionId(), body.kind(), body.proof()));
+    public ApiResponse<MfaService.View> verify(HttpServletRequest request, HttpServletResponse response, @AuthenticationPrincipal Member member, @Valid @RequestBody Proof body) {
+        limit(request, member, true);
+        var result = mfa.verify(ticket(request), member, SecurityUtil.getSessionId(), body.kind(), body.proof());
+        if (result.session() != null) {
+            cookies.addAuthCookies(response, result.session().accessToken(), result.session().refreshToken(),
+                    (int) jwt.getAccessTokenExpiration().toSeconds(), (int) result.session().refreshMaxAge().toSeconds(), result.session().persistent());
+        }
+        return ok(result.view());
+    }
+    @PostMapping("/api/auth/mfa/email/send")
+    public ApiResponse<Void> sendEmail(HttpServletRequest request, @AuthenticationPrincipal Member member) {
+        limit(request, member, false);
+        if (!limiter.tryConsume("risk-email:" + IpExtractor.extract(request), RateLimiter.Policy.EMAIL_SEND))
+            throw new AuthException("인증 요청이 많아요. 잠시 후 다시 시도해주세요.", org.springframework.http.HttpStatus.TOO_MANY_REQUESTS);
+        mfa.sendRiskEmail(ticket(request), member, SecurityUtil.getSessionId());
+        return ok(null);
     }
     @PostMapping("/api/auth/mfa/finish")
     public ApiResponse<Void> finish(HttpServletRequest request, HttpServletResponse response, @AuthenticationPrincipal Member member) {
-        limit(request);
+        limit(request, member, false);
         var result = mfa.finish(ticket(request), member, SecurityUtil.getSessionId());
         if (result.session() != null) {
             cookies.addAuthCookies(response, result.session().accessToken(), result.session().refreshToken(),
@@ -109,7 +126,7 @@ public class MfaController {
     }
     @PostMapping("/api/auth/mfa/defer")
     public ApiResponse<Void> defer(HttpServletRequest request, HttpServletResponse response, @AuthenticationPrincipal Member member) {
-        limit(request);
+        limit(request, member, false);
         var result = mfa.deferEnrollment(ticket(request), member, SecurityUtil.getSessionId());
         cookies.addAuthCookies(response, result.session().accessToken(), result.session().refreshToken(),
                 (int) jwt.getAccessTokenExpiration().toSeconds(), (int) result.session().refreshMaxAge().toSeconds(), result.session().persistent());
@@ -117,35 +134,46 @@ public class MfaController {
         return ok(null);
     }
     @PostMapping("/api/auth/mfa/cancel")
-    public ApiResponse<Void> cancel(HttpServletRequest request, HttpServletResponse response) {
-        limit(request);
+    public ApiResponse<Void> cancel(HttpServletRequest request, HttpServletResponse response, @AuthenticationPrincipal Member member) {
+        if (!limiter.tryConsume("mfa-cancel:" + IpExtractor.extract(request), RateLimiter.Policy.MFA_CANCEL))
+            throw new AuthException("요청이 많아요. 잠시 후 다시 시도해주세요.", org.springframework.http.HttpStatus.TOO_MANY_REQUESTS);
         mfa.cancel(ticket(request));
         cookies.deleteCookie(response, "mfa_ticket");
         return ok(null);
     }
     @PostMapping("/api/auth/mfa/recovery")
-    public ApiResponse<Recovery> recovery(HttpServletRequest request, @AuthenticationPrincipal Member member) {
-        limit(request);
-        return ok(new Recovery(mfa.regenerateRecovery(ticket(request), member, SecurityUtil.getSessionId())));
+    public ApiResponse<Recovery> recovery(HttpServletRequest request, HttpServletResponse response, @AuthenticationPrincipal Member member) {
+        limit(request, member, false);
+        var result = mfa.regenerateRecovery(ticket(request), member, SecurityUtil.getSessionId());
+        cookies.addAuthCookies(response, result.session().accessToken(), result.session().refreshToken(),
+                (int) jwt.getAccessTokenExpiration().toSeconds(), (int) result.session().refreshMaxAge().toSeconds(), result.session().persistent());
+        return ok(new Recovery(result.codes()));
     }
     @PostMapping("/api/auth/mfa/remove")
     public ApiResponse<Void> remove(HttpServletRequest request, HttpServletResponse response, @AuthenticationPrincipal Member member, @Valid @RequestBody Removal body) {
-        limit(request);
+        limit(request, member, false);
         mfa.remove(ticket(request), member, SecurityUtil.getSessionId(), body.id());
         cookies.deleteCookie(response, "mfa_ticket");
         return ok(null);
     }
+    @PostMapping("/api/auth/mfa/rename")
+    public ApiResponse<MfaService.Settings> rename(HttpServletRequest request, @AuthenticationPrincipal Member member, @Valid @RequestBody Rename body) {
+        limit(request, member, false);
+        return ok(mfa.rename(ticket(request), member, SecurityUtil.getSessionId(), body.id(), body.name()));
+    }
     @PostMapping("/api/auth/mfa/disable")
     public ApiResponse<Void> disable(HttpServletRequest request, HttpServletResponse response, @AuthenticationPrincipal Member member) {
-        limit(request);
+        limit(request, member, false);
         mfa.disable(ticket(request), member, SecurityUtil.getSessionId());
         cookies.deleteCookie(response, "mfa_ticket");
         return ok(null);
     }
     private static <T> ApiResponse<T> ok(T value) { return ApiResponse.success(value, "요청을 처리했어요."); }
     private String ticket(HttpServletRequest request) { return CookieUtil.getCookie(request, "mfa_ticket"); }
-    private void limit(HttpServletRequest request) {
-        if (!limiter.tryConsume("mfa:" + IpExtractor.extract(request), RateLimiter.Policy.CODE_VERIFY))
-            throw new AuthException("인증 시도가 많아요. 잠시 후 다시 시도해주세요.", org.springframework.http.HttpStatus.TOO_MANY_REQUESTS);
+    private void limit(HttpServletRequest request, Member member, boolean proof) {
+        if (!limiter.tryConsume("mfa:" + IpExtractor.extract(request), proof ? RateLimiter.Policy.CODE_VERIFY : RateLimiter.Policy.MFA_LIFECYCLE)
+                || !proof && member != null && !limiter.tryConsume("mfa-flow-member:" + member.getId(), RateLimiter.Policy.MFA_LIFECYCLE_ACCOUNT))
+            throw new AuthException(proof ? "인증 시도가 많아요. 잠시 후 다시 시도해주세요."
+                    : "요청이 많아요. 잠시 후 다시 시도해주세요.", org.springframework.http.HttpStatus.TOO_MANY_REQUESTS);
     }
 }

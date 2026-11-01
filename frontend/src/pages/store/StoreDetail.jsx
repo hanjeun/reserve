@@ -197,7 +197,7 @@ const StoreDetail = () => {
     const validId = /^\d+$/.test(id ?? '') && Number.isSafeInteger(Number(id)) && Number(id) > 0;
     const navigate = useNavigate();
     const { message } = useMessage();
-    const { isLoggedIn, user } = useAuthStore();
+    const { isLoggedIn, user, isLoggingOut } = useAuthStore();
     const { pay, paying, paymentDialog } = usePayment();
     const { store, loading, error, refetch } = useStoreData(validId ? id : null, { reservationId: searchParams.get('edit') });
     // 사진 순서·메타데이터 변경은 문서·브라우저 힌트보다 새 공개 응답을 우선한다.
@@ -267,7 +267,8 @@ const StoreDetail = () => {
     // 캐러셀 반복은 유지하고 미리보기용 원본 목록을 별도로 구성한다.
 
     const nearby = isNearby(nearbyUserLocation, store.latitude, store.longitude, store.nearbyRadiusKm ?? undefined);
-    const identityProps = { store, nearby, canContact: user?.id !== store.ownerId, onContact: handleStoreContact };
+    const identityProps = { store, nearby, canContact: user?.id !== store.ownerId,
+        onContact: isLoggedIn && user?.id != null && !isLoggingOut ? handleStoreContact : undefined };
     const panelProps = {
         store, form, onFinish, paying: paying || reservationSubmitting, reservationEntry, isEditMode, editingReservation,
         editLoadError, editRetrying, onRetryEditLoad: retryEditLoad, bookingSectionRef,

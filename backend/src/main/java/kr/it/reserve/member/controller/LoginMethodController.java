@@ -68,7 +68,7 @@ public class LoginMethodController {
     @PutMapping("/password")
     public ApiResponse<Void> changePassword(@Valid @RequestBody kr.it.reserve.member.dto.PasswordChangeRequest body,
             HttpServletRequest request) {
-        Member member = limited(request, RateLimiter.Policy.LOGIN_METHOD_CHANGE);
+        Member member = limitedIp(request, RateLimiter.Policy.LOGIN_METHOD_CHANGE);
         memberService.changePassword(member.getId(), body);
         return ApiResponse.success(null, "비밀번호가 변경됐어요. 다시 로그인해주세요.");
     }
@@ -80,11 +80,17 @@ public class LoginMethodController {
     }
 
     private Member limited(HttpServletRequest request, RateLimiter.Policy policy) {
+        Member member = limitedIp(request, policy);
+        if (!limiter.tryConsume("login-method:member:" + member.getId(), policy))
+            throw new MemberException("시도가 너무 많아요. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+        return member;
+    }
+
+    private Member limitedIp(HttpServletRequest request, RateLimiter.Policy policy) {
         Member member = SecurityUtil.getCurrentMember();
         if (!member.getId().toString().equals(request.getHeader("X-Reserve-Member-Id")))
             throw new MemberException("로그인 상태가 변경됐어요. 새로고침 후 다시 시도해주세요.", HttpStatus.CONFLICT);
-        if (!limiter.tryConsume("login-method:ip:" + IpExtractor.extract(request), policy)
-                || !limiter.tryConsume("login-method:member:" + member.getId(), policy))
+        if (!limiter.tryConsume("login-method:ip:" + IpExtractor.extract(request), policy))
             throw new MemberException("시도가 너무 많아요. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
         return member;
     }

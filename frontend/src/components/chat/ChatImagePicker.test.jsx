@@ -87,9 +87,13 @@ describe('chat photo picker', () => {
         const file = new File(['image'], 'photo.png', { type: 'image/png' });
         const view = render(<ChatImagePicker enabled file={file} onChange={vi.fn()} />);
         await screen.findByRole('button', { name: '첨부 사진 크게 보기' });
+        const remove = screen.getByRole('button', { name: '첨부 사진 제거' });
+        remove.focus();
         view.rerender(<ChatImagePicker enabled file={null} onChange={vi.fn()} />);
         const exiting = view.container.querySelector('.reserve-chat-attachment');
         expect(exiting).toHaveAttribute('inert');
+        expect(exiting).not.toHaveAttribute('aria-hidden');
+        expect(remove).toBeDisabled();
         expect(exiting.style.animation).toContain('slideUpOut');
         expect(screen.queryByRole('button', { name: '첨부 사진 크게 보기' })).toBeNull();
         expect(revoke).not.toHaveBeenCalled();

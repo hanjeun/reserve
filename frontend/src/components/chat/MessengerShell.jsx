@@ -127,7 +127,7 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
     const { data: unread = 0 } = useQuery({
         queryKey: chatKeys.unread(),
         queryFn: chatService.getUnread,
-        enabled: Boolean(user) && !isMessagesPage,
+        enabled: settledSession && Boolean(user) && !isMessagesPage,
         ...chatListQueryPolicy,
         refetchInterval: query => ((!isMobile && open) || isMessagesPage || !shouldAutoRefreshChatMetadata(query))
             ? false : BADGE_POLL_MS,

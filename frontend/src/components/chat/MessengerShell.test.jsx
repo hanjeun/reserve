@@ -43,6 +43,8 @@ describe('MessengerShell accessibility', () => {
         useAuthStore.setState({
             user: { id: 7, role: 'USER', email: 'member7@example.com' },
             isLoggedIn: true,
+            authRestoring: false,
+            isLoggingOut: false,
         });
         useMessengerStore.setState({
             open: false,
@@ -54,6 +56,13 @@ describe('MessengerShell accessibility', () => {
             storeSearch: null,
             sessionIdentity: messengerIdentityOf(useAuthStore.getState()),
         });
+    });
+
+    it.each([{ authRestoring: true }, { isLoggingOut: true }, { isLoggedIn: false }])('does not read private badges before the session is settled: %j', async pending => {
+        useAuthStore.setState(pending);
+        renderShell();
+        await act(async () => {});
+        expect(chatService.getUnread).not.toHaveBeenCalled();
     });
 
     it('opens the mobile message page from the single launcher without a desktop dialog', async () => {

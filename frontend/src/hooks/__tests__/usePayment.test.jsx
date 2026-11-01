@@ -14,6 +14,12 @@ vi.mock('react-router-dom', () => ({ useNavigate: () => fixture.navigate,
 const reservation = { id: 7, storeName: '합성 가게', depositAmount: 99999 };
 const buyer = { name: '합성 회원', email: 'preview@example.test' };
 const prepared = { merchantUid: 'synthetic-order-7', storeId: 'synthetic-store', amount: 10000, productName: '합성 보증금', buyerName: buyer.name, buyerEmail: buyer.email };
+const cardCodes = ['KOOKMIN_CARD', 'SHINHAN_CARD', 'SAMSUNG_CARD', 'HYUNDAI_CARD', 'LOTTE_CARD', 'HANA_CARD',
+    'WOORI_CARD', 'NH_CARD', 'BC_CARD', 'CITI_CARD', 'GWANGJU_CARD', 'JEONBUK_CARD', 'SUHYUP_CARD'];
+const cardRoutes = [
+    ...cardCodes.filter(cardCompany => cardCompany !== 'JEONBUK_CARD').map(cardCompany => ({ provider: 'kcp_v2', cardCompany })),
+    ...cardCodes.map(cardCompany => ({ provider: 'tosspayments', cardCompany })),
+].flatMap(route => ['paid', 'verification-failed', 'provider-failed', 'closed'].map(outcome => ({ ...route, outcome })));
 describe('선택한 예약 결제 경로', () => {
 
     it.each(['response', 'exception'])('KCP Web Close는 모바일과 같은 주문 결과 화면으로 이동해요 (%s)', async kind => {
@@ -103,6 +109,8 @@ describe('선택한 예약 결제 경로', () => {
     beforeEach(() => {
         vi.clearAllMocks(); clearPaymentReturns(); useAuthStore.setState({ sessionRevision: 1, user: { id: 7 } });
         vi.stubEnv('VITE_PORTONE_NAVERPAY_CHANNEL_KEY', '');
+        vi.stubEnv('VITE_PORTONE_NAVERPAY_TEST_CHANNEL_KEY', '');
+        vi.stubEnv('VITE_PORTONE_PAYMENT_ENV', '');
         vi.stubEnv('VITE_PORTONE_KCP_TEST_CHANNEL_KEY', '');
         vi.stubEnv('VITE_PORTONE_TOSS_CHANNEL_KEY', 'channel-key-11111111-1111-4111-8111-111111111111');
         vi.stubEnv('VITE_PORTONE_CHANNEL_KEY', 'channel-key-22222222-2222-4222-8222-222222222222');
@@ -118,6 +126,50 @@ describe('선택한 예약 결제 경로', () => {
         expect(fixture.sdk.mock.calls[0][0]).not.toHaveProperty('easyPay');
         expect(fixture.verify).toHaveBeenCalledWith({ merchantUid: prepared.merchantUid, reservationId: 7 });
         expect(fixture.navigate).toHaveBeenCalledWith(expect.stringContaining('success=true'));
+    });
+    it.each(cardRoutes)('$provider $cardCompany 인증 뒤에는 같은 주문의 서버 검증으로 결과를 결정해요 ($outcome)', async ({ provider, cardCompany, outcome }) => {
+        const kcp = provider === 'kcp_v2';
+        vi.stubEnv('DEV', kcp);
+        vi.stubEnv('VITE_PORTONE_PAYMENT_ENV', 'TEST');
+        vi.stubEnv('VITE_PORTONE_KCP_TEST_CHANNEL_KEY', 'channel-key-33333333-3333-4333-8333-333333333333');
+        const order = { ...prepared, merchantUid: 'ORDsyntheticCard7' };
+        fixture.prepare.mockResolvedValueOnce(order);
+        const method = configuredPaymentMethods(import.meta.env, order)[0];
+        expect(method.pgProvider).toBe(provider);
+        fixture.choose.mockResolvedValueOnce({ ...method, cardCompany });
+        const cancelled = kcp ? { code: 'PG_PROVIDER_ERROR', pgCode: '3001', message: '[3001] 사용자 Web Close' }
+            : { code: 'PAY_PROCESS_CANCELED' };
+        fixture.sdk.mockResolvedValueOnce(outcome === 'closed' ? cancelled : outcome === 'provider-failed'
+            ? { code: 'PG_PROVIDER_ERROR', pgCode: kcp ? 'CC14' : 'SYNTHETIC_DECLINED' } : { paymentId: order.merchantUid });
+        if (outcome === 'verification-failed') fixture.verify.mockRejectedValueOnce(new Error('확인 중'));
+        const { result } = renderHook(() => usePayment());
+        let payment;
+        await act(async () => { payment = await result.current.pay(reservation, buyer); });
+        expect(fixture.sdk).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ paymentId: order.merchantUid,
+            channelKey: kcp ? 'channel-key-33333333-3333-4333-8333-333333333333' : 'channel-key-11111111-1111-4111-8111-111111111111',
+            storeId: order.storeId, totalAmount: order.amount, currency: 'KRW', payMethod: 'CARD',
+            redirectUrl: window.location.origin + '/api/payment/mobile-redirect',
+            card: { cardCompany, ...(kcp ? { installment: { monthOption: { fixedMonth: 0 } } } : {}) } }));
+        const request = fixture.sdk.mock.calls[0][0];
+        expect(request).not.toHaveProperty('easyPay');
+        if (kcp) expect(request.bypass).toEqual({ kcp_v2: { site_name: 'RESERVE' } });
+        else expect(request).not.toHaveProperty('bypass');
+        expect(result.current.paying).toBe(false);
+        expect(fixture.prepare).toHaveBeenCalledOnce();
+        expect(fixture.error).not.toHaveBeenCalled();
+        if (outcome === 'paid') {
+            expect(payment.success).toBe(true);
+            expect(fixture.verify).toHaveBeenCalledExactlyOnceWith({ merchantUid: order.merchantUid, reservationId: 7 });
+            expect(fixture.navigate).toHaveBeenCalledExactlyOnceWith('/payment/result?success=true&merchant_uid=' + order.merchantUid + '&reservation_id=7');
+        } else {
+            expect(payment.success).toBe(false);
+            expect(fixture.navigate).toHaveBeenCalledExactlyOnceWith('/payment/result?'
+                + (outcome === 'verification-failed' ? 'success=false&' : '') + 'checkout_return=true&merchant_uid=' + order.merchantUid);
+            expect(fixture.sdk).toHaveBeenCalledTimes(1);
+            if (outcome === 'verification-failed') expect(fixture.verify).toHaveBeenCalledExactlyOnceWith({ merchantUid: order.merchantUid, reservationId: 7 });
+            else expect(fixture.verify).not.toHaveBeenCalled();
+            if (outcome === 'closed') expect(payment.cancelled).toBe(true);
+        }
     });
     it('간편결제는 선택한 별도 채널과 공급자를 사용해요', async () => {
         fixture.choose.mockResolvedValue(configuredPaymentMethods().find(method => method.brand === 'KAKAOPAY'));

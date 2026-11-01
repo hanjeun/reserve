@@ -8,7 +8,7 @@ services:
     image: ${DOCKERHUB_USERNAME}/reserve:${IMAGE_TAG:-latest}
     # 앱과 nginx가 모두 8081을 사용하므로 컨테이너 포트도 일치시킨다.
     ports:
-      - "8081:8081"
+      - "127.0.0.1:8081:8081"
     # 저장 시각과 로그의 UTC 관례를 유지하며 KST 업무 판단은 ServiceTime에서 명시한다.
     environment:
       - SPRING_PROFILES_ACTIVE=green
@@ -61,6 +61,9 @@ services:
       - RESERVE_REDIS_PORT=${RESERVE_REDIS_PORT:-6379}
       - RESERVE_REDIS_PASSWORD=${RESERVE_REDIS_PASSWORD:-}
       - RESERVE_REDIS_USERNAME=${RESERVE_REDIS_USERNAME:-}
+      - RESERVE_SECURITY_IP_PROTECTION_ENABLED=${RESERVE_SECURITY_IP_PROTECTION_ENABLED:-false}
+      - RESERVE_SECURITY_IP_PROTECTION_FINGERPRINT_KEY=${RESERVE_SECURITY_IP_PROTECTION_FINGERPRINT_KEY:-}
+      - RESERVE_SECURITY_IP_PROTECTION_TRUSTED_PROXIES=${RESERVE_SECURITY_IP_PROTECTION_TRUSTED_PROXIES:-}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - NAVER_CLIENT_ID=${NAVER_CLIENT_ID}
@@ -92,9 +95,14 @@ services:
     volumes:
       - /var/log/reserve:/var/log/reserve
     networks:
-      - app-network
+      app-network: {}
+      reserve-ingress:
+        ipv4_address: 172.30.30.4
+        aliases: [reserve-green-ingress]
     restart: unless-stopped
 
 networks:
+  reserve-ingress:
+    external: true
   app-network:
     external: true

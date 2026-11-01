@@ -1,6 +1,6 @@
 # 보안 정책
 
-RESERVE(https://reserve.it.kr)의 보안 취약점 제보 방법을 안내해요.
+RESERVE(https://app.reserve.it.kr)의 보안 취약점 제보 방법을 안내해요.
 
 ## 지원 버전
 

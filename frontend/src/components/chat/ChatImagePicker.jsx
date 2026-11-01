@@ -27,8 +27,7 @@ function AnimatedAttachment({ file, active, disabled, onRemove, itemKey, onExite
         return () => { mounted = false; URL.revokeObjectURL(objectUrl); };
     }, [file]);
     if (!shouldRender) return null;
-    return <div className="reserve-chat-attachment" aria-hidden={!active || undefined}
-        inert={!active ? true : undefined}
+    return <div className="reserve-chat-attachment" inert={!active ? true : undefined}
         data-ready={ready}
         style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 92, height: 44,
             opacity: active && !ready ? 0 : undefined,

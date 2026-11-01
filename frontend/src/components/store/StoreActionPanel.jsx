@@ -2,8 +2,8 @@ import PropTypes from 'prop-types';
 import { Typography } from 'antd';
 import { colors, fontWeight, radius } from '../../styles/tokens';
 
-export default function StoreActionPanel({ title, isPC = false, children, sectionRef }) {
-    return <div ref={sectionRef} className="reserve-store-action-panel" style={isPC ? panelStyle : undefined}>
+export default function StoreActionPanel({ title, isPC = false, children, sectionRef, className = '' }) {
+    return <div ref={sectionRef} className={['reserve-store-action-panel', className].filter(Boolean).join(' ')} style={isPC ? panelStyle : undefined}>
         <Typography.Title level={3} style={{ marginTop: 0, marginBottom: 20, fontWeight: fontWeight.bold }}>
             {title}
         </Typography.Title>
@@ -16,6 +16,7 @@ StoreActionPanel.propTypes = {
     isPC: PropTypes.bool,
     children: PropTypes.node,
     sectionRef: PropTypes.shape({ current: PropTypes.any }),
+    className: PropTypes.string,
 };
 
 const panelStyle = {

@@ -30,6 +30,16 @@ public class OAuthSessionIssuer {
     public SessionTokens issue(CustomOAuth2User principal) { return issue(principal, true); }
     @Transactional
     public SessionTokens issue(CustomOAuth2User principal, boolean persistent) {
+        return issue(principal, persistent, null);
+    }
+
+    @Transactional
+    public SessionTokens issueReauthenticated(CustomOAuth2User principal, String currentAccessToken) {
+        if (!principal.isLoginMethodAction() || currentAccessToken == null || currentAccessToken.isBlank()) throw reauthenticate();
+        return issue(principal, false, currentAccessToken);
+    }
+
+    private SessionTokens issue(CustomOAuth2User principal, boolean persistent, String currentAccessToken) {
         CustomOAuth2User.OAuthAuthentication authentication = principal.getOauthAuthentication();
         if (authentication == null || authentication.memberId() == null) throw reauthenticate();
         OAuthSubjectSecurity subject = subjects.lock(authentication.provider(), authentication.providerId());
@@ -41,13 +51,26 @@ public class OAuthSessionIssuer {
         subjects.requireFreshAuthentication(authentication.authenticatedAt(), authentication.tokenExpiresAt());
         if (!subject.acceptsAuthentication(authentication.authenticatedAt())
                 || !current.acceptsOAuthAuthentication(authentication.authenticatedAt())) throw reauthenticate();
-        var ticket = mfa == null ? null : mfa.beginLogin(current, authentication.authenticatedAt(), authentication.tokenExpiresAt(), persistent);
+        kr.it.reserve.member.mfa.MfaService.Ticket ticket;
+        try {
+            ticket = currentAccessToken != null || mfa == null ? null : mfa.beginLogin(current, authentication.authenticatedAt(), authentication.tokenExpiresAt(), persistent);
+        } catch (kr.it.reserve.global.security.ip.IpLoginProtection.Unavailable unavailable) {
+            throw new OAuth2AuthenticationException("ip_verification_unavailable");
+        }
         if (ticket != null) {
             members.flush();
             subjects.requireFreshAuthentication(authentication.authenticatedAt(), authentication.tokenExpiresAt());
             return new SessionTokens(null, null, null, ticket.value(), persistent);
         }
-        TokenProvider.IssuedSession issued = tokens.issueSession(current, authentication.authenticatedAt(), persistent);
+        TokenProvider.IssuedSession issued;
+        try {
+            issued = currentAccessToken == null ? tokens.issueSession(current, authentication.authenticatedAt(), persistent)
+                    : tokens.reauthenticateOAuth(current, currentAccessToken, authentication.authenticatedAt());
+        } catch (kr.it.reserve.global.security.ip.IpLoginProtection.Unavailable unavailable) {
+            throw new OAuth2AuthenticationException("ip_verification_unavailable");
+        } catch (kr.it.reserve.global.error.AuthException | io.jsonwebtoken.JwtException exception) {
+            throw reauthenticate();
+        }
         SessionTokens pair = new SessionTokens(issued.accessToken(), issued.refreshToken(), issued.refreshMaxAge(), null, issued.persistent());
         members.flush();
         subjects.requireFreshAuthentication(authentication.authenticatedAt(), authentication.tokenExpiresAt());

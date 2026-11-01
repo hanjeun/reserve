@@ -78,7 +78,7 @@ const Login = () => {
         if (isLoggedIn && params.get('error') === 'oauth2') {
             hasHandledRef.current = true;
             message.error(params.get('message') || '소셜 로그인하지 못했어요. 다시 시도해주세요.');
-            navigate('/my-page', { replace: true });
+            navigate('/my-page?security=retry', { replace: true });
             return;
         }
         // 계정 경계에서 재마운트돼도 원래 요청한 경로로 돌아간다.
@@ -119,9 +119,13 @@ const Login = () => {
         }
     }, [isLoggedIn, mfa, registrationRequested, location.state, location.search, navigate, message]);
 
+    const notifyLoginSuccess = member => {
+        if (member?.id == null) return;
+        message.success(member.name ? `${member.name}님, 로그인됐어요!` : '로그인됐어요.');
+    };
     const completeLogin = member => {
         login(member);
-        message.success(member.name + '님, 로그인됐어요!');
+        notifyLoginSuccess(member);
         const target = consumeLoginRedirect(fromRef.current);
         const direction = preventedRef.current && target !== '/' ? 'from-right' : 'from-left';
         navigate(target, { replace: true, state: { reserveRouteMotion: direction } });
@@ -203,7 +207,11 @@ const Login = () => {
                 <PageDescription style={styles.subtitle}>예약이 필요한 순간, RESERVE</PageDescription></>}
 
                 {mfa ? <MfaFlow page initialView={mfa.mfaRequired ? mfa : undefined}
-                    onDone={() => navigate(new URLSearchParams(location.search).get('security') === '1' ? '/my-page' : consumeLoginRedirect(fromRef.current), { replace: true })}
+                    onDone={member => {
+                        const securityAction = new URLSearchParams(location.search).get('security') === '1';
+                        if (!securityAction) notifyLoginSuccess(member);
+                        navigate(securityAction ? '/my-page?security=verified' : consumeLoginRedirect(fromRef.current), { replace: true });
+                    }}
                     onCancel={() => { setMfa(null); navigate('/login', { replace: true }); }} /> : <>
                 {registrationRequested && <Text role="status">패스키를 등록하려면 먼저 로그인해주세요.</Text>}
                 <Form onFinish={onLoginSubmit} layout="vertical" size="large" requiredMark={false}>

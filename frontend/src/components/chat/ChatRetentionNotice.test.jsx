@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import ChatRetentionNotice from './ChatRetentionNotice';
@@ -26,4 +26,15 @@ it('leaves the current panel alone when the user explicitly chooses a modified l
     fireEvent.click(screen.getByRole('link', { name: '보관 정책 보기' }), { ctrlKey: true });
     expect(fixture.closePanel).not.toHaveBeenCalled();
     expect(screen.getByRole('link', { name: '보관 정책 보기' })).toBeInTheDocument();
+});
+
+it('makes the closing policy notice inert without hiding a focused link with aria-hidden', async () => {
+    const view = render(<MemoryRouter><ChatRetentionNotice visible /></MemoryRouter>);
+    screen.getByRole('link', { name: '보관 정책 보기' }).focus();
+    view.rerender(<MemoryRouter><ChatRetentionNotice visible={false} /></MemoryRouter>);
+    const closing = view.container.querySelector('.reserve-chat-retention-notice-wrap');
+    expect(closing).toHaveAttribute('inert');
+    expect(closing).not.toHaveAttribute('aria-hidden');
+    expect(closing).toHaveClass('is-closing');
+    await waitFor(() => expect(view.container.querySelector('.reserve-chat-retention-notice-wrap')).toBeNull());
 });

@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import kr.it.reserve.config.oauth2.OAuthProviderTokenConverter;
+import kr.it.reserve.global.security.LoginIdentity;
 
 @Entity
 @Table(name = "member", indexes = @Index(name = "idx_member_oauth_subject", columnList = "provider,provider_id,deleted_at"))
@@ -15,7 +16,7 @@ import kr.it.reserve.config.oauth2.OAuthProviderTokenConverter;
 @AllArgsConstructor
 @Builder
 @EntityListeners(AuditingEntityListener.class)
-public class Member {
+public class Member implements LoginIdentity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

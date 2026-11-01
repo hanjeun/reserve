@@ -42,6 +42,15 @@ class LoginAuthorizationRequestRepositoryTest {
         assertThat(repository.removeAuthorizationRequest(callback, new MockHttpServletResponse())).isNull();
         assertThat(LoginAuthorizationRequestRepository.persistent(callback)).isFalse();
     }
+    @Test void incompleteOAuthStateHasABoundedIdleLifetimeWithoutExtendingAnEarlierLimit() {
+        var repository = new LoginAuthorizationRequestRepository();
+        var request = new MockHttpServletRequest();
+        repository.saveAuthorizationRequest(saved(true), request, new MockHttpServletResponse());
+        assertThat(request.getSession(false).getMaxInactiveInterval()).isEqualTo(600);
+        request.getSession(false).setMaxInactiveInterval(120);
+        repository.saveAuthorizationRequest(saved(true), request, new MockHttpServletResponse());
+        assertThat(request.getSession(false).getMaxInactiveInterval()).isEqualTo(120);
+    }
     @ParameterizedTest @ValueSource(booleans = {false, true})
     void resolverKeepsThePreferenceOutOfTheProviderRequest(boolean persistent) {
         var client = ClientRegistration.withRegistrationId("google").clientId("synthetic-client").clientSecret("synthetic")

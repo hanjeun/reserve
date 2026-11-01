@@ -1,0 +1,9 @@
+.reserve-booking-panel--desktop { display: flex; flex-direction: column; max-height: calc(100dvh - 96px); box-sizing: border-box; }
+.reserve-booking-panel--desktop > h3 { flex: 0 0 auto; }
+.reserve-booking-panel--desktop .reserve-booking-panel-form { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.reserve-booking-panel-fields { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; }
+.reserve-booking-panel-submit { flex: 0 0 auto; padding-top: 16px; background: var(--c-bg-paper); }
+@media (max-height: 420px) {
+    .reserve-booking-panel--desktop { max-height: none; }
+    .reserve-booking-panel-fields { overflow-y: visible; }
+}

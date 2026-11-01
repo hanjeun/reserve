@@ -49,6 +49,7 @@ public class LoginMethodService {
     private static final String ISSUED = LoginMethodService.class.getName() + ".issued";
     private static final String BOUND = LoginMethodService.class.getName() + ".bound";
     private static final String COMPLETING = LoginMethodService.class.getName() + ".completing";
+    private static final String REAUTHENTICATED = LoginMethodService.class.getName() + ".reauthenticated";
     private static final SecureRandom RANDOM = new SecureRandom();
     private final MemberRepository members;
     private final LoginMethodChallengeRepository challenges;
@@ -182,7 +183,15 @@ public class LoginMethodService {
         members.flush();
         subjects.requireFreshAuthentication(authenticatedAt, tokenExpiresAt);
         subject.authenticated(authenticatedAt, subjects.now());
+        if (challenge.getPurpose() == Purpose.SOCIAL_REAUTH) request.setAttribute(REAUTHENTICATED, Boolean.TRUE);
         return current;
+    }
+
+    /** 클라이언트 쿼리가 아닌 검증된 공급자 콜백에서만 재인증 의도를 전달한다. */
+    public static boolean consumeReauthentication(HttpServletRequest request) {
+        Object value = request.getAttribute(REAUTHENTICATED);
+        request.removeAttribute(REAUTHENTICATED);
+        return Boolean.TRUE.equals(value);
     }
 
     @Transactional

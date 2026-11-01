@@ -50,14 +50,23 @@ public class EmailService {
         sendVerificationMessage(toEmail, verificationCode, true);
     }
 
+    @Async("mailExecutor")
+    public void sendRiskLoginVerificationEmail(String toEmail, String verificationCode) {
+        if (verificationCode == null || !verificationCode.matches("[0-9]{6}")) throw new IllegalArgumentException("Invalid login verification code");
+        sendVerificationMessage(toEmail, verificationCode, false, true);
+    }
+
     private void sendVerificationMessage(String toEmail, String verificationCode, boolean loginMethod) {
+        sendVerificationMessage(toEmail, verificationCode, loginMethod, false);
+    }
+    private void sendVerificationMessage(String toEmail, String verificationCode, boolean loginMethod, boolean riskLogin) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, MAIL_CHARSET);
             helper.setFrom(fromEmail, fromName);
             helper.setTo(toEmail);
-            helper.setSubject(loginMethod ? "[RESERVE] 이메일 로그인 설정 인증 코드" : "[RESERVE] 이메일 인증 코드");
-            helper.setText(buildVerificationEmailContent(verificationCode, loginMethod), true);
+            helper.setSubject(riskLogin ? "[RESERVE] 새 접속 환경 확인 코드" : loginMethod ? "[RESERVE] 이메일 로그인 설정 인증 코드" : "[RESERVE] 이메일 인증 코드");
+            helper.setText(buildVerificationEmailContent(verificationCode, loginMethod, riskLogin), true);
             mailSender.send(message);
             log.info("Verification email sent");
         } catch (MessagingException | UnsupportedEncodingException | MailException e) {
@@ -470,19 +479,23 @@ public class EmailService {
     }
 
     private String buildVerificationEmailContent(String code, boolean loginMethod) {
+        return buildVerificationEmailContent(code, loginMethod, false);
+    }
+    private String buildVerificationEmailContent(String code, boolean loginMethod, boolean riskLogin) {
         return HTML_HEAD_OPEN + FONT_IMPORT + "</head>"
             + "<body style=\"margin:0;padding:0;font-family:" + FONT_FAMILY + ";background-color:#f9fafb;\">"
             + "  <div style=\"width:100%;background-color:#f9fafb;padding:40px 0;\">"
             + "    <div style=\"max-width:500px;margin:0 auto;background-color:#ffffff;border-radius:24px;padding:48px 32px;box-shadow:0 4px 12px rgba(0,0,0,0.05);\">"
             + "      <div style=\"margin-bottom:32px;\"><span style=\"font-size:20px;font-weight:800;color:#3182f6;letter-spacing:-0.5px;font-family:" + FONT_FAMILY + ";\">RESERVE</span></div>"
-            + "      <h1 style=\"font-size:24px;font-weight:700;color:#191f28;line-height:1.4;margin:0 0 12px 0;font-family:" + FONT_FAMILY + ";\">이메일 인증을<br/>완료해주세요.</h1>"
-            + "      <p style=\"font-size:16px;color:#4e5968;line-height:1.6;margin:0 0 32px 0;\">안녕하세요.<br/>서비스 이용을 위해 아래 인증 코드를 화면에 입력해주세요.</p>"
+            + "      <h1 style=\"font-size:24px;font-weight:700;color:#191f28;line-height:1.4;margin:0 0 12px 0;font-family:" + FONT_FAMILY + ";\">" + (riskLogin ? "새 접속 환경을<br/>확인해주세요." : "이메일 인증을<br/>완료해주세요.") + "</h1>"
+            + "      <p style=\"font-size:16px;color:#4e5968;line-height:1.6;margin:0 0 32px 0;\">" + (riskLogin ? "평소와 다른 접속 환경에서 로그인을 요청했어요.<br/>직접 요청했다면 로그인 화면에 코드를 입력해주세요. 요청하지 않았다면 코드를 전달하지 마세요." : "안녕하세요.<br/>서비스 이용을 위해 아래 인증 코드를 화면에 입력해주세요.") + "</p>"
             + "      <div style=\"background-color:#f2f4f6;border-radius:16px;padding:32px;text-align:center;margin-bottom:32px;\">"
             + "        <span style=\"display:block;font-size:14px;color:#8b95a1;margin-bottom:8px;\">인증번호</span>"
             + "        <span style=\"font-size:36px;font-weight:800;color:#3182f6;letter-spacing:8px;font-family:" + FONT_FAMILY + ";\">" + code + "</span>"
             + "      </div>"
             + "      <div style=\"font-size:13px;color:#b0b8c1;line-height:1.6;border-top:1px solid #f2f4f6;padding-top:24px;\">"
-            + (loginMethod ? "        본 메일은 기존 계정의 이메일 로그인 설정을 위한 본인 확인 메일이에요.<br/>"
+            + (riskLogin ? "        본 메일은 로그인 요청의 접속 환경 확인을 위한 메일이에요. 계정은 잠기지 않았어요.<br/>"
+                    : loginMethod ? "        본 메일은 기존 계정의 이메일 로그인 설정을 위한 본인 확인 메일이에요.<br/>"
                     : "        본 메일은 회원가입을 위한 본인 확인 메일이에요.<br/>")
             + "        인증 코드는 <span style=\"color:#8b95a1;\">5분간</span> 유효해요.<br/><br/>"
             + "        © 2026 RESERVE. All rights reserved."

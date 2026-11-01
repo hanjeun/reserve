@@ -317,10 +317,13 @@ export const ReservationPanel = ({
     const handleAvailabilityChange = React.useCallback(next => { timeAvailabilityRef.current = next; }, []);
     let submitLabel = isEditMode ? '예약 변경하기' : '예약 신청하기';
     if (paying) submitLabel = '처리 중...';
+    const FieldsContainer = isPC ? 'div' : React.Fragment;
     return (
-    <StoreActionPanel sectionRef={bookingSectionRef} title={isEditMode ? '예약 변경하기' : '예약하기'} isPC={isPC}>
+    <StoreActionPanel sectionRef={bookingSectionRef} title={isEditMode ? '예약 변경하기' : '예약하기'} isPC={isPC}
+        className={isPC ? 'reserve-booking-panel--desktop' : undefined}>
         <Form form={form} component={preview ? false : 'form'} layout="vertical" onFinish={preview ? undefined : onFinish}
             initialValues={{ guestCount: 1 }} requiredMark={false}
+            className={isPC ? 'reserve-booking-panel-form' : undefined} scrollToFirstError={isPC ? { block: 'nearest', focus: true } : undefined}
             style={{ fontWeight: fontWeight.medium }}>
             {/* 수정할 예약을 못 불러왔으면 빈 폼을 보여 주지 않는다. 채워지지 않은 폼에서 "변경하기"를
                 누르면 새 예약을 만드는 것처럼 보인다. 재시도 뒤 prefill 이 붙도록 Form 요소는 남긴다. */}
@@ -329,6 +332,7 @@ export const ReservationPanel = ({
                     title="변경할 예약 정보를 불러오지 못했어요." onRetry={onRetryEditLoad} retrying={editRetrying} />
             ) : (
                 <>
+                    <FieldsContainer {...(isPC ? { className: 'reserve-booking-panel-fields', role: 'region', 'aria-label': '예약 입력 영역', tabIndex: 0 } : {})}>
                     <Form.Item label="예약 날짜" name="reservationDate"
                         rules={[{ required: true, message: '날짜를 선택해주세요.' }]}>
                         {/*
@@ -374,7 +378,8 @@ export const ReservationPanel = ({
                         <FormTextArea rows={3} placeholder="요청 사항을 입력하세요." disabled={preview} />
                     </Form.Item>
                     {!isEditMode && <ReservationConsentField storeId={store?.id} disabled={preview} />}
-                    <div style={{ marginTop: 24 }}>
+                    </FieldsContainer>
+                    <div className={isPC ? 'reserve-booking-panel-submit' : undefined} style={{ marginTop: isPC ? 0 : 24 }}>
                         {entry && <ReservationEntryNotice expiresAt={entry.expiresAt} />}
                         <Button variant="primary" htmlType={preview ? 'button' : 'submit'} block loading={paying} disabled={preview}>
                             {submitLabel}

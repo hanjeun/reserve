@@ -3,6 +3,7 @@ import api from './axios';
 import { advanceSession, currentSession } from './sessionScope';
 import useAuthStore from '../store/useAuthStore';
 import chatRetentionService from '../services/chatRetentionService';
+import { chatListQueryPolicy } from '../components/chat/chatListQueryPolicy';
 
 vi.mock('../utils/skeletonDelay', () => ({ skeletonDelayInterceptor: async () => {} }));
 const deferred = () => {
@@ -93,6 +94,9 @@ describe('HTTP session boundary', () => {
             expect(calls).toEqual(['/api/chat/unread', '/api/auth/refresh', '/api/chat/unread']);
             if (status === 401) {
                 expect(error.isSessionExpired).toBe(true);
+                expect(error.status).toBe(401);
+                expect(chatListQueryPolicy.retry(0, error)).toBe(false);
+                expect(chatListQueryPolicy.refetchInterval({ state: { error } })).toBe(false);
                 expect(useAuthStore.getState().isLoggedIn).toBe(false);
             } else {
                 expect(error.status).toBe(403);

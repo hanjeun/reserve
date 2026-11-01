@@ -12,6 +12,10 @@ public final class IpExtractor {
 
     /** 파싱 실패 시 쓰는 값. 이상 요청이 한 버킷을 공유하게 되므로 오히려 조이는 쪽이다. */
     private static final String UNKNOWN = "unknown";
+    private static final String VERIFIED = IpExtractor.class.getName() + ".verified";
+    private record VerifiedAddress(String value) {
+        @Override public String toString() { return "VerifiedAddress[redacted]"; }
+    }
 
     /** 헤더 값 폭주 방어 — IPv6 최대 표기(45자)보다 넉넉하되 무한하지는 않게. */
     private static final int MAX_IP_LENGTH = 64;
@@ -19,6 +23,7 @@ public final class IpExtractor {
     private IpExtractor() {}
 
     public static String extract(HttpServletRequest request) {
+        if (request.getAttribute(VERIFIED) instanceof VerifiedAddress address) return address.value();
         String realIp = sanitize(request.getHeader("X-Real-IP"));
         if (realIp != null) {
             return realIp;
@@ -35,6 +40,11 @@ public final class IpExtractor {
 
         String remoteAddr = sanitize(request.getRemoteAddr());
         return remoteAddr != null ? remoteAddr : UNKNOWN;
+    }
+
+    /** IP 보호 관문이 검증한 주소를 기존 요청 제한에도 동일하게 적용해요. */
+    public static void useVerifiedAddress(HttpServletRequest request, String address) {
+        request.setAttribute(VERIFIED, new VerifiedAddress(address == null ? UNKNOWN : address));
     }
 
     /**

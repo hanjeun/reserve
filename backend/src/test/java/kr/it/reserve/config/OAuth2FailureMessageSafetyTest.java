@@ -18,6 +18,22 @@ class OAuth2FailureMessageSafetyTest {
     private final OAuth2AuthenticationFailureHandler handler = new OAuth2AuthenticationFailureHandler();
 
     @Test
+    void environmentVerificationOutageIsNotReportedAsASessionExpiry() {
+        String message = ReflectionTestUtils.invokeMethod(handler, "resolveMessage",
+                new OAuth2AuthenticationException(new OAuth2Error("ip_verification_unavailable"), "private-provider-response"));
+        assertThat(message).contains("접속 환경", "잠시 후").doesNotContain("만료", "private-provider-response");
+    }
+
+    @Test
+    void reusedOrExpiredRequestsAreNotReportedAsAnExpiredLoginSession() {
+        for (String code : java.util.List.of("authorization_request_not_found", "invalid_state", "login_method_expired")) {
+            var exception = new OAuth2AuthenticationException(new OAuth2Error(code), "private-provider-response");
+            String message = ReflectionTestUtils.invokeMethod(handler, "resolveMessage", exception);
+            assertThat(message).contains("요청").doesNotContain("로그인 요청이 만료", "로그인이 만료", "private-provider-response");
+        }
+    }
+
+    @Test
     @DisplayName("알 수 없는 OAuth 예외 원문은 사용자 리다이렉트 메시지에 포함하지 않는다")
     void unknownExceptionMessageIsReplacedWithGenericCopy() {
         String privateDetail = "private-user@example.com access_token=secret-value";

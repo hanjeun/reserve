@@ -47,6 +47,7 @@ public class AuthApiController {
     @org.springframework.beans.factory.annotation.Autowired
     private kr.it.reserve.member.service.LoginMethodService loginMethods;
     @org.springframework.beans.factory.annotation.Autowired private kr.it.reserve.member.mfa.MfaService mfa;
+    @org.springframework.beans.factory.annotation.Autowired(required = false) private kr.it.reserve.global.security.ip.IpLoginProtection ipProtection;
     private static final String ACCESS_TOKEN_COOKIE = "access_token";
 
     /**
@@ -167,6 +168,7 @@ public class AuthApiController {
         }
         Long memberId = memberService.join(signupRequest);
         Member newMember = memberService.findById(memberId);
+        if (ipProtection != null) ipProtection.approveCurrent(newMember);
         handleTokenIssue(response, newMember);
         return ApiResponse.success(MemberResponse.fromEntity(newMember), "회원가입 완료");
     }

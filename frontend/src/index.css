@@ -6,6 +6,7 @@
 @import './styles/global/navigation-and-media.css';
 @import './styles/global/components-and-forms.css';
 @import './styles/global/account-security.css';
+@import './styles/global/booking-panel.css';
 @import './styles/global/payment-bridge.css';
 @import './styles/global/icons.css';
 @import './styles/global/interactions.css';

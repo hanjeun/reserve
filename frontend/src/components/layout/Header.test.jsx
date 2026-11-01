@@ -71,15 +71,17 @@ describe('shared wordmark and result search header', () => {
         expect(document.querySelector('.reserve-header-back-slot')).not.toHaveClass('reserve-header-control-slot--entering');
     });
 
-    it('uses one full wordmark and restores Login / Start for guests', () => {
+    it('uses one full wordmark and named icon links for guests', () => {
         renderHeader('/stores');
         const logo = screen.getByRole('link', { name: 'RESERVE 홈' });
         expect(logo.textContent).toBe('RESERVE');
         expect(logo.querySelector('img')).toBeNull();
         expect(screen.getByRole('link', { name: '통합 검색' }).textContent).toBe('');
         expect(screen.queryByRole('textbox')).toBeNull();
-        expect(screen.getByRole('button', { name: '로그인' })).toBeTruthy();
-        expect(screen.getByRole('button', { name: '회원가입' })).toBeTruthy();
+        expect(screen.getByRole('link', { name: '로그인' })).toHaveAttribute('href', '/login');
+        expect(screen.getByRole('link', { name: '로그인' }).textContent).toBe('');
+        expect(screen.getByRole('link', { name: '회원가입' })).toHaveAttribute('href', '/signup');
+        expect(screen.getByRole('link', { name: '회원가입' }).textContent).toBe('');
         expect(screen.queryByRole('button', { name: '내 계정 메뉴 열기' })).toBeNull();
         expect(screen.queryByText('관심 가게')).toBeNull();
         expect(screen.queryByText('내 예약 확인')).toBeNull();
@@ -87,11 +89,11 @@ describe('shared wordmark and result search header', () => {
 
     it('keeps guest account actions usable on deeper routes', () => {
         const { unmount } = renderHeader('/store/12');
-        fireEvent.click(screen.getByRole('button', { name: '로그인' }));
+        fireEvent.click(screen.getByRole('link', { name: '로그인' }));
         expect(screen.getByLabelText('현재 경로').textContent).toBe('/login');
         unmount();
         renderHeader('/store/12');
-        fireEvent.click(screen.getByRole('button', { name: '회원가입' }));
+        fireEvent.click(screen.getByRole('link', { name: '회원가입' }));
         expect(screen.getByLabelText('현재 경로').textContent).toBe('/signup');
     });
 
@@ -99,8 +101,8 @@ describe('shared wordmark and result search header', () => {
         authState.isLoggedIn = true;
         renderHeader('/stores');
         expect(await screen.findByRole('button', { name: '내 계정 메뉴 열기' })).toBeTruthy();
-        expect(screen.queryByRole('button', { name: '로그인' })).toBeNull();
-        expect(screen.queryByRole('button', { name: '회원가입' })).toBeNull();
+        expect(screen.queryByRole('link', { name: '로그인' })).toBeNull();
+        expect(screen.queryByRole('link', { name: '회원가입' })).toBeNull();
     });
 
     it.each(['/stores', '/waiting'])('edits only the current list and leaves the separate global entry blank at %s', async path => {

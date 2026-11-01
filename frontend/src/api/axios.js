@@ -18,6 +18,7 @@ class SessionExpiredError extends Error {
     constructor() {
         super('다시 로그인해주세요.');
         this.name = 'SessionExpiredError';
+        this.status = 401;
         this.isSessionExpired = true;
     }
 }

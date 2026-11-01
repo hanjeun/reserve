@@ -68,7 +68,7 @@ final class StoreDirectory {
         if (store.resolveWaitingIntakeMode() != WaitingIntakeMode.OFF) {
             return StoreResponse.fromWaitingDirectory(store, waitingCounts.activeTeams(id));
         }
-        return StoreResponse.fromEntity(store);
+        return StoreResponse.fromPublicEntity(store);
     }
 
     Page<StoreResponse> search(

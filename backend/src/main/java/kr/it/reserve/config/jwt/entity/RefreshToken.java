@@ -88,6 +88,11 @@ public class RefreshToken {
 
     public void bindRefreshToken(String token) { this.refreshTokenHash = hash(token); }
 
+    public void reauthenticateOAuth(LocalDateTime at, boolean strong) {
+        oauthAuthenticatedAt = Objects.requireNonNull(at).truncatedTo(ChronoUnit.MILLIS);
+        loginMethod = strong ? "OAUTH_MFA" : "OAUTH";
+    }
+
     public void rotate(String token, String jti, String keyId, LocalDateTime now, LocalDateTime expiresAt) {
         if (rotationVersion == Long.MAX_VALUE) throw new IllegalStateException("Refresh family rotation exhausted");
         this.previousTokenHash = this.refreshTokenHash;

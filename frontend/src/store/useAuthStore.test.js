@@ -11,6 +11,19 @@ const deferred = () => { let resolve, reject; const promise = new Promise((yes, 
 describe('auth identity transitions', () => {
     beforeEach(() => { useAuthStore.getState().logout(); api.get.mockReset(); api.post.mockReset(); });
     afterEach(() => vi.useRealTimers());
+    it('인증 변경이 겹쳐도 모두 끝날 때까지 개인 조회를 보류하고 계정은 유지해요', async () => {
+        useAuthStore.getState().login(a);
+        const first = deferred(), second = deferred();
+        const one = useAuthStore.getState().withAuthTransition(() => first.promise);
+        const two = useAuthStore.getState().withAuthTransition(() => second.promise);
+        expect(useAuthStore.getState().authRestoring).toBe(true);
+        first.resolve('renewed'); await one;
+        expect(useAuthStore.getState().authRestoring).toBe(true);
+        second.reject(new Error('failed'));
+        await expect(two).rejects.toThrow('failed');
+        expect(useAuthStore.getState().authRestoring).toBe(false);
+        expect(useAuthStore.getState().user).toEqual(a);
+    });
     it('A checkAuth success cannot restore A after B logs in', async () => {
         useAuthStore.getState().login(a);
         const pending = deferred();

@@ -138,6 +138,21 @@ it('reconciles after transport failure without logging the member out and ignore
     expect(state.expireSession).not.toHaveBeenCalled();
 });
 
+it.each([null, { id: 7 }])('rechecks current cookies before ending a replaced session (%j)', async member => {
+    let finish;
+    state.checkAuth.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    render(ui('account'));
+    const old = connections[0];
+    act(() => ready(old));
+    act(() => old.emit('session-ended', {}));
+    expect(old.close).toHaveBeenCalled();
+    expect(state.expireSession).not.toHaveBeenCalled();
+    expect(connections).toHaveLength(1);
+    await act(async () => finish(member));
+    expect(connections).toHaveLength(member ? 2 : 1);
+    expect(state.checkAuth).toHaveBeenCalledExactlyOnceWith(true, { rethrowTransient: true, timeout: 8000 });
+});
+
 it('waits for session renewal and coalesces repeated failures and visibility changes', async () => {
     let finish;
     state.checkAuth.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
@@ -233,6 +248,26 @@ it('reconnects anonymously without attempting session renewal', async () => {
     expect(connections[1].options.withCredentials).toBe(false);
 });
 
+it('checks a previously healthy private session before reconnecting and refreshing a returned tab', async () => {
+    let finish;
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+    render(ui('account'));
+    act(() => ready(connections[0])); await tick(250); state.refresh.mockClear();
+    state.checkAuth.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    hidden.mockReturnValue(true);
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    hidden.mockReturnValue(false);
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    await tick(60_250);
+    expect(state.checkAuth).toHaveBeenCalledOnce();
+    expect(connections).toHaveLength(1);
+    expect(state.refresh).not.toHaveBeenCalled();
+    await act(async () => finish({ id: 7 }));
+    expect(connections).toHaveLength(2);
+    await tick(250);
+    expect(state.refresh).toHaveBeenCalledExactlyOnceWith([], true);
+});
+
 it('marks healthy-stream fallback as periodic while retaining signals in the same batch', async () => {
     render(ui('account'));
     act(() => ready(connections[0])); await tick(250); state.refresh.mockClear();
@@ -264,7 +299,7 @@ it('pauses hidden pages, reconciles on return, and closes subscriptions on unmou
     await tick(60_500);
     expect(state.refresh).not.toHaveBeenCalled();
     hidden.mockReturnValue(false);
-    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    await act(async () => document.dispatchEvent(new Event('visibilitychange')));
     expect(connections).toHaveLength(2);
     await tick(250);
     expect(state.refresh).toHaveBeenCalledWith([], true);

@@ -136,6 +136,11 @@ waiting:
     customer-notice-published-at: ${WAITING_CUSTOMER_RETENTION_NOTICE_PUBLISHED_AT:}
 
 reserve:
+  security:
+    ip-protection:
+      enabled: ${RESERVE_SECURITY_IP_PROTECTION_ENABLED:false}
+      fingerprint-key: ${RESERVE_SECURITY_IP_PROTECTION_FINGERPRINT_KEY:}
+      trusted-proxies: ${RESERVE_SECURITY_IP_PROTECTION_TRUSTED_PROXIES:}
   reservation-consent:
     enabled: ${RESERVE_RESERVATION_CONSENT_ENABLED:false}
     recipient-retention: ${RESERVE_RESERVATION_CONSENT_RECIPIENT_RETENTION:}

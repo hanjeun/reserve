@@ -4,12 +4,17 @@ param(
     [ValidateRange(1024, 65535)][int]$Port = 8080,
     [switch]$StartupCheck,
     [switch]$DisableBackgroundJobs,
-    [switch]$EnableUnpaidExpiry
+    [switch]$EnableUnpaidExpiry,
+    [switch]$AllowOneAdminMfaReset,
+    [switch]$RequireAdminMfa
 )
 
 $ErrorActionPreference = 'Stop'
 if ($EnableUnpaidExpiry -and (-not $DisableBackgroundJobs -or $StartupCheck)) {
     throw 'Unpaid expiry requires -DisableBackgroundJobs and cannot run during StartupCheck.'
+}
+if ($AllowOneAdminMfaReset -and (-not $DisableBackgroundJobs -or $StartupCheck)) {
+    throw 'One-time admin MFA reset requires -DisableBackgroundJobs and cannot run during StartupCheck.'
 }
 $repoRoot = Split-Path -Parent $PSScriptRoot
 if (-not $PSBoundParameters.ContainsKey('JavaPath')) {
@@ -78,6 +83,12 @@ try {
     }
     if ($EnableUnpaidExpiry) {
         $launchArguments += '--reserve.preview.unpaid-expiry-enabled=true'
+    }
+    if ($AllowOneAdminMfaReset) {
+        $launchArguments += '--reserve.preview.admin-mfa-reset-once=true'
+    }
+    if ($AllowOneAdminMfaReset -or $RequireAdminMfa) {
+        $launchArguments += '--reserve.mfa.enabled=true'
     }
     if ($StartupCheck) {
         # 진단 기동은 데이터 보정·예약·환불 작업을 실행하지 않는다.

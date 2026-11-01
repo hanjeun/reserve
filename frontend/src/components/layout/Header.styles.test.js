@@ -41,14 +41,15 @@ describe('result query header source contracts', () => {
         expect(styleAtWidth('.reserve-search-icon:focus-visible', 390).outline).toBe('var(--reserve-focus-ring)');
     });
 
-    it('keeps the search link neutral and closes only the mobile search-to-login gutter', () => {
-        const mobileLogin = styleAtWidth('.reserve-header-is-guest .reserve-header-guest-actions .reserve-btn--ghost', 390);
+    it('keeps neutral 44px navigation icons without legacy guest button spacing', () => {
         expect(styleAtWidth('.reserve-header-search:hover', 390).color).toBe('var(--c-text-primary, #191f28)');
         expect(styleAtWidth('.reserve-header-is-guest .reserve-header-actions', 390).gap).toBe('0');
-        expect(mobileLogin['min-width']).toBe('44px');
-        expect(mobileLogin['padding-left']).toBe('0');
-        expect(mobileLogin['padding-right']).toBe('13px');
-        expect(styleAtWidth('.reserve-header-guest-actions', 960).gap).toBe('12px');
+        for (const width of [320, 390, 960]) {
+            expect(styleAtWidth('.reserve-header-search', width).width).toBe('44px');
+            expect(styleAtWidth('.reserve-header-search', width).height).toBe('44px');
+        }
+        expect(styleAtWidth('.reserve-header-is-guest .reserve-header-guest-actions .reserve-btn--ghost', 390)).toEqual({});
+        expect(styleAtWidth('.reserve-header-guest-actions', 960).gap).toBeUndefined();
     });
 
     it('keeps the contextual back control visible on desktop as well as mobile', () => {

@@ -66,4 +66,5 @@ public class MfaCredential {
         this.backedUp = backedUp;
         lastUsedAt = now;
     }
+    public void rename(String value) { name = value; }
 }

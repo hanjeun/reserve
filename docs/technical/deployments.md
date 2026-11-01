@@ -48,7 +48,13 @@ PR과 main 빌드 모두 최신 기반 이미지를 가져와 캐시 없이 앱 
 
 운영 패치에는 해당 CVE·패키지·서비스 영향·백업과 복구 경로·재시작 시간을 먼저 확정해요. 배포 중에는 `apt upgrade`, Docker·SSH 재시작, 커널 재부팅을 함께 실행하지 않아요. 패치 뒤 설치 버전뿐 아니라 실제 실행 커널과 서비스도 확인해요. nginx·MySQL·Redis·관측 컨테이너는 앱 이미지 검사 범위에 포함되지 않으므로 각 실행 이미지와 보존 볼륨을 별도로 검증해요.
 
-현재 nginx는 호스트의 PRIVATE_IP와 8080·8081 포트로 앱에 연결해요. 앱 포트를 loopback으로만 바꾸면 이 경로가 끊기므로 실제 nginx 네트워크와 함께 전환해야 해요. 전환 전까지 두 앱 포트의 외부 직접 접근을 보안그룹·호스트 방화벽에서 막는지 별도 확인해야 해요. [Docker 공개 포트](https://docs.docker.com/engine/network/port-publishing/)는 호스트 IP를 지정하지 않으면 외부에도 열릴 수 있어요.
+앱 포트 8080·8081은 호스트 루프백에만 연결하고 nginx는 `reserve-ingress` 내부망의 전용 별칭으로 앱에 연결해요. nginx `172.30.30.2`, blue `.3`, green `.4`를 `172.30.30.0/29`에서 고정하고 nginx 주소 하나만 신뢰해요. 이 전환에는 Docker Engine 28 이상과 nginx 1.27.3 이상이 필요해요. nginx는 Docker DNS와 공유 upstream zone을 사용해 비활성 앱의 부재·교체를 처리해요. [Docker 포트 공개](https://docs.docker.com/engine/network/port-publishing/)와 [nginx 동적 주소 확인](https://nginx.org/en/docs/http/ngx_http_upstream_module.html#resolve)을 참고해요.
+
+최초 전환은 별도 승인 후 `python3 scripts/prepare-ip-protection.py prepare-network --apply`로 내부망을 만들고 nginx와 현재 활성 앱에 추가 연결해요. 기존 망·라우팅을 먼저 끊지 않아요. 도구는 대역 충돌·소유·고정 주소·실제 활성 upstream을 검사해요. 배포는 `check-network`를 통과한 뒤 새 앱을 만들며 기존 메모리·호환성·원자적 전환·복구 관문을 유지해요. 이전 호스트 사설 주소를 쓰는 nginx에 포트 제한만 먼저 적용하지 않아요.
+
+Redis 계정 전환도 별도 승인해요. 기존 관리자 설정과 독립된 앱 키를 보호 파일로 준비하고 `prepare-ip-protection.py prepare-acl --apply --admin-config <보호된 redis.conf> --app-key <보호된 앱 키> --output <새 보호된 users.acl>`을 사용해요. 도구는 기존 관리자 권한·인증을 대조하고 앱 권한만 제한하며 ACL을 Redis UID 999가 읽도록 저장해요. `RESERVE_REDIS_ACL_PATH`와 읽기 전용 ACL을 적용하는 Redis 재시작은 진행 중 입장 관문·쓰기를 확인한 승인된 중지 시간에 수행해요. 앱은 새 `RESERVE_REDIS_USERNAME=reserve_app`·전용 암호를 사용해요. 기존 관리자 암호·설정과 직전 compose는 복구에 보존해요.
+
+첫 배포는 IP 보호를 끈 상태로 프록시·제한 Redis 계정·새 앱을 전환하고 같은 SHA의 호환 복구를 확인해요. `check-redis`·필수 CI·외부 앱 포트의 직접 연결 차단·실제 프록시 경유 로그인 확인 뒤 같은 검증 이미지로 IP 보호만 활성화해요. 인증 상태가 새로 생긴 뒤에는 IP 변수를 끈 같은 SHA를 우선 복구 대상으로 사용해요. 최초 인프라 전환이 실패하면 직전 앱·nginx·프론트와 Redis 설정·인증으로 복귀하며 새 내부망은 롤백 확인 전에 제거하지 않아요. 격리 프록시 검사는 `RESERVE_PROXY_INTEGRATION=true python3 scripts/tests/ip_protection_test.py ProxyIntegrationTest`예요.
 
 ## 관련 코드
 

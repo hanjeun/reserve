@@ -15,6 +15,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.config.ObjectPostProcessor;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -23,6 +24,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import kr.it.reserve.config.oauth2.LoginAuthorizationRequestRepository;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
@@ -53,6 +55,7 @@ public class SecurityConfig {
     @Autowired private kr.it.reserve.member.service.LoginMethodService loginMethods;
     @Autowired private org.springframework.beans.factory.ObjectProvider<kr.it.reserve.global.admission.ServiceAdmissionService> serviceAdmission;
     @Autowired private org.springframework.beans.factory.ObjectProvider<kr.it.reserve.global.ratelimit.RateLimiter> entryLimiters;
+    @Autowired private org.springframework.beans.factory.ObjectProvider<kr.it.reserve.global.security.ip.IpLoginProtection> ipProtection;
     @Value("${reserve.service-admission.enabled:false}") private boolean serviceAdmissionEnabled;
     @Value("${server.env:prod}") private String serviceAdmissionEnvironment;
 
@@ -105,7 +108,7 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.POST, ApiPaths.withV1Aliases(
                                 "/api/auth/mfa/status", "/api/auth/mfa/totp/setup", "/api/auth/mfa/totp/confirm",
                                 "/api/auth/mfa/passkey/login", "/api/auth/mfa/passkey/options", "/api/auth/mfa/passkey/confirm",
-                                "/api/auth/mfa/verify", "/api/auth/mfa/finish", "/api/auth/mfa/recovery",
+                                "/api/auth/mfa/verify", "/api/auth/mfa/email/send", "/api/auth/mfa/finish", "/api/auth/mfa/recovery",
                                 "/api/auth/mfa/remove", "/api/auth/mfa/disable", "/api/auth/mfa/cancel", "/api/auth/mfa/defer")).permitAll()
                         // 가입 전 이메일 인증에 필요한 두 요청만 공개한다. 인증 상태를 이메일로
                         // 조회하는 공개 API는 계정·인증 진행 여부를 추측하게 하므로 두지 않는다.
@@ -198,16 +201,28 @@ public class SecurityConfig {
                         // 나머지는 인증 필요
                         .anyRequest().authenticated())
 
-                .oauth2Login(oauth2 -> oauth2
+                .oauth2Login(oauth2 -> {
+                    oauth2.addObjectPostProcessor(new ObjectPostProcessor<OAuth2AuthorizationRequestRedirectFilter>() {
+                        @Override
+                        public <O extends OAuth2AuthorizationRequestRedirectFilter> O postProcess(O filter) {
+                            filter.setAuthenticationFailureHandler(oAuth2AuthenticationFailureHandler);
+                            return filter;
+                        }
+                    });
+                    oauth2
                         // OAuth2 state 파라미터를 세션에 저장 (STATELESS 환경에서 필수)
                         .authorizationEndpoint(authorization -> authorization
                                 .authorizationRequestResolver(new TrustedOAuth2AuthorizationRequestResolver(registrations, siteUrls.oauthOrigins(browserOrigins()), loginMethods))
                                 .authorizationRequestRepository(new LoginAuthorizationRequestRepository()))
                         .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
                         .successHandler(oAuth2AuthenticationSuccessHandler)
-                        .failureHandler(oAuth2AuthenticationFailureHandler))
+                        .failureHandler(oAuth2AuthenticationFailureHandler);
+                })
 
                 // JWT 필터 등록
+                .addFilterBefore(new IpProtectionFilter(ipProtection.getIfAvailable(), objectMapper), OAuth2AuthorizationRequestRedirectFilter.class)
+                .addFilterBefore(new OAuthStartRateLimitFilter(entryLimiters.getIfAvailable(), objectMapper),
+                        OAuth2AuthorizationRequestRedirectFilter.class)
                 .addFilterBefore(new JwtAuthenticationFilter(tokenProvider), UsernamePasswordAuthenticationFilter.class)
                 // firewall·CORS 이후, 인증·CSRF 전에 미지원 API 버전만 404로 종료한다.
                 .addFilterBefore(new UnsupportedApiVersionFilter(objectMapper), CsrfFilter.class)

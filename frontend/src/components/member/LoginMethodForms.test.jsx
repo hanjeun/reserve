@@ -63,6 +63,35 @@ it('explains an invalid email before sending an email challenge', async () => {
     expect(fixture.onSubmit).not.toHaveBeenCalled();
 });
 
+it('회원가입과 같은 필드 옆 발송 버튼을 쓰고 발급 후에만 코드 입력칸을 펼쳐요', async () => {
+    setup();
+    const email = screen.getByLabelText('로그인 이메일');
+    const send = screen.getByRole('button', { name: '인증 코드 받기' });
+    expect(send.parentElement).toBe(email.parentElement);
+    expect(send.parentElement).toHaveClass('reserve-form-field-with-button');
+    expect(send.textContent).toBe('코드발송');
+    expect(screen.queryByLabelText('인증 코드')).toBeNull();
+    fireEvent.click(send);
+    expect(await screen.findByLabelText('인증 코드')).toBeEnabled();
+    expect(screen.getByRole('button', { name: '인증 코드 다시 받기' }).textContent).toBe('재발송');
+    expect(fixture.onSend).toHaveBeenCalledExactlyOnceWith('member@example.test');
+});
+
+it('발송 중 중복 클릭을 잠그고 실패하면 코드 입력을 열지 않아요', async () => {
+    let reject;
+    fixture.onSend.mockReturnValue(new Promise((_, fail) => { reject = fail; }));
+    setup();
+    const send = screen.getByRole('button', { name: '인증 코드 받기' });
+    fireEvent.click(send);
+    fireEvent.click(send);
+    await waitFor(() => expect(fixture.onSend).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('button', { name: '인증 코드 받기 처리 중' })).toBeDisabled();
+    reject(new Error('발송하지 못했어요.'));
+    await waitFor(() => expect(fixture.onError).toHaveBeenCalledWith('발송하지 못했어요.'));
+    expect(screen.queryByLabelText('인증 코드')).toBeNull();
+    expect(screen.getByRole('button', { name: '인증 코드 받기' })).toBeEnabled();
+});
+
 it('explains the missing challenge instead of submitting an email login setup', () => {
     setup();
     const button = screen.getByRole('button', { name: '이메일 로그인 설정' });

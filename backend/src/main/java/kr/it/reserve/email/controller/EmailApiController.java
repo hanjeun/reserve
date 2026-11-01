@@ -79,7 +79,7 @@ public class EmailApiController {
         // 코드별 시도 제한에 더해 IP·계정별 재발송과 대조를 제한한다. 이메일은 소문자로 정규화해 우회를 막는다.
         String ip = IpExtractor.extract(httpRequest);
         boolean ipQuotaLeft = rateLimiter.tryConsume(ip, RateLimiter.Policy.CODE_VERIFY);
-        boolean accountQuotaLeft = rateLimiter.tryConsume(
+        boolean accountQuotaLeft = ipQuotaLeft && rateLimiter.tryConsume(
                 email.trim().toLowerCase(Locale.ROOT), RateLimiter.Policy.CODE_VERIFY_ACCOUNT);
         if (!ipQuotaLeft || !accountQuotaLeft) {
             log.warn("Email verification attempt throttled: ipQuotaLeft={}, accountQuotaLeft={}",

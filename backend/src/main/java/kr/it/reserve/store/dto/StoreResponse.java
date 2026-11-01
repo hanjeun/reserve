@@ -150,8 +150,14 @@ public class StoreResponse {
     }
 
     public static StoreResponse fromWaitingDirectory(Store store, long waitingTeams) {
-        StoreResponse response = fromEntity(store);
+        StoreResponse response = fromPublicEntity(store);
         response.waitingTeams = waitingTeams;
+        return response;
+    }
+
+    public static StoreResponse fromPublicEntity(Store store) {
+        StoreResponse response = fromEntity(store);
+        response.suspendReason = null;
         return response;
     }
 

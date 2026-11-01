@@ -94,7 +94,7 @@ public class PasswordResetController {
         boolean ipQuotaLeft = rateLimiter.tryConsume(ip, RateLimiter.Policy.CODE_VERIFY);
 
         boolean accountQuotaLeft = true;
-        if (email != null && !email.isBlank()) {
+        if (ipQuotaLeft && email != null && !email.isBlank()) {
             accountQuotaLeft = rateLimiter.tryConsume(
                     email.trim().toLowerCase(Locale.ROOT), RateLimiter.Policy.CODE_VERIFY_ACCOUNT);
         }

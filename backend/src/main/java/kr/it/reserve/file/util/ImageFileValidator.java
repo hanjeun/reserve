@@ -135,6 +135,7 @@ public final class ImageFileValidator {
     }
 
     private static Dimensions readStandardDimensions(byte[] bytes) {
+        if (asciiEquals(bytes, 0, "GIF87a") || asciiEquals(bytes, 0, "GIF89a")) validateGifFrames(bytes);
         try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(bytes))) {
             Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
             if (!readers.hasNext()) throw unsupported("디코딩할 수 없는 이미지예요.");
@@ -148,6 +149,49 @@ public final class ImageFileValidator {
         } catch (IOException exception) {
             throw unsupported(INVALID_IMAGE_MESSAGE);
         }
+    }
+
+    /** 첫 프레임을 디코딩하기 전에 전체 블록 경계를 상수 메모리로 검사한다. */
+    private static void validateGifFrames(byte[] bytes) {
+        if (bytes.length < 13) throw unsupported(INVALID_IMAGE_MESSAGE);
+        int width = gifWord(bytes, 6), height = gifWord(bytes, 8);
+        validateDimensions(new Dimensions(width, height));
+        int offset = 13 + gifColorTableSize(bytes[10]);
+        int frames = 0;
+        while (offset < bytes.length) {
+            int block = bytes[offset++] & 0xff;
+            if (block == 0x3b) {
+                if (frames == 0 || offset != bytes.length) throw unsupported(INVALID_IMAGE_MESSAGE);
+                return;
+            }
+            if (block == 0x21) {
+                if (offset >= bytes.length) throw unsupported(INVALID_IMAGE_MESSAGE);
+                offset = gifSubBlocks(bytes, offset + 1);
+            } else if (block == 0x2c) {
+                if (offset + 9 > bytes.length) throw unsupported(INVALID_IMAGE_MESSAGE);
+                int left = gifWord(bytes, offset), top = gifWord(bytes, offset + 2);
+                int frameWidth = gifWord(bytes, offset + 4), frameHeight = gifWord(bytes, offset + 6);
+                validateDimensions(new Dimensions(frameWidth, frameHeight));
+                if (left + frameWidth > width || top + frameHeight > height) throw unsupported(INVALID_IMAGE_MESSAGE);
+                offset += 9 + gifColorTableSize(bytes[offset + 8]);
+                if (offset >= bytes.length) throw unsupported(INVALID_IMAGE_MESSAGE);
+                offset = gifSubBlocks(bytes, offset + 1);
+                frames++;
+            } else { throw unsupported(INVALID_IMAGE_MESSAGE); }
+        }
+        throw unsupported(INVALID_IMAGE_MESSAGE);
+    }
+
+    private static int gifWord(byte[] bytes, int offset) { return (bytes[offset] & 0xff) | (bytes[offset + 1] & 0xff) << 8; }
+    private static int gifColorTableSize(byte packed) { return (packed & 0x80) == 0 ? 0 : 3 * (1 << ((packed & 7) + 1)); }
+    private static int gifSubBlocks(byte[] bytes, int offset) {
+        while (offset < bytes.length) {
+            int size = bytes[offset++] & 0xff;
+            if (size == 0) return offset;
+            if (offset + size > bytes.length) throw unsupported(INVALID_IMAGE_MESSAGE);
+            offset += size;
+        }
+        throw unsupported(INVALID_IMAGE_MESSAGE);
     }
 
     /**

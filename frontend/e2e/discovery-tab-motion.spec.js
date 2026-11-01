@@ -152,7 +152,7 @@ test('rapid header back presses produce one collapse and one history move', asyn
     await page.getByRole('link', { name: 'RESERVE 홈' }).click();
     await expect(page.getByText('아직 추천할 가게가 없어요.', { exact: true })).toBeVisible();
     await expect(page.locator('.reserve-header-back')).toHaveCount(0);
-    await page.getByRole('button', { name: '로그인', exact: true }).click();
+    await page.locator('.reserve-header-inner').getByRole('link', { name: '로그인', exact: true }).click();
     await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible();
     const back = page.getByRole('button', { name: '이전 화면으로 돌아가기' });
     const backSlot = page.locator('.reserve-header-back-slot');
@@ -186,7 +186,7 @@ test('ordinary routes and the password return use the same content-only directio
     await page.goto('/');
     await expect(page.getByText('아직 추천할 가게가 없어요.', { exact: true })).toBeVisible();
     const content = page.locator('.ant-layout-content');
-    await page.getByRole('button', { name: '로그인', exact: true }).click();
+    await page.locator('.reserve-header-inner').getByRole('link', { name: '로그인', exact: true }).click();
     await expect(page).toHaveURL(/\/login$/);
     await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible();
     await expectContentEntry(page, content.locator(':scope > div').first(), 'from-right');

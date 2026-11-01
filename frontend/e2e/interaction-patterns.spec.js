@@ -63,41 +63,41 @@ test.beforeEach(async ({ page, context }) => {
     await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'no-preference' });
 });
 
-test('guest header separates neutral navigation hover from primary press and keyboard focus', async ({ page, isMobile }) => {
+test('guest header uses matching neutral icon links and keyboard focus', async ({ page, isMobile }) => {
     await mockApi(page);
     await page.goto('/');
     const search = page.getByRole('link', { name: '통합 검색' });
-    const login = page.getByRole('button', { name: '로그인', exact: true });
-    const start = page.getByRole('button', { name: '회원가입', exact: true });
+    const login = page.locator('.reserve-header-inner').getByRole('link', { name: '로그인', exact: true });
+    const start = page.locator('.reserve-header-inner').getByRole('link', { name: '회원가입', exact: true });
     await expect(search).toBeVisible();
     await expect(login).toBeVisible();
     await expect(start).toBeVisible();
+    await expect(login).toHaveAttribute('href', '/login');
+    await expect(start).toHaveAttribute('href', '/signup');
 
     if (!isMobile) {
-        await search.hover();
-        await expect.poll(() => search.evaluate(element => {
-            const surface = getComputedStyle(element, '::before');
-            return { background: surface.backgroundColor, opacity: surface.opacity, width: surface.width, height: surface.height, radius: surface.borderRadius };
-        })).toEqual({ background: 'rgb(249, 250, 251)', opacity: '1', width: '32px', height: '32px', radius: '50%' });
-        await expect(search).toHaveCSS('width', '44px');
-        await expect(search).toHaveCSS('height', '44px');
-        await expect(search).toHaveCSS('transform', 'none');
-        await start.hover();
-        await expect(start).toHaveCSS('opacity', '1');
-        const hoverColor = await start.evaluate(element => getComputedStyle(element).getPropertyValue('--c-primary-solid-hover').trim());
-        expect(hoverColor).toMatch(/^#[a-f\d]{6}$/i);
-        const hoverChannels = hoverColor.slice(1).match(/.{2}/g).map(channel => Number.parseInt(channel, 16));
-        await expect(start).toHaveCSS('background-color', `rgb(${hoverChannels.join(', ')})`);
-        await pressWithoutClick(page, start, async () => {
-            await expect(start).toHaveCSS('transform', 'matrix(0.96, 0, 0, 0.96, 0, 0)');
-        });
+        for (const control of [search, login, start]) {
+            await control.hover();
+            await expect.poll(() => control.evaluate(element => {
+                const surface = getComputedStyle(element, '::before');
+                return { background: surface.backgroundColor, opacity: surface.opacity, width: surface.width, height: surface.height, radius: surface.borderRadius };
+            })).toEqual({ background: 'rgb(249, 250, 251)', opacity: '1', width: '32px', height: '32px', radius: '50%' });
+            await expect(control).toHaveCSS('width', '44px');
+            await expect(control).toHaveCSS('height', '44px');
+            await expect(control).toHaveCSS('transform', 'none');
+            await pressWithoutClick(page, control, async () => {
+                await expect(control).toHaveCSS('transform', 'none');
+            });
+        }
     }
 
     await page.goto('/');
-    await tabTo(page, search);
-    await expect(search).toHaveCSS('outline-color', 'rgb(139, 149, 161)');
-    await expect(search).toHaveCSS('outline-width', '1px');
-    expect(await search.evaluate(element => element.matches(':focus-visible'))).toBe(true);
+    for (const control of [search, login, start]) {
+        await tabTo(page, control);
+        await expect(control).toHaveCSS('outline-color', 'rgb(139, 149, 161)');
+        await expect(control).toHaveCSS('outline-width', '1px');
+        expect(await control.evaluate(element => element.matches(':focus-visible'))).toBe(true);
+    }
 
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await pressWithoutClick(page, start, async () => {

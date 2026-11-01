@@ -33,7 +33,7 @@ test('switching A to B in the same SPA cannot reuse A favorites', async ({ page 
     // 세션 전환으로 QueryProvider가 바뀌어도 AntD 메시지 공급자는 남아야 한다.
     await expect(page.getByText('로그아웃했어요.')).toBeVisible();
     await expect(page.getByText('A만의 즐겨찾기', { exact: true })).not.toBeVisible();
-    await page.getByRole('button', { name: '로그인', exact: true }).first().click();
+    await page.locator('.reserve-header-inner').getByRole('link', { name: '로그인', exact: true }).click();
     await page.getByPlaceholder('이메일 주소').fill('b@example.test');
     await page.getByPlaceholder('비밀번호').fill('local-test-password');
     await page.getByRole('main').getByRole('button', { name: '로그인', exact: true }).click();
@@ -102,7 +102,7 @@ test('logout reports a server failure but clears this device session without try
     await menuItem(page, '로그아웃').click();
 
     await expect(page.getByText('이 기기에서 로그아웃했어요. 서버 연결은 확인하지 못했어요.')).toBeVisible();
-    await expect(page.getByRole('button', { name: '로그인', exact: true }).first()).toBeVisible();
+    await expect(page.locator('.reserve-header-inner').getByRole('link', { name: '로그인', exact: true })).toBeVisible();
     expect(requestedPaths).toContain('/api/auth/logout');
     expect(requestedPaths).not.toContain('/api/auth/refresh');
 });

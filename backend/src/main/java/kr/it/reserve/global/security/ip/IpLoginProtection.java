@@ -2,7 +2,7 @@ package kr.it.reserve.global.security.ip;
 
 import jakarta.servlet.http.HttpServletRequest;
 import kr.it.reserve.global.error.AuthException;
-import kr.it.reserve.member.entity.Member;
+import kr.it.reserve.global.security.LoginIdentity;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -37,23 +37,23 @@ public class IpLoginProtection {
 
     public boolean enabled() { return enabled; }
     public String clientAddress(HttpServletRequest request) { return addresses.extract(request); }
-    public boolean needsStepUp(Member member) {
+    public boolean needsStepUp(LoginIdentity member) {
         if (!enabled) return false;
         try { return !store.known(owner(member), network(request())); }
         catch (IpProtectionStore.Unavailable failure) { throw unavailable(); }
     }
 
-    public void bind(String ticket, Member member) {
+    public void bind(String ticket, LoginIdentity member) {
         if (!enabled) throw expired();
         try { store.bind(digest("ticket", ticket), binding(ticket, member)); }
         catch (IpProtectionStore.Unavailable failure) { throw unavailable(); }
     }
-    public void requireBinding(String ticket, Member member) {
+    public void requireBinding(String ticket, LoginIdentity member) {
         if (!enabled) throw expired();
         try { if (!store.binding(digest("ticket", ticket), binding(ticket, member))) throw expired(); }
         catch (IpProtectionStore.Unavailable failure) { throw unavailable(); }
     }
-    public void issueEmailCode(String ticket, Member member, String code) {
+    public void issueEmailCode(String ticket, LoginIdentity member, String code) {
         requireBinding(ticket, member);
         try {
             long result = store.issueCode(digest("ticket", ticket), binding(ticket, member), digest("code", ticket + ":" + code));
@@ -61,7 +61,7 @@ public class IpLoginProtection {
             if (result != 1) throw expired();
         } catch (IpProtectionStore.Unavailable failure) { throw unavailable(); }
     }
-    public boolean verifyEmailCode(String ticket, Member member, String code) {
+    public boolean verifyEmailCode(String ticket, LoginIdentity member, String code) {
         requireBinding(ticket, member);
         if (code == null || !code.matches("[0-9]{6}")) return false;
         try { return store.verifyCode(digest("ticket", ticket), binding(ticket, member), digest("code", ticket + ":" + code)); }
@@ -69,13 +69,13 @@ public class IpLoginProtection {
     }
 
     /** 실제 확인을 마친 가입·추가 인증 경로만 현재 요청에 허용해요. */
-    public void approveCurrent(Member member) {
+    public void approveCurrent(LoginIdentity member) {
         if (!enabled) return;
         HttpServletRequest request = request();
         request.setAttribute(GRANT, new Grant(member.getId(), member.getAuthVersion(), network(request)));
     }
 
-    public Runnable beforeSession(Member member, boolean strong) {
+    public Runnable beforeSession(LoginIdentity member, boolean strong) {
         if (!enabled) return () -> { };
         HttpServletRequest request = request();
         String network = network(request), owner = owner(member);
@@ -101,8 +101,8 @@ public class IpLoginProtection {
         try { store.failed(network(request)); } catch (IpProtectionStore.Unavailable ignored) { }
     }
 
-    private String owner(Member member) { return digest("member", member.getId() + ":" + member.getAuthVersion()); }
-    private String binding(String ticket, Member member) { return digest("binding", member.getId() + ":" + network(request()) + ":" + ticket); }
+    private String owner(LoginIdentity member) { return digest("member", member.getId() + ":" + member.getAuthVersion()); }
+    private String binding(String ticket, LoginIdentity member) { return digest("binding", member.getId() + ":" + network(request()) + ":" + ticket); }
     private String network(HttpServletRequest request) {
         String literal = addresses.extract(request);
         if (literal == null) throw unavailable();

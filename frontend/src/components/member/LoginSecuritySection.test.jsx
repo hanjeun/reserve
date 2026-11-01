@@ -373,7 +373,7 @@ it('invalidates the displayed email challenge when the user edits the email', as
     expect(screen.queryByRole('button', { name: '네이버로 본인 확인' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '인증 코드 받기' }));
     await waitFor(() => expect(screen.getByRole('button', { name: '인증 코드 다시 받기' })).toBeInTheDocument());
-    expect(screen.getByLabelText('인증 코드')).toBeEnabled();
+    expect(await screen.findByLabelText('인증 코드')).toBeEnabled();
     fireEvent.change(screen.getByLabelText('로그인 이메일'), { target: { value: 'another@example.test' } });
     const code = screen.getByLabelText('인증 코드');
     expect(code).toBeDisabled();

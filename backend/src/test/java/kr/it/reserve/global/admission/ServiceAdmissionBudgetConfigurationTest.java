@@ -13,6 +13,7 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -55,19 +56,28 @@ class ServiceAdmissionBudgetConfigurationTest {
     void redisComposePinsMemoryPolicyAndPreservesCredentialAndNetworkFences() throws Exception {
         for (String file : List.of("docker-compose-redis.yml", "docker-compose-local-redis.yml")) {
             Map<String, Object> service = composeService(file, "redis");
-            assertThat(service.get("command")).isEqualTo(List.of("redis-server", "/usr/local/etc/redis/redis.conf",
-                    "--maxmemory", "64mb", "--maxmemory-policy", "noeviction"));
+            boolean production = file.equals("docker-compose-redis.yml");
+            var command = new ArrayList<>(List.of("redis-server", "/usr/local/etc/redis/redis.conf"));
+            if (production) command.addAll(List.of("--aclfile", "/usr/local/etc/redis/users.acl"));
+            command.addAll(List.of("--maxmemory", "64mb", "--maxmemory-policy", "noeviction"));
+            assertThat(service.get("command")).isEqualTo(command);
             assertThat(service.get("mem_limit")).isEqualTo("128m");
             assertThat(service.get("memswap_limit")).isEqualTo("128m");
             assertThat(service.get("image").toString()).matches("redis:8\\.2\\.9-alpine@sha256:[0-9a-f]{64}");
             assertThat(service.get("read_only")).isEqualTo(true);
-            var volume = (Map<?, ?>) ((List<?>) service.get("volumes")).getFirst();
+            var volumes = ((List<?>) service.get("volumes")).stream().map(value -> (Map<?, ?>) value).toList();
+            assertThat(volumes).hasSize(production ? 2 : 1);
+            var volume = volumes.stream().filter(value -> "/usr/local/etc/redis/redis.conf".equals(value.get("target"))).findFirst().orElseThrow();
             assertThat(volume.get("source").toString()).contains("${RESERVE_REDIS_CONFIG_PATH:?");
             assertThat(volume.get("target")).isEqualTo("/usr/local/etc/redis/redis.conf");
             assertThat(volume.get("read_only")).isEqualTo(true);
-            if (file.equals("docker-compose-redis.yml")) {
+            if (production) {
                 assertThat(service).doesNotContainKey("ports");
                 assertThat(((Map<?, ?>) volume.get("bind")).get("create_host_path")).isEqualTo(false);
+                var acl = volumes.stream().filter(value -> "/usr/local/etc/redis/users.acl".equals(value.get("target"))).findFirst().orElseThrow();
+                assertThat(acl.get("source").toString()).contains("${RESERVE_REDIS_ACL_PATH:?");
+                assertThat(acl.get("read_only")).isEqualTo(true);
+                assertThat(((Map<?, ?>) acl.get("bind")).get("create_host_path")).isEqualTo(false);
             } else assertThat(service.get("ports")).isEqualTo(List.of("127.0.0.1:6379:6379"));
         }
     }

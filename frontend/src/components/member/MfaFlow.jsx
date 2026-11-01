@@ -20,12 +20,13 @@ import { revealSecurityPanel } from '../../utils/securityReturn';
 
 const config = { skipAuthRefresh: true };
 const post = (path, data) => api.post('/api/auth/mfa/' + path, data, config);
-function MfaAction({ page, label, icon, loading, disabled, htmlType = 'button', onClick, variant = 'primary' }) {
+function MfaAction({ page, label, icon, loading, disabled, htmlType = 'button', onClick, variant = 'primary', kind = 'tool' }) {
     return page ? <Button variant={variant} size="lg" block icon={icon} loading={loading} disabled={disabled} htmlType={htmlType} onClick={onClick}>{label}</Button>
-        : <IconTool label={label} icon={icon} loading={loading} disabled={disabled} htmlType={htmlType} onClick={onClick} />;
+        : <IconTool label={label} icon={icon} loading={loading} disabled={disabled} htmlType={htmlType} onClick={onClick} kind={kind} />;
 }
 MfaAction.propTypes = { page: PropTypes.bool, label: PropTypes.string.isRequired, icon: PropTypes.node.isRequired,
-    loading: PropTypes.bool, disabled: PropTypes.bool, htmlType: PropTypes.oneOf(['button', 'submit']), onClick: PropTypes.func, variant: PropTypes.string };
+    loading: PropTypes.bool, disabled: PropTypes.bool, htmlType: PropTypes.oneOf(['button', 'submit']), onClick: PropTypes.func, variant: PropTypes.string,
+    kind: PropTypes.oneOf(['navigation', 'tool']) };
 export default function MfaFlow({ ref, initialView, settings, page = false, onDone, onCancel }) {
     const revision = useAuthStore(state => state.sessionRevision);
     const [view, setView] = useState(initialView);
@@ -162,7 +163,7 @@ export default function MfaFlow({ ref, initialView, settings, page = false, onDo
                     <FormInput inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="6자리 인증 코드" />
                 </Form.Item>
                 <div className={!page ? 'reserve-mfa-verification-actions' : undefined}>
-                    {!page && <MfaAction label="뒤로" icon={<ArrowLeftOutlined aria-hidden="true" />} variant="ghost-sm" disabled={busy} onClick={back} />}
+                    {!page && <MfaAction label="뒤로" icon={<ArrowLeftOutlined aria-hidden="true" />} variant="ghost-sm" kind="navigation" disabled={busy} onClick={back} />}
                     <MfaAction page={page} label="등록" htmlType="submit" icon={<CheckOutlined aria-hidden="true" />} loading={busy} />
                 </div>
             </Form>

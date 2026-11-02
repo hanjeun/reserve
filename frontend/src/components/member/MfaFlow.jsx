@@ -195,7 +195,9 @@ export default function MfaFlow({ ref, initialView, settings, page = false, onDo
                         buttonText={emailSent ? '재발송' : '코드발송'} buttonLoading={busy}
                         onButtonClick={() => perform(async () => { await post('email/send'); if (mounted.current) setEmailSent(true); })} />
                 </Form.Item>
-                {emailSent && <MfaAction page={page} label="확인" htmlType="submit" icon={<CheckOutlined aria-hidden="true" />} loading={busy} />}
+                {emailSent && <div className={!page ? 'reserve-mfa-verification-actions' : undefined}>
+                    <MfaAction page={page} label="확인" htmlType="submit" icon={<CheckOutlined aria-hidden="true" />} loading={busy} />
+                </div>}
             </Form> : selected === 'PASSKEY' ? <div className={!page ? 'reserve-mfa-verification-actions' : undefined}>
                 <MfaAction page={page} label="패스키로 확인" icon={<LockOutlined aria-hidden="true" />} loading={busy} onClick={() => passkey(false)} />
                 {!page && alternatives}

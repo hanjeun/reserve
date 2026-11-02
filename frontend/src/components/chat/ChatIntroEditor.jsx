@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { DeleteOutlined, PlusOutlined, ReloadOutlined } from '../common/icons';
 import { Button, DataState, FormField, FormInput, FormTextArea, SegmentedControl } from '../common';
@@ -10,6 +10,8 @@ import MessengerAvatar from './MessengerAvatar';
 import ProfilePhotoUpload from '../common/ProfilePhotoUpload';
 import ProfilePhotoResetButton from '../common/ProfilePhotoResetButton';
 import { DEFAULT_STORE_GREETING, DEFAULT_SUPPORT_GREETING, SUPPORT_DISPLAY_NAME } from '../../constants/chatIntro';
+import useMessage from '../../hooks/useMessage';
+import { currentSession, isCurrentSession } from '../../api/sessionScope';
 
 const LIMITS = Object.freeze({ items: 5, notice: 100, greeting: 200, displayName: 30, question: 40, answer: 300 });
 const MOBILE_PANES = [
@@ -41,6 +43,9 @@ const bodyOf = (draft, items, identityEditable) => ({
  * 가게 표시 이름·사진은 사칭 방지를 위해 가게 정보에서만 바꾼다. 입력 오류는 해당 필드에 유지한다.
  */
 export default function ChatIntroEditor({ intro, onSave, onUploadAvatar, saving = false, kind = 'store', identity, noticeHelp }) {
+    const { message } = useMessage();
+    const mounted = useRef(true);
+    useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
     const isStore = kind === 'store';
     const identityEditable = !isStore;
     const defaultGreeting = isStore ? DEFAULT_STORE_GREETING : DEFAULT_SUPPORT_GREETING;
@@ -49,7 +54,7 @@ export default function ChatIntroEditor({ intro, onSave, onUploadAvatar, saving 
     const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(bodyOf(draftOf(intro), toDraftItems(intro?.items), identityEditable)));
     const [mobilePane, setMobilePane] = useState('edit');
     const [previewRound, setPreviewRound] = useState(0);
-    const [avatarState, setAvatarState] = useState({ uploading: false, error: null });
+    const [avatarState, setAvatarState] = useState({ uploading: false });
     const avatarUploadLock = useRef(false);
     const { errors, validate, clearError, resetErrors } = useFormErrors();
 
@@ -71,7 +76,7 @@ export default function ChatIntroEditor({ intro, onSave, onUploadAvatar, saving 
         setDraft(nextDraft);
         setItems(nextItems);
         setSavedSnapshot(JSON.stringify(bodyOf(nextDraft, nextItems, identityEditable)));
-        setAvatarState({ uploading: false, error: null });
+        setAvatarState({ uploading: false });
         resetErrors();
     };
     const revert = () => apply(JSON.parse(savedSnapshot));
@@ -80,21 +85,23 @@ export default function ChatIntroEditor({ intro, onSave, onUploadAvatar, saving 
     const pickAvatar = async file => {
         if (saving || avatarUploadLock.current) return;
         avatarUploadLock.current = true;
-        setAvatarState({ uploading: true, error: null });
+        const session = currentSession().epoch;
+        setAvatarState({ uploading: true });
         try {
             const url = await onUploadAvatar(file);
-            setField('avatarUrl', url);
-            setAvatarState({ uploading: false, error: null });
-        } catch {
-            setAvatarState({ uploading: false, error: '사진을 올리지 못했어요. 잠시 후 다시 시도해주세요.' });
+            if (mounted.current && isCurrentSession(session)) setField('avatarUrl', url);
+        } catch (failure) {
+            if (mounted.current && isCurrentSession(session) && !failure?.isStaleSession && !failure?.isSessionExpired)
+                message.error('사진을 올리지 못했어요. 잠시 후 다시 시도해주세요.');
         } finally {
             avatarUploadLock.current = false;
+            if (mounted.current) setAvatarState({ uploading: false });
         }
     };
 
     const resetAvatar = () => {
         setField('avatarUrl', '');
-        setAvatarState({ uploading: false, error: null });
+        setAvatarState({ uploading: false });
     };
 
     const handleSave = async () => {
@@ -151,7 +158,6 @@ export default function ChatIntroEditor({ intro, onSave, onUploadAvatar, saving 
                                         <ProfilePhotoResetButton disabled={saving || avatarState.uploading} onClick={resetAvatar}>기본 사진으로</ProfilePhotoResetButton>
                                     )}
                                 </div>
-                                {avatarState.error && <p className="reserve-chat-intro-error" role="alert">{avatarState.error}</p>}
                             </div>
                         ) : (
                             <div className="reserve-chat-intro-identity-readonly">

@@ -87,6 +87,7 @@ export default function Tooltip({ title, children, disabled = false, ...props })
         window.addEventListener('blur', close);
     };
     const handlers = {
+        'data-reserve-tooltip-trigger': enabled ? '' : undefined,
         onMouseEnter: event => { dismissed.current = false; children.props.onMouseEnter?.(event); },
         onMouseLeave: event => { children.props.onMouseLeave?.(event); },
         onFocusCapture: event => {
@@ -106,7 +107,9 @@ export default function Tooltip({ title, children, disabled = false, ...props })
             } else children.props.onClickCapture?.(event);
         },
         onContextMenu: event => {
-            if (suppressClick.current) { event.preventDefault(); event.stopPropagation(); return; }
+            if ((press.current || suppressClick.current) && !event.target.closest?.('a[href]')) {
+                event.preventDefault(); event.stopPropagation(); return;
+            }
             children.props.onContextMenu?.(event);
         },
         onClick: event => { close(); children.props.onClick?.(event); },

@@ -31,6 +31,11 @@ export default function DiscoveryNav({ pendingPathname }) {
 
     const startSlide = (event, to) => {
         const plainClick = event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+        if (plainClick && to === pathname && !pendingPathname) {
+            event.preventDefault();
+            window.scrollTo({ left: 0, top: 0, behavior: prefersReducedMotion() ? 'instant' : 'smooth' });
+            return;
+        }
         if (plainClick) rememberDiscoveryLocation(location, { left: window.scrollX, top: window.scrollY });
         const inner = innerRef.current;
         if (!plainClick || to === currentPath || !inner || prefersReducedMotion()) return;

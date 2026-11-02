@@ -55,6 +55,17 @@ const renderHeader = (path = '/') => render(
     </MemoryRouter>,
 );
 
+it.each([['/', '홈'], ['/stores', '탐색'], ['/benefits', '혜택'], ['/waiting', '웨이팅'], ['/feed', '피드']])('선택한 %s 탭을 다시 누르면 목록 조건을 유지하고 위로 이동해요', (path, label) => {
+    const scroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    const motion = vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: false });
+    try {
+        render(<MemoryRouter initialEntries={[`${path}?page=2&region=all`]}><DiscoveryNav /><CurrentRoute /></MemoryRouter>);
+        fireEvent.click(screen.getByRole('link', { name: label, exact: true }));
+        expect(scroll).toHaveBeenCalledWith({ left: 0, top: 0, behavior: 'smooth' });
+        expect(screen.getByRole('status', { name: '현재 경로' })).toHaveTextContent(`${path}?page=2&region=all`);
+    } finally { scroll.mockRestore(); motion.mockRestore(); }
+});
+
 describe('shared wordmark and result search header', () => {
     beforeEach(() => { vi.clearAllMocks(); authState.isLoggedIn = false; reducedMotionState.value = true; });
 

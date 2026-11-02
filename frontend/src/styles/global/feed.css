@@ -158,6 +158,27 @@
 .reserve-liked-section { margin: 32px 0; }
 .reserve-liked-section--listing { margin-top: 0; }
 .reserve-liked-section h2 { margin: 0 0 16px; font-size: 18px; }
+.reserve-liked-card .reserve-liked-title-line,
+.reserve-liked-list-row .reserve-liked-title-line { padding-right: 0; justify-content: space-between; gap: 4px; }
+.reserve-liked-title-link { position: relative; z-index: 2; flex: 1; min-width: 0; overflow: hidden; color: inherit; }
+.reserve-liked-title-link > .reserve-store-card-name,
+.reserve-liked-title-link > .reserve-store-list-row-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reserve-liked-title-tools { position: relative; z-index: 2; display: flex; flex: 0 0 auto; align-items: center; margin-left: auto; }
+.reserve-liked-title-tools .reserve-feed-interaction { display: inline-flex; flex: none; align-items: center; justify-content: center; min-width: 44px; height: 44px; padding-inline: 4px; }
+.reserve-liked-title-tools .reserve-feed-interaction .anticon { flex: none; }
+.reserve-liked-card p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; margin: 4px 0; color: var(--c-text-secondary); font-size: 13px; }
+.reserve-liked-card .reserve-store-list-row-meta { font-size: 13px; color: var(--c-text-secondary); }
+.reserve-liked-card time, .reserve-liked-list-row time { white-space: nowrap; }
+.reserve-liked-secondary-actions { position: relative; z-index: 2; }
+.reserve-liked-secondary-actions .reserve-feed-interactions { justify-content: flex-end; margin: 4px 0 0; }
+.reserve-liked-list-row { position: relative; }
+.reserve-liked-list-row:has(> .reserve-store-card-hit:hover) .reserve-store-list-row-image img { opacity: 0.88; }
+.reserve-liked-list-row .reserve-store-list-row-link { transition: transform 0.12s ease, opacity 0.12s ease; transform-origin: left center; }
+.reserve-liked-list-row:has(> .reserve-store-card-hit:active) .reserve-store-list-row-link { transform: scale(0.98); opacity: 0.88; }
+@media (prefers-reduced-motion: reduce) {
+    .reserve-liked-list-row .reserve-store-list-row-link { transition: none; }
+    .reserve-liked-list-row:has(> .reserve-store-card-hit:active) .reserve-store-list-row-link { transform: none; }
+}
 .reserve-liked-unavailable { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--c-border-default); }
 .reserve-feed-report-list { list-style: none; padding: 0; }
 .reserve-feed-report-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 18px 0; border-bottom: 1px solid var(--c-border-default); }

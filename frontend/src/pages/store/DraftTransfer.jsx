@@ -47,7 +47,10 @@ function DraftTransferSession() {
         const session = currentSession().epoch; const stamp = generation.current;
         const ticket = {}; lock.current = ticket; setBusy(true); setError('');
         try { await action(session); }
-        catch (failure) { if (!failure.isStaleSession && isCurrentSession(session) && generation.current === stamp) setError(failure.message); }
+        catch (failure) { if (!failure.isStaleSession && isCurrentSession(session) && generation.current === stamp) {
+            if (records) message.error(failure.message || '초안을 옮기지 못했어요. 다시 시도해주세요.');
+            else setError(failure.message);
+        } }
         finally { if (lock.current === ticket) lock.current = false; if (generation.current === stamp) setBusy(false); }
     };
     const exportSelected = () => work(async session => {
@@ -81,8 +84,8 @@ function DraftTransferSession() {
         <div className="reserve-feed-editor-actions"><Button variant="outline" size="sm" onClick={exportSelected} disabled={busy || !selected.length}>선택한 초안 내보내기</Button>
             <Button size="sm" onClick={() => chooser.current?.click()} disabled={busy}>파일 가져오기</Button></div>
         <input ref={chooser} className="reserve-feed-file-input" type="file" accept="application/json,.json" onChange={chooseFile} disabled={busy} aria-label="임시저장 파일 가져오기" />
-        {error && <p className="reserve-field-error" role="alert">{error}</p>}
-        {records?.length ? <ul className="reserve-feed-report-list">
+        {!records && error ? <DataState compact state="error" title="가게 초안을 불러오지 못했어요." error={error}
+            onRetry={() => work(session => refresh(session))} retrying={busy} /> : records?.length ? <ul className="reserve-feed-report-list">
             {records.map(record => <li key={record.key}><Checkbox disabled={busy} checked={selected.includes(record.key)} onChange={event => setSelected(current => event.target.checked ? [...current, record.key] : current.filter(key => key !== record.key))}>
                 {record.values.name || '새 가게 초안'} · {new Date(record.savedAt).toLocaleString('ko-KR')}</Checkbox>
                 <Link to={record.key.endsWith(':new') ? '/store/register' : `/store/${record.key.split(':').at(-1)}/edit`}>작성 계속하기</Link></li>)}</ul>

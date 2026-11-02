@@ -2,9 +2,10 @@ import PropTypes from 'prop-types';
 import { Typography } from 'antd';
 import IconTool from '../common/IconTool';
 import { DisconnectOutlined } from '../common/icons';
+import { mfaCredentialName } from '../../utils/passkey';
 
 export default function MfaCredentialRow({ credential, busy, lastRequired, onRemove }) {
-    const name = credential.name || (credential.kind === 'PASSKEY' ? '패스키' : '인증 앱');
+    const name = mfaCredentialName(credential);
     return <div className="reserve-mfa-credential" role="group" aria-label={`${name} 인증 수단`}>
         <div className="reserve-mfa-credential-heading">
             <Typography.Text>{name}</Typography.Text>

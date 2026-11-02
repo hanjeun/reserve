@@ -6,12 +6,12 @@ import WaitingJoin from './WaitingJoin';
 import waitingService from '../../services/waitingService';
 import { clearRedirect, peekRedirect } from '../../utils/redirect';
 
-const state = vi.hoisted(() => ({ revision: 1, loggedIn: true, termsAgreed: true, success: vi.fn() }));
+const state = vi.hoisted(() => ({ revision: 1, loggedIn: true, termsAgreed: true, success: vi.fn(), error: vi.fn() }));
 vi.mock('../../store/useAuthStore', () => {
     const read = () => ({ sessionRevision: state.revision, isLoggedIn: state.loggedIn, user: { termsAgreed: state.termsAgreed } });
     const hook = selector => selector(read()); hook.getState = read; return { default: hook };
 });
-vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: { success: state.success } }) }));
+vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: { success: state.success, error: state.error } }) }));
 vi.mock('../../services/waitingService', () => ({ default: { join: vi.fn(), getRetentionPolicy: vi.fn() } }));
 vi.mock('../common', () => ({
     Button: ({ children, onClick, disabled }) => <button onClick={onClick} disabled={disabled}>{children}</button>,
@@ -27,7 +27,7 @@ function setup(mode = 'REMOTE', hash = '', storeValues = {}) {
     const result = render(tree()); return { ...result, client, update: () => result.rerender(tree()) };
 }
 beforeEach(() => {
-    state.revision = 1; state.loggedIn = true; state.termsAgreed = true; state.success.mockReset(); waitingService.join.mockReset();
+    state.revision = 1; state.loggedIn = true; state.termsAgreed = true; state.success.mockReset(); state.error.mockReset(); waitingService.join.mockReset();
     clearRedirect();
     waitingService.getRetentionPolicy.mockReset().mockResolvedValue({ intakeReady: true, noticePublishedAt: '2026-10-07T09:00:00Z', finishedRecordRetentionDays: 7 });
 });
@@ -57,7 +57,8 @@ it('blocks duplicate submits and keeps the retry key until the party size change
     const id = waitingService.join.mock.calls[0][1].clientRequestId;
     expect(waitingService.join.mock.calls[0][1]).toMatchObject({ privacyAgreed: true, privacyNoticePublishedAt: '2026-10-07T09:00:00Z' });
     await act(async () => fail(new Error('응답 실패')));
-    fireEvent.click(submit); await screen.findByRole('alert');
+    fireEvent.click(submit); await waitFor(() => expect(state.error).toHaveBeenCalledWith('다시 시도'));
+    expect(screen.queryByRole('alert')).toBeNull();
     expect(waitingService.join.mock.calls[1][1].clientRequestId).toBe(id);
     fireEvent.change(screen.getByLabelText('웨이팅 인원'), { target: { value: '2' } });
     waitingService.join.mockResolvedValueOnce({ id: 1, storeId: 31 }); fireEvent.click(submit);

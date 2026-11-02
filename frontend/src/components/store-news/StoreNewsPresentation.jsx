@@ -68,7 +68,11 @@ export function BenefitDetailContent({ item, preview = false, actions, status, n
     return <article className={`reserve-benefits-page reserve-benefit-detail reserve-benefit-detail--${design}`} aria-label={preview ? `${item.title} 가게 소식 미리보기` : undefined} aria-labelledby={preview ? undefined : 'benefit-detail-title'}>
         <header className="reserve-benefits-heading"><div>
             <PageTitle level={preview ? 2 : 1} id={preview ? undefined : 'benefit-detail-title'}>{item.title || '제목 없는 소식'}</PageTitle>
-            <div className="reserve-benefit-byline">{store}{item.createdAt && <time dateTime={item.createdAt}>{formatBenefitDate(item.createdAt)}</time>}{status && <span className="reserve-benefit-review-status">{status}</span>}</div>
+            <div className="reserve-benefit-heading-row"><div className="reserve-benefit-byline">{store}{item.createdAt && <time dateTime={item.createdAt}>{formatBenefitDate(item.createdAt)}</time>}{status && <span className="reserve-benefit-review-status">{status}</span>}</div>
+                {!preview && <div className="reserve-benefit-detail-actions">
+                    <IconTool label="가게 보기" icon={<InterfaceIcon name="store" />} to={`/store/${item.storeId}`} />{actions}
+                </div>}
+            </div>
             <StoreNewsMetadata item={item} /></div></header>
         {pictures.length ? <BenefitPhotos key={pictures.map(image => image.src).join('|')} pictures={pictures} />
             : <LoadingImage className={`reserve-benefit-detail-image${mainImage === BENEFIT_IMAGE_FALLBACK ? ' reserve-benefit-detail-image--placeholder' : ''}`}
@@ -77,13 +81,6 @@ export function BenefitDetailContent({ item, preview = false, actions, status, n
         <div className="reserve-benefit-detail-content">{item.content}</div>
         {item.conditions && <section className="reserve-store-news-conditions" aria-label="이용 조건"><h2>이용 조건</h2><p>{item.conditions}</p></section>}
         {notice}
-        {!preview && <footer className="reserve-benefit-detail-links">
-            <nav className="reserve-benefit-detail-navigation" aria-label="소식 이동">
-                <IconTool label="소식 목록" icon={<InterfaceIcon name="chevronLeft" />} kind="navigation" tooltip to="/benefits" />
-                <IconTool label="가게 보기" icon={<InterfaceIcon name="store" />} to={`/store/${item.storeId}`} />
-            </nav>
-            {actions && <div className="reserve-benefit-detail-actions">{actions}</div>}
-        </footer>}
     </article>;
 }
 BenefitDetailContent.propTypes = { item: PropTypes.object.isRequired, preview: PropTypes.bool, actions: PropTypes.node, status: PropTypes.string, notice: PropTypes.node };

@@ -6,8 +6,9 @@ import { App as AntApp } from 'antd';
 import MfaSecuritySection from './MfaSecuritySection';
 import useAuthStore from '../../store/useAuthStore';
 
-const fixture = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
+const fixture = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), message: { error: vi.fn(), info: vi.fn() } }));
 vi.mock('../../api/axios', () => ({ default: { get: fixture.get, post: fixture.post } }));
+vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: fixture.message }) }));
 vi.mock('./MfaFlow', () => ({ default: function ManagedFlow({ ref, initialView, onCancel }) {
     useImperativeHandle(ref, () => ({ cancel: onCancel }));
     return <span>{initialView.verified ? '인증 수단 관리' : '기존 인증 수단 확인'}</span>;
@@ -46,6 +47,15 @@ describe('계정별 인증 관리', () => {
         expect(screen.queryByRole('heading')).toBeNull();
         expect(screen.queryByLabelText('현재 비밀번호')).toBeNull();
         expect(fixture.post).not.toHaveBeenCalled();
+    });
+    it('인증 관리 요청 실패는 메시지로 알리고 입력한 폼은 유지해요', async () => {
+        fixture.post.mockRejectedValue(new Error('잠시 후 다시 시도해주세요.'));
+        show(); fireEvent.click(await screen.findByRole('button', { name: '패스키·인증 앱 관리' }));
+        fireEvent.change(screen.getByLabelText('현재 비밀번호'), { target: { value: 'fixture-password' } });
+        fireEvent.submit(screen.getByRole('form', { name: '패스키·인증 앱 관리' }));
+        await waitFor(() => expect(fixture.message.error).toHaveBeenCalledExactlyOnceWith('잠시 후 다시 시도해주세요.'));
+        expect(screen.queryByRole('alert')).toBeNull();
+        expect(screen.getByLabelText('현재 비밀번호')).toHaveValue('fixture-password');
     });
     it.each(['USER', 'BUSINESS'])('%s는 등록한 패스키 없이 현재 비밀번호로 관리해요', async role => {
         useAuthStore.setState({ user: { id: 7, role } });
@@ -117,6 +127,7 @@ describe('계정별 인증 관리', () => {
         await screen.findByRole('button', { name: '패스키·인증 앱 등록' });
         await act(async () => fail(new Error('이전 계정의 실패')));
         expect(screen.queryByRole('alert')).toBeNull();
+        expect(fixture.message.error).not.toHaveBeenCalled();
         expect(screen.queryByText('인증 수단 관리')).toBeNull();
     });
     it('등록 아이콘의 보안 설정 주소는 작은 입력 폼을 바로 열어요', async () => {

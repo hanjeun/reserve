@@ -7,11 +7,39 @@ import MfaFlow from './MfaFlow';
 import { performPasskey } from '../../utils/passkey';
 import useAuthStore from '../../store/useAuthStore';
 import { requestAuthenticationBack } from '../../utils/authenticationNavigation';
-const fixture = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn(), login: vi.fn() }));
+const fixture = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn(), login: vi.fn(), message: { error: vi.fn(), info: vi.fn() } }));
 vi.mock('../../api/axios', () => ({ default: { post: fixture.post, get: fixture.get } }));
+vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: fixture.message }) }));
 
 vi.mock('../../utils/passkey', async importOriginal => ({ ...await importOriginal(), performPasskey: vi.fn() }));
 describe('추가 인증', () => {
+    it('인증 정보 조회 실패는 메시지로 알리고 아이콘으로 다시 조회할 수 있어요', async () => {
+        fixture.post.mockRejectedValueOnce(new Error('인증 정보를 불러오지 못했어요.'))
+            .mockResolvedValueOnce({ purpose: 'MANAGE', totpAvailable: true });
+        render(<MfaFlow />);
+        await waitFor(() => expect(fixture.message.error).toHaveBeenCalledWith('인증 정보를 불러오지 못했어요.'));
+        expect(screen.queryByRole('alert')).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: '인증 정보 다시 불러오기' }));
+        expect(await screen.findByLabelText('인증 앱 코드')).toBeInTheDocument();
+        expect(fixture.post).toHaveBeenCalledTimes(2);
+    });
+
+    it('전달받은 인증 실패는 메시지 한 번으로 표시하고 폼에 누적하지 않아요', () => {
+        const initialView = { purpose: 'LOGIN', totpAvailable: true, initialError: '다른 인증 수단으로 확인해주세요.' };
+        const page = render(<MfaFlow initialView={initialView} />);
+        page.rerender(<MfaFlow initialView={{ ...initialView }} />);
+        expect(fixture.message.error).toHaveBeenCalledExactlyOnceWith(initialView.initialError);
+        expect(screen.queryByRole('alert')).toBeNull();
+    });
+    it('폐기된 인증 요청의 늦은 실패는 메시지로 다시 표시하지 않아요', async () => {
+        fixture.post.mockRejectedValue(Object.assign(new Error('이전 인증 요청'), { isStaleSession: true }));
+        render(<MfaFlow initialView={{ purpose: 'MANAGE', verified: true }} settings={{ required: true, credentials: [] }} />);
+        fireEvent.click(screen.getByRole('button', { name: '패스키 추가' }));
+        await waitFor(() => expect(fixture.post).toHaveBeenCalledTimes(1));
+        await act(async () => {});
+        expect(fixture.message.error).not.toHaveBeenCalled();
+        expect(fixture.message.info).not.toHaveBeenCalled();
+    });
 
     it('새 환경의 이메일 확인은 기존 발송 필드를 쓰고 인증 수단 등록을 열지 않아요', async () => {
         fixture.post.mockImplementation(path => Promise.resolve(path.endsWith('/verify') ? { purpose: 'RISK_LOGIN', verified: true } : null));
@@ -241,7 +269,8 @@ describe('추가 인증', () => {
         fixture.post.mockRejectedValue(new Error('기존 인증 수단으로 다시 확인해주세요.'));
         render(<MfaFlow initialView={{ purpose: 'MANAGE', verified: true }} settings={{ required: true, credentials: [] }} />);
         fireEvent.click(screen.getByRole('button', { name: '패스키 추가' }));
-        expect(await screen.findByRole('alert')).toHaveTextContent('기존 인증 수단으로 다시 확인해주세요.');
+        await waitFor(() => expect(fixture.message.error).toHaveBeenCalledWith('기존 인증 수단으로 다시 확인해주세요.'));
+        expect(screen.queryByRole('alert')).toBeNull();
         expect(fixture.post).toHaveBeenCalledExactlyOnceWith('/api/auth/mfa/passkey/options', { registration: true }, expect.anything());
         expect(performPasskey).not.toHaveBeenCalled();
         expect(fixture.login).not.toHaveBeenCalled();
@@ -310,7 +339,8 @@ describe('추가 인증', () => {
         render(<MfaFlow initialView={{ mfaRequired: true, enrollmentRequired: false, totpAvailable: true, purpose: 'LOGIN' }} />);
         fireEvent.change(screen.getByLabelText('인증 앱 코드'), { target: { value: '123456' } });
         fireEvent.click(screen.getByRole('button', { name: '확인', exact: true }));
-        expect(await screen.findByRole('alert')).toHaveTextContent('코드를 확인해주세요.');
+        await waitFor(() => expect(fixture.message.error).toHaveBeenCalledWith('코드를 확인해주세요.'));
+        expect(screen.queryByRole('alert')).toBeNull();
         expect(fixture.login).not.toHaveBeenCalled();
     });
     it('다른 인증 수단이 남으면 현재 브라우저의 새 쿠키를 확인하고 관리 화면을 닫아요', async () => {

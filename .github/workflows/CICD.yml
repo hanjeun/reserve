@@ -113,7 +113,7 @@ jobs:
         run: npm audit --audit-level=high
       - name: Validate operations scripts
         run: |
-          node --test scripts/tests/observability-config.test.mjs scripts/tests/deployment-memory.test.mjs scripts/tests/release-schema-readonly.test.mjs scripts/tests/backup-engine.test.mjs
+          node --test scripts/tests/observability-config.test.mjs scripts/tests/deployment-memory.test.mjs scripts/tests/release-schema-readonly.test.mjs scripts/tests/backup-engine.test.mjs scripts/tests/sync-release-notes.test.mjs
           node --test scripts/tests/container-security.test.mjs
           python3 -m unittest discover -s scripts/tests -p 'ip_protection_test.py'
           python3 -B scripts/tests/ubuntu-security_test.py
@@ -492,7 +492,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: https://reserve.it.kr
+      url: ${{ vars.RESERVE_DOMAIN_SPLIT == 'true' && 'https://app.reserve.it.kr' || 'https://reserve.it.kr' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

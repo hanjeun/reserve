@@ -2,7 +2,7 @@
 
 <a href="https://reserve.it.kr"><img src="frontend/public/og-image.png" alt="RESERVE — 예약이 필요한 순간" width="760" /></a>
 
-[**서비스 바로가기**](https://reserve.it.kr)
+[**서비스 바로가기**](https://app.reserve.it.kr)
 
 <br />
 

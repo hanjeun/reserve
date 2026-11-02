@@ -2,6 +2,8 @@ version: 2
 updates:
   - package-ecosystem: "npm"
     directory: "/frontend"
+    commit-message:
+      prefix: "chore"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
@@ -20,6 +22,8 @@ updates:
 
   - package-ecosystem: "gradle"
     directory: "/backend"
+    commit-message:
+      prefix: "chore"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
@@ -34,6 +38,8 @@ updates:
 
   - package-ecosystem: "github-actions"
     directory: "/"
+    commit-message:
+      prefix: "chore"
     schedule:
       interval: "weekly"
     labels: ["chore", "dependencies"]

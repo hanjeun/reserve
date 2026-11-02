@@ -1,7 +1,7 @@
 # 업데이트 소식 (CHANGELOG)
 
 RESERVE의 버전별 변경사항을 **사용자 눈높이**로 정리한 문서예요.
-자세한 기술 변경(PR 목록·커밋)은 [GitHub 릴리즈](https://github.com/hanjeun/reserve/releases)에서 볼 수 있어요.
+자세한 기술 변경은 [GitHub PR](https://github.com/hanjeun/reserve/pulls)에서 볼 수 있어요.
 
 ## v2.16.3
 

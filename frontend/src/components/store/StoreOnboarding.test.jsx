@@ -33,6 +33,34 @@ beforeEach(() => { submit.mockReset(); draft.mockReset(); changes.mockReset(); }
 const currentQuestion = () => within(document.querySelector('.reserve-onboarding-step:not([hidden])'));
 const actions = () => within(document.querySelector('.reserve-store-form-actions'));
 
+it('서비스 분야를 오른쪽·왼쪽으로 바꾸면 업종 글자의 전환 방향도 뒤집어요', async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'animate');
+    const motions = [];
+    const animate = vi.fn(function (frames) {
+        const motion = { cancel: vi.fn(), playState: 'running', pending: false };
+        if (this.closest('.reserve-rolling-form-input')) motions.push({ frames, motion });
+        return motion;
+    });
+    Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value: animate });
+    try {
+        render(<Harness />);
+        fireEvent.click(currentQuestion().getByRole('button', { name: '맛집 · 카페' }));
+        await waitFor(() => expect(currentQuestion().getByLabelText('업종')).toHaveValue('맛집 · 카페'));
+        fireEvent.click(currentQuestion().getByRole('button', { name: '공연 · 클래스' }));
+        await waitFor(() => expect(currentQuestion().getByLabelText('업종')).toHaveValue('공연 · 클래스'));
+        expect(motions).toHaveLength(2);
+        expect(motions[0].frames[0].transform).toBe('translateY(-70%) rotateX(25deg)');
+        act(() => motions[0].motion.onfinish());
+        fireEvent.click(currentQuestion().getByRole('button', { name: '뷰티 · 클리닉' }));
+        await waitFor(() => expect(currentQuestion().getByLabelText('업종')).toHaveValue('뷰티 · 클리닉'));
+        expect(motions).toHaveLength(4);
+        expect(motions[2].frames[0].transform).toBe('translateY(70%) rotateX(-25deg)');
+    } finally {
+        if (descriptor) Object.defineProperty(HTMLElement.prototype, 'animate', descriptor);
+        else delete HTMLElement.prototype.animate;
+    }
+});
+
 it.each(['document', 'skeleton', 'cached'])('leaves the initial %s entrance to the route and preserves question transitions', async phase => {
     const presentation = createLoadingPresentation('form-entry', { documentEntry: phase === 'document' });
     if (phase === 'skeleton') presentation.markSkeletonShown();

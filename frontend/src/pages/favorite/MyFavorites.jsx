@@ -93,7 +93,7 @@ const MyFavorites = () => {
             );
         }
         if (favorites.length === 0) {
-            return <DataState state="empty" kind="favorite" title="아직 즐겨찾기한 가게가 없어요." compact={hasContentLikes && kind === 'all'}
+            return <DataState state="empty" kind="favorite" title="아직 즐겨찾기한 가게가 없어요."
                 action={<TextLink to="/stores">가게 둘러보기</TextLink>} />;
         }
         return (

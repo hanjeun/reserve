@@ -7,14 +7,14 @@ import { interactionKeys, useFeedInteractions } from '../../hooks/feedInteractio
 import service from '../../services/feedInteractionService';
 import ContentLikeButton from './ContentLikeButton';
 
-export default function PostInteractionBar({ type = 'POST', targetId, postId, onShare }) {
+export default function PostInteractionBar({ type = 'POST', targetId, postId, onShare, showLike = true }) {
     const config = useFeedInteractions();
     const enabled = (type === 'NEWS' ? config.data?.newsEnabled : config.data?.enabled) === true && Number.isSafeInteger(targetId) && targetId > 0;
     const key = interactionKeys.status(type, targetId);
     const status = useQuery({ queryKey: key, queryFn: ({ signal }) => service.status(type, targetId, signal), enabled, staleTime: 30_000, retry: false });
     if (!enabled && !onShare) return null;
     return <div className="reserve-feed-interactions" data-discovery-swipe-ignore="true">
-        {enabled && <ContentLikeButton type={type} targetId={targetId} />}
+        {enabled && showLike && <ContentLikeButton type={type} targetId={targetId} />}
         {enabled && postId && <Link className="reserve-feed-interaction" to={`/feed/posts/${postId}#comments`} aria-label="댓글 보기">
             <InterfaceIcon name="comment" />{status.data?.commentCount > 0 && <span>{status.data.commentCount.toLocaleString('ko-KR')}</span>}
         </Link>}
@@ -23,4 +23,4 @@ export default function PostInteractionBar({ type = 'POST', targetId, postId, on
         </button></Tooltip>}
     </div>;
 }
-PostInteractionBar.propTypes = { type: PropTypes.oneOf(['POST', 'NEWS']), targetId: PropTypes.number.isRequired, postId: PropTypes.number, onShare: PropTypes.func };
+PostInteractionBar.propTypes = { type: PropTypes.oneOf(['POST', 'NEWS']), targetId: PropTypes.number.isRequired, postId: PropTypes.number, onShare: PropTypes.func, showLike: PropTypes.bool };

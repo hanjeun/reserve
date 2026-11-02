@@ -352,7 +352,7 @@ public class MfaService {
         return label;
     }
     @Transactional
-    public void remove(String ticket, Member authenticated, String sid, String credentialId) {
+    public Completion remove(String ticket, Member authenticated, String sid, String credentialId) {
         Bound bound = bound(ticket, authenticated, sid, null);
         requireVerifiedManage(bound);
         var values = credentials.findByMemberIdOrderByCreatedAtAsc(bound.member().getId());
@@ -363,11 +363,14 @@ public class MfaService {
                     throw AuthException.badRequest("관리자의 마지막 인증 수단은 해제할 수 없어요.");
                 clearFactors(bound);
             } else disable(bound);
-            return;
+            return new Completion(null);
         }
         credentials.delete(value);
         changed(bound.member(), bound.challenge());
+        // 다른 인증 수단이 남으면 기존 세션은 폐기하고 확인한 현재 브라우저만 교체한다.
+        var replacement = continueSession(bound.member(), bound.challenge(), ticket);
         bound.challenge().consume(now());
+        return new Completion(replacement);
     }
     @Transactional
     public void disable(String ticket, Member authenticated, String sid) {

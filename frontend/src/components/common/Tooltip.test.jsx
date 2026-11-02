@@ -140,6 +140,19 @@ describe('shared explanation tooltips', () => {
     });
 });
 
+it('suppresses the native selection menu even before the held description opens', () => {
+    const view = setup(<Tooltip title="신고 설명"><button>신고</button></Tooltip>);
+    const button = screen.getByRole('button', { name: '신고' });
+    expect(button).toHaveAttribute('data-reserve-tooltip-trigger');
+    pointer(button, 'pointerdown', 'touch');
+    expect(fireEvent.contextMenu(button)).toBe(false);
+    pointer(document, 'pointercancel', 'touch');
+    view.unmount();
+    setup(<Tooltip title="링크 설명"><a href="/help">도움말</a></Tooltip>);
+    const link = screen.getByRole('link'); pointer(link, 'pointerdown', 'touch');
+    expect(fireEvent.contextMenu(link)).toBe(true);
+});
+
 it('shows a held touch description only until release and consumes that gesture click', async () => {
     const click = vi.fn();
     setup(<Tooltip title="신고 검토 설명"><button onClick={click}>검토</button></Tooltip>);

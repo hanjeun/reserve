@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { authenticateWithPasskey, finishMfaSession } from './mfaAuthentication';
 import { performPasskey } from './passkey';
 import api from '../api/axios';
+import { advanceSession } from '../api/sessionScope';
 vi.mock('../api/axios', () => ({ default: { post: vi.fn(), get: vi.fn() } }));
 vi.mock('./passkey', () => ({ performPasskey: vi.fn() }));
 describe('브라우저 패스키 인계', () => {
@@ -12,10 +13,11 @@ describe('브라우저 패스키 인계', () => {
         api.post.mockResolvedValueOnce('options').mockResolvedValueOnce({ verified: true });
         performPasskey.mockResolvedValue('signed-credential');
         await authenticateWithPasskey(registration, signal);
-        expect(api.post).toHaveBeenNthCalledWith(1, '/api/auth/mfa/passkey/options', { registration }, { skipAuthRefresh: true, signal });
-        expect(performPasskey).toHaveBeenCalledExactlyOnceWith('options', registration, signal);
+        const activeSignal = api.post.mock.calls[0][2].signal;
+        expect(api.post).toHaveBeenNthCalledWith(1, '/api/auth/mfa/passkey/options', { registration }, { skipAuthRefresh: true, signal: activeSignal });
+        expect(performPasskey).toHaveBeenCalledExactlyOnceWith('options', registration, activeSignal);
         expect(api.post).toHaveBeenNthCalledWith(2, registration ? '/api/auth/mfa/passkey/confirm' : '/api/auth/mfa/verify',
-            registration ? { credential: 'signed-credential', name: '패스키' } : { kind: 'PASSKEY', proof: 'signed-credential' }, { skipAuthRefresh: true, signal });
+            registration ? { credential: 'signed-credential', name: '패스키' } : { kind: 'PASSKEY', proof: 'signed-credential' }, { skipAuthRefresh: true, signal: activeSignal });
     });
     it('화면이 닫히면 늦은 옵션 응답으로 브라우저 선택창을 열지 않아요', async () => {
         const controller = new AbortController();
@@ -32,6 +34,29 @@ describe('브라우저 패스키 인계', () => {
     it('완료 실패는 본인 정보 조회와 로그인 완료로 이어지지 않아요', async () => {
         api.post.mockRejectedValue(new Error('expired'));
         await expect(finishMfaSession()).rejects.toThrow('expired');
+        expect(api.get).not.toHaveBeenCalled();
+    });
+    it.each([false, true])('계정이 바뀐 뒤 브라우저가 돌려준 이전 키는 새 계정에 전송하지 않아요 (%s)', async registration => {
+        api.post.mockResolvedValue('options');
+        performPasskey.mockImplementation(async (_options, _registration, signal) => {
+            advanceSession();
+            expect(signal.aborted).toBe(true);
+            return 'previous-credential';
+        });
+        await expect(authenticateWithPasskey(registration)).rejects.toHaveProperty('isStaleSession', true);
+        expect(api.post).toHaveBeenCalledTimes(1);
+    });
+    it('계정 전환으로 닫힌 브라우저 인증을 새 계정의 사용자 취소로 안내하지 않아요', async () => {
+        api.post.mockResolvedValue('options');
+        performPasskey.mockImplementation(async () => { advanceSession(); throw new DOMException('cancelled', 'NotAllowedError'); });
+        await expect(authenticateWithPasskey(false)).rejects.toHaveProperty('isStaleSession', true);
+        expect(api.post).toHaveBeenCalledTimes(1);
+    });
+    it('계정이 바뀐 늦은 옵션과 완료 응답은 다음 인증 단계로 이어지지 않아요', async () => {
+        api.post.mockImplementation(async () => { advanceSession(); return 'late response'; });
+        await expect(authenticateWithPasskey(false)).rejects.toHaveProperty('isStaleSession', true);
+        expect(performPasskey).not.toHaveBeenCalled();
+        await expect(finishMfaSession()).rejects.toHaveProperty('isStaleSession', true);
         expect(api.get).not.toHaveBeenCalled();
     });
     it.each([
@@ -54,13 +79,20 @@ describe('브라우저 패스키 인계', () => {
         await authenticateWithPasskey(true);
         expect(api.post).toHaveBeenLastCalledWith('/api/auth/mfa/passkey/confirm', { credential, name }, expect.anything());
     });
-    it.each([['cross-platform', '외부 패스키'], [null, '패스키'], ['unknown', '패스키']])('다른 기기·보안 키나 불명확한 수단을 현재 PC에 저장했다고 표시하지 않아요: %s', async (attachment, name) => {
+    it.each([['cross-platform', '다른 기기 패스키'], [null, '패스키'], ['unknown', '패스키']])('다른 기기·보안 키나 불명확한 수단을 현재 PC에 저장했다고 표시하지 않아요: %s', async (attachment, name) => {
         vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Windows NT 10.0) Chrome/136.0.0.0' });
         const credential = JSON.stringify({ authenticatorAttachment: attachment, response: { transports: ['hybrid'] } });
         api.post.mockResolvedValue('options');
         performPasskey.mockResolvedValue(credential);
         await authenticateWithPasskey(true);
         expect(api.post).toHaveBeenLastCalledWith('/api/auth/mfa/passkey/confirm', { credential, name }, expect.anything());
+    });
+    it('아이폰의 다른 인증 연결도 저장 위치 대신 모바일 등록 환경으로 표시해요', async () => {
+        vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) CriOS/136.0.0.0 Mobile/15E148 Safari/604.1' });
+        const credential = JSON.stringify({ authenticatorAttachment: 'cross-platform' });
+        api.post.mockResolvedValue('options'); performPasskey.mockResolvedValue(credential);
+        await authenticateWithPasskey(true);
+        expect(api.post).toHaveBeenLastCalledWith('/api/auth/mfa/passkey/confirm', { credential, name: '모바일 · Chrome에서 등록' }, expect.anything());
     });
     it('기기 표시 정보를 읽지 못해도 유효한 등록 응답 전달을 막지 않아요', async () => {
         vi.stubGlobal('navigator', { get userAgent() { throw new Error('environment unavailable'); } });

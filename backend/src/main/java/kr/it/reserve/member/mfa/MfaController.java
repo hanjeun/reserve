@@ -38,6 +38,7 @@ public class MfaController {
         @Override public String toString() { return "Proof[redacted]"; }
     }
     public record Removal(@NotBlank @Size(max = 36) String id) { }
+    public record CredentialRemoval(boolean sessionRenewed) { }
     public record Rename(@NotBlank @Size(max = 36) String id, @NotBlank @Size(max = 80) String name) {
         @Override public String toString() { return "Rename[redacted]"; }
     }
@@ -150,11 +151,15 @@ public class MfaController {
         return ok(new Recovery(result.codes()));
     }
     @PostMapping("/api/auth/mfa/remove")
-    public ApiResponse<Void> remove(HttpServletRequest request, HttpServletResponse response, @AuthenticationPrincipal Member member, @Valid @RequestBody Removal body) {
+    public ApiResponse<CredentialRemoval> remove(HttpServletRequest request, HttpServletResponse response, @AuthenticationPrincipal Member member, @Valid @RequestBody Removal body) {
         limit(request, member, false);
-        mfa.remove(ticket(request), member, SecurityUtil.getSessionId(), body.id());
+        var result = mfa.remove(ticket(request), member, SecurityUtil.getSessionId(), body.id());
+        if (result.session() != null) {
+            cookies.addAuthCookies(response, result.session().accessToken(), result.session().refreshToken(),
+                    (int) jwt.getAccessTokenExpiration().toSeconds(), (int) result.session().refreshMaxAge().toSeconds(), result.session().persistent());
+        }
         cookies.deleteCookie(response, "mfa_ticket");
-        return ok(null);
+        return ok(new CredentialRemoval(result.session() != null));
     }
     @PostMapping("/api/auth/mfa/rename")
     public ApiResponse<MfaService.Settings> rename(HttpServletRequest request, @AuthenticationPrincipal Member member, @Valid @RequestBody Rename body) {

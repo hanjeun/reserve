@@ -14,9 +14,11 @@ import api from '../../api/axios';
 import useAuthStore from '../../store/useAuthStore';
 import { authenticateWithPasskey, finishMfaSession } from '../../utils/mfaAuthentication';
 import { AUTHENTICATION_BACK } from '../../utils/authenticationNavigation';
-import { colors, fontSize } from '../../styles/tokens';
+import { fontSize } from '../../styles/tokens';
+import useMessage from '../../hooks/useMessage';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import { revealSecurityPanel } from '../../utils/securityReturn';
+import { isCurrentSession, currentSession } from '../../api/sessionScope';
 
 const config = { skipAuthRefresh: true };
 const post = (path, data) => api.post('/api/auth/mfa/' + path, data, config);
@@ -29,11 +31,14 @@ MfaAction.propTypes = { page: PropTypes.bool, label: PropTypes.string.isRequired
     kind: PropTypes.oneOf(['navigation', 'tool']) };
 export default function MfaFlow({ ref, initialView, settings, page = false, onDone, onCancel }) {
     const revision = useAuthStore(state => state.sessionRevision);
+    const { message } = useMessage();
     const [view, setView] = useState(initialView);
     const [setup, setSetup] = useState(null);
     const [codes, setCodes] = useState(null);
     const [busy, setBusy] = useState(false);
-    const [error, setError] = useState(initialView?.initialError || '');
+    const [loadFailed, setLoadFailed] = useState(false);
+    const [statusRetry, setStatusRetry] = useState(0);
+    const initialNotice = useRef(null);
     const [method, setMethod] = useState(initialView?.preferredFactor || null);
     const [emailSent, setEmailSent] = useState(false);
     const active = useRef(false);
@@ -45,6 +50,11 @@ export default function MfaFlow({ ref, initialView, settings, page = false, onDo
         mounted.current = true;
         return () => { mounted.current = false; controller.current?.abort(); };
     }, []);
+    useEffect(() => {
+        if (!initialView?.initialError || initialNotice.current === initialView.initialError) return;
+        initialNotice.current = initialView.initialError;
+        message.error(initialView.initialError);
+    }, [initialView?.initialError, message]);
     const finish = async (defer = false) => {
         const member = await finishMfaSession(controller.current?.signal, defer);
         if (!mounted.current) return;
@@ -54,13 +64,13 @@ export default function MfaFlow({ ref, initialView, settings, page = false, onDo
     const perform = async (action, totpAvailable = view?.totpAvailable) => {
         if (active.current) return;
         active.current = true;
-        setBusy(true); setError('');
+        setBusy(true);
         try { await action(); }
         catch (failure) {
-            if (!mounted.current) return;
+            if (!mounted.current || failure.isSessionExpired || failure.isStaleSession) return;
             const cancelled = ['NotAllowedError', 'AbortError'].includes(failure.name);
-            setError(cancelled ? '패스키 인증을 취소했어요. 다른 방법으로 확인할 수 있어요.'
-                : failure.message || '인증을 다시 시작해주세요.');
+            if (cancelled) message.info('패스키 인증을 취소했어요. 다른 방법으로 확인할 수 있어요.');
+            else message.error(failure.message || '인증을 다시 시작해주세요.');
             if (cancelled && totpAvailable) setMethod('TOTP');
         }
         finally { active.current = false; if (mounted.current) setBusy(false); }
@@ -87,6 +97,7 @@ export default function MfaFlow({ ref, initialView, settings, page = false, onDo
         else await finish();
     }, availableView?.totpAvailable);
     const receiveInitial = useEffectEvent(result => {
+        setLoadFailed(false);
         setView(result);
         if (result.passkeyAvailable && !result.enrollmentRequired && !result.verified
             && !result.initialError && !result.preferredFactor) void passkey(false, result);
@@ -95,9 +106,13 @@ export default function MfaFlow({ ref, initialView, settings, page = false, onDo
         if (initialView) return;
         let live = true;
         api.post('/api/auth/mfa/status', undefined, config).then(result => { if (live) receiveInitial(result); })
-            .catch(failure => { if (live) setError(failure.message); });
+            .catch(failure => {
+                if (!live || failure.isSessionExpired || failure.isStaleSession) return;
+                setLoadFailed(true);
+                message.error(failure.message || '인증 정보를 불러오지 못했어요.');
+            });
         return () => { live = false; };
-    }, [initialView, revision]);
+    }, [initialView, revision, statusRetry, message]);
     const cancel = () => {
         void perform(async () => { await post('cancel'); if (mounted.current) onCancel?.(); });
     };
@@ -148,7 +163,8 @@ export default function MfaFlow({ ref, initialView, settings, page = false, onDo
             <Typography.Title level={5} className="reserve-mfa-title" style={{ fontSize: fontSize.base, marginBottom: 8 }}><SafetyCertificateOutlined aria-hidden="true" /> {title}</Typography.Title>
             <Typography.Paragraph type="secondary" style={{ fontSize: fontSize.sm }}>{description}</Typography.Paragraph>
         </>}
-        {error && <Typography.Paragraph role="alert" style={{ color: colors.error.main }}>{error}</Typography.Paragraph>}
+        {loadFailed && <div className="reserve-mfa-verification-actions"><IconTool label="인증 정보 다시 불러오기" icon={<ReloadOutlined aria-hidden="true" />}
+            disabled={busy} onClick={() => { setLoadFailed(false); setStatusRetry(value => value + 1); }} /></div>}
         {codes ? <>
             <ul aria-label="복구코드" className="reserve-mfa-recovery-codes">{codes.map(code => <li key={code}><code>{code}</code></li>)}</ul>
             <div className={!page ? 'reserve-mfa-verification-actions' : undefined}><MfaAction page={page} label="보관했어요" icon={<CheckOutlined aria-hidden="true" />} loading={busy} onClick={() => perform(() => finish())} /></div>
@@ -175,7 +191,20 @@ export default function MfaFlow({ ref, initialView, settings, page = false, onDo
             {changing && <>
                 {settings.credentials.map(value => <MfaCredentialRow key={value.id} credential={value} busy={busy}
                     lastRequired={settings.required && !settings.localAdminResetAvailable && settings.credentials.length <= 1}
-                    onRemove={id => perform(async () => { await post('remove', { id }); useAuthStore.getState().logout(); onCancel?.(); })} />)}
+                    onRemove={id => perform(() => useAuthStore.getState().withAuthTransition(async () => {
+                        const session = currentSession().epoch;
+                        const result = await post('remove', { id });
+                        if (!mounted.current || !isCurrentSession(session)) return;
+                        if (result?.sessionRenewed) {
+                            const member = await api.get('/api/member/me', config);
+                            if (!mounted.current || !isCurrentSession(session)) return;
+                            useAuthStore.getState().updateUser(member);
+                            onDone?.(member);
+                        } else {
+                            useAuthStore.getState().logout();
+                            onCancel?.();
+                        }
+                    }))} />)}
                 <div className="reserve-mfa-management-actions reserve-mfa-management-actions--secondary">
                     {registrationActions}
                     <IconTool label="복구코드 재발급" icon={<ReloadOutlined aria-hidden="true" />} disabled={busy}

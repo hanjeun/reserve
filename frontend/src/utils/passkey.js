@@ -1,6 +1,9 @@
 const decode = value => Uint8Array.from(atob(value.replace(/-/g, '+').replace(/_/g, '/')), character => character.charCodeAt(0));
 const encode = value => btoa(String.fromCharCode(...new Uint8Array(value))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
+export const mfaCredentialName = credential => credential.name === '외부 패스키' ? '다른 기기 패스키'
+    : credential.name || (credential.kind === 'PASSKEY' ? '패스키' : '인증 앱');
+
 export async function performPasskey(json, registration, signal) {
     if (!window.isSecureContext || !window.PublicKeyCredential
         || typeof navigator.credentials?.[registration ? 'create' : 'get'] !== 'function') throw new Error('이 브라우저에서 패스키를 사용할 수 없어요.');

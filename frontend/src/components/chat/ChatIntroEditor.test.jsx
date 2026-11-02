@@ -1,7 +1,10 @@
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import ChatIntroEditor from './ChatIntroEditor';
+const notices = vi.hoisted(() => ({ error: vi.fn(), info: vi.fn() }));
+vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: notices }) }));
+beforeEach(() => { notices.error.mockClear(); notices.info.mockClear(); });
 
 const renderEditor = (props = {}) => render(
     <ChatIntroEditor
@@ -15,6 +18,23 @@ const renderEditor = (props = {}) => render(
 const preview = () => screen.getByRole('region', { name: '미리보기' });
 
 describe('chat intro editor', () => {
+    it('reports an upload failure in a message while retaining the editor', async () => {
+        const onUploadAvatar = vi.fn().mockRejectedValue(new Error('offline'));
+        renderEditor({ kind: 'support', onUploadAvatar });
+        fireEvent.change(screen.getByLabelText('고객지원 사진 파일'), { target: { files: [new File(['photo'], 'photo.png', { type: 'image/png' })] } });
+        await waitFor(() => expect(notices.error).toHaveBeenCalledExactlyOnceWith('사진을 올리지 못했어요. 잠시 후 다시 시도해주세요.'));
+        expect(screen.queryByRole('alert')).toBeNull();
+        expect(screen.getByLabelText('고객지원 사진 파일')).toBeEnabled();
+    });
+    it('does not announce a late upload failure after leaving the editor', async () => {
+        let fail;
+        const onUploadAvatar = vi.fn(() => new Promise((_, reject) => { fail = reject; }));
+        const page = renderEditor({ kind: 'support', onUploadAvatar });
+        fireEvent.change(screen.getByLabelText('고객지원 사진 파일'), { target: { files: [new File(['photo'], 'photo.png', { type: 'image/png' })] } });
+        await waitFor(() => expect(onUploadAvatar).toHaveBeenCalledTimes(1));
+        page.unmount(); await act(async () => fail(new Error('offline')));
+        expect(notices.error).not.toHaveBeenCalled();
+    });
     it('starts from saved items, and the preview is the real customer intro', () => {
         renderEditor({ intro: { notice: '반가워요', items: [{ question: '주차', answer: '2대 가능' }] } });
         expect(screen.getByLabelText('질문 1')).toHaveValue('주차');

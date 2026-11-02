@@ -5,7 +5,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { Card as AntCard } from 'antd';
-// shadows 는 더 이상 쓰지 않는다 — 그림자 값은 index.css 의 "Card 그림자·hover" 블록에 있다.
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
 import { getThumbnailUrl } from '../../utils';
 import LoadingImage from './LoadingImage';
@@ -22,11 +21,7 @@ const Card = ({
     className,
     ...rest
 }) => {
-    // boxShadow를 여기(인라인)에 두지 않는다 — hover 그림자가 죽는다.
-    //   인라인 스타일은 클래스 규칙보다 우선이라, 인라인으로 box-shadow를 박으면
-    //   AntD hoverable의 hover 그림자도, 아래 .reserve-card:hover 규칙도 전부 밀린다.
-    //   실제로 그래서 "그림자 상승 + 이미지 줌"이라고 적어둔 관용구의 절반(그림자)이
-    //   구현돼 있지 않았다. 그림자는 아래 <style>의 클래스 규칙이 담당한다.
+    // hover 그림자는 전역 CSS에서 처리해 인라인 우선순위로 덮지 않아요.
     const cardStyle = {
         borderRadius: 0,
         overflow: 'hidden',
@@ -78,12 +73,12 @@ const Card = ({
  */
 // 사진 오류는 공통 대체 이미지로 한 번 교체한다.
 
-const handleCoverError = (event) => {
-    const fallback = getThumbnailUrl();
+const handleCoverError = (event, fallbackSrc) => {
+    const fallback = fallbackSrc || getThumbnailUrl();
     if (event.currentTarget.src !== new URL(fallback, window.location.href).href) event.currentTarget.src = fallback;
 };
 
-Card.Cover = ({ src, alt, width, height, aspectRatio, imageClassName, referrerPolicy }) => (
+Card.Cover = ({ src, alt, width, height, aspectRatio, imageClassName, referrerPolicy, fallbackSrc }) => (
     <div style={{ overflow: 'hidden', lineHeight: 0, margin: 0, aspectRatio }}>
         <LoadingImage
             alt={alt}
@@ -93,7 +88,7 @@ Card.Cover = ({ src, alt, width, height, aspectRatio, imageClassName, referrerPo
             referrerPolicy={referrerPolicy}
             width={width}
             height={height}
-            onError={handleCoverError}
+            onError={event => handleCoverError(event, fallbackSrc)}
             style={{ width: '100%', height: aspectRatio ? '100%' : 'auto', aspectRatio: aspectRatio ?? `auto ${width || 1} / ${height || 1}`, objectFit: 'cover', transition: 'transform 0.3s', display: 'block' }}
             className={['reserve-card-image', imageClassName].filter(Boolean).join(' ')}
         />
@@ -165,6 +160,7 @@ Card.Cover.propTypes = {
     aspectRatio: PropTypes.number,
     imageClassName: PropTypes.string,
     referrerPolicy: PropTypes.string,
+    fallbackSrc: PropTypes.string,
 };
 
 Card.Body.propTypes = {

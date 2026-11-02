@@ -126,7 +126,7 @@ const MyFavorites = () => {
                 loading={showStores && (loading || refetching)} initialLoading={showStores && loading}
                 extraSkeleton={<Bone width={44} height={44} borderRadius={10} />}
                 extra={showStores || hasContentLikes ? <div className="reserve-favorites-toolbar">
-                    {showStores && <StoreListViewToggle view={view} onChange={setView} disabled={loading} />}
+                    <StoreListViewToggle view={view} onChange={setView} disabled={showStores && loading} />
                     {hasContentLikes && <FilterMenu appearance="plain" value={kind} options={kinds} aria-label="좋아요 종류"
                         onChange={value => setSearchParams(previous => { const next = new URLSearchParams(previous); next.set('kind', value); return next; })} />}
                 </div> : undefined} />
@@ -137,7 +137,7 @@ const MyFavorites = () => {
                     title="최신 즐겨찾기를 확인하지 못해 이전 목록을 보여드리고 있어요."
                     onRetry={refetch} retrying={isFetching} compact />}>{renderContent()}</ListingContent></section>}
             {hasContentLikes && kind !== 'stores' && <section className="reserve-liked-section" aria-label="좋아요한 게시물과 소식">
-                {kind === 'all' && <h2>게시물 · 가게 소식 · 댓글</h2>}<LikedContentList type={kind === 'posts' ? 'POST' : kind === 'news' ? 'NEWS' : kind === 'comments' ? 'COMMENT' : 'ALL'} />
+                {kind === 'all' && <h2>게시물 · 가게 소식 · 댓글</h2>}<LikedContentList view={view} type={kind === 'posts' ? 'POST' : kind === 'news' ? 'NEWS' : kind === 'comments' ? 'COMMENT' : 'ALL'} />
             </section>}
         </PageContainer>
     );

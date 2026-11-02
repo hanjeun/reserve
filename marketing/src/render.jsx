@@ -2,9 +2,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import Home, { homeAnimationStyles } from './home';
 import Footer from './Footer';
 import { faqCollapseStyles } from './home/sections/FaqSection';
-import Button from '../../frontend/src/components/common/Button';
 import { LockOutlined, UserOutlined } from '../../frontend/src/components/common/icons';
-import { colors, heights, fontWeight, radius } from '../../frontend/src/styles/tokens';
+import { colors, heights, fontWeight } from '../../frontend/src/styles/tokens';
 
 function Header() {
     return <header className="marketing-header" style={{
@@ -15,10 +14,8 @@ function Header() {
         <a href="/" data-scroll-top style={{ fontSize: 22, fontWeight: fontWeight.heavy, color: colors.primary.main,
             letterSpacing: '-0.8px', textDecoration: 'none' }}>RESERVE</a>
         <nav aria-label="계정" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Button variant="ghost" size="md" icon={<LockOutlined />} data-app-path="/login" style={{ fontWeight: fontWeight.semibold,
-                borderRadius: radius.md, padding: '0 4px', whiteSpace: 'nowrap' }}>로그인</Button>
-            <Button variant="primary" size="md" icon={<UserOutlined />} data-app-path="/signup" style={{ fontWeight: fontWeight.semibold,
-                borderRadius: radius.md, padding: '0 12px', whiteSpace: 'nowrap' }}>회원가입</Button>
+            <a data-app-path="/login" className="reserve-header-search" aria-label="로그인" title="로그인"><LockOutlined aria-hidden /></a>
+            <a data-app-path="/signup" className="reserve-header-search" aria-label="회원가입" title="회원가입"><UserOutlined aria-hidden /></a>
         </nav>
     </header>;
 }

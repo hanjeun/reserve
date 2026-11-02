@@ -6,8 +6,9 @@ import { App as AntApp } from 'antd';
 import MfaSecuritySection from './MfaSecuritySection';
 import useAuthStore from '../../store/useAuthStore';
 
-const fixture = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
+const fixture = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), message: { error: vi.fn(), info: vi.fn() } }));
 vi.mock('../../api/axios', () => ({ default: { get: fixture.get, post: fixture.post } }));
+vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: fixture.message }) }));
 vi.mock('./MfaFlow', () => ({ default: function ManagedFlow({ ref, initialView, onCancel }) {
     useImperativeHandle(ref, () => ({ cancel: onCancel }));
     return <span>{initialView.verified ? '인증 수단 관리' : '기존 인증 수단 확인'}</span>;
@@ -47,6 +48,15 @@ describe('계정별 인증 관리', () => {
         expect(screen.queryByLabelText('현재 비밀번호')).toBeNull();
         expect(fixture.post).not.toHaveBeenCalled();
     });
+    it('인증 관리 요청 실패는 메시지로 알리고 입력한 폼은 유지해요', async () => {
+        fixture.post.mockRejectedValue(new Error('잠시 후 다시 시도해주세요.'));
+        show(); fireEvent.click(await screen.findByRole('button', { name: '패스키·인증 앱 관리' }));
+        fireEvent.change(screen.getByLabelText('현재 비밀번호'), { target: { value: 'fixture-password' } });
+        fireEvent.submit(screen.getByRole('form', { name: '패스키·인증 앱 관리' }));
+        await waitFor(() => expect(fixture.message.error).toHaveBeenCalledExactlyOnceWith('잠시 후 다시 시도해주세요.'));
+        expect(screen.queryByRole('alert')).toBeNull();
+        expect(screen.getByLabelText('현재 비밀번호')).toHaveValue('fixture-password');
+    });
     it.each(['USER', 'BUSINESS'])('%s는 등록한 패스키 없이 현재 비밀번호로 관리해요', async role => {
         useAuthStore.setState({ user: { id: 7, role } });
         show();
@@ -66,6 +76,40 @@ describe('계정별 인증 관리', () => {
         expect(await screen.findByText('기존 인증 수단 확인')).toBeInTheDocument();
         expect(screen.queryByLabelText('현재 비밀번호')).toBeNull();
         expect(fixture.post).toHaveBeenCalledWith('/api/member/mfa/manage', { password: undefined }, { skipAuthRefresh: true, signal: expect.any(AbortSignal) });
+    });
+    it.each(['admin', 'social'])('%s의 관리 요청을 기다릴 때 임시 확인 폼을 표시하지 않아요', async kind => {
+        let complete;
+        fixture.post.mockImplementation(() => new Promise(resolve => { complete = resolve; }));
+        if (kind === 'admin') fixture.get.mockResolvedValue({ ...connected, required: true });
+        show({ ...methods, socialProofFresh: kind === 'social' });
+        fireEvent.click(await screen.findByRole('button', { name: '패스키·인증 앱 관리' }));
+        expect(screen.getByRole('status', { name: '인증 수단을 확인하는 중' })).toHaveAttribute('aria-busy', 'true');
+        expect(screen.queryByRole('form')).toBeNull();
+        expect(screen.queryByLabelText('현재 비밀번호')).toBeNull();
+        await act(async () => complete({ purpose: 'MANAGE', verified: false }));
+        expect(screen.getByText('기존 인증 수단 확인')).toBeVisible();
+        expect(screen.queryByRole('status')).toBeNull();
+        expect(fixture.post).toHaveBeenCalledTimes(1);
+    });
+    it('직접 관리 요청이 실패하면 메시지를 알리고 같은 패널에서 다시 시작해요', async () => {
+        fixture.get.mockResolvedValue({ ...connected, required: true });
+        fixture.post.mockRejectedValueOnce(new Error('일시적인 오류예요.')).mockResolvedValueOnce({ purpose: 'MANAGE', verified: false });
+        show();
+        fireEvent.click(await screen.findByRole('button', { name: '패스키·인증 앱 관리' }));
+        const form = await screen.findByRole('form', { name: '패스키·인증 앱 관리' });
+        expect(fixture.message.error).toHaveBeenCalledExactlyOnceWith('일시적인 오류예요.');
+        fireEvent.submit(form);
+        expect(await screen.findByText('기존 인증 수단 확인')).toBeVisible();
+        expect(fixture.post).toHaveBeenCalledTimes(2);
+    });
+    it('보안 설정 주소로 진입해도 상태 조회 전에는 확인 폼을 표시하지 않아요', async () => {
+        let complete;
+        fixture.get.mockImplementation(() => new Promise(resolve => { complete = resolve; }));
+        show(methods, '/my-page#account-security');
+        expect(screen.getByRole('status', { name: '인증 수단을 확인하는 중' })).toBeVisible();
+        expect(screen.queryByRole('form')).toBeNull();
+        await act(async () => complete(connected));
+        expect(screen.getByLabelText('현재 비밀번호')).toBeVisible();
     });
     it('최근 확인한 연결 소셜 계정으로 바로 관리해요', async () => {
         show({ ...methods, passwordEnabled: false, socialProofFresh: true });
@@ -117,6 +161,7 @@ describe('계정별 인증 관리', () => {
         await screen.findByRole('button', { name: '패스키·인증 앱 등록' });
         await act(async () => fail(new Error('이전 계정의 실패')));
         expect(screen.queryByRole('alert')).toBeNull();
+        expect(fixture.message.error).not.toHaveBeenCalled();
         expect(screen.queryByText('인증 수단 관리')).toBeNull();
     });
     it('등록 아이콘의 보안 설정 주소는 작은 입력 폼을 바로 열어요', async () => {

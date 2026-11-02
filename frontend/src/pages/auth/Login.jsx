@@ -20,6 +20,7 @@ import { colors, fontSize } from '../../styles/tokens';
 
 const { Text } = Typography;
 const PASSKEY_SETTINGS = '/my-page?tab=name#account-security';
+const PASSKEY_RETURN = { pathname: '/my-page', search: '?tab=name', hash: '#account-security' };
 const lifetimeLabel = seconds => seconds % 86400 === 0 ? seconds / 86400 + '일'
     : seconds % 3600 === 0 ? seconds / 3600 + '시간' : Math.ceil(seconds / 60) + '분';
 
@@ -43,6 +44,7 @@ const Login = () => {
     // 안내 후에도 로그인 전환 방향을 유지한다.
     const preventedRef = useRef(Boolean(location.state?.prevented));
     const hasHandledRef = useRef(false);
+    const enrollmentNoticeRef = useRef(null);
     const [loading, setLoading] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
     const loginAttempt = useRef(false);
@@ -59,6 +61,18 @@ const Login = () => {
         return () => controller.abort();
     }, [rememberNotice]);
     const [mfa, setMfa] = useState(() => new URLSearchParams(location.search).get('mfa') === '1' ? {} : null);
+    useEffect(() => {
+        if (!registrationRequested || isLoggedIn || mfa || enrollmentNoticeRef.current === location.key) return;
+        enrollmentNoticeRef.current = location.key;
+        fromRef.current = PASSKEY_SETTINGS;
+        saveRedirect(PASSKEY_SETTINGS);
+        message.info('패스키를 등록하려면 먼저 로그인해주세요.');
+        const params = new URLSearchParams(location.search);
+        params.delete('enroll');
+        const { prevented: _prevented, ...state } = location.state || {};
+        navigate({ pathname: location.pathname, search: params.size ? `?${params}` : '', hash: location.hash },
+            { replace: true, state: { ...state, from: PASSKEY_RETURN } });
+    }, [registrationRequested, isLoggedIn, mfa, location.key, location.pathname, location.search, location.hash, location.state, navigate, message]);
     // 정지 사유는 소셜·이메일 로그인에 같은 모달로 표시한다.
     const [suspendInfo, setSuspendInfo] = useState(() => {
         if (isLoggedIn || location.state?.signupSuccess || location.state?.prevented) return null;
@@ -72,6 +86,7 @@ const Login = () => {
     };
 
     useEffect(() => {
+        if (registrationRequested && !isLoggedIn && !mfa) return;
         if (hasHandledRef.current) return;
         const params = new URLSearchParams(location.search);
         // 연결·재인증을 취소해도 기존 로그인은 유효하다. 오류를 먼저 알리고 보안 설정으로 돌려보낸다.
@@ -87,7 +102,7 @@ const Login = () => {
         if (location.state?.signupSuccess) {
             hasHandledRef.current = true;
             message.success('회원가입이 완료됐어요! 로그인해주세요.');
-            navigate('/login', { replace: true, state: {} });
+            navigate('/login', { replace: true, state: { from: location.state.from } });
             return;
         }
 
@@ -213,7 +228,6 @@ const Login = () => {
                         navigate(securityAction ? '/my-page?security=verified' : consumeLoginRedirect(fromRef.current), { replace: true });
                     }}
                     onCancel={() => { setMfa(null); navigate('/login', { replace: true }); }} /> : <>
-                {registrationRequested && <Text role="status">패스키를 등록하려면 먼저 로그인해주세요.</Text>}
                 <Form onFinish={onLoginSubmit} layout="vertical" size="large" requiredMark={false}>
                     <Form.Item name="email" rules={VALIDATION_RULES.loginEmail}>
                         <FormInput type="email" placeholder="이메일 주소" autoComplete="username webauthn" />
@@ -229,7 +243,8 @@ const Login = () => {
                             onClick={() => {
                                 fromRef.current = PASSKEY_SETTINGS;
                                 saveRedirect(PASSKEY_SETTINGS);
-                                navigate('/login?enroll=passkey', { replace: true });
+                                message.info('패스키를 등록하려면 먼저 로그인해주세요.');
+                                navigate('/login', { replace: true, state: { from: PASSKEY_RETURN } });
                             }} />
                         <IconTool label="비밀번호 찾기" icon={<MailOutlined />} disabled={loading}
                             onClick={() => navigate('/forgot-password')} />

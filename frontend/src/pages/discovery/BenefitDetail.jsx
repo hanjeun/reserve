@@ -4,7 +4,6 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { DataState } from '../../components/common';
 import IconTool from '../../components/common/IconTool';
 import InterfaceIcon from '../../components/common/InterfaceIcon';
-import { StoreNewsManageAction } from '../../components/store-news/StoreNewsActions';
 import BenefitDetailSkeleton from '../../components/common/BenefitDetailSkeleton';
 import { BenefitDetailContent } from '../../components/store-news/StoreNewsPresentation';
 import PostInteractionBar from '../../components/feed/PostInteractionBar';
@@ -55,7 +54,6 @@ export default function BenefitDetail() {
     return <><BenefitDetailContent item={item}
         notice={isError && <DataState compact state="error" title="최신 내용을 확인하지 못했어요. 현재 내용은 유지했어요." error={error} onRetry={refetch} retrying={isFetching} />}
         actions={<><PostInteractionBar type="NEWS" targetId={Number(id)} />
-            {config.data?.enabled && <IconTool label="소식 신고" icon={<InterfaceIcon name="report" />} onClick={report} />}
-            {user?.role === 'BUSINESS' && <StoreNewsManageAction />}</>} />
+            {config.data?.enabled && <IconTool label="소식 신고" icon={<InterfaceIcon name="report" />} onClick={report} />}</>} />
         <Suspense fallback={null}>{reportMounted && <FeedReportModal newsId={reportOpen ? Number(id) : null} onClose={() => setReportOpen(false)} />}</Suspense></>;
 }

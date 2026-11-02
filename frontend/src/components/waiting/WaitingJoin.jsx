@@ -83,7 +83,7 @@ function WaitingJoinForm({ store, preview, isPC }) {
             // 토큰은 다음 화면의 주소나 방문 기록에 더 전파하지 않는다.
             navigate('/my-reservations?tab=waiting', { replace: Boolean(onsiteToken) });
         } catch (failure) {
-            if (current() && !controller.signal.aborted && !failure?.isStaleSession) setError(failure?.message || '접수하지 못했어요. 다시 시도해주세요.');
+            if (current() && !controller.signal.aborted && !failure?.isStaleSession) message.error(failure?.message || '접수하지 못했어요. 다시 시도해주세요.');
         } finally {
             if (operation.current === controller) operation.current = null;
             if (current()) setPending(false);

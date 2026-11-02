@@ -299,9 +299,9 @@ describe('actual photo benefits banners without invented campaign or general sto
         expect(document.querySelector('.reserve-benefit-detail-content script, .reserve-benefit-detail-content img')).toBeNull();
         expect(screen.getByRole('img', { name: '가게 사진이 등록되지 않았어요' })).toHaveAttribute('src', BENEFIT_IMAGE_FALLBACK);
         expect(screen.getByRole('link', { name: '가게 보기' })).toHaveAttribute('href', '/store/12');
-        expect(screen.getByRole('link', { name: '소식 목록', exact: true })).toHaveAttribute('href', '/benefits');
+        expect(screen.queryByRole('link', { name: '소식 목록', exact: true })).toBeNull();
         expect(screen.getByRole('link', { name: '가게 보기' }).querySelector('svg')).toBeInTheDocument();
-        expect(screen.getByRole('link', { name: '소식 목록', exact: true }).querySelector('svg')).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: '가게 보기' }).closest('.reserve-benefit-heading-row')).toBeInTheDocument();
         expect(benefitService.getDetail).toHaveBeenCalledTimes(3);
     });
 

@@ -1416,6 +1416,11 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 .reserve-store-view-toggle:focus-visible, .reserve-icon-tool:focus-visible,
 .reserve-store-list-row-link:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 2px; }
 .reserve-icon-tool { text-decoration: none; }
+button[data-reserve-tooltip-trigger], [data-reserve-tooltip-trigger] button {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
 .reserve-icon-tool-wrapper { display: inline-flex; flex-shrink: 0; }
 .reserve-icon-tool-loading { display: inline-flex; align-items: center; justify-content: center; font-size: var(--reserve-icon-glyph-size); line-height: 0; }
 .reserve-icon-tool:disabled { cursor: not-allowed; opacity: 0.45; }

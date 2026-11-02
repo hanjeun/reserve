@@ -344,7 +344,7 @@ test('required checks remain present and deployment waits for both builds', () =
     assert.deepEqual(staging.needs, ['build-backend', 'build-frontend']);
     assert.equal(staging.if, deployment.if);
     assert.equal(staging.environment, undefined);
-    assert.deepEqual(deployment.environment, { name: 'production', url: 'https://reserve.it.kr' });
+    assert.deepEqual(deployment.environment, { name: 'production', url: "${{ vars.RESERVE_DOMAIN_SPLIT == 'true' && 'https://app.reserve.it.kr' || 'https://reserve.it.kr' }}" });
     assert.ok(!deployment.steps.some(entry => /Create GitHub deployment|Mark deployment/.test(entry.name ?? '')));
     for (const job of [backend, frontend]) {
         assert.equal(job.if, '${{ always() && !cancelled() }}');

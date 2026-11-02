@@ -15,7 +15,7 @@ vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: fixture.me
 vi.mock('../../hooks/useDocumentTitle', () => ({ default: () => {} }));
 vi.mock('../../components/member/MfaFlow', () => ({ default: ({ onDone, initialView }) => <button data-method={initialView?.preferredFactor} onClick={() => onDone(fixture.member)}>추가 인증 완료</button> }));
 
-const DestinationPath = () => { const location = useLocation(); return <span aria-label="도착 주소">{location.pathname + location.search}</span>; };
+const DestinationPath = () => { const location = useLocation(); return <span aria-label="도착 주소" data-state={JSON.stringify(location.state)}>{location.pathname + location.search}</span>; };
 const show = path => render(<MemoryRouter initialEntries={[path]}><AntApp><DestinationPath /><Routes>
     <Route path="/login" element={<Login />} /><Route element={<PrivateRoute />}>
         <Route path="/my-page" element={<span>보안 설정</span>} /></Route>
@@ -128,7 +128,8 @@ describe('로그인과 기본 인증 인계', () => {
     it('등록 아이콘은 로그인 후 일반 계정의 보안 설정으로 이어져요', async () => {
         fixture.state.isLoggingOut = true;
         show('/login'); fireEvent.click(screen.getByRole('button', { name: '패스키 등록' }));
-        expect(await screen.findByRole('status')).toHaveTextContent('패스키를 등록하려면 먼저 로그인해주세요.');
+        await waitFor(() => expect(fixture.message.info).toHaveBeenCalledExactlyOnceWith('패스키를 등록하려면 먼저 로그인해주세요.'));
+        expect(screen.queryByText('패스키를 등록하려면 먼저 로그인해주세요.')).toBeNull();
         expect(screen.queryByText('홈 화면')).toBeNull(); expect(fixture.post).not.toHaveBeenCalled();
         fixture.post.mockResolvedValue({ id: 7, role: 'USER', name: '합성 회원', termsAgreed: true });
         submitPassword();
@@ -140,6 +141,21 @@ describe('로그인과 기본 인증 인계', () => {
         show('/login?enroll=passkey');
         expect(await screen.findByText('보안 설정')).toBeInTheDocument();
         expect(screen.queryByText('홈 화면')).toBeNull(); expect(fixture.post).not.toHaveBeenCalled();
+    });
+    it('이전 등록 URL의 안내를 한 번 소비하고 새로고침 뒤에도 등록 목적지는 유지해요', async () => {
+        const page = show('/login?enroll=passkey&source=fixture');
+        await waitFor(() => expect(fixture.message.info).toHaveBeenCalledExactlyOnceWith('패스키를 등록하려면 먼저 로그인해주세요.'));
+        const destination = screen.getByLabelText('도착 주소');
+        expect(destination).toHaveTextContent('/login?source=fixture');
+        const state = JSON.parse(destination.getAttribute('data-state'));
+        expect(state.from).toEqual({ pathname: '/my-page', search: '?tab=name', hash: '#account-security' });
+        page.unmount(); fixture.message.info.mockClear();
+        show({ pathname: '/login', search: '?source=fixture', state });
+        expect(fixture.message.info).not.toHaveBeenCalled();
+        expect(screen.queryByText('패스키를 등록하려면 먼저 로그인해주세요.')).toBeNull();
+        fixture.post.mockResolvedValue({ id: 7, role: 'USER', name: '합성 회원', termsAgreed: true });
+        submitPassword();
+        expect(await screen.findByText('보안 설정')).toBeInTheDocument();
     });
     it.each([
         { path: '/login?mfa=1', destination: '홈 화면', name: '합성 회원' },

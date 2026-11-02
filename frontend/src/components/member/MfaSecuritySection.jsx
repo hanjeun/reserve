@@ -15,10 +15,13 @@ import useReducedMotion from '../../hooks/useReducedMotion';
 import LoginMethodFormActions from './LoginMethodFormActions';
 import MfaFlow from './MfaFlow';
 import styles from './myPageStyles';
+import { mfaCredentialName } from '../../utils/passkey';
+import useMessage from '../../hooks/useMessage';
 
 export default function MfaSecuritySection({ loginMethods, disabled = false, resumeRequest, onIntentChange, onSocialProof }) {
     const navigate = useNavigate();
     const location = useLocation();
+    const { message } = useMessage();
     const sectionRef = useRef(null);
     const groupRef = useRef(null);
     const panelId = useId();
@@ -34,10 +37,10 @@ export default function MfaSecuritySection({ loginMethods, disabled = false, res
     const [action, setAction] = useState(null);
     const [panel, setPanel] = useState({ revision, open: location.hash === '#account-security' });
     const currentAction = action?.revision === revision ? action : null;
-    const error = currentAction?.error || '';
     const busy = currentAction?.busy || false;
     const status = load?.revision === revision ? load.status : null;
     const loadError = load?.revision === revision ? load.error : null;
+    const directManage = Boolean(status?.required && status.enabled || loginMethods.socialProofFresh);
     const open = panel.revision === revision && panel.open;
     const reducedMotion = useReducedMotion();
     const { shouldRender, isClosing } = useExitAnimation(open, reducedMotion ? 0 : 200);
@@ -73,12 +76,13 @@ export default function MfaSecuritySection({ loginMethods, disabled = false, res
             const value = await api.post('/api/member/mfa/manage', { password }, { skipAuthRefresh: true, signal: operation.controller.signal });
             if (!operation.controller.signal.aborted && useAuthStore.getState().sessionRevision === revision) setView({ revision, value });
         } catch (failure) {
-            if (!operation.controller.signal.aborted && useAuthStore.getState().sessionRevision === revision) setAction({ revision, error: failure.message });
+            if (!operation.controller.signal.aborted && useAuthStore.getState().sessionRevision === revision
+                && !failure.isSessionExpired && !failure.isStaleSession) message.error(failure.message || '인증 수단 관리를 시작하지 못했어요.');
         } finally {
             if (activeManage.current === operation) activeManage.current = null;
             if (!operation.controller.signal.aborted) setAction(previous => previous?.revision === revision ? { ...previous, busy: false } : previous);
         }
-    }, [revision]);
+    }, [revision, message]);
     const begin = event => {
         if (activeManage.current) return;
         event.currentTarget.focus({ preventScroll: true });
@@ -91,7 +95,7 @@ export default function MfaSecuritySection({ loginMethods, disabled = false, res
         setAction(null);
         onIntentChange?.('mfa', true);
         setPanel({ revision, open: true });
-        if (status.required && status.enabled || loginMethods.socialProofFresh) void manage();
+        if (directManage) void manage();
     };
     useEffect(() => {
         if (!resumeRequest?.key || resumeRequest.revision !== revision || resumeRequest.memberId !== useAuthStore.getState().user?.id
@@ -100,17 +104,17 @@ export default function MfaSecuritySection({ loginMethods, disabled = false, res
             resumed.current = resumeRequest.key;
             setPanel({ revision, open: true }); setView(null); setAction(null);
             onIntentChange?.('mfa', true);
-            if (status.required && status.enabled || loginMethods.socialProofFresh) void manage();
+            if (directManage) void manage();
             returnReveal.current?.();
             returnReveal.current = revealSecurityPanel(() => surfaceRef.current || sectionRef.current, reducedMotion);
         });
         return () => cancelAnimationFrame(frame);
-    }, [resumeRequest, status, disabled, revision, loginMethods.socialProofFresh, onIntentChange, manage, reducedMotion]);
+    }, [resumeRequest, status, disabled, revision, directManage, onIntentChange, manage, reducedMotion]);
     if (status && !status.available && !status.enabled) return null;
     const showPassword = loginMethods.passwordEnabled && (!status?.enabled || !status.required);
     const needsSocialProof = !showPassword && !(status?.required && status?.enabled) && !loginMethods.socialProofFresh;
     const label = status?.enabled ? '패스키·인증 앱 관리' : '패스키·인증 앱 등록';
-    const credentialNames = status?.credentials?.map(value => value.name || (value.kind === 'PASSKEY' ? '패스키' : '인증 앱')) || [];
+    const credentialNames = status?.credentials?.map(mfaCredentialName) || [];
     const connection = credentialNames.length ? `${credentialNames.join(' · ')} 연결됨` : '연결됨';
     return <div ref={groupRef} role="group" aria-label="패스키 및 인증 앱" data-sentry-block style={{ display: 'contents' }}>
         <div ref={sectionRef} id="account-security" style={styles.loginMethodLabel}>
@@ -126,12 +130,15 @@ export default function MfaSecuritySection({ loginMethods, disabled = false, res
         </div>
         {loadError && <div style={{ gridColumn: '1 / -1' }}><DataState state="error" title="인증 수단을 불러오지 못했어요." error={loadError}
             compact onRetry={() => setRetry(value => value + 1)} /></div>}
-        {shouldRender && <div id={panelId} className="reserve-login-security-panel" inert={!open || isClosing ? true : undefined}
+        {shouldRender && !loadError && <div id={panelId} className="reserve-login-security-panel" inert={!open || isClosing ? true : undefined}
             style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateRows: '1fr',
                 animation: reducedMotion ? 'none' : !open || isClosing ? 'reserve-feed-replies-exit 200ms ease-in both' : 'reserve-feed-replies-enter 200ms ease-out both' }}>
             <div style={{ minHeight: 0, overflow: 'hidden' }}><div ref={surfaceRef} tabIndex={-1} className="reserve-login-security-surface">
-                {error && <Typography.Paragraph role="alert">{error}</Typography.Paragraph>}
-                {view?.revision === revision ? <MfaFlow ref={flowRef} initialView={view.value} settings={status} onDone={close} onCancel={close} />
+                {!status || busy && directManage ? <div role="status" aria-label="인증 수단을 확인하는 중" aria-busy="true">
+                    <Bone width={160} height={20} pageLoading={false} />
+                    <Bone height={16} pageLoading={false} style={{ marginTop: 12 }} />
+                    <Bone width={44} height={44} pageLoading={false} style={{ marginTop: 16, marginInlineStart: 'auto' }} />
+                </div> : view?.revision === revision ? <MfaFlow ref={flowRef} initialView={view.value} settings={status} onDone={() => { setRetry(value => value + 1); close(); }} onCancel={close} />
                     : <Form key={revision} aria-label={label} layout="vertical" requiredMark={false} onFinish={manage}>
                         {showPassword && <Form.Item name="password" label="현재 비밀번호" rules={[{ required: !loginMethods.socialProofFresh, message: '현재 비밀번호를 입력해주세요.' }]}>
                             <FormInput type="password" autoComplete="current-password" maxLength={64} disabled={busy} />

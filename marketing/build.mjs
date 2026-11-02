@@ -14,7 +14,7 @@ const { parseFragment, serialize } = await import(pathToFileURL(jsdomRequire.res
 const app = new URL(process.env.APP_PUBLIC_URL || 'https://app.reserve.it.kr');
 const marketing = new URL(process.env.APP_MARKETING_URL || 'https://reserve.it.kr');
 for (const url of [app, marketing]) if (url.protocol !== 'https:' || url.pathname !== '/' || url.username || url.password || url.search || url.hash) throw new Error('Build origins must be HTTPS origins');
-for (const dir of ['icons', 'fonts', 'images']) await mkdir(resolve(output, dir), { recursive: true });
+for (const dir of ['icons', 'fonts', 'marketing-images']) await mkdir(resolve(output, dir), { recursive: true });
 const bundler = { bundle: true, nodePaths: [resolve(root, '../frontend/node_modules')], jsx: 'automatic',
     define: { 'process.env.NODE_ENV': '"production"', 'import.meta.env': '{}', '__RESERVE_APP_ORIGIN__': JSON.stringify(app.origin) }, logLevel: 'warning' };
 const rendered = await build({ ...bundler, entryPoints: [resolve(root, 'src/render.jsx')], platform: 'node', format: 'cjs', write: false });
@@ -23,8 +23,8 @@ new Function('require', 'module', 'exports', rendered.outputFiles[0].text)(front
 const page = pageModule.exports.renderPage();
 const styles = new Map();
 const photos = new Map([
-    ['https://images.unsplash.com/photo-1518611012118-696072aa579a?w=400&q=80', '/images/pilates.jpg'],
-    ['https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=400&q=80', '/images/hair.jpg'],
+    ['/images/pilates.jpg', '/marketing-images/pilates.jpg'],
+    ['/images/hair.jpg', '/marketing-images/hair.jpg'],
 ]);
 function staticMarkup(source, mobile = false) {
     const fragment = parseFragment(source);
@@ -44,7 +44,7 @@ function staticMarkup(source, mobile = false) {
                 const url = new URL(path.value, app.origin);
                 if (url.origin !== app.origin || !path.value.startsWith('/') || path.value.startsWith('//')) throw new Error('Invalid app navigation');
                 node.tagName = node.nodeName = 'a';
-                node.attrs = node.attrs.filter(a => a.name !== 'type' && a !== path);
+                node.attrs = node.attrs.filter(a => a.name !== 'type' && a.name !== 'href' && a !== path);
                 node.attrs.push({ name: 'href', value: url.href });
             }
             for (const a of node.attrs) {
@@ -77,12 +77,12 @@ const footerCss = sharedRules(postcss.parse(await readFile(resolve(root, '../fro
     /\.footer-copyright|\.reserve-app-footer/).toString();
 const socialCss = sharedRules(postcss.parse(await readFile(resolve(root, '../frontend/src/styles/global/interactions.css'), 'utf8')),
     /\.reserve-social(?=:|--velog)/).toString();
-const storeCardCss = sharedRules(postcss.parse(await readFile(resolve(root, '../frontend/src/styles/global/feature-surfaces.css'), 'utf8')),
-    /\.reserve-store-(?:card|identity-text)/).toString();
+const surfaceCss = sharedRules(postcss.parse(await readFile(resolve(root, '../frontend/src/styles/global/feature-surfaces.css'), 'utf8')),
+    /\.reserve-store-(?:card|identity-text)|\.reserve-header-search/).toString();
 const iconTokens = await readFile(resolve(root, '../frontend/src/styles/tokens/icon-controls.css'), 'utf8');
 const iconCss = sharedRules(postcss.parse(await readFile(resolve(root, '../frontend/src/styles/global/icons.css'), 'utf8')),
-    /\.anticon\.reserve-ui-icon|\.reserve-favorite-button/).toString();
-await writeFile(resolve(output, 'site.css'), [await readFile(resolve(root, 'site.css'), 'utf8'), page.css, componentCss, textLinkCss, footerCss, socialCss, storeCardCss, iconTokens, iconCss,
+    /\.anticon\.reserve-ui-icon|\.reserve-favorite-button|\.reserve-header-search/).toString();
+await writeFile(resolve(output, 'site.css'), [await readFile(resolve(root, 'site.css'), 'utf8'), page.css, componentCss, textLinkCss, footerCss, socialCss, surfaceCss, iconTokens, iconCss,
     ...[...styles].map(([name, value]) => `:root .${name}{${value}}`)].join('\n'));
 await build({ ...bundler, entryPoints: [resolve(root, 'site.js')], platform: 'browser', target: ['es2022'], format: 'iife', minify: true, outfile: resolve(output, 'site.js') });
 await copyFile(resolve(root, '../frontend/src/styles/theme.css'), resolve(output, 'theme.css'));
@@ -91,7 +91,7 @@ await copyFile(resolve(root, '../frontend/node_modules/pretendard/dist/LICENSE.t
 await copyFile(resolve(root, '../frontend/public/fonts/SUITE-Variable.woff2'), resolve(output, 'fonts/SUITE-Variable.woff2'));
 await copyFile(resolve(root, '../frontend/public/fonts/SUITE-LICENSE.txt'), resolve(output, 'fonts/SUITE-LICENSE.txt'));
 for (const file of ['og-image.png', 'icons/favicon.svg', 'icons/R_logo.png']) await copyFile(resolve(root, '../frontend/public', file), resolve(output, file));
-for (const file of ['pilates.jpg', 'hair.jpg']) await copyFile(resolve(root, 'images', file), resolve(output, 'images', file));
+for (const file of ['pilates.jpg', 'hair.jpg']) await copyFile(resolve(root, 'images', file), resolve(output, 'marketing-images', file));
 await copyFile(resolve(root, '../frontend/node_modules/hangul-js/LICENSE'), resolve(output, 'Hangul-js-LICENSE.txt'));
 let html = (await readFile(resolve(root, 'index.html'), 'utf8')).replaceAll('https://app.reserve.it.kr', app.origin).replaceAll('https://reserve.it.kr', marketing.origin);
 for (const file of ['theme.css', 'site.css', 'site.js']) {

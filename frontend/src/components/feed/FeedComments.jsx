@@ -212,7 +212,7 @@ function FeedCommentsSession({ postId }) {
             nonce.current = null; message.warning('이전 댓글 저장은 완료됐어요. 작성 중인 내용은 남겨뒀어요. 다시 확인하고 저장해주세요.');
         } else { revokePhotos(); setContent(''); setImages([]); setTarget(null); nonce.current = null; setError(''); setPhotoError(''); generation.current += 1; }
         await invalidateInteractions(client);
-    }, onError: (failure, variables) => { if (!failure.isStaleSession && isCurrentSession(variables.session) && generation.current === variables.generation) setError(failure.message); }, onSettled: () => { lock.current = false; } });
+    }, onError: (failure, variables) => { if (!failure.isStaleSession && isCurrentSession(variables.session) && generation.current === variables.generation) message.error(failure.message || '댓글을 저장하지 못했어요.'); }, onSettled: () => { lock.current = false; } });
     const remove = useMutation({ mutationFn: async ({ id, session }) => {
         assertCurrentSession(session); await service.deleteComment(id); assertCurrentSession(session);
     },

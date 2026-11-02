@@ -12,7 +12,7 @@ dependencyLocking {
 group = 'kr.it.reserve'
 // 프론트 package.json과 릴리스 버전을 맞춘다.
 
-version = '2.16.2'
+version = '2.16.3'
 description = 'We are reserve'
 
 java {

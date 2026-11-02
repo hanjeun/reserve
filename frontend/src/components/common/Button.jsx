@@ -157,7 +157,9 @@ const Button = ({
     const reasonId = useId();
     const isGhostSm = variant.startsWith('ghost-sm');
     const iconOnly = icon != null && React.Children.count(children) === 0;
-    const neutralText = !iconOnly && ['ghost', 'ghost-sm'].includes(variant)
+    const textOnly = icon == null && React.Children.toArray(children)
+        .every(child => typeof child === 'string' || typeof child === 'number');
+    const neutralText = textOnly && ['ghost', 'ghost-sm'].includes(variant)
         && (style?.color == null || [colors.text.secondary, colors.text.tertiary].includes(style.color));
     const smallButtonRadius = iconOnly ? radius.md : radius.pill;
 

@@ -1,5 +1,6 @@
 import api from '../api/axios';
 import { performPasskey } from './passkey';
+import { assertCurrentSession, currentSession } from '../api/sessionScope';
 
 const config = signal => ({ skipAuthRefresh: true, signal });
 
@@ -33,16 +34,27 @@ function registrationName(credential) {
 }
 
 export async function authenticateWithPasskey(registration, signal) {
-    const options = await api.post('/api/auth/mfa/passkey/options', { registration }, config(signal));
-    signal?.throwIfAborted();
-    const credential = await performPasskey(options, registration, signal);
-    signal?.throwIfAborted();
-    return registration
-        ? api.post('/api/auth/mfa/passkey/confirm', { credential, name: registrationName(credential) }, config(signal))
-        : api.post('/api/auth/mfa/verify', { kind: 'PASSKEY', proof: credential }, config(signal));
+    const session = currentSession();
+    const activeSignal = signal ? AbortSignal.any([signal, session.signal]) : session.signal;
+    try {
+        const options = await api.post('/api/auth/mfa/passkey/options', { registration }, config(activeSignal));
+        assertCurrentSession(session.epoch);
+        activeSignal.throwIfAborted();
+        const credential = await performPasskey(options, registration, activeSignal);
+        assertCurrentSession(session.epoch);
+        activeSignal.throwIfAborted();
+        return registration
+            ? await api.post('/api/auth/mfa/passkey/confirm', { credential, name: registrationName(credential) }, config(activeSignal))
+            : await api.post('/api/auth/mfa/verify', { kind: 'PASSKEY', proof: credential }, config(activeSignal));
+    } catch (failure) {
+        assertCurrentSession(session.epoch);
+        throw failure;
+    }
 }
 export async function finishMfaSession(signal, defer = false) {
+    const session = currentSession();
     await api.post(defer ? '/api/auth/mfa/defer' : '/api/auth/mfa/finish', undefined, config(signal));
+    assertCurrentSession(session.epoch);
     signal?.throwIfAborted();
     return api.get('/api/member/me', config(signal));
 }

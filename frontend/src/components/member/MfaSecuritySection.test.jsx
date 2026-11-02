@@ -77,6 +77,40 @@ describe('계정별 인증 관리', () => {
         expect(screen.queryByLabelText('현재 비밀번호')).toBeNull();
         expect(fixture.post).toHaveBeenCalledWith('/api/member/mfa/manage', { password: undefined }, { skipAuthRefresh: true, signal: expect.any(AbortSignal) });
     });
+    it.each(['admin', 'social'])('%s의 관리 요청을 기다릴 때 임시 확인 폼을 표시하지 않아요', async kind => {
+        let complete;
+        fixture.post.mockImplementation(() => new Promise(resolve => { complete = resolve; }));
+        if (kind === 'admin') fixture.get.mockResolvedValue({ ...connected, required: true });
+        show({ ...methods, socialProofFresh: kind === 'social' });
+        fireEvent.click(await screen.findByRole('button', { name: '패스키·인증 앱 관리' }));
+        expect(screen.getByRole('status', { name: '인증 수단을 확인하는 중' })).toHaveAttribute('aria-busy', 'true');
+        expect(screen.queryByRole('form')).toBeNull();
+        expect(screen.queryByLabelText('현재 비밀번호')).toBeNull();
+        await act(async () => complete({ purpose: 'MANAGE', verified: false }));
+        expect(screen.getByText('기존 인증 수단 확인')).toBeVisible();
+        expect(screen.queryByRole('status')).toBeNull();
+        expect(fixture.post).toHaveBeenCalledTimes(1);
+    });
+    it('직접 관리 요청이 실패하면 메시지를 알리고 같은 패널에서 다시 시작해요', async () => {
+        fixture.get.mockResolvedValue({ ...connected, required: true });
+        fixture.post.mockRejectedValueOnce(new Error('일시적인 오류예요.')).mockResolvedValueOnce({ purpose: 'MANAGE', verified: false });
+        show();
+        fireEvent.click(await screen.findByRole('button', { name: '패스키·인증 앱 관리' }));
+        const form = await screen.findByRole('form', { name: '패스키·인증 앱 관리' });
+        expect(fixture.message.error).toHaveBeenCalledExactlyOnceWith('일시적인 오류예요.');
+        fireEvent.submit(form);
+        expect(await screen.findByText('기존 인증 수단 확인')).toBeVisible();
+        expect(fixture.post).toHaveBeenCalledTimes(2);
+    });
+    it('보안 설정 주소로 진입해도 상태 조회 전에는 확인 폼을 표시하지 않아요', async () => {
+        let complete;
+        fixture.get.mockImplementation(() => new Promise(resolve => { complete = resolve; }));
+        show(methods, '/my-page#account-security');
+        expect(screen.getByRole('status', { name: '인증 수단을 확인하는 중' })).toBeVisible();
+        expect(screen.queryByRole('form')).toBeNull();
+        await act(async () => complete(connected));
+        expect(screen.getByLabelText('현재 비밀번호')).toBeVisible();
+    });
     it('최근 확인한 연결 소셜 계정으로 바로 관리해요', async () => {
         show({ ...methods, passwordEnabled: false, socialProofFresh: true });
         fireEvent.click(await screen.findByRole('button', { name: '패스키·인증 앱 관리' }));

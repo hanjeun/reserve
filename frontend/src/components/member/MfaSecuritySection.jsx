@@ -40,6 +40,7 @@ export default function MfaSecuritySection({ loginMethods, disabled = false, res
     const busy = currentAction?.busy || false;
     const status = load?.revision === revision ? load.status : null;
     const loadError = load?.revision === revision ? load.error : null;
+    const directManage = Boolean(status?.required && status.enabled || loginMethods.socialProofFresh);
     const open = panel.revision === revision && panel.open;
     const reducedMotion = useReducedMotion();
     const { shouldRender, isClosing } = useExitAnimation(open, reducedMotion ? 0 : 200);
@@ -94,7 +95,7 @@ export default function MfaSecuritySection({ loginMethods, disabled = false, res
         setAction(null);
         onIntentChange?.('mfa', true);
         setPanel({ revision, open: true });
-        if (status.required && status.enabled || loginMethods.socialProofFresh) void manage();
+        if (directManage) void manage();
     };
     useEffect(() => {
         if (!resumeRequest?.key || resumeRequest.revision !== revision || resumeRequest.memberId !== useAuthStore.getState().user?.id
@@ -103,12 +104,12 @@ export default function MfaSecuritySection({ loginMethods, disabled = false, res
             resumed.current = resumeRequest.key;
             setPanel({ revision, open: true }); setView(null); setAction(null);
             onIntentChange?.('mfa', true);
-            if (status.required && status.enabled || loginMethods.socialProofFresh) void manage();
+            if (directManage) void manage();
             returnReveal.current?.();
             returnReveal.current = revealSecurityPanel(() => surfaceRef.current || sectionRef.current, reducedMotion);
         });
         return () => cancelAnimationFrame(frame);
-    }, [resumeRequest, status, disabled, revision, loginMethods.socialProofFresh, onIntentChange, manage, reducedMotion]);
+    }, [resumeRequest, status, disabled, revision, directManage, onIntentChange, manage, reducedMotion]);
     if (status && !status.available && !status.enabled) return null;
     const showPassword = loginMethods.passwordEnabled && (!status?.enabled || !status.required);
     const needsSocialProof = !showPassword && !(status?.required && status?.enabled) && !loginMethods.socialProofFresh;
@@ -129,11 +130,15 @@ export default function MfaSecuritySection({ loginMethods, disabled = false, res
         </div>
         {loadError && <div style={{ gridColumn: '1 / -1' }}><DataState state="error" title="인증 수단을 불러오지 못했어요." error={loadError}
             compact onRetry={() => setRetry(value => value + 1)} /></div>}
-        {shouldRender && <div id={panelId} className="reserve-login-security-panel" inert={!open || isClosing ? true : undefined}
+        {shouldRender && !loadError && <div id={panelId} className="reserve-login-security-panel" inert={!open || isClosing ? true : undefined}
             style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateRows: '1fr',
                 animation: reducedMotion ? 'none' : !open || isClosing ? 'reserve-feed-replies-exit 200ms ease-in both' : 'reserve-feed-replies-enter 200ms ease-out both' }}>
             <div style={{ minHeight: 0, overflow: 'hidden' }}><div ref={surfaceRef} tabIndex={-1} className="reserve-login-security-surface">
-                {view?.revision === revision ? <MfaFlow ref={flowRef} initialView={view.value} settings={status} onDone={() => { setRetry(value => value + 1); close(); }} onCancel={close} />
+                {!status || busy && directManage ? <div role="status" aria-label="인증 수단을 확인하는 중" aria-busy="true">
+                    <Bone width={160} height={20} pageLoading={false} />
+                    <Bone height={16} pageLoading={false} style={{ marginTop: 12 }} />
+                    <Bone width={44} height={44} pageLoading={false} style={{ marginTop: 16, marginInlineStart: 'auto' }} />
+                </div> : view?.revision === revision ? <MfaFlow ref={flowRef} initialView={view.value} settings={status} onDone={() => { setRetry(value => value + 1); close(); }} onCancel={close} />
                     : <Form key={revision} aria-label={label} layout="vertical" requiredMark={false} onFinish={manage}>
                         {showPassword && <Form.Item name="password" label="현재 비밀번호" rules={[{ required: !loginMethods.socialProofFresh, message: '현재 비밀번호를 입력해주세요.' }]}>
                             <FormInput type="password" autoComplete="current-password" maxLength={64} disabled={busy} />

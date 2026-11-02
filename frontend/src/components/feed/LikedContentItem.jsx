@@ -8,7 +8,7 @@ import InterfaceIcon from '../common/InterfaceIcon';
 import Tooltip from '../common/Tooltip';
 import ContentLikeButton from './ContentLikeButton';
 import PostInteractionBar from './PostInteractionBar';
-import { feedDate, feedMediaUrl } from '../../utils/feed';
+import { feedMediaUrl } from '../../utils/feed';
 import { BENEFIT_IMAGE_FALLBACK, getBenefitImageUrl } from '../../pages/discovery/benefitPresentation';
 import { fontSize } from '../../styles/tokens';
 
@@ -22,17 +22,17 @@ export default function LikedContentItem({ item, view, onShare, onReport }) {
     const to = news ? `/benefits/${item.targetId}` : comment ? `/feed/posts/${value.postId}#comment-${value.id}` : `/feed/posts/${item.targetId}`;
     const image = value.images?.[0];
     const src = feedMediaUrl(image?.url) || (news ? getBenefitImageUrl(value.mainImageUrl) : BENEFIT_IMAGE_FALLBACK);
-    const meta = <span className="reserve-store-list-row-meta"><span>{kind}</span>{news && value.storeName && <span>{value.storeName}</span>}
-        {value.createdAt && <time dateTime={value.createdAt}>{feedDate(value.createdAt)}</time>}</span>;
+    const storeName = news ? value.storeName : value.store?.name;
+    const meta = storeName && <span className="reserve-store-list-row-meta">{storeName}</span>;
     const storeId = news ? value.storeId : value.store?.id;
     const tools = <>
         {Number.isSafeInteger(storeId) && storeId > 0 && <IconTool label="가게 보기" icon={<InterfaceIcon name="store" />} to={`/store/${storeId}`} />}
-        <ContentLikeButton type={item.type} targetId={item.targetId} />
+        <ContentLikeButton type={item.type} targetId={item.targetId} showCount={false} />
         {!value.mine && onReport && <IconTool label={news ? '소식 신고' : comment ? '댓글 신고' : '게시물 신고'}
             icon={<InterfaceIcon name="report" />} onClick={() => onReport(item)} />}
     </>;
     const interactions = !news && !comment && <div className="reserve-liked-secondary-actions"><PostInteractionBar type="POST"
-        targetId={item.targetId} postId={item.targetId} showLike={false} onShare={onShare ? () => onShare(value) : undefined} /></div>;
+        targetId={item.targetId} postId={item.targetId} showLike={false} showCounts={false} onShare={onShare ? () => onShare(value) : undefined} /></div>;
     if (view === 'list') return <article className="reserve-store-list-row reserve-liked-list-row" data-list-item-id={`liked:${item.id}`}>
         <Link to={to} className="reserve-store-card-hit" tabIndex={-1} aria-hidden="true" />
         <div className="reserve-store-list-row-link">

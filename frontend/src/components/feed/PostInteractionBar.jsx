@@ -7,20 +7,20 @@ import { interactionKeys, useFeedInteractions } from '../../hooks/feedInteractio
 import service from '../../services/feedInteractionService';
 import ContentLikeButton from './ContentLikeButton';
 
-export default function PostInteractionBar({ type = 'POST', targetId, postId, onShare, showLike = true }) {
+export default function PostInteractionBar({ type = 'POST', targetId, postId, onShare, showLike = true, showCounts = true }) {
     const config = useFeedInteractions();
     const enabled = (type === 'NEWS' ? config.data?.newsEnabled : config.data?.enabled) === true && Number.isSafeInteger(targetId) && targetId > 0;
     const key = interactionKeys.status(type, targetId);
     const status = useQuery({ queryKey: key, queryFn: ({ signal }) => service.status(type, targetId, signal), enabled, staleTime: 30_000, retry: false });
     if (!enabled && !onShare) return null;
     return <div className="reserve-feed-interactions" data-discovery-swipe-ignore="true">
-        {enabled && showLike && <ContentLikeButton type={type} targetId={targetId} />}
+        {enabled && showLike && <ContentLikeButton type={type} targetId={targetId} showCount={showCounts} />}
         {enabled && postId && <Link className="reserve-feed-interaction" to={`/feed/posts/${postId}#comments`} aria-label="댓글 보기">
-            <InterfaceIcon name="comment" />{status.data?.commentCount > 0 && <span>{status.data.commentCount.toLocaleString('ko-KR')}</span>}
+            <InterfaceIcon name="comment" />{showCounts && status.data?.commentCount > 0 && <span>{status.data.commentCount.toLocaleString('ko-KR')}</span>}
         </Link>}
         {onShare && <Tooltip title="게시물 공유"><button type="button" className="reserve-feed-interaction" aria-label="게시물 공유" onClick={onShare}>
             <InterfaceIcon name="share" />
         </button></Tooltip>}
     </div>;
 }
-PostInteractionBar.propTypes = { type: PropTypes.oneOf(['POST', 'NEWS']), targetId: PropTypes.number.isRequired, postId: PropTypes.number, onShare: PropTypes.func, showLike: PropTypes.bool };
+PostInteractionBar.propTypes = { type: PropTypes.oneOf(['POST', 'NEWS']), targetId: PropTypes.number.isRequired, postId: PropTypes.number, onShare: PropTypes.func, showLike: PropTypes.bool, showCounts: PropTypes.bool };

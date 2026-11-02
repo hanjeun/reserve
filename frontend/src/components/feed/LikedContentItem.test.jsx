@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import LikedContentItem from './LikedContentItem';
+import PostInteractionBar from './PostInteractionBar';
 import LikedContentList from './LikedContentList';
 import MyFavorites from '../../pages/favorite/MyFavorites';
 import service from '../../services/feedInteractionService';
@@ -18,12 +19,13 @@ vi.mock('../../hooks/feedInteractionQueries', () => ({
     interactionKeys: { mine: params => ['likes', params], status: (type, id) => ['status', type, id] },
     invalidateInteractions: vi.fn(),
 }));
-vi.mock('./ContentLikeButton', () => ({ default: () => <button type="button" aria-label="좋아요 취소">좋아요</button> }));
+vi.mock('../../hooks/useContentLike', () => ({ default: () => ({ enabled: true, busy: false, label: '좋아요 취소', click: vi.fn(),
+    status: { data: { liked: true, likeCount: 12 } } }) }));
 vi.mock('./FeedReportModal', () => ({ default: ({ postId, newsId, commentId, onClose }) => postId || newsId || commentId
     ? <section role="dialog" aria-label="신고"><output>{newsId ? 'NEWS' : commentId ? 'COMMENT' : 'POST'}:{newsId || commentId || postId}</output><button onClick={onClose}>닫기</button></section> : null }));
 
 const news = { id: 9, type: 'NEWS', targetId: 7, available: true, news: { id: 7, title: '새 메뉴', storeId: 12, storeName: '테스트 가게',
-    content: '가게 소식 내용', images: [{ url: '/api/store-news/media/1', width: 1200, height: 800 }] } };
+    content: '가게 소식 내용', createdAt: '2026-11-02T07:00:00', images: [{ url: '/api/store-news/media/1', width: 1200, height: 800 }] } };
 const post = { id: 10, type: 'POST', targetId: 8, available: true, post: { id: 8, author: { nickname: '테스트 작성자' }, content: '게시물 내용' } };
 const clients = [];
 function RouteProbe() { const location = useLocation(); return <output aria-label="현재 경로">{location.pathname}</output>; }
@@ -40,6 +42,25 @@ beforeEach(() => {
 afterEach(() => clients.splice(0).forEach(client => client.clear()));
 
 describe('liked content follows the store card and row presentation', () => {
+    it.each(['cards', 'list'])('keeps only the store name below the content and hides counts in %s', view => {
+        const { container } = show(<LikedContentItem item={news} view={view} onReport={vi.fn()} />);
+        expect(container.querySelector('.reserve-store-list-row-meta')).toHaveTextContent(/^테스트 가게$/);
+        expect(container.querySelector('time')).toBeNull();
+        expect(screen.queryByText('가게 소식', { exact: true })).toBeNull();
+        expect(screen.getByRole('button', { name: '좋아요 취소' })).not.toHaveTextContent(/\d/);
+    });
+
+    it('preserves default feed counts while allowing the likes view to hide them', async () => {
+        show(<><section aria-label="기본 상호작용"><PostInteractionBar targetId={8} postId={8} /></section>
+            <section aria-label="간단한 상호작용"><PostInteractionBar targetId={8} postId={8} showCounts={false} /></section></>);
+        const regular = screen.getByRole('region', { name: '기본 상호작용' });
+        const compact = screen.getByRole('region', { name: '간단한 상호작용' });
+        expect(await within(regular).findByText('2')).toBeInTheDocument();
+        expect(within(regular).getByRole('button', { name: '좋아요 취소' })).toHaveTextContent('12');
+        expect(within(compact).getByRole('link', { name: '댓글 보기' })).not.toHaveTextContent(/\d/);
+        expect(within(compact).getByRole('button', { name: '좋아요 취소' })).not.toHaveTextContent(/\d/);
+    });
+
     it.each(['cards', 'list'])('reveals the full long title on hover and keyboard focus without duplicating the %s navigation stop', async view => {
         vi.useFakeTimers();
         try {

@@ -40,6 +40,25 @@ beforeEach(() => {
 afterEach(() => clients.splice(0).forEach(client => client.clear()));
 
 describe('liked content follows the store card and row presentation', () => {
+    it.each(['cards', 'list'])('reveals the full long title on hover and keyboard focus without duplicating the %s navigation stop', async view => {
+        vi.useFakeTimers();
+        try {
+            const title = '이번 주에 새롭게 준비한 메뉴와 예약 혜택을 자세히 안내해요';
+            const { container } = show(<LikedContentItem item={{ ...news, news: { ...news.news, title } }} view={view} onReport={vi.fn()} />);
+            const link = screen.getByRole('link', { name: `${title} 가게 소식 보기` });
+            expect(screen.getAllByRole('link', { name: `${title} 가게 소식 보기` })).toHaveLength(1);
+            expect(container.querySelector('.reserve-store-card-hit')).toHaveAttribute('tabindex', '-1');
+            fireEvent.mouseEnter(link); await act(async () => { vi.advanceTimersByTime(500); });
+            expect(screen.getByRole('tooltip')).toHaveTextContent(title);
+            fireEvent.mouseLeave(link); await act(async () => { vi.advanceTimersByTime(500); });
+            fireEvent.keyDown(document, { key: 'Tab' }); act(() => link.focus());
+            await act(async () => { vi.advanceTimersByTime(500); });
+            expect(link).toHaveFocus(); expect(screen.getByRole('tooltip')).toHaveTextContent(title);
+            fireEvent.click(link);
+            expect(screen.getByRole('status', { name: '현재 경로' })).toHaveTextContent('/benefits/7');
+        } finally { vi.useRealTimers(); }
+    });
+
     it('keeps the original photo ratio and the common card title tools', () => {
         const { container } = show(<LikedContentItem item={news} view="cards" onReport={vi.fn()} />);
         const image = container.querySelector('.reserve-card-image');

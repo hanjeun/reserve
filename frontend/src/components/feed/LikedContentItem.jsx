@@ -5,6 +5,7 @@ import Card from '../common/Card';
 import LoadingImage from '../common/LoadingImage';
 import IconTool from '../common/IconTool';
 import InterfaceIcon from '../common/InterfaceIcon';
+import Tooltip from '../common/Tooltip';
 import ContentLikeButton from './ContentLikeButton';
 import PostInteractionBar from './PostInteractionBar';
 import { feedDate, feedMediaUrl } from '../../utils/feed';
@@ -33,21 +34,25 @@ export default function LikedContentItem({ item, view, onShare, onReport }) {
     const interactions = !news && !comment && <div className="reserve-liked-secondary-actions"><PostInteractionBar type="POST"
         targetId={item.targetId} postId={item.targetId} showLike={false} onShare={onShare ? () => onShare(value) : undefined} /></div>;
     if (view === 'list') return <article className="reserve-store-list-row reserve-liked-list-row" data-list-item-id={`liked:${item.id}`}>
-        <Link to={to} className="reserve-store-card-hit" aria-label={`${title} ${kind} 보기`} />
+        <Link to={to} className="reserve-store-card-hit" tabIndex={-1} aria-hidden="true" />
         <div className="reserve-store-list-row-link">
             <span className="reserve-store-list-row-image"><LoadingImage src={src} alt="" loading="lazy" width={160} height={160}
                 onError={event => { if (!event.currentTarget.src.endsWith(BENEFIT_IMAGE_FALLBACK)) event.currentTarget.src = BENEFIT_IMAGE_FALLBACK; }} /></span>
             <div className="reserve-store-list-row-body"><div className="reserve-store-list-row-title-line reserve-liked-title-line">
-                <strong className="reserve-store-list-row-name">{title}</strong><div className="reserve-liked-title-tools">{tools}</div></div>
+                <Tooltip title={title}><Link to={to} className="reserve-liked-title-link" aria-label={`${title} ${kind} 보기`}>
+                    <strong className="reserve-store-list-row-name">{title}</strong></Link></Tooltip>
+                <div className="reserve-liked-title-tools">{tools}</div></div>
                 <span className="reserve-store-list-row-description">{content}</span>{meta}{interactions}</div>
         </div>
     </article>;
     return <Card hoverable className="reserve-liked-card" data-list-item-id={`liked:${item.id}`}>
         <div className="reserve-store-card-shell">
-            <Link to={to} className="reserve-store-card-hit" aria-label={`${title} ${kind} 보기`} />
+            <Link to={to} className="reserve-store-card-hit" tabIndex={-1} aria-hidden="true" />
             <Card.Cover src={src} alt="" width={image?.width ?? value.mainImageWidth} height={image?.height ?? value.mainImageHeight} fallbackSrc={BENEFIT_IMAGE_FALLBACK} />
             <div className="reserve-store-card-info"><div className="reserve-store-card-title-line reserve-liked-title-line">
-                <Typography.Title level={5} className="reserve-store-card-name" style={{ margin: 0, fontSize: fontSize.xl }}>{title}</Typography.Title>
+                <Tooltip title={title}><Link to={to} className="reserve-liked-title-link" aria-label={`${title} ${kind} 보기`}>
+                    <Typography.Title level={5} className="reserve-store-card-name" style={{ margin: 0, fontSize: fontSize.xl }}>{title}</Typography.Title>
+                </Link></Tooltip>
                 <div className="reserve-liked-title-tools">{tools}</div></div>
                 <p>{content}</p>{meta}{interactions}</div>
         </div>

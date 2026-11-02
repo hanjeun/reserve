@@ -158,6 +158,23 @@
 .reserve-liked-section { margin: 32px 0; }
 .reserve-liked-section--listing { margin-top: 0; }
 .reserve-liked-section h2 { margin: 0 0 16px; font-size: 18px; }
+.reserve-liked-card-link { display: block; color: inherit; text-decoration: none; }
+.reserve-liked-card { display: flex; flex-direction: column; }
+.reserve-liked-card .ant-card-body { flex: 1; }
+.reserve-liked-item-actions { display: flex; align-items: center; justify-content: flex-end; padding-inline: 12px; }
+.reserve-liked-card .reserve-liked-item-actions .reserve-feed-interaction { display: inline-flex; flex: none; align-items: center; justify-content: center; }
+.reserve-liked-card .ant-card-actions .reserve-liked-item-actions a.reserve-feed-interaction { display: inline-flex; width: auto; }
+.reserve-liked-item-actions .reserve-feed-interaction .anticon { flex: none; }
+.reserve-liked-card h3 { margin: 0 0 8px; font-size: 18px; }
+.reserve-liked-card p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; min-height: 3em; margin: 0 0 12px; }
+.reserve-liked-card .reserve-store-list-row-meta { font-size: 13px; color: var(--c-text-secondary); }
+.reserve-liked-card time, .reserve-liked-list-row time { white-space: nowrap; }
+.reserve-liked-card .reserve-feed-interactions, .reserve-liked-section .reserve-store-list-row-actions .reserve-feed-interactions { margin: 0; }
+@media (max-width: 575px) {
+    .reserve-liked-list-row { flex-wrap: wrap; }
+    .reserve-liked-list-row .reserve-store-list-row-link { flex-basis: 100%; }
+    .reserve-liked-list-row .reserve-store-list-row-actions { width: 100%; justify-content: flex-end; }
+}
 .reserve-liked-unavailable { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--c-border-default); }
 .reserve-feed-report-list { list-style: none; padding: 0; }
 .reserve-feed-report-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 18px 0; border-bottom: 1px solid var(--c-border-default); }

@@ -2,13 +2,14 @@ import { useEffect } from 'react';
 import { useLocation, useNavigationType } from 'react-router-dom';
 import useReducedMotion from '../../hooks/useReducedMotion';
 
-export default function useTermsAnchorScroll() {
+export default function useTermsAnchorScroll(anchors = ['payments']) {
     const { key, hash } = useLocation();
     const navigationType = useNavigationType();
     const reducedMotion = useReducedMotion();
+    const targetId = anchors.includes(hash.slice(1)) ? hash.slice(1) : null;
 
     useEffect(() => {
-        if (hash !== '#payments') return undefined;
+        if (!targetId) return undefined;
         const animate = navigationType === 'PUSH' && !reducedMotion;
         let frame = 0;
         let finished = false;
@@ -23,7 +24,7 @@ export default function useTermsAnchorScroll() {
         };
         const reveal = () => {
             if (finished || document.documentElement.dataset.reserveModalOpen) return;
-            const target = document.getElementById('payments');
+            const target = document.getElementById(targetId);
             stop();
             target?.focus({ preventScroll: true });
             target?.scrollIntoView({ block: 'start', behavior: animate ? 'smooth' : 'instant' });
@@ -46,5 +47,5 @@ export default function useTermsAnchorScroll() {
         window.addEventListener('keydown', stop);
         schedule();
         return stop;
-    }, [key, hash, navigationType, reducedMotion]);
+    }, [key, targetId, navigationType, reducedMotion]);
 }

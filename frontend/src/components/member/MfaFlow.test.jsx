@@ -10,7 +10,7 @@ import { requestAuthenticationBack } from '../../utils/authenticationNavigation'
 const fixture = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn(), login: vi.fn() }));
 vi.mock('../../api/axios', () => ({ default: { post: fixture.post, get: fixture.get } }));
 
-vi.mock('../../utils/passkey', () => ({ performPasskey: vi.fn() }));
+vi.mock('../../utils/passkey', async importOriginal => ({ ...await importOriginal(), performPasskey: vi.fn() }));
 describe('추가 인증', () => {
 
     it('새 환경의 이메일 확인은 기존 발송 필드를 쓰고 인증 수단 등록을 열지 않아요', async () => {
@@ -313,6 +313,38 @@ describe('추가 인증', () => {
         expect(await screen.findByRole('alert')).toHaveTextContent('코드를 확인해주세요.');
         expect(fixture.login).not.toHaveBeenCalled();
     });
+    it('다른 인증 수단이 남으면 현재 브라우저의 새 쿠키를 확인하고 관리 화면을 닫아요', async () => {
+        const done = vi.fn(), logout = vi.fn();
+        useAuthStore.setState({ user: { id: 7, role: 'ADMIN' }, isLoggedIn: true, logout });
+        fixture.post.mockResolvedValue({ sessionRenewed: true });
+        fixture.get.mockResolvedValue({ id: 7, role: 'ADMIN' });
+        render(<MfaFlow initialView={{ purpose: 'MANAGE', verified: true }} settings={{ required: true,
+            credentials: [{ id: 'old-phone', kind: 'PASSKEY', name: '다른 기기 패스키' }, { id: 'pc', kind: 'PASSKEY', name: 'PC · Chrome' }] }} onDone={done} />);
+        fireEvent.click(screen.getByRole('button', { name: '다른 기기 패스키 해제' }));
+        await waitFor(() => expect(done).toHaveBeenCalledWith({ id: 7, role: 'ADMIN' }));
+        expect(logout).not.toHaveBeenCalled();
+        expect(fixture.login).not.toHaveBeenCalled();
+        expect(fixture.get).toHaveBeenCalledWith('/api/member/me', expect.objectContaining({ skipAuthRefresh: true }));
+    });
+    it('인증 수단 해제 응답 전에 계정이 바뀌면 이전 계정의 화면 갱신을 이어가지 않아요', async () => {
+        let complete;
+        const done = vi.fn();
+        useAuthStore.setState({ user: { id: 7, role: 'ADMIN' }, isLoggedIn: true });
+        fixture.post.mockImplementation(() => new Promise(resolve => { complete = resolve; }));
+        render(<MfaFlow initialView={{ purpose: 'MANAGE', verified: true }} settings={{ required: true,
+            credentials: [{ id: 'phone', kind: 'PASSKEY', name: '모바일' }, { id: 'pc', kind: 'PASSKEY', name: 'PC' }] }} onDone={done} />);
+        fireEvent.click(screen.getByRole('button', { name: '모바일 해제' }));
+        await waitFor(() => expect(complete).toBeTypeOf('function'));
+        await act(async () => {
+            useAuthStore.getState().expireSession();
+            useAuthStore.setState({ user: { id: 8, role: 'USER' }, isLoggedIn: true });
+            complete({ sessionRenewed: true });
+        });
+        expect(fixture.get).not.toHaveBeenCalled();
+        expect(done).not.toHaveBeenCalled();
+        expect(useAuthStore.getState().user.id).toBe(8);
+    });
+
     it.each([[false, false], [true, false], [true, true]])('마지막 인증 수단은 관리자 필수 %s·격리 로컬 허용 %s에 따라 보호해요', async (required, localAdminResetAvailable) => {
         const cancel = vi.fn();
         const logout = vi.fn();

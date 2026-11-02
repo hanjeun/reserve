@@ -7,8 +7,7 @@ const config = signal => ({ skipAuthRefresh: true, signal });
 function registrationName(credential) {
     try {
         const attachment = JSON.parse(credential).authenticatorAttachment;
-        if (attachment === 'cross-platform') return '외부 패스키';
-        if (attachment !== 'platform') return '패스키';
+        if (!['platform', 'cross-platform'].includes(attachment)) return '패스키';
         const browser = globalThis.navigator;
         const ua = browser?.userAgent || '';
         const hints = browser?.userAgentData;
@@ -16,6 +15,7 @@ function registrationName(credential) {
         const mobile = hints?.mobile === true || /Android|iPhone|iPad|iPod|Mobile/i.test(ua)
             || /Android|iOS/i.test(platform) || /Macintosh/i.test(ua) && browser.maxTouchPoints > 1;
         const pc = /Windows NT|Macintosh|X11|CrOS|Linux/i.test(ua) || /Windows|macOS|Linux|Chrome OS/i.test(platform);
+        if (attachment === 'cross-platform' && !mobile) return '다른 기기 패스키';
         if (!mobile && !pc) return '패스키';
         const brands = Array.isArray(hints?.brands) ? hints.brands.map(value => value.brand) : [];
         const label = [
@@ -27,7 +27,8 @@ function registrationName(credential) {
             ['Safari', /Safari\//i, 'Safari'],
         ].find(([, pattern, brand]) => pattern.test(ua) || brands.includes(brand))?.[0];
         const device = mobile ? '모바일' : 'PC';
-        return label ? `${device} · ${label}` : `${device} 패스키`;
+        const environment = label ? `${device} · ${label}` : `${device} 패스키`;
+        return attachment === 'cross-platform' ? `${environment}에서 등록` : environment;
     } catch { return '패스키'; }
 }
 

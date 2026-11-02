@@ -54,13 +54,20 @@ describe('브라우저 패스키 인계', () => {
         await authenticateWithPasskey(true);
         expect(api.post).toHaveBeenLastCalledWith('/api/auth/mfa/passkey/confirm', { credential, name }, expect.anything());
     });
-    it.each([['cross-platform', '외부 패스키'], [null, '패스키'], ['unknown', '패스키']])('다른 기기·보안 키나 불명확한 수단을 현재 PC에 저장했다고 표시하지 않아요: %s', async (attachment, name) => {
+    it.each([['cross-platform', '다른 기기 패스키'], [null, '패스키'], ['unknown', '패스키']])('다른 기기·보안 키나 불명확한 수단을 현재 PC에 저장했다고 표시하지 않아요: %s', async (attachment, name) => {
         vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Windows NT 10.0) Chrome/136.0.0.0' });
         const credential = JSON.stringify({ authenticatorAttachment: attachment, response: { transports: ['hybrid'] } });
         api.post.mockResolvedValue('options');
         performPasskey.mockResolvedValue(credential);
         await authenticateWithPasskey(true);
         expect(api.post).toHaveBeenLastCalledWith('/api/auth/mfa/passkey/confirm', { credential, name }, expect.anything());
+    });
+    it('아이폰의 다른 인증 연결도 저장 위치 대신 모바일 등록 환경으로 표시해요', async () => {
+        vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) CriOS/136.0.0.0 Mobile/15E148 Safari/604.1' });
+        const credential = JSON.stringify({ authenticatorAttachment: 'cross-platform' });
+        api.post.mockResolvedValue('options'); performPasskey.mockResolvedValue(credential);
+        await authenticateWithPasskey(true);
+        expect(api.post).toHaveBeenLastCalledWith('/api/auth/mfa/passkey/confirm', { credential, name: '모바일 · Chrome에서 등록' }, expect.anything());
     });
     it('기기 표시 정보를 읽지 못해도 유효한 등록 응답 전달을 막지 않아요', async () => {
         vi.stubGlobal('navigator', { get userAgent() { throw new Error('environment unavailable'); } });

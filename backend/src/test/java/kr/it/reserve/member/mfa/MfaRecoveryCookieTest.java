@@ -23,6 +23,31 @@ import static org.mockito.Mockito.*;
 class MfaRecoveryCookieTest {
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
+    void removingOneCredentialReplacesCookiesWithoutReturningTokens(boolean persistent) {
+        SecurityContextHolder.clearContext();
+        var service = mock(MfaService.class);
+        var properties = mock(JwtProperties.class);
+        when(properties.getAccessTokenExpiration()).thenReturn(Duration.ofMinutes(15));
+        var limiter = mock(RateLimiter.class);
+        when(limiter.tryConsume(anyString(), any())).thenReturn(true);
+        var session = new TokenProvider.IssuedSession("synthetic-access", "synthetic-refresh", Duration.ofDays(1), persistent);
+        when(service.remove(any(), any(), any(), eq("synthetic-credential"))).thenReturn(new MfaService.Completion(session));
+        var response = new MockHttpServletResponse();
+        var result = new MfaController(service, new CookieUtil("local"), properties, limiter)
+                .remove(new MockHttpServletRequest(), response, null, new MfaController.Removal("synthetic-credential"));
+        assertThat(result.getData()).isEqualTo(new MfaController.CredentialRemoval(true));
+        var auth = response.getHeaders("Set-Cookie").stream().filter(value -> value.startsWith("access_token=synthetic-access") || value.startsWith("refresh_token=synthetic-refresh")).toList();
+        assertThat(auth).hasSize(3);
+        assertThat(auth).anyMatch(value -> value.startsWith("access_token=synthetic-access"))
+                .anyMatch(value -> value.startsWith("refresh_token=synthetic-refresh"));
+        assertThat(auth).anyMatch(value -> value.contains("Path=/api/auth;"))
+                .anyMatch(value -> value.contains("Path=/api/v1/auth;"));
+        assertThat(auth.stream().allMatch(value -> value.contains("Max-Age="))).isEqualTo(persistent);
+        verify(service, never()).finish(any(), any(), any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
     void managementRecoveryProofReplacesCookiesAndReturnsOnlyTheView(boolean persistent) {
         SecurityContextHolder.clearContext();
         var service = mock(MfaService.class);

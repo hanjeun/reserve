@@ -669,6 +669,24 @@ class SecurityCompletionSettlementTest {
         assertThat(mfa.beginManage(current(owner), renewed.sessionId(), null, "fixture-password")).isNotNull();
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = Role.class, names = {"USER", "BUSINESS", "ADMIN"})
+    void removingOneOfSeveralCredentialsKeepsOnlyTheConfirmedBrowser(Role role) {
+        tx.executeWithoutResult(ignored -> members.findById(owner.getId()).orElseThrow().setRole(role));
+        var manage = nameManagement(owner, true);
+        var removed = namedPasskey(owner, "다른 기기 패스키");
+        var other = tokens.issueVerifiedSession(current(owner), null, "PASSWORD_MFA", true);
+        var result = mfa.remove(manage.ticket().value(), current(owner), manage.sid(), removed.getId());
+        assertThatThrownBy(() -> tokens.verifyAuthentication(manage.session().accessToken())).isInstanceOf(AuthException.class);
+        assertThatThrownBy(() -> tokens.verifyAuthentication(other.accessToken())).isInstanceOf(AuthException.class);
+        var replacement = tokens.verifyAuthentication(result.session().accessToken());
+        assertThat(replacement.loginMethod()).isEqualTo(role == Role.ADMIN ? "PASSWORD_MFA" : "PASSWORD");
+        assertThat(result.session().persistent()).isTrue();
+        assertThat(mfa.settings(current(owner)).credentials()).hasSize(1).noneMatch(value -> value.id().equals(removed.getId()));
+        assertThatThrownBy(() -> mfa.status(manage.ticket().value(), current(owner), replacement.sessionId())).isInstanceOf(AuthException.class);
+        assertThat(mfa.beginManage(current(owner), replacement.sessionId(), null, "fixture-password")).isNotNull();
+    }
+
     @Test void localLastCredentialResetStillRequiresProofAndNewAdministratorEnrollment() {
         administrator(owner);
         var used = new java.util.concurrent.atomic.AtomicBoolean();

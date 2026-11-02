@@ -15,6 +15,7 @@ import useReducedMotion from '../../hooks/useReducedMotion';
 import LoginMethodFormActions from './LoginMethodFormActions';
 import MfaFlow from './MfaFlow';
 import styles from './myPageStyles';
+import { mfaCredentialName } from '../../utils/passkey';
 
 export default function MfaSecuritySection({ loginMethods, disabled = false, resumeRequest, onIntentChange, onSocialProof }) {
     const navigate = useNavigate();
@@ -110,7 +111,7 @@ export default function MfaSecuritySection({ loginMethods, disabled = false, res
     const showPassword = loginMethods.passwordEnabled && (!status?.enabled || !status.required);
     const needsSocialProof = !showPassword && !(status?.required && status?.enabled) && !loginMethods.socialProofFresh;
     const label = status?.enabled ? '패스키·인증 앱 관리' : '패스키·인증 앱 등록';
-    const credentialNames = status?.credentials?.map(value => value.name || (value.kind === 'PASSKEY' ? '패스키' : '인증 앱')) || [];
+    const credentialNames = status?.credentials?.map(mfaCredentialName) || [];
     const connection = credentialNames.length ? `${credentialNames.join(' · ')} 연결됨` : '연결됨';
     return <div ref={groupRef} role="group" aria-label="패스키 및 인증 앱" data-sentry-block style={{ display: 'contents' }}>
         <div ref={sectionRef} id="account-security" style={styles.loginMethodLabel}>
@@ -131,7 +132,7 @@ export default function MfaSecuritySection({ loginMethods, disabled = false, res
                 animation: reducedMotion ? 'none' : !open || isClosing ? 'reserve-feed-replies-exit 200ms ease-in both' : 'reserve-feed-replies-enter 200ms ease-out both' }}>
             <div style={{ minHeight: 0, overflow: 'hidden' }}><div ref={surfaceRef} tabIndex={-1} className="reserve-login-security-surface">
                 {error && <Typography.Paragraph role="alert">{error}</Typography.Paragraph>}
-                {view?.revision === revision ? <MfaFlow ref={flowRef} initialView={view.value} settings={status} onDone={close} onCancel={close} />
+                {view?.revision === revision ? <MfaFlow ref={flowRef} initialView={view.value} settings={status} onDone={() => { setRetry(value => value + 1); close(); }} onCancel={close} />
                     : <Form key={revision} aria-label={label} layout="vertical" requiredMark={false} onFinish={manage}>
                         {showPassword && <Form.Item name="password" label="현재 비밀번호" rules={[{ required: !loginMethods.socialProofFresh, message: '현재 비밀번호를 입력해주세요.' }]}>
                             <FormInput type="password" autoComplete="current-password" maxLength={64} disabled={busy} />

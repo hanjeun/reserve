@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Form } from 'antd';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import ReservationConsentField from './ReservationConsentField';
 import useAuthStore from '../../store/useAuthStore';
 const fixture = vi.hoisted(() => ({ get: vi.fn() }));
@@ -15,10 +16,23 @@ const notice = { enabled: true, version: 'fixture-version', hash: 'fixture-hash'
 function show() {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const done = vi.fn();
-    render(<QueryClientProvider client={client}><Form onFinish={done}>
+    render(<MemoryRouter initialEntries={['/store/7']}><QueryClientProvider client={client}><Form onFinish={done}>
         <ReservationConsentField storeId={7} /><button type="submit">예약 신청</button>
-    </Form></QueryClientProvider>);
+    </Form></QueryClientProvider></MemoryRouter>);
     return { client, done };
+}
+function RoundTripForm() {
+    return <Form><Form.Item name="request"><input aria-label="요청사항" /></Form.Item><ReservationConsentField storeId={7} /></Form>;
+}
+function BackFromNotice() {
+    const navigate = useNavigate();
+    return <button onClick={() => navigate(-1)}>예약으로 돌아가기</button>;
+}
+function showRoundTrip() {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<MemoryRouter initialEntries={['/store/7']}><QueryClientProvider client={client}><Routes>
+        <Route path="/store/:id" element={<RoundTripForm />} /><Route path="/reservation-notice/:id" element={<BackFromNotice />} />
+    </Routes></QueryClientProvider></MemoryRouter>);
 }
 describe('예약 동의 경계', () => {
     beforeEach(() => { vi.clearAllMocks(); useAuthStore.setState({ user: { id: 3 }, sessionRevision: 1 }); fixture.get.mockResolvedValue(notice); });
@@ -34,8 +48,12 @@ describe('예약 동의 경계', () => {
         await waitFor(() => expect(done).toHaveBeenCalledWith({ legalConsent: {
             version: notice.version, noticeHash: notice.hash, privacyAccepted: true, conditionsAccepted: true,
         } }));
-        fireEvent.click(screen.getByRole('button', { name: '예약 및 개인정보 제공 안내' }));
-        expect(await screen.findByRole('dialog')).toHaveTextContent('합성 보유기간');
+        expect(screen.queryByRole('button', { name: '예약 및 개인정보 제공 안내' })).toBeNull();
+        const conditions = screen.getByRole('link', { name: '예약·취소·환불 조건' });
+        const sharing = screen.getByRole('link', { name: '가게에 예약 정보를 제공' });
+        expect(conditions).toHaveAttribute('href', '/reservation-notice/7#conditions');
+        expect(sharing).toHaveAttribute('href', '/reservation-notice/7#sharing');
+        expect(conditions).not.toHaveAttribute('target'); expect(sharing).not.toHaveAttribute('target');
     });
     it('정책이 바뀌면 이전 체크를 새 동의에 자동으로 넘기지 않아요', async () => {
         const { client, done } = show();
@@ -60,5 +78,24 @@ describe('예약 동의 경계', () => {
         useAuthStore.setState({ user: null });
         const { container } = render(<ReservationConsentField storeId={7} />);
         expect(container).toBeEmptyDOMElement(); expect(fixture.get).not.toHaveBeenCalled();
+    });
+    it('같은 예약에서 안내를 읽고 뒤로 오면 입력과 확인한 동의를 복원해요', async () => {
+        showRoundTrip();
+        fireEvent.change(screen.getByRole('textbox', { name: '요청사항' }), { target: { value: '합성 요청사항' } });
+        fireEvent.click(await screen.findByRole('checkbox', { name: /예약·취소·환불 조건/ }));
+        fireEvent.click(screen.getByRole('link', { name: '가게에 예약 정보를 제공' }));
+        fireEvent.click(await screen.findByRole('button', { name: '예약으로 돌아가기' }));
+        await waitFor(() => expect(screen.getByRole('textbox', { name: '요청사항' })).toHaveValue('합성 요청사항'));
+        expect(screen.getByRole('checkbox', { name: /예약·취소·환불 조건/ })).toBeChecked();
+        expect(screen.getByRole('checkbox', { name: /가게에 예약 정보/ })).not.toBeChecked();
+    });
+    it('안내를 읽는 동안 계정을 바꾸면 이전 계정의 입력을 복원하지 않아요', async () => {
+        showRoundTrip();
+        fireEvent.change(screen.getByRole('textbox', { name: '요청사항' }), { target: { value: '이전 계정의 합성 요청' } });
+        fireEvent.click(await screen.findByRole('link', { name: '가게에 예약 정보를 제공' }));
+        act(() => useAuthStore.setState({ user: { id: 4 }, sessionRevision: 2 }));
+        fireEvent.click(screen.getByRole('button', { name: '예약으로 돌아가기' }));
+        await screen.findByRole('checkbox', { name: /가게에 예약 정보/ });
+        expect(screen.getByRole('textbox', { name: '요청사항' })).toHaveValue('');
     });
 });

@@ -6,6 +6,9 @@
 .reserve-benefit-detail > .reserve-benefits-heading { margin: 0; align-items: flex-start; }
 .reserve-benefit-detail .reserve-benefits-heading > div { width: 100%; min-width: 0; }
 .reserve-benefit-byline { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; }
+.reserve-benefit-heading-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; }
+.reserve-benefit-heading-row .reserve-benefit-detail-actions { margin-inline-start: auto; }
+.reserve-benefit-heading-row .reserve-feed-interactions { margin: 0; }
 .reserve-benefit-byline .reserve-benefits-text-link { padding-inline: 8px; min-height: 32px; margin-inline-start: -8px; border-radius: 10px; font-size: 14px; line-height: 22px; max-width: 100%; overflow-wrap: anywhere; }
 .reserve-benefit-byline time { display: inline-flex; align-items: center; min-height: 32px; color: var(--c-text-secondary); font-size: 14px; line-height: 22px; white-space: nowrap; }
 .reserve-benefit-review-status { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 8px; border-radius: 6px; background: var(--c-gray-100); color: var(--c-text-secondary); font-size: 12px; line-height: 20px; }

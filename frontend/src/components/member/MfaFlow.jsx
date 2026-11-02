@@ -17,6 +17,7 @@ import { AUTHENTICATION_BACK } from '../../utils/authenticationNavigation';
 import { colors, fontSize } from '../../styles/tokens';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import { revealSecurityPanel } from '../../utils/securityReturn';
+import { isCurrentSession, currentSession } from '../../api/sessionScope';
 
 const config = { skipAuthRefresh: true };
 const post = (path, data) => api.post('/api/auth/mfa/' + path, data, config);
@@ -175,7 +176,20 @@ export default function MfaFlow({ ref, initialView, settings, page = false, onDo
             {changing && <>
                 {settings.credentials.map(value => <MfaCredentialRow key={value.id} credential={value} busy={busy}
                     lastRequired={settings.required && !settings.localAdminResetAvailable && settings.credentials.length <= 1}
-                    onRemove={id => perform(async () => { await post('remove', { id }); useAuthStore.getState().logout(); onCancel?.(); })} />)}
+                    onRemove={id => perform(() => useAuthStore.getState().withAuthTransition(async () => {
+                        const session = currentSession().epoch;
+                        const result = await post('remove', { id });
+                        if (!mounted.current || !isCurrentSession(session)) return;
+                        if (result?.sessionRenewed) {
+                            const member = await api.get('/api/member/me', config);
+                            if (!mounted.current || !isCurrentSession(session)) return;
+                            useAuthStore.getState().updateUser(member);
+                            onDone?.(member);
+                        } else {
+                            useAuthStore.getState().logout();
+                            onCancel?.();
+                        }
+                    }))} />)}
                 <div className="reserve-mfa-management-actions reserve-mfa-management-actions--secondary">
                     {registrationActions}
                     <IconTool label="복구코드 재발급" icon={<ReloadOutlined aria-hidden="true" />} disabled={busy}

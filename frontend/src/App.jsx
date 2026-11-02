@@ -54,6 +54,7 @@ const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'));
 const Terms = lazyPublicPage('/terms', () => import('./pages/legal/Terms'));
 const SocialAgreement = lazy(() => import('./pages/auth/SocialAgreement'));
 const Privacy = lazyPublicPage('/privacy', () => import('./pages/legal/Privacy'));
+const ReservationNotice = React.lazy(() => import('./pages/legal/ReservationNotice'));
 const ContentSources = lazyPublicPage('/content-sources', () => import('./pages/legal/ContentSources'));
 const OperationGuide = lazyPublicPage('/operation-guide', () => import('./pages/legal/OperationGuide'));
 const UserGuide = lazyPublicPage('/guide/user', () => import('./pages/legal/UserGuide'));
@@ -397,6 +398,7 @@ function AppRoutes() {
 
                     {/* 로그인 유저 공통 */}
                     <Route element={<PrivateRoute />}>
+                        <Route path="/reservation-notice/:storeId" element={<ReservationNotice />} />
                         <Route path="/feed/notifications" element={<FeedNotifications />} />
                         <Route path="/my-reservations" element={<MyReservations />} />
                         <Route path="/my-favorites" element={<MyFavorites />} />

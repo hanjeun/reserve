@@ -13,7 +13,7 @@
 .reserve-mfa-credential-heading > span { min-width: 0; overflow-wrap: anywhere; }
 .reserve-mfa-credential-tools { display: flex; align-items: center; gap: 4px; }
 .reserve-mfa-verification-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
-.reserve-mfa-verification-actions > .reserve-mfa-alternatives { justify-content: flex-start; margin-top: 0; }
+.reserve-mfa-verification-actions > .reserve-mfa-alternatives { justify-content: flex-end; margin-top: 0; }
 .reserve-mfa-flow--settings .reserve-auth-secondary-actions { justify-content: flex-end; gap: 8px; margin-top: 8px; }
 .reserve-login-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .reserve-login-actions > button { min-width: 0; }

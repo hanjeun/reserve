@@ -108,6 +108,9 @@ jobs:
       - name: Install dependencies
         working-directory: frontend
         run: npm ci
+      - name: Audit frontend dependencies
+        working-directory: frontend
+        run: npm audit --audit-level=high
       - name: Validate operations scripts
         run: |
           node --test scripts/tests/observability-config.test.mjs scripts/tests/deployment-memory.test.mjs scripts/tests/release-schema-readonly.test.mjs scripts/tests/backup-engine.test.mjs

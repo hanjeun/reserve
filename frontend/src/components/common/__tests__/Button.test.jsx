@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { EyeOutlined } from '../icons';
+import { DeleteOutlined, EyeOutlined, SyncOutlined } from '../icons';
 import Button from '../Button';
 import { colors } from '../../../styles/tokens';
 
@@ -32,6 +32,8 @@ describe('Button', () => {
             <Button variant="ghost-sm" style={{ color: '#fa8c16' }}>정지</Button>
             <Button variant="secondary">닫기</Button>
             <Button variant="ghost-sm" icon={<EyeOutlined />} aria-label="보기" />
+            <Button variant="ghost-sm"><DeleteOutlined aria-hidden="true" /> 예약 삭제</Button>
+            <Button variant="ghost" icon={<SyncOutlined />}>다시 불러오기</Button>
         </>);
         for (const name of ['취소', '초기화']) {
             const action = screen.getByRole('button', { name, exact: true });
@@ -39,7 +41,7 @@ describe('Button', () => {
             expect(action.style.color).toBe('');
             expect(action.style.transition).toBe('');
         }
-        for (const name of ['수정', '삭제', '완료', '정지', '닫기', '보기']) {
+        for (const name of ['수정', '삭제', '완료', '정지', '닫기', '보기', '예약 삭제', '다시 불러오기']) {
             expect(screen.getByRole('button', { name, exact: true })).not.toHaveClass('reserve-text-link');
         }
         expect(screen.getByRole('button', { name: '정지', exact: true })).toHaveStyle({ color: '#fa8c16' });

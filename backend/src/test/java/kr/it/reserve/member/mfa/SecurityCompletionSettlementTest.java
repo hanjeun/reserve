@@ -645,7 +645,26 @@ class SecurityCompletionSettlementTest {
         });
         var request = new kr.it.reserve.member.dto.PasswordChangeRequest();
         request.setCurrentPassword("fixture-password"); request.setNewPassword("FixtureNext123!"); request.setNewPasswordConfirm("FixtureNext123!");
-        memberService.changePassword(owner.getId(), request);
+        assertThatThrownBy(() -> memberService.changePassword(owner.getId(), request))
+                .isInstanceOf(AuthException.class).satisfies(failure -> assertThat(((AuthException) failure).getStatus().value()).isEqualTo(428));
+        assertThat(current(owner).getAuthVersion()).isZero();
+        assertThat(passwordResets.findIdsByEmail(owner.getEmail())).isNotEmpty();
+        String sid = tokens.getSessionId(session.accessToken());
+        var proof = mfa.beginSensitive(current(owner), sid, null, "fixture-password", true, null, MfaService.SensitiveAction.CHANGE);
+        assertThat(mfa.status(proof.value(), current(owner), sid).verified()).isTrue();
+        var browser = new MockHttpServletRequest(); browser.setCookies(new Cookie("mfa_ticket", proof.value()));
+        var context = org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+        var authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        var principal = UsernamePasswordAuthenticationToken.authenticated(current(owner), null, List.of());
+        principal.setDetails(new kr.it.reserve.config.util.SecurityUtil.OAuthAuthenticationDetails(null, "PASSWORD", sid));
+        try {
+            org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(new org.springframework.web.context.request.ServletRequestAttributes(browser));
+            org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(principal);
+            memberService.changePassword(owner.getId(), request);
+        } finally {
+            org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(context);
+            org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(authentication);
+        }
         assertThat(passwordResets.findIdsByEmail(owner.getEmail())).isEmpty();
         assertThat(current(owner).getAuthVersion()).isEqualTo(1);
         assertThatThrownBy(() -> tokens.verifyAuthentication(session.accessToken())).isInstanceOf(AuthException.class);

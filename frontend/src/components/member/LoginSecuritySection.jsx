@@ -229,7 +229,7 @@ export default function LoginSecuritySection({ user, initialPasswordOpen = false
 
     return <section ref={sectionRef} id="login-security" tabIndex={-1} aria-label="로그인 및 보안" style={{ ...styles.tabsCard, marginTop: 24 }} aria-busy={busy}>
         {sensitive.panel}
-        <div hidden={sensitive.confirming}>
+        <div hidden={sensitive.confirming} style={{ display: sensitive.confirming ? 'none' : 'contents' }}>
         <Text strong style={styles.sectionTitle}>로그인 및 보안</Text>
         <Text style={{ ...hintStyle, marginTop: -8, marginBottom: 16 }}>로그인 방법을 바꿔도 회원 정보와 이용 내역은 유지돼요.</Text>
         {loading && <div aria-label="로그인 방법을 불러오는 중">{[0, 1, 2, 3].map(row => <Bone key={row} height={44} style={{ marginBottom: 12 }} />)}</div>}

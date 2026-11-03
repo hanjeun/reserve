@@ -21,7 +21,7 @@ public class IpLoginProtection {
     private static final String COOKIE = IpLoginProtection.class.getName() + ".cookie";
     private static final String RESULT = IpLoginProtection.class.getName() + ".result";
     @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private kr.it.reserve.config.util.CookieUtil cookies = new kr.it.reserve.config.util.CookieUtil("prod");
+    private BrowserCookies cookies = new BrowserCookies("prod");
     private final boolean enabled;
     private final IpProtectionStore store;
     private final TrustedClientIp addresses;

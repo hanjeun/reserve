@@ -38,7 +38,7 @@ const useBookingCalendar = (storeId, month, reservationId = null) => {
         // 이전 달을 흐리게 두고 기다릴 수 있다.
         loading: isLoading,
         fetching: isFetching,
-        error: error ? (error.message || '달력을 불러오지 못했어요.') : null,
+        error: error ?? null,
         refetch,
     };
 };

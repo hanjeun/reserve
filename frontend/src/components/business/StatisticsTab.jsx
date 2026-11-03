@@ -453,14 +453,15 @@ const StatisticsTab = () => {
     return (
         <div className="reserve-statistics-tab" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {toolbar}
-            {storesError && myStores.length > 0 && <DataState state="error" kind="store" subject="가게 목록" error={storesError}
+            {storesError && !statsError && myStores.length > 0 && <DataState state="error" kind="store" subject="가게 목록" error={storesError}
                 onRetry={refetchStores} retrying={storesLoading} compact />}
             {statsError && (
                 <DataState state="error" subject="통계" error={statsError}
                     title={stats
                         ? '통계를 갱신하지 못했어요. 이전 조회 결과를 표시하고 있어요.'
                         : '통계를 불러오지 못했어요.'}
-                    onRetry={refetch} retrying={isFetching} compact={Boolean(stats)} />
+                    onRetry={storesError ? () => Promise.allSettled([refetch(), refetchStores()]) : refetch}
+                    retrying={isFetching || storesLoading} compact={Boolean(stats)} />
             )}
             {(!statsError || stats) && <>
             {/*

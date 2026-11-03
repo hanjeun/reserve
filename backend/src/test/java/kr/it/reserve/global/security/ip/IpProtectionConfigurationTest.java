@@ -2,16 +2,57 @@ package kr.it.reserve.global.security.ip;
 
 import kr.it.reserve.global.redis.RedisFailureBackoff;
 import kr.it.reserve.global.redis.RedisNamespace;
+import kr.it.reserve.member.entity.Member;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import java.io.IOException;
+import java.util.HashSet;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.ArgumentMatchers.anyString;
 
 class IpProtectionConfigurationTest {
+    @Test void credentialVersionChangeRequiresTheSameNetworkToBeConfirmedAgain() {
+        var properties = new IpProtectionProperties();
+        properties.setEnabled(true);
+        properties.setFingerprintKey("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
+        var store = mock(IpProtectionStore.class);
+        var known = new HashSet<String>();
+        when(store.browser(anyString(), anyString(), anyString(), anyString(), anyString())).thenAnswer(call ->
+                known.contains(call.getArgument(0) + ":" + call.getArgument(1)) ? 1L : 0L);
+        doAnswer(call -> { known.add(call.getArgument(0) + ":" + call.getArgument(1)); return null; })
+                .when(store).rememberBrowser(anyString(), anyString(), anyString(), anyString(), anyString());
+        var protection = new IpLoginProtection(properties, store);
+        var member = Member.builder().id(7L).build();
+        var request = new MockHttpServletRequest();
+        request.setRemoteAddr("192.0.2.10");
+        var previous = RequestContextHolder.getRequestAttributes();
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        try {
+            assertThat(protection.needsStepUp(member)).isTrue();
+            protection.approveCurrent(member);
+            protection.prepareBrowser(member, true);
+            protection.beforeSession(member, false).run();
+            var response = new org.springframework.mock.web.MockHttpServletResponse();
+            protection.writeBrowserCookie(request, response);
+            String raw = response.getHeader("Set-Cookie").split("[=;]")[1];
+            request.setCookies(new jakarta.servlet.http.Cookie("__Host-reserve_browser", raw));
+            assertThat(protection.needsStepUp(member)).isFalse();
+            member.rotateAuthVersion();
+            assertThat(protection.needsStepUp(member)).isTrue();
+            assertThatThrownBy(() -> protection.beforeSession(member, false))
+                    .isInstanceOf(kr.it.reserve.global.error.AuthException.class);
+        } finally { RequestContextHolder.setRequestAttributes(previous); }
+    }
+
     private final ApplicationContextRunner context = new ApplicationContextRunner().withUserConfiguration(IpProtectionConfiguration.class);
     private ApplicationContextRunner redis() {
         return context.withBean(StringRedisTemplate.class, () -> mock(StringRedisTemplate.class))

@@ -36,6 +36,7 @@ import static org.mockito.Mockito.*;
 class LoginMethodPersistenceTest {
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 10, 22, 1, 0);
     @Autowired private LoginMethodService service;
+    @Autowired private kr.it.reserve.member.mfa.MfaService mfa;
     @Autowired private MemberRepository members;
     @Autowired private LoginMethodChallengeRepository challenges;
     @Autowired private PlatformTransactionManager transactions;
@@ -51,19 +52,45 @@ class LoginMethodPersistenceTest {
     @BeforeEach void setUp() {
         tx = new TransactionTemplate(transactions);
         when(subjects.now()).thenReturn(NOW);
+        org.springframework.test.util.ReflectionTestUtils.invokeMethod((Object) org.springframework.test.util.AopTestUtils.getUltimateTargetObject(mfa),
+                "setClock", java.time.Clock.fixed(NOW.toInstant(ZoneOffset.UTC), java.time.ZoneOffset.UTC));
         member = tx.execute(status -> members.saveAndFlush(Member.builder().name("retained owner")
                 .email("login-method-" + UUID.randomUUID() + "@example.test").role(Role.BUSINESS)
                 .provider(AuthProvider.NAVER).providerId("test-" + UUID.randomUUID()).oauthAuthenticatedAt(NOW).build()));
     }
     @AfterEach void cleanOwnData() {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
+        org.springframework.test.util.ReflectionTestUtils.invokeMethod((Object) org.springframework.test.util.AopTestUtils.getUltimateTargetObject(mfa), "setClock", java.time.Clock.systemUTC());
         tx.executeWithoutResult(status -> {
             for (var purpose : LoginMethodChallenge.Purpose.values())
                 challenges.findByMemberIdAndPurpose(member.getId(), purpose).ifPresent(challenges::delete);
             challenges.flush();
+            mfa.erase(member.getId());
             sessions.deleteByMemberId(member.getId());
             members.deleteById(member.getId());
         });
     }
+    private void context(MockHttpServletRequest request) {
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(new org.springframework.web.context.request.ServletRequestAttributes(request));
+        String token = kr.it.reserve.config.util.CookieUtil.getCookie(request, "access_token");
+        var authentication = org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated(member, null, java.util.List.of());
+        authentication.setDetails(new kr.it.reserve.config.util.SecurityUtil.OAuthAuthenticationDetails(member.isOAuthUser() ? NOW : null,
+                member.isOAuthUser() ? "OAUTH" : "PASSWORD", tokens.getSessionId(token)));
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(authentication);
+    }
+    private MockHttpServletRequest proof(kr.it.reserve.member.mfa.MfaService.SensitiveAction action) {
+        var request = new MockHttpServletRequest();
+        var session = tokens.issueSession(member, member.isOAuthUser() ? NOW : null);
+        request.setCookies(new Cookie("access_token", session.accessToken()));
+        context(request);
+        var ticket = mfa.beginSensitive(member, tokens.getSessionId(session.accessToken()), member.isOAuthUser() ? NOW : null,
+                member.isOAuthUser() ? null : "Password123!", true, null, action);
+        assertThat(mfa.status(ticket.value(), member, tokens.getSessionId(session.accessToken())).verified()).isTrue();
+        request.setCookies(new Cookie("access_token", session.accessToken()), new Cookie("mfa_ticket", ticket.value()));
+        return request;
+    }
+
     private record Code(String id, String value) { }
     private Code issue() {
         var challenge = service.sendPasswordCode(member, NOW, member.getEmail());
@@ -84,12 +111,15 @@ class LoginMethodPersistenceTest {
     }
     @Test void concurrentCompletionConsumesOneCodeOnceAndKeepsTheSameBusinessMember() throws Exception {
         Code code = issue();
+        var request = proof(kr.it.reserve.member.mfa.MfaService.SensitiveAction.SET);
         ExecutorService workers = Executors.newFixedThreadPool(2);
         CountDownLatch start = new CountDownLatch(1);
         Callable<Boolean> complete = () -> {
             start.await();
+            context(request);
             try { service.setPassword(member, NOW, code.id(), code.value(), "Password123!", "Password123!"); return true; }
             catch (MemberException exception) { return false; }
+            finally { org.springframework.security.core.context.SecurityContextHolder.clearContext(); org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes(); }
         };
         try {
             Future<Boolean> first = workers.submit(complete);
@@ -117,8 +147,7 @@ class LoginMethodPersistenceTest {
             current.setPassword(new BCryptPasswordEncoder(4).encode("Password123!"));
             return members.saveAndFlush(current);
         });
-        var request = new MockHttpServletRequest();
-        request.setCookies(new Cookie("access_token", tokens.issueSession(member, null).accessToken()));
+        var request = proof(kr.it.reserve.member.mfa.MfaService.SensitiveAction.LINK);
         String url = service.beginOAuth(member, AuthProvider.NAVER, "Password123!", false, request);
         request.setParameter("account_link", url.substring(url.indexOf('=') + 1));
         service.bindOAuth(request, OAuth2AuthorizationRequest.authorizationCode().authorizationUri("https://nid.naver.com/oauth2.0/authorize")
@@ -134,6 +163,11 @@ class LoginMethodPersistenceTest {
         when(info.getEmail()).thenReturn(member.getEmail());
         service.completeOAuth(request, AuthProvider.NAVER, info, "test-provider-token", NOW, NOW.plusHours(1).toInstant(ZoneOffset.UTC));
         Member stored = members.findById(member.getId()).orElseThrow();
+        var continued = LoginMethodService.consumeLinkedSession(request);
+        assertThat(continued).isNotNull();
+        assertThat(continued.mfaTicket()).isNull();
+        assertThat(tokens.verifyAuthentication(continued.accessToken()).member().getId()).isEqualTo(member.getId());
+        assertThat(LoginMethodService.consumeLinkedSession(request)).isNull();
         assertThat(stored.getProvider()).isEqualTo(AuthProvider.NAVER);
         assertThat(stored.getProviderId()).isEqualTo(providerId);
         assertThat(stored.getOauthAccessToken()).isEqualTo("test-provider-token");

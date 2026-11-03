@@ -21,7 +21,7 @@ import useListQueryNormalization from '../../hooks/useListQueryNormalization';
 import useGoBack from '../../hooks/useGoBack';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
 import { httpStatusOf, isMissingRequestError } from '../../utils/listErrorMessage';
-import { isBlockingListReadError, isReadAccessDenied } from '../../hooks/liveUpdateQueries';
+import { isBlockingListReadError, isReadAccessDenied, refetchFailedReads } from '../../hooks/liveUpdateQueries';
 
 const FeedReportModal = lazy(() => import('../../components/feed/FeedReportModal'));
 const retryProfileRead = (count, error) => httpStatusOf(error) !== 429 && !isReadAccessDenied(error) && count < 1;
@@ -49,9 +49,16 @@ export default function FeedAuthor() {
         queryFn: ({ signal }) => feedService.authorPosts(publicId, listParams, signal), enabled: enabled && Boolean(author.data) && !authorUnavailable,
         staleTime: 30_000, placeholderData: keepPreviousData, retry: retryProfileRead });
     const listRef = useRef(null);
-    const unavailable = authorUnavailable || [config, posts].some(query => [401, 403].includes(httpStatusOf(query.error)));
-    const blockingError = isBlockingListReadError(posts.error, posts.data?.content);
-    const backgroundFailure = [config, author, ...(!blockingError ? [posts] : [])].find(query => query.isError && query.data !== undefined);
+    const postsEnabled = enabled && Boolean(author.data) && !authorUnavailable;
+    const reads = [config, ...(enabled ? [author] : []), ...(postsEnabled ? [posts] : []), ...(enabled && user ? [ownProfile] : [])];
+    const unavailable = enabled && authorUnavailable || [config, ...(postsEnabled ? [posts] : [])].some(query => [401, 403].includes(httpStatusOf(query.error)));
+    const blockingError = postsEnabled && isBlockingListReadError(posts.error, posts.data?.content);
+    const blockingFailure = config.isError && (!config.data || unavailable)
+        || enabled && (author.isError && (!author.data || authorUnavailable) || blockingError);
+    const backgroundFailure = !blockingFailure && [...(postsEnabled ? [posts] : []), ...(enabled ? [author] : []), config].find(query => query.isError && query.data !== undefined);
+    const profileFailure = !blockingFailure && !backgroundFailure && enabled && user && author.data && posts.data && ownProfile.isError;
+    const retryReads = () => refetchFailedReads(reads);
+    const retrying = reads.some(query => query.isFetching);
     useListRefreshAnchor(listRef, `${publicId}:${page}`, posts.isFetching && !posts.isPlaceholderData, unavailable ? null : posts.data);
     const totalPages = Math.max(1, Math.ceil(feedTotal(posts.data) / FEED_PAGE_SIZE));
     useEffect(() => {
@@ -70,12 +77,12 @@ export default function FeedAuthor() {
     const renderList = () => {
         if (!validId) return <DataState state="empty" title="공개 프로필을 찾을 수 없어요." />;
         if (config.isPending && !config.data) return <FeedSkeleton />;
-        if (config.isError && (!config.data || [401, 403].includes(httpStatusOf(config.error)))) return <DataState state="error" title="피드 상태를 불러오지 못했어요." error={config.error} onRetry={config.refetch} retrying={config.isFetching} />;
+        if (config.isError && (!config.data || [401, 403].includes(httpStatusOf(config.error)))) return <DataState state="error" title="피드 상태를 불러오지 못했어요." error={config.error} onRetry={retryReads} retrying={retrying} />;
         if (!config.data?.enabled) return <DataState state="empty" kind="feed" title="피드를 준비하고 있어요." />;
         if (author.isError && (!author.data || authorUnavailable)) return <DataState state={isMissingRequestError(author.error) ? 'empty' : 'error'} requestType="detail" title="공개 프로필을 불러올 수 없어요."
-            error={author.error} onRetry={isMissingRequestError(author.error) ? undefined : author.refetch} retrying={author.isFetching} />;
+            error={author.error} onRetry={isMissingRequestError(author.error) ? undefined : retryReads} retrying={retrying} />;
         if (!author.data && author.isPending || !posts.data && posts.isPending) return <FeedSkeleton />;
-        if (blockingError || posts.isError && unavailable) return <DataState state="error" title="게시물을 불러오지 못했어요." error={posts.error} onRetry={posts.refetch} retrying={posts.isFetching} />;
+        if (blockingError || posts.isError && unavailable) return <DataState state="error" title="게시물을 불러오지 못했어요." error={posts.error} onRetry={retryReads} retrying={retrying} />;
         if (!posts.data?.content?.length) return <DataState state="empty" kind="feed" title="공개한 게시물이 없어요." />;
         return <div className="reserve-feed-list" aria-busy={posts.isFetching}>{posts.data.content.map(post => <FeedPostCard key={post.id} post={post} listItemId={`post:${post.id}`}
             onEdit={mine ? item => { setEditorMounted(true); setEditingPost(item); } : undefined}
@@ -90,7 +97,9 @@ export default function FeedAuthor() {
             <div><h2>{author.data.nickname}</h2><p>{author.data.bio}</p></div>
             {mine && <IconTool label="공개 프로필 수정" icon={<InterfaceIcon name="edit" />}
                 onClick={() => navigate('/my-page?tab=public-profile')} />}</div>}
-        {!unavailable && backgroundFailure && <DataState compact state="error" title="게시물을 갱신하지 못했어요." error={backgroundFailure.error} onRetry={backgroundFailure.refetch} retrying={backgroundFailure.isFetching} />}
+        {profileFailure && <DataState compact state="error" title={ownProfile.data === undefined ? '공개 프로필을 불러오지 못했어요.' : '공개 프로필을 갱신하지 못했어요.'}
+            error={ownProfile.error} onRetry={retryReads} retrying={retrying} />}
+        {!unavailable && backgroundFailure && <DataState compact state="error" title="게시물을 갱신하지 못했어요." error={backgroundFailure.error} onRetry={retryReads} retrying={retrying} />}
         {renderList()}
         {enabled && !unavailable && !blockingError && posts.data && feedTotal(posts.data) > FEED_PAGE_SIZE && <nav className="reserve-feed-pagination" aria-label="작성자 게시물 페이지">
             <Pagination current={page} total={feedTotal(posts.data)} pageSize={FEED_PAGE_SIZE} showSizeChanger={false}

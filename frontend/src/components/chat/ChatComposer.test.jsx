@@ -4,6 +4,19 @@ import ChatComposer from './ChatComposer';
 
 const props = () => ({ value: '안녕하세요', onChange: vi.fn(), onSend: vi.fn(), onFileChange: vi.fn() });
 describe('shared chat composer', () => {
+    it('offers a retry for image settings without disabling text or losing the draft', () => {
+        const inputProps = props();
+        const retry = vi.fn();
+        render(<ChatComposer {...inputProps} imageError={{ code: 'ERR_NETWORK' }} onImageRetry={retry} />);
+        expect(screen.getByRole('alert')).toHaveTextContent('사진 첨부 설정을 불러오지 못했어요.');
+        expect(screen.getByRole('alert')).toHaveTextContent('서버에 연결할 수 없어요.');
+        expect(screen.getByRole('button', { name: '사진 첨부' })).toBeDisabled();
+        expect(screen.getByRole('textbox')).toHaveValue('안녕하세요');
+        expect(screen.getByRole('textbox')).toBeEnabled();
+        expect(screen.getByRole('button', { name: '보내기' })).toBeEnabled();
+        fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
+        expect(retry).toHaveBeenCalledOnce();
+    });
     it('reserves a disabled attachment control while the image setting is loading', () => {
         const inputProps = props();
         const view = render(<ChatComposer {...inputProps} imageLoading disabled />);

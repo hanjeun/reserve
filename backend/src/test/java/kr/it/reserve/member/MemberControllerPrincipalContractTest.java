@@ -2,6 +2,7 @@ package kr.it.reserve.member;
 
 import kr.it.reserve.config.util.CookieUtil;
 import kr.it.reserve.global.error.MemberException;
+import kr.it.reserve.global.ratelimit.RateLimiter;
 import kr.it.reserve.member.controller.MemberApiController;
 import kr.it.reserve.member.dto.MemberResponse;
 import kr.it.reserve.member.entity.Member;
@@ -32,7 +33,7 @@ class MemberControllerPrincipalContractTest {
     private final MemberService service = mock(MemberService.class);
     private final CookieUtil cookies = mock(CookieUtil.class);
     private final MemberWithdrawalService withdrawal = mock(MemberWithdrawalService.class);
-    private final MemberApiController controller = new MemberApiController(service, cookies, withdrawal);
+    private final MemberApiController controller = new MemberApiController(service, cookies, withdrawal, mock(RateLimiter.class));
 
     @AfterEach
     void clearAuthentication() {
@@ -44,11 +45,11 @@ class MemberControllerPrincipalContractTest {
         String denied = "수정 권한이 없어요.";
         return Stream.of(
                 Arguments.of((Consumer<MemberApiController>) MemberApiController::getCurrentMember, missingMember),
-                Arguments.of((Consumer<MemberApiController>) value -> value.updateMarketingConsent(Map.of()), missingMember),
-                Arguments.of((Consumer<MemberApiController>) value -> value.updateLocation(null), missingMember),
-                Arguments.of((Consumer<MemberApiController>) value -> value.updateMember(null), denied),
-                Arguments.of((Consumer<MemberApiController>) value -> value.uploadProfileImage(null), denied),
-                Arguments.of((Consumer<MemberApiController>) MemberApiController::deleteProfileImage, denied));
+                Arguments.of((Consumer<MemberApiController>) value -> value.updateMarketingConsent(Map.of(), null), missingMember),
+                Arguments.of((Consumer<MemberApiController>) value -> value.updateLocation(null, null), missingMember),
+                Arguments.of((Consumer<MemberApiController>) value -> value.updateMember(null, null), denied),
+                Arguments.of((Consumer<MemberApiController>) value -> value.uploadProfileImage(null, null), denied),
+                Arguments.of((Consumer<MemberApiController>) value -> value.deleteProfileImage(null), denied));
     }
 
     @ParameterizedTest

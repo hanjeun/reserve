@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '../../components/common';
 import { useMessage } from '../../hooks';
 import { memberService } from '../../services';
@@ -11,9 +11,37 @@ import useReducedMotion from '../../hooks/useReducedMotion';
 
 const ProfileImageTab = ({ user }) => {
     const { message, confirm } = useMessage();
+    const sessionRevision = useAuthStore(state => state.sessionRevision);
     const [loading, setLoading] = useState(false);
+    const mounted = useRef(false);
+    const activeRequest = useRef(null);
+    const scope = `${user?.id}:${user?.role}:${sessionRevision}`;
     // pending: null | 'reset' | { file: File, previewUrl: string }
     const [pending, setPending] = useState(null);
+
+    useLayoutEffect(() => {
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+            activeRequest.current = null;
+        };
+    }, [scope]);
+
+    const isCurrent = request => {
+        const auth = useAuthStore.getState();
+        return mounted.current && activeRequest.current === request && auth.isLoggedIn
+            && auth.sessionRevision === sessionRevision && user?.id != null && user?.role
+            && auth.user?.id === user.id && auth.user?.role === user.role;
+    };
+
+    const beginRequest = phase => {
+        if (activeRequest.current) return null;
+        const request = { phase };
+        activeRequest.current = request;
+        if (isCurrent(request)) return request;
+        activeRequest.current = null;
+        return null;
+    };
 
     React.useEffect(() => {
         return () => {
@@ -29,38 +57,47 @@ const ProfileImageTab = ({ user }) => {
         setPending(null);
     };
 
-    const handleSave = async () => {
+    const savePhoto = async (request, save, successMessage) => {
+        if (!isCurrent(request)) return;
         setLoading(true);
         try {
-            if (pending?.file) {
-                await memberService.uploadProfileImage(pending.file);
-                message.success('프로필 사진이 변경됐어요');
-            }
+            await save();
+            if (!isCurrent(request)) return;
             await useAuthStore.getState().checkAuth(true);
+            if (!isCurrent(request)) return;
+            message.success(successMessage);
             setPending(null);
         } catch (err) {
-            handleApiError(err, message, '프로필 사진 변경에 실패했어요');
+            if (isCurrent(request)) handleApiError(err, message, '프로필 사진 변경에 실패했어요');
         } finally {
-            setLoading(false);
+            if (isCurrent(request)) {
+                setLoading(false);
+                activeRequest.current = null;
+            }
         }
     };
 
+    const handleSave = () => {
+        if (!pending?.file) return;
+        const request = beginRequest('saving');
+        if (request) return savePhoto(request, () => memberService.uploadProfileImage(pending.file), '프로필 사진이 변경됐어요');
+    };
+
     const handleResetToDefault = () => {
+        const request = beginRequest('confirm');
+        if (!request) return;
         confirm({
             title: '기본 이미지로 변경',
             content: '현재 프로필 사진을 삭제하고 기본 이미지로 되돌려요. 계속할까요?',
             okText: '변경', cancelText: '취소', centered: true,
-            onOk: async () => {
-                setLoading(true);
-                try {
-                    await memberService.deleteProfileImage();
-                    message.success('기본 이미지로 변경됐어요');
-                    await useAuthStore.getState().checkAuth(true);
-                } catch (err) {
-                    handleApiError(err, message, '프로필 사진 변경에 실패했어요');
-                } finally {
-                    setLoading(false);
-                }
+            onCancel: () => {
+                if (isCurrent(request) && request.phase === 'confirm') activeRequest.current = null;
+            },
+            onOk: () => {
+                // Portal에 남은 확인창은 원래 회원·세션과 현재 컴포넌트에서만 실행한다.
+                if (!isCurrent(request) || request.phase !== 'confirm') return;
+                request.phase = 'saving';
+                return savePhoto(request, () => memberService.deleteProfileImage(), '기본 이미지로 변경됐어요');
             },
         });
     };

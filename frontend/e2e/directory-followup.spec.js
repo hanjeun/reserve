@@ -9,7 +9,7 @@ const user = { id: 41, name: '확인 사용자', email: 'ui@example.test', role:
 const profile = { publicId: '326f8cca-6b4d-4ef2-90bc-d380872f1888', nickname: '확인 작성자' };
 const pageOf = content => ({ content, page: { number: 0, totalElements: content.length, totalPages: 1 } });
 const store = { id: 81, ownerId: 41, name: '리저브 카페', category: '맛집 · 카페', description: '커피와 함께 잠시 쉬어가는 공간이에요.',
-    mainImageUrl: '/api/feed/media/1', mainImageWidth: 800, mainImageHeight: 450, detailImageUrls: ['/api/feed/media/1', '/api/feed/media/2'],
+    mainImageUrl: '/api/feed/media/1', mainImageWidth: 960, mainImageHeight: 640, detailImageUrls: ['/api/feed/media/1', '/api/feed/media/2'],
     imageAutoplayEnabled: false, reservationEnabled: true, waitingEnabled: true, waitingIntakeMode: 'ONSITE',
     bookingType: 'SESSION', openTime: '09:00', closeTime: '18:00', sessionTimes: ['10:00'], maxCapacityPerSlot: 3 };
 const post = { id: 8, state: 'PUBLISHED', author: profile, store, content: '새로 문을 연 카페를 소개해요.', images: [], createdAt: new Date().toISOString() };
@@ -94,6 +94,9 @@ test('waiting reuses exploration geometry and refreshes an open information bubb
     await expect(page).toHaveURL(/region=all/);
     const hint = page.getByRole('button', { name: /^웨이팅 정보:/ });
     await expect(hint).toBeVisible();
+    const cover = page.getByRole('img', { name: store.name, exact: true });
+    await expect(cover).toHaveJSProperty('complete', true);
+    await expect(cover).toHaveJSProperty('naturalWidth', store.mainImageWidth);
     expect((await title.boundingBox()).height).toBeCloseTo(cardHeight, 0);
     expect((await page.locator('.reserve-explore-filters').boundingBox()).y).toBeCloseTo(toolbarTop, 0);
     await expect(page.getByRole('heading', { name: '웨이팅', exact: true })).toHaveCount(0);

@@ -1,4 +1,3 @@
-import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import reservationService from '../services/reservationService';
 import { handleApiError } from '../utils/errorHandler';
@@ -27,10 +26,6 @@ const useReservations = (params = {}) => {
         refetchIntervalInBackground: false,
         refetchOnWindowFocus: 'always',
     });
-
-    React.useEffect(() => {
-        if (error && data === undefined) handleApiError(error, message, '예약 목록을 불러오지 못했어요');
-    }, [error, data]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const cancelMutation = useMutation({
         mutationFn: (reservationId) => reservationService.cancelReservation(reservationId),

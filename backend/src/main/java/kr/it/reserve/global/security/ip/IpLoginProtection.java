@@ -17,6 +17,11 @@ public class IpLoginProtection {
         public Unavailable() { super("접속 환경을 확인할 수 없어요. 잠시 후 다시 로그인해주세요.", HttpStatus.SERVICE_UNAVAILABLE); }
     }
     private static final String GRANT = IpLoginProtection.class.getName() + ".grant";
+    private static final String PREFERENCE = IpLoginProtection.class.getName() + ".preference";
+    private static final String COOKIE = IpLoginProtection.class.getName() + ".cookie";
+    private static final String RESULT = IpLoginProtection.class.getName() + ".result";
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private BrowserCookies cookies = new BrowserCookies("prod");
     private final boolean enabled;
     private final IpProtectionStore store;
     private final TrustedClientIp addresses;
@@ -39,7 +44,7 @@ public class IpLoginProtection {
     public String clientAddress(HttpServletRequest request) { return addresses.extract(request); }
     public boolean needsStepUp(LoginIdentity member) {
         if (!enabled) return false;
-        try { return !store.known(owner(member), network(request())); }
+        try { long risk = browserRisk(member, request()); return risk != 1 && risk != 2; }
         catch (IpProtectionStore.Unavailable failure) { throw unavailable(); }
     }
 
@@ -83,12 +88,89 @@ public class IpLoginProtection {
         boolean approved = proof instanceof Grant grant && grant.member().equals(member.getId())
                 && grant.version() == member.getAuthVersion() && grant.network().equals(network);
         try {
-            if (!strong && !approved && !store.known(owner, network)) throw expired();
+            if (!strong && !approved && !trustedBrowser(member, request)) throw expired();
         } catch (IpProtectionStore.Unavailable failure) { throw unavailable(); }
         return () -> {
             // 신뢰 이력은 DB 세션 발급이 커밋된 뒤에만 남겨요. 기록 장애는 기존 제한으로 복구해요.
+            // 복구 이미지의 IP 이력 기록은 브라우저 설정 결과와 구분해요.
             try { store.remember(owner, network); } catch (IpProtectionStore.Unavailable ignored) { }
+            try {
+                Object preference = request.getAttribute(PREFERENCE);
+                String raw = cookies.browserCookie(request);
+                if (Boolean.FALSE.equals(preference)) {
+                    if (raw != null) store.forgetBrowser(owner, digest("browser", raw));
+                    request.setAttribute(COOKIE, "");
+                    request.setAttribute(RESULT, "NOT_REMEMBERED");
+                } else if ((strong || approved) && Boolean.TRUE.equals(preference)) {
+                    if (raw == null) { byte[] random = new byte[32]; new java.security.SecureRandom().nextBytes(random); raw = Base64.getUrlEncoder().withoutPadding().encodeToString(random); }
+                    store.rememberBrowser(owner, digest("browser", raw), network, prefix(request), family(request));
+                    request.setAttribute(COOKIE, raw);
+                    request.setAttribute(RESULT, "REMEMBERED");
+                }
+            } catch (IpProtectionStore.Unavailable failure) { request.setAttribute(RESULT, "UNAVAILABLE"); }
         };
+    }
+
+    private boolean trustedBrowser(LoginIdentity member, HttpServletRequest request) {
+        long risk = browserRisk(member, request);
+        return risk == 1 || risk == 2;
+    }
+    private long browserRisk(LoginIdentity member, HttpServletRequest request) {
+        String raw = cookies.browserCookie(request);
+        return raw == null ? 0 : store.browser(owner(member), digest("browser", raw), network(request), prefix(request), family(request));
+    }
+    public String browserStatus(LoginIdentity member) {
+        if (!enabled) return "DISABLED";
+        try { long risk = browserRisk(member, request()); return risk >= 1 && risk <= 3 ? "REMEMBERED" : "NOT_REMEMBERED"; }
+        catch (IpProtectionStore.Unavailable | Unavailable failure) { return "UNAVAILABLE"; }
+    }
+    public void prepareBrowser(LoginIdentity member, Boolean remember) {
+        if (!enabled) return;
+        // 기존 동의만 이어주고 새 브라우저는 명시적으로 선택해야 해요.
+        if (remember != null) request().setAttribute(PREFERENCE, remember);
+    }
+    public void forgetBrowser(LoginIdentity member) {
+        if (!enabled) return;
+        HttpServletRequest request = request();
+        String raw = cookies.browserCookie(request);
+        try { if (raw != null) store.forgetBrowser(owner(member), digest("browser", raw)); }
+        catch (IpProtectionStore.Unavailable failure) { throw unavailable(); }
+        request.setAttribute(COOKIE, "");
+    }
+    public void writeBrowserCookie(jakarta.servlet.http.HttpServletRequest request, jakarta.servlet.http.HttpServletResponse response) {
+        Object value = request.getAttribute(COOKIE);
+        if (value instanceof String raw) {
+            if (raw.isEmpty()) cookies.forgetBrowser(response);
+            else cookies.rememberBrowser(response, raw);
+        }
+    }
+    public String browserResult() {
+        if (!enabled) return "DISABLED";
+        Object value = request().getAttribute(RESULT);
+        return value instanceof String result ? result : null;
+    }
+    public String sensitiveBinding(LoginIdentity member, String session) {
+        if (!enabled) return "disabled";
+        HttpServletRequest request = request();
+        return digest("sensitive", member.getId() + ":" + member.getAuthVersion() + ":" + session + ":" + network(request)
+                + ":" + cookies.browserCookie(request) + ":" + family(request));
+    }
+    private String prefix(HttpServletRequest request) {
+        String literal = addresses.extract(request);
+        if (literal == null) throw unavailable();
+        try {
+            byte[] address = java.net.InetAddress.getByName(literal).getAddress();
+            return digest("prefix", HexFormat.of().formatHex(java.util.Arrays.copyOf(address, address.length == 4 ? 3 : 8)));
+        } catch (java.net.UnknownHostException invalid) { throw unavailable(); }
+    }
+    private String family(HttpServletRequest request) {
+        String agent = request.getHeader("User-Agent");
+        if (agent == null || agent.length() > 2048) agent = "";
+        String os = agent.contains("Android") ? "android" : agent.contains("iPhone") || agent.contains("iPad") ? "ios"
+                : agent.contains("Windows") ? "windows" : agent.contains("Macintosh") ? "mac" : agent.contains("Linux") ? "linux" : "other";
+        String browser = agent.contains("Edg/") ? "edge" : agent.contains("Firefox/") || agent.contains("FxiOS/") ? "firefox"
+                : agent.contains("Chrome/") || agent.contains("CriOS/") ? "chrome" : agent.contains("Safari/") ? "safari" : "other";
+        return digest("family", os + ":" + browser);
     }
 
     public long blocked(HttpServletRequest request) {
@@ -102,7 +184,7 @@ public class IpLoginProtection {
     }
 
     private String owner(LoginIdentity member) { return digest("member", member.getId() + ":" + member.getAuthVersion()); }
-    private String binding(String ticket, LoginIdentity member) { return digest("binding", member.getId() + ":" + network(request()) + ":" + ticket); }
+    private String binding(String ticket, LoginIdentity member) { return digest("binding", member.getId() + ":" + network(request()) + ":" + cookies.browserCookie(request()) + ":" + family(request()) + ":" + ticket); }
     private String network(HttpServletRequest request) {
         String literal = addresses.extract(request);
         if (literal == null) throw unavailable();

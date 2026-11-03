@@ -34,6 +34,32 @@ describe('결제 외부 화면 복귀', () => {
         act(() => { result.current({ merchantUid: 'restored-order' }); window.dispatchEvent(event); });
         expect(returned).toHaveBeenCalledTimes(1);
     });
+    it('SDK 응답 없이 복원된 문서는 같은 주문 확인으로 넘기고 늦은 응답은 무시해요', async () => {
+        const returned = vi.fn(); const { result } = renderHook(() => usePaymentHandoff(returned));
+        let complete; let payment;
+        await act(async () => { payment = result.current({ merchantUid: 'restored-pending-order' }, () => new Promise(resolve => { complete = resolve; })); });
+        const event = new Event('pageshow'); Object.defineProperty(event, 'persisted', { value: true });
+        act(() => { window.dispatchEvent(event); });
+        expect(await payment).toBe(PAYMENT_HANDOFF);
+        expect(returned).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ merchantUid: 'restored-pending-order' }));
+        await act(async () => { complete({ paymentId: 'restored-pending-order' }); });
+        act(() => { window.dispatchEvent(event); vi.advanceTimersByTime(20000); });
+        expect(returned).toHaveBeenCalledOnce();
+    });
+    it('숨긴 채 복원된 SDK 대기도 화면이 실제로 보인 뒤 같은 주문을 확인해요', async () => {
+        const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+        const returned = vi.fn(); const { result } = renderHook(() => usePaymentHandoff(returned));
+        let payment;
+        await act(async () => { payment = result.current({ merchantUid: 'hidden-restored-order' }, () => new Promise(() => {})); });
+        visibility.mockReturnValue('hidden');
+        const event = new Event('pageshow'); Object.defineProperty(event, 'persisted', { value: true });
+        act(() => { document.dispatchEvent(new Event('visibilitychange')); window.dispatchEvent(event); });
+        expect(returned).not.toHaveBeenCalled();
+        visibility.mockReturnValue('visible');
+        act(() => document.dispatchEvent(new Event('visibilitychange')));
+        expect(await payment).toBe(PAYMENT_HANDOFF);
+        expect(returned).toHaveBeenCalledOnce();
+    });
     it('결제 프레임이 열려 있는 동안은 시간·포커스만으로 중단하지 않아요', async () => {
         const returned = vi.fn(); const { result } = renderHook(() => usePaymentHandoff(returned));
         const frame = document.createElement('iframe'); frame.id = 'imp-iframe';
@@ -42,6 +68,8 @@ describe('결제 외부 화면 복귀', () => {
             document.body.append(frame); return new Promise(() => {});
         }); });
         act(() => { window.dispatchEvent(new Event('blur')); window.dispatchEvent(new Event('focus')); vi.advanceTimersByTime(20000); });
+        const shown = new Event('pageshow'); Object.defineProperty(shown, 'persisted', { value: true });
+        act(() => window.dispatchEvent(shown));
         expect(returned).not.toHaveBeenCalled();
         await act(async () => { frame.remove(); });
         await act(async () => { vi.advanceTimersByTime(300); expect(await done).toBe(PAYMENT_HANDOFF); });

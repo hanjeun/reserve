@@ -22,7 +22,7 @@ import {
 import RetryButton from './RetryButton';
 import StateIllustration from './StateIllustration';
 import { fontSize, spacing } from '../../styles/tokens';
-import { isMissingRequestError, listRequestErrorKind, listRequestErrorMessage } from '../../utils/listErrorMessage';
+import { isMissingRequestError, listRequestErrorDescription, listRequestErrorKind, listRequestErrorMessage } from '../../utils/listErrorMessage';
 
 const EMPTY_ICON_BY_KIND = {
     advertisement: NotificationOutlined,
@@ -85,6 +85,8 @@ const DataState = ({
         ? (ERROR_ICON_BY_KIND[errorKind] ?? ERROR_ICON_BY_KIND.unknown)
         : (EMPTY_ICON_BY_KIND[kind] ?? InboxOutlined);
     const message = title ?? (isError ? listRequestErrorMessage(error, subject ?? '목록', requestType) : '표시할 항목이 없어요.');
+    const reason = isError && title ? listRequestErrorDescription(error, requestType) : undefined;
+    const detail = [...new Set([reason, description].filter(Boolean))].join(' ');
     const errorImages = { forbidden: 'access-restricted', missing: 'not-found', offline: 'network-offline',
         rateLimited: 'rate-limited', retry: 'retry', unavailable: 'server-unavailable', unknown: 'unknown-error' };
     const illustration = isMissingDetail ? 'not-found' : isError ? errorImages[errorKind] ?? 'unknown-error' : `empty-${kind}`;
@@ -106,7 +108,7 @@ const DataState = ({
                 : <StateIllustration name={illustration} fallback={<Icon />} interactive={!retrying} />}
             <div className="reserve-data-state__copy">
                 <p className="reserve-data-state__title">{message}</p>
-                {description && <p className="reserve-data-state__description">{description}</p>}
+                {detail && <p className="reserve-data-state__description">{detail}</p>}
             </div>
             {action ?? (isMissingDetail ? missingAction : onRetry && (
                 <RetryButton

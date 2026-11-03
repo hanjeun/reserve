@@ -217,6 +217,17 @@ it('keeps an ad lookup failure separate from the empty ad table', () => {
     expect(screen.queryByTestId('data-table')).not.toBeInTheDocument();
 });
 
+it('collapses failed ad and store filter reads and retries both from the primary error', () => {
+    const refetchStores = vi.fn().mockResolvedValue(null);
+    state.stores = { stores: [{ id: 12, name: '합성 가게' }], loading: false, error: new Error('stores offline'), refetch: refetchStores };
+    Object.assign(state.query, { isError: true, error: new Error('ads offline') });
+    render(<AdManageTab />);
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
+    expect(state.query.refetch).toHaveBeenCalledOnce();
+    expect(refetchStores).toHaveBeenCalledOnce();
+});
+
 it('keeps ads visible and retries the failed store filter from the result area', () => {
     const refetchStores = vi.fn();
     state.stores = { stores: [], loading: false, error: new Error('offline'), refetch: refetchStores };
@@ -296,6 +307,19 @@ it('labels retained statistics when a refresh fails', () => {
     expect(screen.getByText('예약금 순결제액: 2,000')).toBeInTheDocument();
 });
 
+it.each([false, true])('combines failed statistics and store refreshes without losing available data (%s)', cached => {
+    const refetchStores = vi.fn().mockResolvedValue(null);
+    state.stores = { stores: [{ id: 31, name: '합성 가게' }], loading: false, error: new Error('stores offline'), refetch: refetchStores };
+    Object.assign(state.query, { data: cached ? { totalDepositRevenue: 2000, reviewCount: 3 } : undefined,
+        isError: true, error: new Error('statistics offline') });
+    render(<StatisticsTab />);
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    expect(Boolean(screen.queryByText('예약금 순결제액: 2,000'))).toBe(cached);
+    fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
+    expect(state.query.refetch).toHaveBeenCalledOnce();
+    expect(refetchStores).toHaveBeenCalledOnce();
+});
+
 it('keeps the partner filter skeleton noninteractive until its shared lookup is ready', () => {
     state.stores = { stores: [], loading: true, error: null, refetch: vi.fn() };
     const { container, rerender } = render(<MemoryRouter><BusinessPanel /></MemoryRouter>);
@@ -358,17 +382,20 @@ it('marks QR check-in as the active partner tab only while its sheet is open', a
     await waitFor(() => expect(reservationsTab).toHaveAttribute('aria-current', 'page'));
 });
 
-it('retries both independent lookups when partner stores and reservations fail together', () => {
+it.each([false, true])('retries both failed partner lookups through one notice (cached rows=%s)', cached => {
     const refetchStores = vi.fn().mockResolvedValue(null);
     const refetchReservations = vi.fn().mockResolvedValue(null);
-    state.stores = { stores: [], loading: false, error: new Error('stores offline'), refetch: refetchStores };
-    state.manage = { error: new Error('reservations offline'), refetch: refetchReservations };
+    state.stores = { stores: cached ? [{ id: 12, name: '합성 가게' }] : [], loading: false, error: new Error('stores offline'), refetch: refetchStores };
+    state.manage = { error: new Error('reservations offline'), refetch: refetchReservations,
+        ...(cached ? { reservations: [{ id: 7, storeName: '합성 가게', status: 'CONFIRMED' }] } : {}) };
     const { rerender } = render(<MemoryRouter><BusinessPanel /></MemoryRouter>);
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
     fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
     expect(refetchStores).toHaveBeenCalledOnce();
     expect(refetchReservations).toHaveBeenCalledOnce();
     state.stores.error = null;
     state.manage.error = null;
+    state.manage.reservations = [];
     rerender(<MemoryRouter><BusinessPanel /></MemoryRouter>);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByText('예약 내역이 없어요.')).toBeInTheDocument();

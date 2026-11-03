@@ -1,8 +1,11 @@
 /*
  * 위치 요청은 Promise<{ latitude, longitude } | null>을 반환한다. 거부·시간 초과·미지원은 안내 후 null로 처리한다. showError가 false면 호출부 안내를 사용한다.
  */
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import useMessage from './useMessage';
+import { currentSession, isCurrentSession } from '../api/sessionScope';
+
+const REQUEST_TIMEOUT_MS = 8000;
 
 const failureMessage = (error) => {
     if (error?.code === 1 || error?.name === 'NotAllowedError' || error?.name === 'SecurityError') {
@@ -20,36 +23,55 @@ const failureMessage = (error) => {
 const useGeolocation = () => {
     const { message } = useMessage();
     const [requesting, setRequesting] = useState(false);
+    const active = useRef(null);
+    const mounted = useRef(false);
+    useEffect(() => {
+        mounted.current = true;
+        return () => { mounted.current = false; active.current?.cancel(); };
+    }, []);
 
     const request = useCallback(({ showError = true } = {}) => {
-        return new Promise((resolve) => {
-            const fail = (text) => {
-                setRequesting(false);
-                if (showError) message.warning(text);
-                resolve(null);
-            };
-            try {
-                const geolocation = typeof navigator === 'undefined' ? null : navigator.geolocation;
-                if (typeof geolocation?.getCurrentPosition !== 'function') {
-                    fail('이 브라우저에서는 현재 위치 기능을 사용할 수 없어요. 마이페이지에 주소를 등록해주세요.');
-                    return;
-                }
-                setRequesting(true);
-                geolocation.getCurrentPosition(
-                    (position) => {
-                        setRequesting(false);
-                        resolve({
-                            latitude: position.coords.latitude,
-                            longitude: position.coords.longitude,
-                        });
-                    },
-                    (error) => fail(failureMessage(error)),
-                    { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60 * 1000 }
-                );
-            } catch (error) {
-                fail(failureMessage(error));
+        if (!mounted.current) return Promise.resolve(null);
+        if (active.current) return active.current.promise;
+        const session = currentSession().epoch;
+        let resolve;
+        const operation = { promise: new Promise(done => { resolve = done; }) };
+        active.current = operation;
+        let timer;
+        const finish = (position, text) => {
+            if (active.current !== operation) return;
+            active.current = null;
+            clearTimeout(timer);
+            if (mounted.current) setRequesting(false);
+            const current = mounted.current && isCurrentSession(session);
+            if (current && text && showError) message.warning(text);
+            resolve(current ? position : null);
+        };
+        operation.cancel = () => finish(null);
+        const fail = text => finish(null, text);
+        // 권한 응답 대기는 브라우저의 위치 획득 timeout에 포함되지 않는다.
+        timer = setTimeout(() => fail(failureMessage({ code: 3 })), REQUEST_TIMEOUT_MS);
+        try {
+            const geolocation = typeof navigator === 'undefined' ? null : navigator.geolocation;
+            if (typeof geolocation?.getCurrentPosition !== 'function') {
+                fail('이 브라우저에서는 현재 위치 기능을 사용할 수 없어요. 마이페이지에 주소를 등록해주세요.');
+                return operation.promise;
             }
-        });
+            setRequesting(true);
+            geolocation.getCurrentPosition(
+                (position) => {
+                    finish({
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                    });
+                },
+                (error) => fail(failureMessage(error)),
+                { enableHighAccuracy: false, timeout: REQUEST_TIMEOUT_MS, maximumAge: 5 * 60 * 1000 }
+            );
+        } catch (error) {
+            fail(failureMessage(error));
+        }
+        return operation.promise;
     }, [message]);
 
     return { request, requesting };

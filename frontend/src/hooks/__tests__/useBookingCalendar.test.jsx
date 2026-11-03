@@ -27,7 +27,7 @@ it('uses the preserved reservation context for an edit and never falls back to p
 it('keeps a rejected edit context as an error without querying public discovery routes', async () => {
     reservationService.getEditCalendar.mockRejectedValue(Object.assign(new Error('변경할 수 없는 예약이에요.'), { status: 403 }));
     const { result } = renderCalendar({ storeId: 10, month: '2030-01', reservationId: 31 });
-    await waitFor(() => expect(result.current.error).toBe('변경할 수 없는 예약이에요.'));
+    await waitFor(() => expect(result.current.error?.status).toBe(403));
     expect(result.current.byDate).toEqual({});
     expect(api.get).not.toHaveBeenCalled();
 });

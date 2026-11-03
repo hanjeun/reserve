@@ -14,7 +14,7 @@ services:
       - /var/log/reserve:/var/log/reserve:ro
       - /var/log/metrics:/var/log/metrics:ro
       - ${RESERVE_NGINX_LOG_DIR:?set the current nginx Docker log directory}:/var/log/reserve-nginx:ro
-      - ./alloy-config.alloy:/etc/alloy/config.alloy:ro
+      - ${RESERVE_ALLOY_CONFIG_PATH:-./alloy-config.alloy}:/etc/alloy/config.alloy:ro
       - promtail-positions:/tmp:ro
       - alloy-data:/var/lib/alloy/data
     networks:

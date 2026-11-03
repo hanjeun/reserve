@@ -8,6 +8,7 @@ import benefitService from '../../services/benefitService';
 import { BENEFIT_IMAGE_FALLBACK, getBenefitImageUrl } from './benefitPresentation';
 import { feedKeys } from '../../hooks/feedQueries';
 import { storeNewsKeys } from '../../hooks/storeNewsQueries';
+import storeNewsService from '../../services/storeNewsService';
 
 vi.mock('../../services/benefitService', () => ({ default: { getList: vi.fn(), getDetail: vi.fn() } }));
 const item = { id: 1, storeId: 12, storeName: '가게 이름', title: '신메뉴 안내', excerpt: '가게의 새 소식', content: '<img src=x onerror="window.hacked=true">\n<script>alert(1)</script>', mainImageUrl: 'https://tracker.example/photo.png', createdAt: '2026-09-13T10:00:00' };
@@ -24,6 +25,40 @@ const renderPage = (path = '/benefits') => {
 
 describe('public store news and benefit guidance', () => {
     beforeEach(() => { vi.clearAllMocks(); window.scrollTo = vi.fn(); });
+    it('hides a cached list failure after approval is disabled while retaining policy retry feedback', async () => {
+        benefitService.getList.mockResolvedValue({ content: [item], page: { totalElements: 1 } });
+        const { client, unmount } = renderPage();
+        await screen.findByRole('link', { name: '가게 이름 · 신메뉴 안내 소식 보기' });
+        benefitService.getList.mockRejectedValue({ status: 503 });
+        await act(async () => { await client.invalidateQueries({ queryKey: ['public-promotions', 'list'] }); });
+        await screen.findByRole('alert');
+        act(() => client.setQueryData(storeNewsKeys.config(), { enabled: false, benefitApprovalEnabled: false }));
+        await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+        expect(screen.getByText('관리자 승인형 혜택을 준비하고 있어요.')).toBeInTheDocument();
+        const config = vi.spyOn(storeNewsService, 'config').mockRejectedValue({ status: 503 });
+        await act(async () => { await client.invalidateQueries({ queryKey: storeNewsKeys.config() }); });
+        expect(await screen.findByRole('alert')).toHaveTextContent('혜택 상태를 갱신하지 못했어요.');
+        const calls = benefitService.getList.mock.calls.length;
+        await act(async () => fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' })));
+        expect(benefitService.getList).toHaveBeenCalledTimes(calls);
+        unmount(); client.clear(); config.mockRestore();
+    });
+    it('surfaces a cached policy failure once and retries it beside usable news', async () => {
+        benefitService.getList.mockResolvedValue({ content: [item], page: { totalElements: 1 } });
+        const { client, unmount } = renderPage();
+        await screen.findByRole('link', { name: '가게 이름 · 신메뉴 안내 소식 보기' });
+        const config = vi.spyOn(storeNewsService, 'config').mockRejectedValueOnce({ status: 503 })
+            .mockResolvedValue({ enabled: false, benefitApprovalEnabled: true });
+        await act(async () => { await client.invalidateQueries({ queryKey: storeNewsKeys.config() }); });
+        expect(await screen.findByText('혜택 상태를 갱신하지 못했어요.')).toBeInTheDocument();
+        expect(screen.getAllByRole('alert')).toHaveLength(1);
+        const calls = benefitService.getList.mock.calls.length;
+        fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
+        await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+        expect(config).toHaveBeenCalledTimes(2);
+        expect(benefitService.getList).toHaveBeenCalledTimes(calls);
+        unmount(); client.clear(); config.mockRestore();
+    });
     it.each([false, true])('distinguishes a failed refresh from a successful cached empty result (rows=%s)', async hasRows => {
         benefitService.getList.mockResolvedValue({ content: hasRows ? [item] : [], page: { totalElements: hasRows ? 1 : 0 } });
         const { client } = renderPage('/benefits?page=1&period=ALL');

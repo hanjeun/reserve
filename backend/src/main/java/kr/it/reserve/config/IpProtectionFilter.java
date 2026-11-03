@@ -35,7 +35,9 @@ final class IpProtectionFilter extends OncePerRequestFilter {
             return;
         }
         kr.it.reserve.global.ratelimit.IpExtractor.useVerifiedAddress(request, protection.clientAddress(request));
-        if (EXEMPT.contains(path)) { chain.doFilter(request, response); return; }
+        // 공유 IP의 실패 이력이 기존 세션의 조회까지 차단하지 않게 해요.
+        boolean authentication = start || path.startsWith("/api/auth/") || path.equals("/api/member/login-methods/confirm");
+        if (EXEMPT.contains(path) || !authentication) { chain.doFilter(request, response); return; }
         long remaining = protection.blocked(request);
         if (remaining > 0) {
             response.setStatus(429);

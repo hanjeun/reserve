@@ -16,7 +16,7 @@ public class RedisFailureBackoff {
         long previous = retryAt.get();
         if (now >= previous && retryAt.compareAndSet(previous, now + 5_000)) {
             // 연결 문자열·암호·접수 대상은 로그에 넣지 않는다.
-            log.warn("Redis unavailable ({}); using bounded local limits and waiting refresh", failure.getClass().getSimpleName());
+            log.warn("Redis unavailable ({}); applying operation-specific recovery policy", failure.getClass().getSimpleName());
         }
     }
 }

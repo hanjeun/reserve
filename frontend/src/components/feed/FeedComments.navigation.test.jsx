@@ -7,10 +7,10 @@ import PostInteractionBar from './PostInteractionBar';
 import { interactionKeys } from '../../hooks/feedInteractionQueries';
 import useAuthStore from '../../store/useAuthStore';
 
-const fixture = vi.hoisted(() => ({ comments: vi.fn(), create: vi.fn(), reduced: false, profile: null,
+const fixture = vi.hoisted(() => ({ config: vi.fn(), comments: vi.fn(), create: vi.fn(), reduced: false, profile: null,
     message: { error: vi.fn(), warning: vi.fn(), success: vi.fn() } }));
 vi.mock('../../services/feedInteractionService', () => ({ default: {
-    config: async () => ({ enabled: true }), status: async () => ({ commentCount: 1 }),
+    config: (...args) => fixture.config(...args), status: async () => ({ commentCount: 1 }),
     comments: (...args) => fixture.comments(...args),
     createComment: (...args) => fixture.create(...args),
 } }));
@@ -29,6 +29,7 @@ beforeEach(() => {
     fixture.reduced = false;
     fixture.profile = null; fixture.create.mockReset(); Object.values(fixture.message).forEach(mock => mock.mockClear());
     fixture.comments.mockReset().mockResolvedValue(empty);
+    fixture.config.mockReset().mockResolvedValue({ enabled: true });
     useAuthStore.setState({ user: null, isLoggedIn: false, sessionRevision: 0 });
     scroll = vi.fn();
     vi.stubGlobal('requestAnimationFrame', callback => setTimeout(callback, 0));
@@ -43,13 +44,41 @@ function Harness() {
         <PostInteractionBar targetId={23} postId={23} />
         {location.pathname === '/feed/posts/23' && <FeedComments postId={23} />}</>;
 }
-function view(path = '/feed', cached = false) {
+function view(path = '/feed', cached = false, configCached = false) {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity, gcTime: 0 } } });
     clients.push(client);
     if (cached) client.setQueryData(interactionKeys.comments(23), { pages: [empty], pageParams: [0] });
+    if (configCached) client.setQueryData(interactionKeys.config(), { enabled: true });
     render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}><Harness /></MemoryRouter></QueryClientProvider>);
     return client;
 }
+
+it('does not hide a failed initial comment policy as a disabled feature', async () => {
+    fixture.config.mockRejectedValueOnce({ code: 'ERR_NETWORK' });
+    view('/feed/posts/23');
+    expect(await screen.findByRole('alert')).toHaveTextContent('댓글 상태를 불러오지 못했어요.');
+    expect(screen.getByRole('alert')).toHaveTextContent('서버에 연결할 수 없어요.');
+    expect(fixture.comments).not.toHaveBeenCalled();
+});
+
+it('collapses failed comment and cached policy reads and recovers both through one retry', async () => {
+    fixture.comments.mockRejectedValueOnce({ status: 503 });
+    let failPolicy;
+    fixture.config.mockImplementationOnce(() => new Promise((_, reject) => { failPolicy = reject; }));
+    const client = view('/feed/posts/23', false, true);
+    await screen.findByRole('alert');
+    let refresh;
+    act(() => { refresh = client.invalidateQueries({ queryKey: interactionKeys.config() }); });
+    await waitFor(() => expect(screen.getByRole('button', { name: '다시 불러오기' })).toBeDisabled());
+    await act(async () => { failPolicy({ status: 503 }); await refresh; });
+    await waitFor(() => expect(screen.getByRole('button', { name: '다시 불러오기' })).toBeEnabled());
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
+    await screen.findByText('아직 댓글이 없어요.');
+    expect(fixture.config).toHaveBeenCalledTimes(2);
+    expect(fixture.comments).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+});
 
 it('reports a failed save as a message while retaining the comment draft', async () => {
     useAuthStore.setState({ user: { id: 7 }, isLoggedIn: true });

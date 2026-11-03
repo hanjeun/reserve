@@ -78,6 +78,11 @@ RUN for REQUIRED_CLASS in \
     BOOT-INF/classes/kr/it/reserve/member/mfa/MfaPolicy.class \
     BOOT-INF/classes/kr/it/reserve/member/mfa/MfaController.class \
     BOOT-INF/classes/kr/it/reserve/member/mfa/MfaCredential.class \
+    BOOT-INF/classes/kr/it/reserve/global/security/ip/BrowserCookies.class \
+    BOOT-INF/classes/kr/it/reserve/global/ratelimit/AuthRateLimitProperties.class \
+    BOOT-INF/classes/kr/it/reserve/global/ratelimit/RedisAuthRateLimiter.class \
+    BOOT-INF/classes/redis/auth-rate-limit.lua \
+    BOOT-INF/classes/redis/ip-protection.lua \
     BOOT-INF/classes/kr/it/reserve/reservation/service/ReservationAutoCompletion.class \
     BOOT-INF/classes/kr/it/reserve/payment/service/TestSettlementService.class \
     BOOT-INF/classes/kr/it/reserve/payment/entity/TestSettlementPayout.class \
@@ -103,4 +108,5 @@ RUN for REQUIRED_CLASS in \
     BOOT-INF/classes/kr/it/reserve/config/oauth2/events/OAuthSecurityEventService.class \
     BOOT-INF/classes/kr/it/reserve/config/oauth2/events/OAuthSecurityEventTransaction.class; \
     do jar tf app.jar | grep -F -x "$REQUIRED_CLASS" > /dev/null || exit 1; done
+LABEL reserve.auth-compat="browser-sensitive-shared-limits-v1"
 ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]

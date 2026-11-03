@@ -74,7 +74,9 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         OAuthSessionIssuer.SessionTokens pair;
         try {
             if (mfa != null) mfa.cancel(CookieUtil.getCookie(request, "mfa_ticket"));
-            pair = kr.it.reserve.member.service.LoginMethodService.consumeReauthentication(request)
+            var linked = kr.it.reserve.member.service.LoginMethodService.consumeLinkedSession(request);
+            pair = linked != null ? linked
+                    : kr.it.reserve.member.service.LoginMethodService.consumeReauthentication(request)
                     ? sessionIssuer.issueReauthenticated(oAuth2User, CookieUtil.getCookie(request, "access_token"))
                     : sessionIssuer.issue(oAuth2User, LoginAuthorizationRequestRepository.persistent(request));
         } catch (org.springframework.security.oauth2.core.OAuth2AuthenticationException exception) {
@@ -92,6 +94,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
             return;
         }
         cookieUtil.deleteCookie(response, "mfa_ticket");
+        if (mfa != null) mfa.writeBrowserCookie(request, response);
         String accessToken = pair.accessToken();
         String refreshToken = pair.refreshToken();
 

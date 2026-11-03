@@ -108,6 +108,7 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
     }, []);
     const isCurrent = () => alive.current && revision === useAuthStore.getState().sessionRevision;
     const refresh = () => queryClient.invalidateQueries({ queryKey, exact: true });
+    const retryReads = () => Promise.allSettled([...(board.error ? [refresh()] : []), ...(storesError ? [refetchStores()] : [])]);
 
     const write = async (key, send, success, afterSuccess) => {
         if (!isCurrent() || operation.current !== null || !storeId || storesError || accessLost) return;
@@ -216,10 +217,10 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
             </div>
             {board.data && <p className="reserve-waiting-form-help" role="status">{paused ? '신규 접수를 잠시 중지했어요. 기존 대기는 호출·입장 처리할 수 있어요.'
                 : intakeMode === 'OFF' ? '직원 접수를 받고 있어요. 고객 접수 방식은 가게 수정에서 설정할 수 있어요.' : '웨이팅 접수를 받고 있어요.'}</p>}
-            {board.error && board.data && !blockingError && <DataState compact state="error" kind="waiting" subject="대기 명단 갱신" error={board.error} onRetry={refresh} retrying={board.isFetching} />}
+            {board.error && board.data && !blockingError && <DataState compact state="error" kind="waiting" subject="대기 명단 갱신" error={board.error} onRetry={retryReads} retrying={board.isFetching || storesLoading} />}
         </>;
         content = blockingError ? <DataState state="error" kind="waiting" subject="대기 명단 갱신"
-            error={board.error} onRetry={refresh} retrying={board.isFetching} />
+            error={board.error} onRetry={retryReads} retrying={board.isFetching || storesLoading} />
             : visibleEntries.length ? <ul ref={listRef} className={entryClass} aria-label="대기 접수 목록">
             {visibleEntries.map(entry => <WaitingEntry key={entry.id} entry={entry} businessDate={board.data?.businessDate} view={view}
                 busy={busy} changing={pending === entry.id} onChange={changeStatus} onCancel={cancel} onOpenDetail={setDetailId} />)}
@@ -247,7 +248,7 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
         <FilterToolbar search={{ value: search, onChange: onSearchChange, placeholder: '이름, 대기번호로 검색' }}
             onReload={store ? refresh : refetchStores} loading={storesLoading || board.isFetching} autoRefreshDomain="WAITING" />
         <ListingContent notice={<>
-            {storesError && stores.length > 0 && <DataState compact state="error" kind="store" subject="가게 목록 갱신" error={storesError} onRetry={refetchStores} />}
+            {storesError && !board.error && stores.length > 0 && <DataState compact state="error" kind="store" subject="가게 목록 갱신" error={storesError} onRetry={refetchStores} />}
             {notice}
         </>}>{content}</ListingContent>
         {!accessLost && <WaitingQrModal open={qrOpen} storeId={storeId} onClose={() => setQrOpen(false)} />}

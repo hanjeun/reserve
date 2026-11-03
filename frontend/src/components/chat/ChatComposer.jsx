@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { Popover } from 'antd';
 import { ArrowRightOutlined, SmileOutlined, StopOutlined } from '../common/icons';
 import { SpinIndicator } from '../common/Loading';
+import DataState from '../common/DataState';
 import ChatImagePicker from './ChatImagePicker';
 import { colors } from '../../styles/tokens';
 
@@ -21,6 +22,7 @@ const EMOJI = [
 /** 고객·사업자·관리자 입력의 IME/길이/도구/전송 규칙을 한 관문에 둔다. */
 export default function ChatComposer({ value, onChange, onSend, sending = false, disabled = false,
     file, onFileChange, imageEnabled = false, imageLoading = false, onCancel,
+    imageError, imageRetrying = false, onImageRetry,
     files, onFilesChange, onRemoveFile,
     maxLength = 2000, placeholder = '메시지를 입력하세요', inputLabel = '메시지 입력', sendText = '보내기',
     inputRef, attachmentControl, attachments, attachmentError, hasAttachments = Boolean(files?.length || file) }) {
@@ -81,6 +83,8 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
                 }
             }} placeholder={placeholder} aria-label={inputLabel} maxLength={maxLength} rows={2} disabled={disabled} />
         <div className="reserve-chat-composer-attachments">
+            {imageError && <DataState compact state="error" title="사진 첨부 설정을 불러오지 못했어요."
+                error={imageError} onRetry={onImageRetry} retrying={imageRetrying} />}
             {attachmentError && <span role="alert" style={{ color: colors.error.main, fontSize: 12 }}>{attachmentError}</span>}
             {previews}
         </div>
@@ -113,7 +117,7 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
     }
     if (attachmentControl != null) return renderComposer(attachmentControl, attachments);
     return <ChatImagePicker file={file} onChange={onFileChange} files={files} onFilesChange={onFilesChange} onRemoveFile={onRemoveFile}
-        enabled={imageEnabled || imageLoading} disabled={blocked || imageLoading}
+        enabled={imageEnabled || imageLoading || Boolean(imageError)} disabled={blocked || imageLoading || Boolean(imageError)}
         renderContent={(control, previews) => renderComposer(control, attachments ?? previews)} />;
 }
 
@@ -121,6 +125,7 @@ ChatComposer.propTypes = {
     value: PropTypes.string.isRequired, onChange: PropTypes.func.isRequired, onSend: PropTypes.func.isRequired,
     sending: PropTypes.bool, disabled: PropTypes.bool, file: PropTypes.object,
     onFileChange: PropTypes.func, imageEnabled: PropTypes.bool, imageLoading: PropTypes.bool,
+    imageError: PropTypes.any, imageRetrying: PropTypes.bool, onImageRetry: PropTypes.func,
     onCancel: PropTypes.func, maxLength: PropTypes.number, placeholder: PropTypes.string, inputLabel: PropTypes.string,
     sendText: PropTypes.string, inputRef: PropTypes.oneOfType([PropTypes.func, PropTypes.shape({ current: PropTypes.any })]),
     attachmentControl: PropTypes.oneOfType([PropTypes.node, PropTypes.func]), attachments: PropTypes.node,

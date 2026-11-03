@@ -14,8 +14,8 @@ export default function usePaymentHandoff(onReturn) {
             const order = current.current;
             if (!order || order.revision !== useAuthStore.getState().sessionRevision || document.visibilityState === 'hidden') return;
             // 인증 중인 프레임이나 팝업으로 나간 사용자를 시간만으로 중단하지 않아요.
-            if (order.frame?.isConnected || order.away && !document.hasFocus()) return;
-            if (order.pendingSdk && !order.frame) return;
+            if (order.frame?.isConnected || !order.historyRestored && order.away && !document.hasFocus()) return;
+            if (order.pendingSdk && !order.frame && !order.historyRestored) return;
             current.current = null;
             order.dispose();
             order.resolve?.(PAYMENT_HANDOFF);
@@ -28,7 +28,11 @@ export default function usePaymentHandoff(onReturn) {
             else if (current.current?.away) { current.current.away = false; recover(); }
         };
         const focus = () => { if (current.current?.away) { current.current.away = false; recover(); } };
-        const shown = event => { if (event.persisted) recover(); };
+        const shown = event => {
+            if (!event.persisted || !current.current) return;
+            current.current.historyRestored = true;
+            recover();
+        };
         document.addEventListener('visibilitychange', visible);
         window.addEventListener('blur', away);
         window.addEventListener('focus', focus);
@@ -50,7 +54,7 @@ export default function usePaymentHandoff(onReturn) {
         previous?.dispose();
         previous?.resolve?.(PAYMENT_HANDOFF);
         const value = { ...order, revision: useAuthStore.getState().sessionRevision,
-            away: document.visibilityState === 'hidden', frame: null, pendingSdk: Boolean(request) };
+            away: document.visibilityState === 'hidden', frame: null, pendingSdk: Boolean(request), historyRestored: false };
         const priorFrame = document.getElementById('imp-iframe');
         let observer;
         let closeTimer;

@@ -95,6 +95,11 @@ export const isReadAccessDenied = error => [401, 403, 404, 410].includes(queryEr
 export const isBlockingListReadError = (error, items) => Boolean(error)
     && (isReadAccessDenied(error) || !items?.length);
 
+/* 한 오류 안내의 재시도에서 실패한 조회만 다시 요청한다. 쓰기 작업은 받지 않는다. */
+export const refetchFailedReads = queries => Promise.allSettled(
+    queries.filter(query => query?.isError).map(query => query.refetch()),
+);
+
 export function clearDeniedQueryData(error, query) {
     const status = queryErrorStatus(error);
     const key = query.queryKey;

@@ -12,7 +12,7 @@ import useGoBack from '../../hooks/useGoBack';
 import useListQueryNormalization from '../../hooks/useListQueryNormalization';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
 import { httpStatusOf } from '../../utils/listErrorMessage';
-import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
+import { isBlockingListReadError, refetchFailedReads } from '../../hooks/liveUpdateQueries';
 import useMessage from '../../hooks/useMessage';
 import service from '../../services/feedInteractionService';
 import { feedDate, feedPage, feedRelativeDate, feedTotal } from '../../utils/feed';
@@ -38,9 +38,13 @@ export default function FeedNotifications() {
     const list = useQuery({ queryKey: interactionKeys.notifications(request), queryFn: ({ signal }) => service.notifications(request, signal),
         enabled, placeholderData: keepPreviousData, staleTime: 20_000 });
     const listRef = useRef(null);
-    const unavailable = [config, list].some(query => [401, 403].includes(httpStatusOf(query.error)));
-    const blockingError = isBlockingListReadError(list.error, list.data?.content);
-    const backgroundFailure = [config, ...(!blockingError ? [list] : [])].find(query => query.isError && query.data !== undefined);
+    const reads = [config, ...(enabled ? [list] : [])];
+    const unavailable = reads.some(query => [401, 403].includes(httpStatusOf(query.error)));
+    const blockingError = enabled && isBlockingListReadError(list.error, list.data?.content);
+    const blockingFailure = config.isError && (!config.data || unavailable) || enabled && blockingError;
+    const backgroundFailure = !blockingFailure && [...(enabled ? [list] : []), config].find(query => query.isError && query.data !== undefined);
+    const retryReads = () => refetchFailedReads(reads);
+    const retrying = reads.some(query => query.isFetching);
     useListRefreshAnchor(listRef, `${view}:${page}`, list.isFetching && !list.isPlaceholderData, unavailable ? null : list.data);
     const lastPage = Math.max(1, Math.ceil(feedTotal(list.data) / 20));
     useEffect(() => {
@@ -61,7 +65,7 @@ export default function FeedNotifications() {
         const failure = config.isError && (!config.data || [401, 403].includes(httpStatusOf(config.error))) ? config
             : blockingError || list.isError && unavailable ? list : null;
         if (failure) return <DataState state="error" title="알림을 불러오지 못했어요." error={failure.error}
-            onRetry={failure.refetch} retrying={failure.isFetching} />;
+            onRetry={retryReads} retrying={retrying} />;
         if (!enabled) return <DataState state="empty" kind="notification" title="피드 알림을 준비하고 있어요." />;
         if (!list.data?.content?.length) return <DataState state="empty" kind="notification" title={view === 'unread' ? '안 읽은 알림이 없어요.' : '아직 새 알림이 없어요.'} />;
         return <ul className="reserve-feed-notification-list" aria-busy={list.isFetching}>
@@ -83,7 +87,7 @@ export default function FeedNotifications() {
             <FilterMenu appearance="plain" value={view} options={FEED_NOTIFICATION_VIEWS} aria-label="알림 보기" onChange={value => setParams(previous => {
                 const next = new URLSearchParams(previous); next.set('view', value); next.set('page', '1'); return next;
             })} /></div>
-        {!unavailable && backgroundFailure && <DataState compact state="error" title="알림을 갱신하지 못했어요." error={backgroundFailure.error} onRetry={backgroundFailure.refetch} retrying={backgroundFailure.isFetching} />}
+        {!unavailable && backgroundFailure && <DataState compact state="error" title="알림을 갱신하지 못했어요." error={backgroundFailure.error} onRetry={retryReads} retrying={retrying} />}
         <AnimatedContent motionKey={`${view}:${page}`} ready={!config.isPending && (!enabled || !list.isPending && !list.isPlaceholderData)}>{content()}</AnimatedContent>
         {enabled && !unavailable && !blockingError && list.data && feedTotal(list.data) > 20 && <Pagination current={page} total={feedTotal(list.data)} pageSize={20} showSizeChanger={false}
             onChange={value => setParams(previous => { const next = new URLSearchParams(previous); next.set('page', String(value)); return next; })} />}

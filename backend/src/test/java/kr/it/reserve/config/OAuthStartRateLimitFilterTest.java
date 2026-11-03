@@ -8,6 +8,18 @@ import org.springframework.mock.web.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class OAuthStartRateLimitFilterTest {
+    @Test void sharedAuthenticationOutageIs503BeforeAnySessionOrProviderRequest() throws Exception {
+        var limiter = org.mockito.Mockito.mock(RateLimiter.class);
+        org.mockito.Mockito.when(limiter.tryConsume(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new kr.it.reserve.global.ratelimit.RedisAuthRateLimiter.Unavailable(10));
+        var request = start("GET");
+        var response = new MockHttpServletResponse();
+        new OAuthStartRateLimitFilter(limiter, new ObjectMapper().findAndRegisterModules()).doFilter(request, response, (req, res) -> request.getSession());
+        assertThat(response.getStatus()).isEqualTo(503);
+        assertThat(response.getHeader("Retry-After")).isEqualTo("10");
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(request.getSession(false)).isNull();
+    }
     @Test void repeatedAnonymousStartsStopBeforeAnyNewHttpSessionIsCreated() throws Exception {
         var filter = new OAuthStartRateLimitFilter(new RateLimiter(), new ObjectMapper().findAndRegisterModules());
         for (int i = 0; i <= RateLimiter.Policy.OAUTH_START.capacity(); i++) {

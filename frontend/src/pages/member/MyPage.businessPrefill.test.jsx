@@ -37,8 +37,8 @@ vi.mock('../../components/common', async () => ({
     Bone: () => <span />,
     SegmentedControl: () => null,
     FormSelect: () => null,
-    DataState: ({ state = 'error', title, description, onRetry, retrying }) => (
-        <section role={state === 'error' ? 'alert' : undefined}>
+    DataState: ({ state = 'error', title, description, error, onRetry, retrying }) => (
+        <section role={state === 'error' ? 'alert' : undefined} data-error-status={error?.status}>
             <span>{title}</span>
             {description && <span>{description}</span>}
             {onRetry && <button type="button" onClick={onRetry} disabled={retrying}>다시 불러오기</button>}
@@ -87,9 +87,10 @@ describe('MyPage business edit prefill', () => {
 
     it('keeps the pending application closed on failure and retries with actual existing fields', async () => {
         await openBusiness();
-        businessService.getMyStatus.mockRejectedValueOnce(new Error('offline'));
+        businessService.getMyStatus.mockRejectedValueOnce({ status: 503 });
         startEdit();
         await screen.findByText('사업자 신청 내용을 불러오지 못했어요.');
+        expect(screen.getByRole('alert')).toHaveAttribute('data-error-status', '503');
         expect(screen.getByText('심사 중이에요')).toBeInTheDocument();
         expect(screen.queryByPlaceholderText('상호명 *')).toBeNull();
         expect(screen.queryByText('신청 내용 수정')).toBeNull();
@@ -179,10 +180,11 @@ describe('MyPage business edit prefill', () => {
     });
 
     it('retries an initial status failure with a loading boundary before exposing any application form', async () => {
-        businessService.getMyStatus.mockRejectedValueOnce(new Error('offline'));
+        businessService.getMyStatus.mockRejectedValueOnce({ status: 429 });
         show();
         fireEvent.click(screen.getByRole('tab', { name: /사업자/ }));
         await screen.findByText('사업자 인증 상태를 불러오지 못했어요.');
+        expect(screen.getByRole('alert')).toHaveAttribute('data-error-status', '429');
         const request = deferred();
         businessService.getMyStatus.mockReturnValueOnce(request.promise);
         fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));

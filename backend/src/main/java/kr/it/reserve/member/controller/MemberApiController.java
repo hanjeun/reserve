@@ -3,6 +3,9 @@ package kr.it.reserve.member.controller;
 import kr.it.reserve.config.util.SecurityUtil;
 import kr.it.reserve.config.util.CookieUtil;
 import kr.it.reserve.global.common.ApiResponse;
+import kr.it.reserve.global.error.MemberException;
+import kr.it.reserve.global.ratelimit.IpExtractor;
+import kr.it.reserve.global.ratelimit.RateLimiter;
 import kr.it.reserve.member.dto.LocationUpdateRequest;
 import kr.it.reserve.member.dto.MemberResponse;
 import kr.it.reserve.member.dto.MemberUpdateRequest;
@@ -15,7 +18,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 
 @RequiredArgsConstructor
 @RestController
@@ -28,6 +33,7 @@ public class MemberApiController {
     private final MemberService memberService;
     private final CookieUtil cookieUtil;
     private final MemberWithdrawalService memberWithdrawalService;
+    private final RateLimiter limiter;
 
     // 내 정보 조회 (SecurityContext의 id로 DB 조회 - 최신 정보 보장)
     @GetMapping("/me")
@@ -39,8 +45,8 @@ public class MemberApiController {
 
     // 내 정보 수정
     @PutMapping("/update")
-    public ApiResponse<MemberResponse> updateMember(@RequestBody MemberUpdateRequest request) {
-        Member member = SecurityUtil.getCurrentMember(UPDATE_PERMISSION_DENIED_MESSAGE);
+    public ApiResponse<MemberResponse> updateMember(@Valid @RequestBody MemberUpdateRequest request, HttpServletRequest http) {
+        Member member = limitedUpdate(http, UPDATE_PERMISSION_DENIED_MESSAGE);
         MemberResponse updated = memberService.updateMember(member.getId(), request);
         return ApiResponse.success(updated, "회원 정보가 성공적으로 수정됐어요.");
     }
@@ -59,24 +65,24 @@ public class MemberApiController {
 
     // 프로필 이미지 업로드
     @PostMapping("/profile-image")
-    public ApiResponse<MemberResponse> uploadProfileImage(@RequestParam("image") MultipartFile image) {
-        Member member = SecurityUtil.getCurrentMember(UPDATE_PERMISSION_DENIED_MESSAGE);
+    public ApiResponse<MemberResponse> uploadProfileImage(@RequestParam("image") MultipartFile image, HttpServletRequest http) {
+        Member member = limitedUpdate(http, UPDATE_PERMISSION_DENIED_MESSAGE);
         MemberResponse updated = memberService.updateProfileImage(member.getId(), image);
         return ApiResponse.success(updated, "프로필 이미지가 업데이트됐어요.");
     }
 
     // 프로필 이미지 삭제 (기본 이미지로 초기화)
     @DeleteMapping("/profile-image")
-    public ApiResponse<MemberResponse> deleteProfileImage() {
-        Member member = SecurityUtil.getCurrentMember(UPDATE_PERMISSION_DENIED_MESSAGE);
+    public ApiResponse<MemberResponse> deleteProfileImage(HttpServletRequest http) {
+        Member member = limitedUpdate(http, UPDATE_PERMISSION_DENIED_MESSAGE);
         MemberResponse updated = memberService.deleteProfileImage(member.getId());
         return ApiResponse.success(updated, "프로필 이미지가 초기화됐어요.");
     }
 
     // 마케팅 수신 동의 토글 (선택 동의 — 가입 후 언제든 변경 가능)
     @PatchMapping("/me/marketing-consent")
-    public ApiResponse<MemberResponse> updateMarketingConsent(@RequestBody java.util.Map<String, Boolean> body) {
-        Member member = SecurityUtil.getCurrentMember(MEMBER_NOT_FOUND_MESSAGE);
+    public ApiResponse<MemberResponse> updateMarketingConsent(@RequestBody java.util.Map<String, Boolean> body, HttpServletRequest http) {
+        Member member = limitedUpdate(http, MEMBER_NOT_FOUND_MESSAGE);
         boolean agreed = Boolean.TRUE.equals(body.get("marketingAgreed"));
         MemberResponse updated = memberService.updateMarketingConsent(member.getId(), agreed);
         return ApiResponse.success(updated, agreed ? "마케팅 수신에 동의했어요." : "마케팅 수신 동의를 철회했어요.");
@@ -84,10 +90,20 @@ public class MemberApiController {
 
     // 위치(위도/경도) 등록 — 거리순 가게 정렬용. Geolocation 거부/미지원 시 주소 검색 폴백으로 호출
     @PatchMapping("/me/location")
-    public ApiResponse<MemberResponse> updateLocation(@RequestBody LocationUpdateRequest body) {
-        Member member = SecurityUtil.getCurrentMember(MEMBER_NOT_FOUND_MESSAGE);
+    public ApiResponse<MemberResponse> updateLocation(@Valid @RequestBody LocationUpdateRequest body, HttpServletRequest http) {
+        Member member = limitedUpdate(http, MEMBER_NOT_FOUND_MESSAGE);
         MemberResponse updated = memberService.updateLocation(member.getId(), body);
         return ApiResponse.success(updated, "위치가 등록됐어요.");
+    }
+
+    private Member limitedUpdate(HttpServletRequest http, String missingMemberMessage) {
+        Member member = SecurityUtil.getCurrentMember(missingMemberMessage);
+        // 수정 경로가 달라도 같은 한도를 쓰며 IP 거절 뒤에는 회원 한도를 소비하지 않는다.
+        if (!limiter.tryConsume("member-update:ip:" + IpExtractor.extract(http), RateLimiter.Policy.MEMBER_UPDATE_IP)
+                || !limiter.tryConsume("member-update:member:" + member.getId(), RateLimiter.Policy.MEMBER_UPDATE)) {
+            throw new MemberException("수정 요청이 너무 많아요. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+        }
+        return member;
     }
 
     @GetMapping("/withdrawal-readiness")

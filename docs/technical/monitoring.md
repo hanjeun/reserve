@@ -30,4 +30,4 @@ CSP는 Report-Only로 위반을 관찰해요. 강제 차단으로 바꾸기 전�
 
 ## 관련 코드
 
-수집·대시보드 설정은 저장소의 모니터링 설정 파일, 자원 수집은 [collect-metrics.sh](../../scripts/collect-metrics.sh)를 보세요.
+수집 설정은 [infra/logging](../../infra/logging), Compose 구성은 [infra/compose](../../infra/compose), 대시보드는 monitoring에 있어요. 저장소에서 Compose를 읽을 때는 [배포 문서](deployments.md)의 프로젝트 경로 도구를 사용해요. 자원 수집은 [collect-metrics.sh](../../scripts/collect-metrics.sh)를 보세요.

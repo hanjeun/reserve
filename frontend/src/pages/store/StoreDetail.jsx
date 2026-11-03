@@ -288,6 +288,8 @@ const StoreDetail = () => {
         <PageContainer className="reserve-store-detail" size={containerSize} paddingTop={paddingTop}>
             <AdmissionModal {...admissionModalProps} />
             {paymentDialog}
+            {error && <DataState compact state="error" subject="가게 정보" title="가게 정보를 갱신하지 못했어요."
+                error={error} onRetry={refetch} />}
 
             {isPC ? (
                 <StoreDetailPCLayout sliderImages={sliderImages} identityProps={identityProps}

@@ -19,6 +19,8 @@ import MfaSecuritySection from './MfaSecuritySection';
 import PasswordTab from './PasswordTab';
 import { LoginMethodPasswordProof, LoginMethodPasswordSetup } from './LoginMethodForms';
 import styles from './myPageStyles';
+import useSensitiveAccountAction from '../../hooks/useSensitiveAccountAction';
+import UnderlinedTextButton from '../common/UnderlinedTextButton';
 
 const PROVIDERS = [['NAVER', '네이버'], ['KAKAO', '카카오'], ['GOOGLE', 'Google']];
 const { Text } = Typography;
@@ -29,6 +31,7 @@ const hintStyle = styles.loginMethodHint;
 
 export default function LoginSecuritySection({ user, initialPasswordOpen = false, children }) {
     const { message, confirm } = useMessage();
+    const sensitive = useSensitiveAccountAction();
     const navigate = useNavigate();
     const location = useLocation();
     const confirmationNotice = useRef(null);
@@ -122,7 +125,7 @@ export default function LoginSecuritySection({ user, initialPasswordOpen = false
             return result;
         } catch (error) {
             if (owns(owner) && active.current === operation) {
-                handleApiError(error, message, '로그인 방법을 변경하지 못했어요.');
+                if (error.name !== 'AbortError') handleApiError(error, message, '로그인 방법을 변경하지 못했어요.');
                 if (error.status === 428) setRetry(value => value + 1);
             }
             return undefined;
@@ -140,7 +143,9 @@ export default function LoginSecuritySection({ user, initialPasswordOpen = false
         else if (returnIntent.current?.target === target) returnIntent.current = null;
     }, [user?.id, revision]);
     const oauth = (owner, provider, currentPassword, reauthenticate = false, resumeTarget) => perform(owner,
-        () => memberService.beginLoginMethodOAuth(owner.id, { provider, currentPassword, reauthenticate }), result => {
+        () => reauthenticate ? memberService.beginLoginMethodOAuth(owner.id, { provider, currentPassword, reauthenticate })
+            : sensitive.run('LINK', currentPassword, proof => memberService.beginLoginMethodOAuth(owner.id,
+                { provider, currentPassword, reauthenticate, ...proof })), result => {
             const expected = `/oauth2/authorization/${provider.toLowerCase()}?account_link=`;
             if (typeof result.authorizationUrl !== 'string' || !result.authorizationUrl.startsWith(expected)) throw new Error('로그인 요청을 확인하지 못했어요.');
             const remembered = returnIntent.current;
@@ -172,7 +177,7 @@ export default function LoginSecuritySection({ user, initialPasswordOpen = false
     const removePassword = () => {
         const owner = scope();
         confirm({ title: '이메일 로그인을 해제할까요?', content: '연결된 소셜 계정으로만 로그인하게 돼요.\n회원 정보와 가게·예약 데이터는 유지돼요.',
-            okText: '해제', onOk: () => perform(owner, () => memberService.removeLoginMethodPassword(owner.id),
+            okText: '해제', onOk: () => perform(owner, () => sensitive.run('REMOVE', undefined, () => memberService.removeLoginMethodPassword(owner.id)),
                 () => changed('이메일 로그인을 해제했어요. 소셜 계정으로 다시 로그인해주세요.')) });
     };
     const busy = pending || loading;
@@ -205,21 +210,26 @@ export default function LoginSecuritySection({ user, initialPasswordOpen = false
             : !panelOpen || panelClosing ? 'reserve-feed-replies-exit 200ms ease-in both' : 'reserve-feed-replies-enter 200ms ease-out both' }}>
         <div style={{ minHeight: 0, overflow: 'hidden' }}><div className="reserve-login-security-surface">
         {panel.kind === 'change-password' && <PasswordTab onBusyChange={passwordBusy} onCancel={closePanel} />}
-        {panel.kind.startsWith('link:') && <LoginMethodPasswordProof busy={pending} submitText={`${PROVIDERS.find(([key]) => key === panel.kind.slice(5))?.[1]} 계정으로 연결하기`} actionText="연결"
-            onCancel={closePanel} onSubmit={password => oauth(panel.owner, panel.kind.slice(5), password)} />}
+        {panel.kind.startsWith('link:') && <>
+            <p style={{ ...hintStyle, marginBottom: 12 }}>소셜 계정을 연결해도 이메일 로그인은 유지돼요. 필요한 본인 확인을 먼저 마친 뒤 연결하고 로그인을 이어가요.</p>
+            <LoginMethodPasswordProof busy={pending} submitText={`${PROVIDERS.find(([key]) => key === panel.kind.slice(5))?.[1]} 계정으로 연결하기`} actionText="연결"
+                onCancel={closePanel} onSubmit={password => oauth(panel.owner, panel.kind.slice(5), password)} />
+        </>}
         {panel.kind === 'unlink' && <><Text style={{ ...hintStyle, marginBottom: 12 }}>RESERVE의 소셜 로그인 연결을 해제해요. 공급자에 남은 서비스 동의는 해당 계정 설정에서 관리할 수 있어요.</Text>
             <LoginMethodPasswordProof busy={pending} submitText="연결 해제" onCancel={closePanel}
-                onSubmit={password => perform(panel.owner, () => memberService.unlinkSocialLogin(panel.owner.id, password),
+                onSubmit={password => perform(panel.owner, () => sensitive.run('UNLINK', password, () => memberService.unlinkSocialLogin(panel.owner.id, password)),
                     () => changed('소셜 로그인 연결을 해제했어요. 이메일로 다시 로그인해주세요.'))} /></>}
         {panel.kind === 'setup-password' && status?.socialProofFresh && <LoginMethodPasswordSetup email={status.email} busy={pending} onCancel={closePanel}
             onError={text => message.error(text)}
             onSend={email => perform(panel.owner, () => memberService.sendLoginMethodCode(panel.owner.id, email), () => message.success('인증 코드를 발송했어요.'))}
-            onSubmit={data => perform(panel.owner, () => memberService.setLoginMethodPassword(panel.owner.id, data),
+            onSubmit={data => perform(panel.owner, () => sensitive.run('SET', undefined, () => memberService.setLoginMethodPassword(panel.owner.id, data)),
                 () => changed('이메일 로그인을 설정했어요. 다시 로그인해주세요.'))} />}
         </div></div>
     </div>;
 
     return <section ref={sectionRef} id="login-security" tabIndex={-1} aria-label="로그인 및 보안" style={{ ...styles.tabsCard, marginTop: 24 }} aria-busy={busy}>
+        {sensitive.panel}
+        <div hidden={sensitive.confirming} style={{ display: sensitive.confirming ? 'none' : 'contents' }}>
         <Text strong style={styles.sectionTitle}>로그인 및 보안</Text>
         <Text style={{ ...hintStyle, marginTop: -8, marginBottom: 16 }}>로그인 방법을 바꿔도 회원 정보와 이용 내역은 유지돼요.</Text>
         {loading && <div aria-label="로그인 방법을 불러오는 중">{[0, 1, 2, 3].map(row => <Bone key={row} height={44} style={{ marginBottom: 12 }} />)}</div>}
@@ -272,9 +282,14 @@ export default function LoginSecuritySection({ user, initialPasswordOpen = false
                 onSocialProof={() => oauth(scope(), status.socialProvider, undefined, true, 'mfa')} />
             </div>
             {!status.socialProvider && visibleProviders.length === 0 && <Text style={{ ...hintStyle, marginTop: 12 }}>이 이메일은 소셜 로그인 연결을 지원하지 않아요. 이메일 로그인은 계속 사용할 수 있어요.</Text>}
+            {status.browserTrust === 'REMEMBERED' && <div style={{ marginTop: 12 }}><Text style={hintStyle}>이 브라우저를 기억하고 있어요. </Text>
+                <UnderlinedTextButton disabled={busy} onClick={() => perform(scope(), () => memberService.forgetLoginBrowser(user.id),
+                    () => { message.success('이 브라우저의 기억을 해제했어요.'); setRetry(value => value + 1); })}>기억 해제</UnderlinedTextButton></div>}
+            {status.browserTrust === 'UNAVAILABLE' && <Text style={{ ...hintStyle, marginTop: 12 }}>브라우저 기억 상태를 확인하지 못했어요. 잠시 후 새로고침해주세요.</Text>}
             <Text style={{ ...hintStyle, marginTop: 12 }}>소셜 계정은 한 개를 연결할 수 있어요. 로그인 방법은 최소 하나를 유지해주세요.</Text>
         </>}
         {children && <><Divider />{children}</>}
+        </div>
     </section>;
 }
 LoginSecuritySection.propTypes = { user: PropTypes.object, initialPasswordOpen: PropTypes.bool, children: PropTypes.node };

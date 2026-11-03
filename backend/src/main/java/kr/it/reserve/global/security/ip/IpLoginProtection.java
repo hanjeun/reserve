@@ -92,8 +92,9 @@ public class IpLoginProtection {
         } catch (IpProtectionStore.Unavailable failure) { throw unavailable(); }
         return () -> {
             // 신뢰 이력은 DB 세션 발급이 커밋된 뒤에만 남겨요. 기록 장애는 기존 제한으로 복구해요.
+            // 복구 이미지의 IP 이력 기록은 브라우저 설정 결과와 구분해요.
+            try { store.remember(owner, network); } catch (IpProtectionStore.Unavailable ignored) { }
             try {
-                store.remember(owner, network);
                 Object preference = request.getAttribute(PREFERENCE);
                 String raw = cookies.browserCookie(request);
                 if (Boolean.FALSE.equals(preference)) {

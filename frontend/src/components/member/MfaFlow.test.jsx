@@ -83,7 +83,7 @@ describe('추가 인증', () => {
         fireEvent.click(screen.getByRole('button', { name: '로그인 계속하기' }));
         await waitFor(() => expect(fixture.login).toHaveBeenCalled());
         expect(fixture.post).toHaveBeenCalledWith('/api/auth/mfa/finish', { completionId: view.completionId, rememberBrowser: true }, expect.anything());
-        expect(fixture.message.info).toHaveBeenCalledWith(expect.stringContaining('브라우저를 기억하지 못했어요'));
+        expect(fixture.message.info).toHaveBeenCalledWith(expect.stringContaining('브라우저 기억 설정을 완료하지 못했어요'));
     });
     it('메일 전송 실패를 발송 성공으로 표시하지 않고 다시 요청할 수 있어요', async () => {
         fixture.post.mockRejectedValueOnce(new Error('인증 메일을 보내지 못했어요.'));

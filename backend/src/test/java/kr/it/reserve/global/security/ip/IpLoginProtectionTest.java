@@ -87,6 +87,31 @@ class IpLoginProtectionTest {
         request.setCookies(new jakarta.servlet.http.Cookie("__Host-reserve_browser", "a".repeat(43)), new jakarta.servlet.http.Cookie("__Host-reserve_browser", "a".repeat(43)));
         assertThat(protection.needsStepUp(member)).isTrue();
     }
+    @Test void legacyHistoryFailureDoesNotReportASettingFailureWhenNoBrowserSettingWasRequested() {
+        doThrow(new IpProtectionStore.Unavailable()).when(store).remember(anyString(), anyString());
+        protection.beforeSession(member, true).run();
+        assertThat(protection.browserResult()).isNull();
+    }
+    @Test void decliningANewBrowserNeedsNoRedisRevocationAndDoesNotReportALegacyHistoryFailure() {
+        doThrow(new IpProtectionStore.Unavailable()).when(store).remember(anyString(), anyString());
+        protection.prepareBrowser(member, false);
+        protection.beforeSession(member, true).run();
+        assertThat(protection.browserResult()).isEqualTo("NOT_REMEMBERED");
+        verify(store, never()).forgetBrowser(anyString(), anyString());
+    }
+    @Test void browserSaveAndRevocationFailuresRemainExplicitAndDoNotClaimTheSettingWasApplied() {
+        request.setCookies(new jakarta.servlet.http.Cookie("__Host-reserve_browser", "a".repeat(43)));
+        doThrow(new IpProtectionStore.Unavailable()).when(store).rememberBrowser(anyString(), anyString(), anyString(), anyString(), anyString());
+        doThrow(new IpProtectionStore.Unavailable()).when(store).forgetBrowser(anyString(), anyString());
+        for (boolean remember : new boolean[]{true, false}) {
+            protection.prepareBrowser(member, remember);
+            protection.beforeSession(member, true).run();
+            assertThat(protection.browserResult()).isEqualTo("UNAVAILABLE");
+            var response = new org.springframework.mock.web.MockHttpServletResponse();
+            protection.writeBrowserCookie(request, response);
+            assertThat(response.getHeaders("Set-Cookie")).isEmpty();
+        }
+    }
     @Test void verifiedFactorCanAdmitANewNetworkWithoutClearingPriorFailures() {
         protection.beforeSession(member, true).run();
         verify(store).remember(anyString(), anyString());

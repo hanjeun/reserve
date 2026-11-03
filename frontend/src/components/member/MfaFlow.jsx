@@ -63,7 +63,7 @@ export default function MfaFlow({ ref, initialView, settings, page = false, reve
         if (view?.purpose === 'RISK_LOGIN') completion.current.rememberBrowser = rememberBrowser;
         const member = await finishMfaSession(controller.current?.signal, defer, completion.current);
         if (!mounted.current) return;
-        if (completion.current.browser === 'UNAVAILABLE') message.info('로그인은 완료했지만 브라우저를 기억하지 못했어요. 다음 로그인에서 다시 확인할 수 있어요.');
+        if (completion.current.browser === 'UNAVAILABLE') message.info('로그인은 완료했지만 브라우저 기억 설정을 완료하지 못했어요. 로그인 및 보안에서 다시 확인해주세요.');
         useAuthStore.getState().login(member);
         onDone?.(member);
     };

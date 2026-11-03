@@ -8,6 +8,7 @@ const memberService = {
     /** 내 정보 조회 */
     getMe: () => api.get(API_ENDPOINTS.MEMBER.ME),
 
+    forgetLoginBrowser: memberId => api.delete('/api/member/login-methods/browser', loginMethodScope(memberId)),
     getLoginMethods: (signal) => api.get('/api/member/login-methods', { signal }),
     beginLoginMethodOAuth: (memberId, data) => api.post('/api/member/login-methods/oauth', data, loginMethodScope(memberId)),
     sendLoginMethodCode: (memberId, email) => api.post('/api/member/login-methods/password/code', { email }, loginMethodScope(memberId)),

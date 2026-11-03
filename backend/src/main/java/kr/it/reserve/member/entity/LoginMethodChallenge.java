@@ -51,13 +51,17 @@ public class LoginMethodChallenge {
         this.email = email;
         this.codeHash = codeHash;
         this.createdAt = now;
-        this.expiresAt = now.plusMinutes(5);
+        this.expiresAt = now.plusMinutes(5).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
     }
 
     public boolean validFor(Member current, Purpose expected, LocalDateTime now) {
         return !consumed && attemptCount < 5 && now.isBefore(expiresAt)
                 && purpose == expected && member.getId().equals(current.getId())
                 && authVersion == current.getAuthVersion();
+    }
+    public void seal(String proof, LocalDateTime expiry) {
+        if (expiry.isBefore(expiresAt)) expiresAt = expiry.truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        codeHash = proof;
     }
     public void failAttempt() { attemptCount++; }
     public void consume() { consumed = true; codeHash = null; }

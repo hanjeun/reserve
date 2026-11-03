@@ -22,6 +22,23 @@ dev 대상 PR은 merge commit, main 대상 릴리스 PR은 squash를 사용해�
 
 같은 입력의 성공 검사 결과는 유효한 증거가 있을 때 재사용해요. 필수 빌드와 보안 검사는 유지해요.
 
+CI.yml은 검사·필수 빌드·보안 검사와 같은 이미지의 게시를 맡아요. main push의 필수 잡이 성공하면 같은 실행에서 CD.yml을 재사용 워크플로로 호출해요. PR과 수동 CI는 서버에 접근하지 않으며 CD 전용 실행 기록을 추가하지 않아요.
+
+CD는 원래 main push의 저장소·SHA·실행과 필수 잡 성공, 같은 SHA의 최신 CodeQL 성공을 확인해요. 프론트·소개 화면은 같은 실행의 SHA별 산출물을 받고, 백엔드는 그 실행이 게시한 digest로 고정해요. 다른 저장소·PR 산출물·최신 태그로 바꾸지 않으며 더 새로운 main이 있으면 서버 접근 전에 중단해요. SSH 준비와 전환은 CD에만 두고 production 환경·건강 확인·스키마·RAM·복구 관문을 유지해요.
+
+## 구성 파일 위치
+
+Compose 파일은 infra/compose, Alloy·Promtail 설정은 infra/logging에 있어요. 저장소에서는 프로젝트 루트·환경 파일·상대 mount 기준을 유지하는 다음 도구를 사용해요.
+
+```sh
+bash scripts/compose.sh mysql config
+bash scripts/compose.sh monitoring -f infra/compose/docker-compose-observability.yml config
+```
+
+monitoring-email·observability·alloy는 독립 프로젝트가 아닌 monitoring의 overlay예요. monitoring과 -f로 함께 지정하고 실제 기동할 서비스도 명시해요. Alloy와 Promtail을 동시에 기동하지 않아요.
+
+기존 COMPOSE_PROJECT_NAME과 -p 선택은 유지하며 이름을 바꿔 새 데이터 볼륨을 만들지 않아요. 운영 앱 배포는 Compose 파일만 /home/ubuntu에 펼쳐 기존 경로를 사용하고 보조 스크립트는 /home/ubuntu/scripts에 유지해요. 운영 모니터링·DB·Redis를 이 도구로 재생성하는 승인은 포함하지 않아요. 기존 Alloy 설정 경로는 RESERVE_ALLOY_CONFIG_PATH로 지정할 수 있어요.
+
 ## 배포 조건
 
 - 새 서버가 실제 데이터 구조와 호환되어야 해요.
@@ -58,6 +75,6 @@ Redis 계정 전환도 별도 승인해요. 기존 관리자 설정과 독립된
 
 ## 관련 코드
 
-- [GitHub Actions](../../.github/workflows/CICD.yml)
+- [CI](../../.github/workflows/CI.yml) · [CD](../../.github/workflows/CD.yml)
 - [Nginx 설정](../../nginx)
 - [화면 전환 도구](../../scripts/domain-release.sh)

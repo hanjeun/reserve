@@ -57,6 +57,7 @@ function StaleListError({ query, rows, title }) {
     return (
         <DataState state="error" kind="message"
             title={title}
+            error={query.error}
             onRetry={query.refetch} retrying={query.isFetching} compact />
     );
 }

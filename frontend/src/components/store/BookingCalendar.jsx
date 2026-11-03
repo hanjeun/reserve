@@ -150,7 +150,7 @@ const BookingCalendarField = ({ id, storeId, reservationId, value, onChange, sty
     // 날짜 그리드 본문 — 오류 → 로딩(스켈레톤) → 날짜 칸 순으로 판정한다.
     const renderDayGrid = () => {
         if (error) {
-            return <DataState state="error" title={error} onRetry={refetch} compact />;
+            return <DataState state="error" title="예약 가능한 날짜를 불러오지 못했어요." error={error} onRetry={refetch} compact />;
         }
         if (loading || fetching) {
             return (

@@ -186,7 +186,9 @@ function FeedCommentsSession({ postId }) {
     const profileUnavailable = [401, 403].includes(httpStatusOf(profile.error));
     const items = [...new Map((comments.data?.pages.flatMap(page => page.content || []) || []).map(item => [item.id, item])).values()];
     const blockingError = isBlockingListReadError(comments.error, items);
-    const backgroundFailure = [config, ...(!blockingError ? [comments] : [])].find(query => query.isError && query.data !== undefined);
+    const backgroundFailure = !blockingError && [comments, config].find(query => query.isError && query.data !== undefined);
+    const retryReads = () => Promise.allSettled([...(config.isError ? [config.refetch()] : []), ...(comments.isError ? [comments.refetch()] : [])]);
+    const retrying = config.isFetching || comments.isFetching;
     useListRefreshAnchor(listRef, `comments:${postId}:${sessionRevision}`, comments.isFetching && !comments.isFetchingNextPage, unavailable ? null : comments.data);
     const save = useMutation({ mutationFn: async variables => {
         assertCurrentSession(variables.session);
@@ -279,14 +281,17 @@ function FeedCommentsSession({ postId }) {
         confirm({ title: '댓글을 삭제할까요?', content: '댓글과 첨부 사진이 공개 화면에서 삭제돼요. 삭제한 댓글은 복원할 수 없어요.',
             onOk: () => { confirmOpen.current = false; remove.mutate({ id: item.id, session }); }, onCancel: () => { confirmOpen.current = false; } });
     }, onReport: item => { if (!user) login(); else { setReportMounted(true); setReportId(item.id); } } };
+    if (config.isError && (!config.data || [401, 403].includes(httpStatusOf(config.error)))) {
+        return <DataState compact state="error" title="댓글 상태를 불러오지 못했어요." error={config.error} onRetry={retryReads} retrying={retrying} />;
+    }
     if (!enabled) return null;
     return <section ref={listRef} id="comments" className="reserve-feed-comments" aria-labelledby="feed-comments-title" data-discovery-swipe-ignore="true" aria-busy={comments.isFetching}>
         <h2 id="feed-comments-title">댓글</h2>
         {focusedId && (focused.isError && (!focused.data || focusedUnavailable) || focusedParentUnavailable) && <p className="reserve-feed-note">해당 댓글이 삭제되었거나 현재 볼 수 없어요.</p>}
         {!unavailable && focusedRoot?.postId === postId && <CommentItem key={`focused-${focusedRoot.id}`} item={focusedRoot} focusedReply={focusedComment?.parentId ? focusedComment : undefined} {...actions} />}
-        {!unavailable && backgroundFailure && <DataState compact state="error" title="댓글을 갱신하지 못했어요." error={backgroundFailure.error} onRetry={backgroundFailure.refetch} retrying={backgroundFailure.isFetching} />}
-        {unavailable ? <DataState state="error" compact title="댓글을 불러오지 못했어요." error={failure.error} onRetry={failure.refetch} retrying={failure.isFetching} />
-            : comments.isPending && !comments.data ? <Bone width="85%" height={44} /> : blockingError ? <DataState state="error" compact title="댓글을 불러오지 못했어요." error={comments.error} onRetry={comments.refetch} retrying={comments.isFetching} />
+        {!unavailable && backgroundFailure && <DataState compact state="error" title="댓글을 갱신하지 못했어요." error={backgroundFailure.error} onRetry={retryReads} retrying={retrying} />}
+        {unavailable ? <DataState state="error" compact title="댓글을 불러오지 못했어요." error={failure.error} onRetry={retryReads} retrying={retrying} />
+            : comments.isPending && !comments.data ? <Bone width="85%" height={44} /> : blockingError ? <DataState state="error" compact title="댓글을 불러오지 못했어요." error={comments.error} onRetry={retryReads} retrying={retrying} />
             : comments.data && !items.length && focusedRoot?.postId !== postId
                 ? <DataState state="empty" kind="comment" title="아직 댓글이 없어요." style={{ minHeight: 0, padding: '16px 0' }} />
             : items.filter(item => item.id !== focusedRoot?.id).map(item => <CommentItem key={item.id} item={item} {...actions} />)}

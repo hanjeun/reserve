@@ -9,21 +9,50 @@ import { spawnSync } from 'node:child_process';
 
 const read = path => fs.readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 const require = createRequire(new URL('../../frontend/package.json', import.meta.url));
-const workflow = require('js-yaml').load(read('.github/workflows/CICD.yml'));
+const workflow = require('js-yaml').load(read('.github/workflows/CI.yml'));
 const backend = workflow.jobs['build-backend'];
 const frontend = workflow.jobs['build-frontend'];
-const deployment = workflow.jobs['deploy-backend'];
+const cd = require('js-yaml').load(read('.github/workflows/CD.yml'));
+const deployment = cd.jobs['deploy-backend'];
 const backendTests = workflow.jobs['test-backend'];
 const frontendTests = workflow.jobs['test-frontend'];
-const staging = workflow.jobs['stage-release'];
+const staging = cd.jobs['stage-release'];
 const detectionScript = read('scripts/detect-active-upstream.sh');
 const step = (job, id) => job.steps.find(entry => entry.id === id);
+
+test('shared authentication activation requires Redis key epoch and a completed recovery wait before startup', () => {
+    const launch = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
+    const names = ['RESERVE_SECURITY_AUTH_LIMITS_ENABLED', 'RESERVE_SECURITY_AUTH_LIMITS_FINGERPRINT_KEY', 'RESERVE_SECURITY_AUTH_LIMITS_EPOCH'];
+    assert.match(launch.env[names[0]], /false/);
+    for (const name of names) {
+        assert.ok(launch.with.envs.split(',').includes(name));
+        for (const color of ['blue', 'green']) assert.ok(read('infra/compose/docker-compose-' + color + '.yml').includes(name + '='));
+    }
+    const source = launch.with.script;
+    const beginning = source.indexOf('case "${RESERVE_SECURITY_AUTH_LIMITS_ENABLED:-false}"');
+    const end = source.indexOf('case "$RESERVE_SECURITY_IP_PROTECTION_ENABLED"', beginning);
+    assert.ok(beginning >= 0 && end > beginning && end < source.indexOf('sudo docker pull'));
+    const run = overrides => spawnSync(process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash',
+        ['-c', 'set -eu\n' + source.slice(beginning, end)], { encoding: 'utf8', timeout: 5000,
+            env: { ...process.env, RESERVE_SECURITY_AUTH_LIMITS_ENABLED: 'false', RESERVE_REDIS_ENABLED: 'false',
+                RESERVE_SECURITY_AUTH_LIMITS_FINGERPRINT_KEY: '', RESERVE_SECURITY_AUTH_LIMITS_EPOCH: '', ...overrides } });
+    assert.equal(run({}).status, 0);
+    assert.notEqual(run({ RESERVE_SECURITY_AUTH_LIMITS_ENABLED: 'invalid' }).status, 0);
+    const enabled = { RESERVE_SECURITY_AUTH_LIMITS_ENABLED: 'true', RESERVE_REDIS_ENABLED: 'true',
+        RESERVE_SECURITY_AUTH_LIMITS_FINGERPRINT_KEY: 'synthetic-private-key', RESERVE_SECURITY_AUTH_LIMITS_EPOCH: 'synthetic-v1' };
+    assert.equal(run(enabled).status, 0);
+    for (const [name, value] of [[names[1], ''], [names[2], ''], ['RESERVE_REDIS_ENABLED', 'false']])
+        assert.notEqual(run({ ...enabled, [name]: value }).status, 0);
+    const ready = source.indexOf('prepare-ip-protection.py check-auth-limits');
+    assert.ok(ready > 0 && ready < source.indexOf('check-deployment-memory.sh'));
+    assert.ok(ready < source.indexOf('sudo -E docker compose'));
+});
 
 test('target app creation checks physical RAM immediately before compose and never ignores a rejection', () => {
     const validation = frontendTests.steps.find(entry => entry.name === 'Validate operations scripts');
     assert.match(validation.run, /node --test[^\n]*scripts\/tests\/deployment-memory\.test\.mjs/);
     assert.match(validation.run, /bash -n scripts\/check-deployment-memory\.sh/);
-    const transfer = deployment.steps.find(entry => entry.name === 'Deploy docker-compose files to EC2');
+    const transfer = deployment.steps.find(entry => entry.name === 'Deploy deployment guards to EC2');
     assert.ok(transfer.with.source.split(',').includes('scripts/check-deployment-memory.sh'));
     const start = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
     const script = start.with.script;
@@ -46,7 +75,7 @@ test('IP protection deployment keeps activation explicit and rejects missing pre
     for (const name of names) {
         assert.ok(start.with.envs.split(',').includes(name));
         for (const side of ['blue', 'green']) {
-            assert.ok(read(`docker-compose-${side}.yml`).includes(`${name}=\${${name}:-`));
+            assert.ok(read(`infra/compose/docker-compose-${side}.yml`).includes(`${name}=\${${name}:-`));
         }
     }
     const source = start.with.script;
@@ -76,7 +105,7 @@ test('proxy boundary and Redis readiness run before target startup without repla
         assert.ok(check > 0 && check < step.with.script.indexOf('check-deployment-memory.sh'));
     }
     for (const side of ['blue', 'green']) {
-        const compose = require('js-yaml').load(read(`docker-compose-${side}.yml`));
+        const compose = require('js-yaml').load(read(`infra/compose/docker-compose-${side}.yml`));
         const port = side === 'blue' ? 8080 : 8081;
         assert.deepEqual(compose.services[side].ports, [`127.0.0.1:${port}:${port}`]);
         assert.equal(compose.networks['reserve-ingress'].external, true);
@@ -86,7 +115,7 @@ test('proxy boundary and Redis readiness run before target startup without repla
     const nginx = read('nginx/default.conf');
     assert.match(nginx, /resolver 127\.0\.0\.11 valid=5s ipv6=off;/);
     assert.doesNotMatch(nginx, /server PRIVATE_IP/);
-    const redis = require('js-yaml').load(read('docker-compose-redis.yml')).services.redis;
+    const redis = require('js-yaml').load(read('infra/compose/docker-compose-redis.yml')).services.redis;
     assert.ok(redis.command.includes('--aclfile'));
     assert.ok(redis.volumes.some(volume => volume.target === '/usr/local/etc/redis/users.acl' && volume.read_only));
     const boundary = deployment.steps.findIndex(entry => entry.name === 'Verify target network boundary');
@@ -103,7 +132,7 @@ test('v11 deployment forwards disabled feature flags and requires a dedicated MF
         'RESERVE_RESERVATION_RETENTION_ENABLED', 'RESERVE_RESERVATION_RETENTION_PURGE_ENABLED',
         'RESERVE_RESERVATION_CONSENT_ENABLED', 'RESERVE_RESERVATION_CONSENT_RECIPIENT_RETENTION']) {
         assert.ok(start.with.envs.split(',').includes(name));
-        for (const side of ['blue', 'green']) assert.ok(read('docker-compose-' + side + '.yml').includes(name + '='));
+        for (const side of ['blue', 'green']) assert.ok(read('infra/compose/docker-compose-' + side + '.yml').includes(name + '='));
     }
     const source = start.with.script;
     const beginning = source.indexOf(': "${RESERVE_MFA_ENCRYPTION_KEY:');
@@ -228,7 +257,7 @@ test('automatic service admission deployment is opt-in and cannot bypass the bas
 });
 
 test('deployment memory preflight ships with compose and must succeed immediately before target startup', () => {
-    const transfer = deployment.steps.find(entry => entry.name === 'Deploy docker-compose files to EC2');
+    const transfer = deployment.steps.find(entry => entry.name === 'Deploy deployment guards to EC2');
     assert.ok(transfer.with.source.split(',').includes('scripts/check-deployment-memory.sh'));
     const start = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
     const script = start.with.script;
@@ -274,7 +303,7 @@ for (const [description, overrides] of [
 
 test('production deployment requires the restricted app account and cannot fall back to root or DDL update', () => {
     for (const color of ['blue', 'green']) {
-        const compose = require('js-yaml').load(read(`docker-compose-${color}.yml`));
+        const compose = require('js-yaml').load(read(`infra/compose/docker-compose-${color}.yml`));
         const environment = compose.services[color].environment;
         assert.ok(environment.includes('DB_USERNAME=reserve_app'));
         assert.ok(environment.includes('SPRING_JPA_HIBERNATE_DDL_AUTO=validate'));
@@ -307,7 +336,7 @@ test('provider security remains opt-in and forwards dedicated keys through the p
     for (const name of keys) assert.equal(launch.env[name], `\${{ secrets.${name} }}`);
     for (const name of [...flags, ...keys, 'KAKAO_APP_ID']) assert.ok(launch.with.envs.split(',').includes(name));
     for (const color of ['blue', 'green']) {
-        const environment = require('js-yaml').load(read(`docker-compose-${color}.yml`)).services[color].environment;
+        const environment = require('js-yaml').load(read(`infra/compose/docker-compose-${color}.yml`)).services[color].environment;
         for (const name of flags) assert.ok(environment.includes(`${name}=\${${name}:-false}`));
         for (const name of [...keys, 'KAKAO_APP_ID']) assert.ok(environment.includes(`${name}=\${${name}:-}`));
     }
@@ -328,10 +357,64 @@ test('CodeQL skips duplicate dev pushes without removing PR, main or scheduled s
     assert.equal(scan.jobs.analyze['continue-on-error'], undefined);
 });
 
-test('PR labeling runs only for creation, reopening and title edits', () => {
-    const labels = require('js-yaml').load(read('.github/workflows/pr-labels.yml'));
-    assert.equal(labels.jobs.label.if, "github.event.pull_request.user.login != 'dependabot[bot]' && (github.event.action != 'edited' || github.event.changes.title != null)");
-    assert.deepEqual(labels.on.pull_request.types, ['opened', 'edited', 'reopened']);
+test('PR labels share existing CI events without metadata-only runs or weaker build checks', () => {
+    assert.equal(fs.existsSync(new URL('../../.github/workflows/pr-labels.yml', import.meta.url)), false);
+    assert.deepEqual(workflow.on.pull_request.types, ['opened', 'synchronize', 'reopened']);
+    assert.equal(workflow.on.pull_request_target, undefined);
+    assert.equal(workflow.on.workflow_run, undefined);
+    assert.deepEqual(workflow.permissions, { contents: 'read' });
+    const labels = workflow.jobs['label-pr'];
+    assert.match(labels.if, /github\.event_name == 'pull_request'/);
+    assert.match(labels.if, /head\.repo\.full_name == github\.repository/);
+    assert.match(labels.if, /user\.login != 'dependabot\[bot\]'/);
+    assert.deepEqual(labels.permissions, { 'pull-requests': 'write', issues: 'write' });
+    assert.equal(labels.steps.length, 1);
+    assert.match(labels.steps[0].uses, /^actions\/github-script@[a-f0-9]{40}$/);
+    assert.equal(labels.steps[0].env, undefined);
+    assert.doesNotMatch(labels.steps[0].with.script, /\$\{\{|(?:^|[^\w.])(?:require|exec|fetch)\(/);
+    assert.equal(labels.concurrency.group, 'pr-labels-${{ github.event.pull_request.number }}');
+    for (const job of [backend, frontend, backendTests, frontendTests]) {
+        assert.ok(!Object.hasOwn(job.permissions || {}, 'issues'));
+        assert.ok(!Object.hasOwn(job.permissions || {}, 'pull-requests'));
+        assert.ok(![].concat(job.needs || []).includes('label-pr'));
+    }
+});
+
+const runLabels = async ({ title = 'fix: current title', author = 'member', repo = 'hanjeun/reserve',
+    labels = ['feat', 'frontend', 'bug', 'needs-review'], missing = false } = {}) => {
+    const calls = [];
+    const record = name => async args => { calls.push([name, args]); return {}; };
+    const github = { rest: {
+        pulls: { get: async () => ({ data: { number: 7, title, user: { login: author }, head: { repo: { full_name: repo } } } }) },
+        issues: { getLabel: async () => { if (missing) throw Object.assign(new Error('synthetic'), { status: 404 }); },
+            createLabel: record('create'), listLabelsOnIssue: () => {}, removeLabel: record('remove'), addLabels: record('add') },
+    }, paginate: async () => labels.map(name => ({ name })) };
+    const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+    await new AsyncFunction('github', 'context', workflow.jobs['label-pr'].steps[0].with.script)(github, {
+        repo: { owner: 'hanjeun', repo: 'reserve' }, payload: { pull_request: { number: 7, title: 'feat: stale event title' } },
+    });
+    return calls;
+};
+
+test('labeling reads the current PR title and preserves manual status labels', async () => {
+    const calls = await runLabels();
+    assert.deepEqual(calls.filter(([name]) => name === 'remove').map(([, value]) => value.name), ['feat', 'frontend', 'bug']);
+    assert.deepEqual(calls.filter(([name]) => name === 'add').map(([, value]) => value.labels), [['fix']]);
+    assert.ok(calls.every(([, value]) => value.name !== 'needs-review'));
+});
+
+test('labeling creates a missing type once and does not add an existing type twice', async () => {
+    const created = await runLabels({ missing: true });
+    assert.equal(created.filter(([name]) => name === 'create').length, 1);
+    assert.deepEqual(await runLabels({ labels: ['fix', 'needs-review'] }), []);
+});
+
+test('forks, Dependabot and unrecognized titles do not perform label writes', async () => {
+    for (const values of [{ repo: 'fork/reserve' }, { author: 'dependabot[bot]' }, { title: 'unknown title' },
+        { title: 'constructor: unknown type' }, { title: '__proto__: unknown type' },
+        { title: '${{ secrets.ANYTHING }}; process.exit(1)' }]) {
+        assert.deepEqual(await runLabels(values), []);
+    }
 });
 
 test('required checks remain present and deployment waits for both builds', () => {
@@ -340,8 +423,9 @@ test('required checks remain present and deployment waits for both builds', () =
     assert.equal(frontendTests.if, undefined);
     assert.deepEqual(backend.needs, ['test-backend', 'build-frontend']);
     assert.equal(frontend.needs, 'test-frontend');
-    assert.deepEqual(deployment.needs, ['build-backend', 'build-frontend', 'test-backend', 'test-frontend', 'stage-release']);
-    assert.deepEqual(staging.needs, ['build-backend', 'build-frontend']);
+    assert.deepEqual(workflow.jobs.cd.needs, ['build-backend', 'build-frontend', 'test-backend', 'test-frontend']);
+    assert.deepEqual(deployment.needs, ['verify-source', 'stage-release']);
+    assert.deepEqual(staging.needs, ['verify-source']);
     assert.equal(staging.if, deployment.if);
     assert.equal(staging.environment, undefined);
     assert.deepEqual(deployment.environment, { name: 'production', url: "${{ vars.RESERVE_DOMAIN_SPLIT == 'true' && 'https://app.reserve.it.kr' || 'https://reserve.it.kr' }}" });

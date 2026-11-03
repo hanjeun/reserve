@@ -23,6 +23,15 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(kr.it.reserve.global.ratelimit.RedisAuthRateLimiter.Unavailable.class)
+    protected ResponseEntity<ApiResponse<Void>> handleAuthenticationLimitUnavailable(
+            kr.it.reserve.global.ratelimit.RedisAuthRateLimiter.Unavailable unavailable) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .header("Retry-After", String.valueOf(unavailable.retrySeconds()))
+                .header("Cache-Control", "no-store")
+                .body(ApiResponse.error(unavailable.getMessage()));
+    }
+
     /** 끊기거나 완료된 스트림에는 JSON 본문을 다시 쓰지 않는다. 실제 서버 예외는 아래 관문에 남긴다. */
     @ExceptionHandler(AsyncRequestNotUsableException.class)
     protected void handleClosedAsyncResponse(AsyncRequestNotUsableException ignored) {

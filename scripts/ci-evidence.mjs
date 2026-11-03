@@ -11,7 +11,7 @@ const VERSION = 1;
 const MAX_AGE_MS = 7 * 86_400_000;
 const scopes = {
     backend: ['backend', 'frontend/index.html', 'scripts/java/kr/it/reserve/tools/VerifyDatabaseSchema.java', 'scripts/java/kr/it/reserve/tools/VerifyChatImageRecovery.java', 'scripts/tests/kr/it/reserve/tools/VerifyChatImageRecoveryTest.java', 'scripts/java/kr/it/reserve/tools/PrepareAdmissionCampaign.java', 'scripts/java/kr/it/reserve/tools/PrepareServiceAdmission.java', 'scripts/tests/kr/it/reserve/tools/PrepareServiceAdmissionTest.java', 'scripts/test-backend-isolated.sh', 'scripts/ci-evidence.mjs', 'scripts/resolve-bin.mjs', 'scripts/coverage.init.gradle', 'scripts/dependency-notices.gradle',
-        '.github/workflows/CICD.yml', '.gitattributes', 'docker-compose-blue.yml', 'docker-compose-green.yml'],
+        '.github/workflows/CI.yml', '.gitattributes', 'infra/compose/docker-compose-blue.yml', 'infra/compose/docker-compose-green.yml'],
     frontend: ['frontend', 'backend/src/main', 'scripts', '.github', '.gitattributes', 'nginx', 'monitoring', 'docs/design-system/snapshots'],
 };
 function componentConfig(requested) {
@@ -40,7 +40,7 @@ export function evidenceKey(component, entries, runtime) {
 export function eligibleRun(run, repository, now = Date.now()) {
     const age = now - Date.parse(run.updated_at);
     return run.conclusion === 'success' && run.status === 'completed'
-        && run.path === '.github/workflows/CICD.yml' && run.head_repository?.full_name === repository
+        && run.path === '.github/workflows/CI.yml' && run.head_repository?.full_name === repository
         && (run.event === 'pull_request' || (run.event === 'push' && run.head_branch === 'main'))
         && /^[a-f0-9]{40}$/.test(run.head_sha) && age >= 0 && age < MAX_AGE_MS;
 }

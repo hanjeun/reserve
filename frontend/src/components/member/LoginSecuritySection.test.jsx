@@ -26,6 +26,7 @@ beforeEach(() => {
     sessionStorage.clear();
     useAuthStore.setState({ user: owner, sessionRevision: 70, isLoggedIn: true, logout: fixture.logout });
     fixture.api.getLoginMethods.mockResolvedValue(methods());
+    fixture.mfaPost.mockResolvedValue({ purpose: 'MANAGE', verified: true, enrollmentRequired: false });
     fixture.mfaGet.mockResolvedValue({ available: true, enabled: false, required: false, credentials: [] });
 });
 
@@ -230,6 +231,7 @@ it.each([['NAVER', '네이버'], ['GOOGLE', 'Google'], ['KAKAO', '카카오']])(
     const connect = await screen.findByRole('button', { name: `${label} 연결` });
     fireEvent.click(connect);
     const form = screen.getByLabelText('현재 비밀번호').closest('form');
+    expect(screen.getByText(/소셜 계정을 연결해도 이메일 로그인은 유지돼요/)).toBeInTheDocument();
     const panel = form.closest('.reserve-login-security-panel');
     expect(panel.previousElementSibling).toBe(connect.closest('div'));
     expect(panel.id).toBe(connect.getAttribute('aria-controls'));
@@ -239,6 +241,24 @@ it.each([['NAVER', '네이버'], ['GOOGLE', 'Google'], ['KAKAO', '카카오']])(
     expect(panel).toHaveAttribute('inert');
     await waitFor(() => expect(form).not.toBeInTheDocument());
     expect(fixture.api.beginLoginMethodOAuth).not.toHaveBeenCalled();
+});
+
+it('소셜 연결에서 뒤로 돌아오면 상태를 다시 읽고 기존 계정을 유지해요', async () => {
+    fixture.api.beginLoginMethodOAuth.mockResolvedValue({ authorizationUrl: `/oauth2/authorization/naver?account_link=${'a'.repeat(43)}` });
+    render(view(owner));
+    fireEvent.click(await screen.findByRole('button', { name: '네이버 연결' }));
+    fireEvent.change(screen.getByLabelText('현재 비밀번호'), { target: { value: 'synthetic-password' } });
+    fireEvent.submit(screen.getByLabelText('현재 비밀번호').closest('form'));
+    await waitFor(() => expect(fixture.api.beginLoginMethodOAuth).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: '네이버 계정으로 연결하기' })).toBeDisabled());
+    const event = new Event('pageshow');
+    Object.defineProperty(event, 'persisted', { value: true });
+    fireEvent(window, event);
+    await waitFor(() => expect(fixture.api.getLoginMethods).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByRole('button', { name: '네이버 연결' })).toBeEnabled());
+    expect(useAuthStore.getState().user).toEqual(owner);
+    expect(fixture.logout).not.toHaveBeenCalled();
+    expect(fixture.api.beginLoginMethodOAuth).toHaveBeenCalledTimes(1);
 });
 
 it('closes the previous method form when selecting another row', async () => {

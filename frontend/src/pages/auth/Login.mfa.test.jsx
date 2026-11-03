@@ -1,9 +1,10 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { App as AntApp } from 'antd';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Login from './Login';
 import PrivateRoute from '../../components/PrivateRoute';
+import * as oauth from '../../utils/oauthAuthorization';
 
 const fixture = vi.hoisted(() => ({ state: {}, member: null, post: vi.fn(), get: vi.fn(), authenticate: vi.fn(), finish: vi.fn(), login: vi.fn(),
     message: { warning: vi.fn(), error: vi.fn(), success: vi.fn(), info: vi.fn() } }));
@@ -32,6 +33,12 @@ const enableRememberMe = async () => {
     fireEvent.click(await screen.findByRole('button', { name: '로그인 유지하기' }));
     await waitFor(() => expect(screen.getByRole('checkbox', { name: '로그인 유지' })).toBeChecked());
 };
+const restorePage = persisted => {
+    const event = new Event('pageshow');
+    Object.defineProperty(event, 'persisted', { value: persisted });
+    fireEvent(window, event);
+};
+afterEach(() => vi.restoreAllMocks());
 
 describe('로그인과 기본 인증 인계', () => {
     beforeEach(() => {
@@ -41,6 +48,45 @@ describe('로그인과 기본 인증 인계', () => {
         fixture.get.mockResolvedValue({ idleSeconds: 1209600, absoluteSeconds: 2592000 });
         fixture.authenticate.mockResolvedValue({ verified: true });
         fixture.finish.mockResolvedValue({ id: 7, name: '합성 회원' });
+    });
+    it.each([['kakao', '카카오'], ['naver', '네이버'], ['google', 'Google']])('취소 후 복원된 %s 로그인은 입력을 유지하고 다시 시작할 수 있어요', async (provider, label) => {
+        const authorization = vi.spyOn(oauth, 'oauthAuthorizationUrl');
+        fixture.post.mockResolvedValue({ mfaRequired: true, enrollmentRequired: true });
+        show('/login');
+        fireEvent.change(screen.getByPlaceholderText('이메일 주소'), { target: { value: 'fixture@example.test' } });
+        fireEvent.click(screen.getByRole('button', { name: `${label}로 로그인` }));
+        const submit = screen.getByRole('button', { name: '로그인', exact: true });
+        expect(submit).toBeDisabled();
+        expect(authorization).toHaveBeenCalledWith(provider, undefined, false);
+        expect(fixture.get).not.toHaveBeenCalled();
+        expect(fixture.post).not.toHaveBeenCalled();
+        restorePage(false);
+        expect(submit).toBeDisabled();
+        restorePage(true);
+        expect(submit).toBeEnabled();
+        expect(screen.getByPlaceholderText('이메일 주소')).toHaveValue('fixture@example.test');
+        submitPassword();
+        await screen.findByRole('button', { name: '추가 인증 완료' });
+        expect(fixture.post).toHaveBeenCalledTimes(1);
+    });
+    it('외부 이동 시작 실패도 로그인 로딩과 실행 잠금을 해제해요', () => {
+        vi.spyOn(oauth, 'oauthAuthorizationUrl').mockImplementationOnce(() => { throw new Error('이동 요청을 확인하지 못했어요.'); });
+        show('/login');
+        fireEvent.click(screen.getByRole('button', { name: '카카오로 로그인' }));
+        expect(screen.getByRole('button', { name: '로그인', exact: true })).toBeEnabled();
+        expect(fixture.message.error).toHaveBeenCalledExactlyOnceWith('이동 요청을 확인하지 못했어요.');
+        expect(fixture.post).not.toHaveBeenCalled();
+    });
+    it('외부 이동이 아닌 진행 중 비밀번호 요청은 페이지 표시 이벤트로 초기화하지 않아요', async () => {
+        let finish;
+        fixture.post.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+        show('/login'); submitPassword();
+        await waitFor(() => expect(fixture.post).toHaveBeenCalledTimes(1));
+        restorePage(true);
+        expect(screen.getByRole('button', { name: '로그인', exact: true })).toBeDisabled();
+        await act(async () => { finish({ mfaRequired: true, enrollmentRequired: true }); });
+        await screen.findByRole('button', { name: '추가 인증 완료' });
+        expect(fixture.post).toHaveBeenCalledTimes(1);
     });
     it('페이지 제목은 아이콘과 접근성 이름만 남기고 로그인 동의 문구를 표시하지 않아요', () => {
         show('/login');
@@ -68,6 +114,20 @@ describe('로그인과 기본 인증 인계', () => {
         expect(screen.getByText(/공용 PC에서는 사용 후 꼭 로그아웃해주세요/)).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: '취소', exact: true }));
         expect(screen.getByRole('checkbox', { name: '로그인 유지' })).not.toBeChecked();
+    });
+    it('로그인 유지 안내 조회 실패를 표시하고 재시도해도 인증이나 유지 선택을 실행하지 않아요', async () => {
+        fixture.get.mockRejectedValueOnce({ status: 503 });
+        show('/login');
+        fireEvent.click(screen.getByRole('checkbox', { name: '로그인 유지' }));
+        expect(await screen.findByRole('alert')).toHaveTextContent('로그인 유지 안내를 불러오지 못했어요.');
+        expect(screen.getByRole('alert')).toHaveTextContent('서버에서 요청을 처리하지 못했어요.');
+        fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
+        expect(await screen.findByText(/14일 동안 사용하지 않거나 로그인한 지 30일/)).toBeInTheDocument();
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+        expect(screen.getByRole('checkbox', { name: '로그인 유지' })).not.toBeChecked();
+        expect(fixture.get).toHaveBeenCalledTimes(2);
+        expect(fixture.post).not.toHaveBeenCalled();
+        expect(fixture.login).not.toHaveBeenCalled();
     });
     it('패스키 버튼은 이메일 폼 없이 브라우저 인증을 한 번 요청하고 바로 로그인해요', async () => {
         fixture.post.mockResolvedValue({ purpose: 'PASSKEY_LOGIN' });

@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useImperativeHandle, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
-import { Form, Typography, Flex } from 'antd';
+import { Form, Typography, Flex, Checkbox } from 'antd';
 import { QRCodeSVG } from 'qrcode.react';
 import Button from '../common/Button';
 import FormInput from '../common/FormInput';
@@ -29,10 +29,11 @@ function MfaAction({ page, label, icon, loading, disabled, htmlType = 'button', 
 MfaAction.propTypes = { page: PropTypes.bool, label: PropTypes.string.isRequired, icon: PropTypes.node.isRequired,
     loading: PropTypes.bool, disabled: PropTypes.bool, htmlType: PropTypes.oneOf(['button', 'submit']), onClick: PropTypes.func, variant: PropTypes.string,
     kind: PropTypes.oneOf(['navigation', 'tool']) };
-export default function MfaFlow({ ref, initialView, settings, page = false, revealOnMount = true, onDone, onCancel }) {
+export default function MfaFlow({ ref, initialView, settings, page = false, revealOnMount = true, onDone, onCancel, onVerified, allowRememberBrowser = false }) {
     const revision = useAuthStore(state => state.sessionRevision);
     const { message } = useMessage();
     const [view, setView] = useState(initialView);
+    const [rememberBrowser, setRememberBrowser] = useState(initialView?.rememberedBrowser === true);
     const [setup, setSetup] = useState(null);
     const [codes, setCodes] = useState(null);
     const [busy, setBusy] = useState(false);
@@ -43,6 +44,7 @@ export default function MfaFlow({ ref, initialView, settings, page = false, reve
     const [emailSent, setEmailSent] = useState(false);
     const active = useRef(false);
     const controller = useRef(null);
+    const completion = useRef(initialView?.completionState || {});
     const mounted = useRef(true);
     const sectionRef = useRef(null);
     const reducedMotion = useReducedMotion();
@@ -56,8 +58,12 @@ export default function MfaFlow({ ref, initialView, settings, page = false, reve
         message.error(initialView.initialError);
     }, [initialView?.initialError, message]);
     const finish = async (defer = false) => {
-        const member = await finishMfaSession(controller.current?.signal, defer);
+        if (view?.completionId && completion.current.reference !== view.completionId)
+            completion.current = { reference: view.completionId };
+        if (view?.purpose === 'RISK_LOGIN') completion.current.rememberBrowser = rememberBrowser;
+        const member = await finishMfaSession(controller.current?.signal, defer, completion.current);
         if (!mounted.current) return;
+        if (completion.current.browser === 'UNAVAILABLE') message.info('로그인은 완료했지만 브라우저를 기억하지 못했어요. 다음 로그인에서 다시 확인할 수 있어요.');
         useAuthStore.getState().login(member);
         onDone?.(member);
     };
@@ -78,6 +84,7 @@ export default function MfaFlow({ ref, initialView, settings, page = false, reve
     const enrolled = async result => {
         if (!mounted.current) return;
         setSetup(null);
+        setView(current => ({ ...current, verified: true, enrollmentRequired: false, purpose: 'LOGIN' }));
         if (result.codes?.length) setCodes(result.codes);
         else await finish();
     };
@@ -85,7 +92,10 @@ export default function MfaFlow({ ref, initialView, settings, page = false, reve
         const request = () => post('verify', { kind, proof });
         const result = kind === 'BACKUP' ? await useAuthStore.getState().withAuthTransition(request) : await request();
         if (!mounted.current) return;
-        if (result.purpose === 'MANAGE') setView(result);
+        setView(result);
+        if (result.completionId && completion.current.reference !== result.completionId)
+            completion.current = { reference: result.completionId };
+        if (result.purpose === 'MANAGE') { if (onVerified) await onVerified({ ...result, rememberBrowser }); }
         else await finish();
     };
     const passkey = (registration, availableView = view) => perform(async () => {
@@ -93,12 +103,18 @@ export default function MfaFlow({ ref, initialView, settings, page = false, reve
         const result = await authenticateWithPasskey(registration, controller.current.signal);
         if (!mounted.current) return;
         if (registration) await enrolled(result);
-        else if (result.purpose === 'MANAGE') setView(result);
-        else await finish();
+        else {
+            setView(result);
+            if (result.completionId && completion.current.reference !== result.completionId)
+                completion.current = { reference: result.completionId };
+            if (result.purpose === 'MANAGE') { if (onVerified) await onVerified({ ...result, rememberBrowser }); }
+            else await finish();
+        }
     }, availableView?.totpAvailable);
     const receiveInitial = useEffectEvent(result => {
         setLoadFailed(false);
         setView(result);
+        setRememberBrowser(result.rememberedBrowser === true);
         if (result.passkeyAvailable && !result.enrollmentRequired && !result.verified
             && !result.initialError && !result.preferredFactor) void passkey(false, result);
     });
@@ -129,6 +145,8 @@ export default function MfaFlow({ ref, initialView, settings, page = false, reve
         return () => window.removeEventListener(AUTHENTICATION_BACK, back);
     }, []);
     const changing = settings && view?.purpose === 'MANAGE' && view?.verified;
+    const verifiedAction = onVerified && view?.verified;
+    const verifiedLogin = view?.verified && view?.purpose !== 'MANAGE';
     const selected = method || (view?.emailAvailable ? 'EMAIL' : view?.passkeyAvailable || view?.purpose === 'PASSKEY_LOGIN' ? 'PASSKEY' : 'TOTP');
     const title = codes ? '복구코드 보관' : setup ? '인증 앱 연결'
         : changing ? '인증 수단 관리' : view?.enrollmentRequired ? '패스키 등록하기'
@@ -136,10 +154,11 @@ export default function MfaFlow({ ref, initialView, settings, page = false, reve
     const description = codes ? '패스키나 인증 앱을 쓸 수 없을 때 사용하는 비상용 코드예요. 각 코드는 한 번만 사용할 수 있어요.'
         : setup ? '인증 앱에서 QR을 스캔하고 6자리 코드를 입력해주세요.'
             : changing ? '패스키는 등록한 환경으로 표시해요. 저장 위치는 브라우저에서 선택해요.'
+                : verifiedLogin ? '본인 확인을 마쳤어요. 로그인을 계속해주세요.'
             : view?.enrollmentRequired ? '기기나 비밀번호 관리자에 저장하고, 지문·얼굴·기기 PIN으로 사용해요.'
-                : view?.purpose === 'RISK_LOGIN' ? '새 접속 환경에서 로그인하고 있어요. 본인 확인을 마치면 계속할 수 있어요.'
+                : view?.purpose === 'RISK_LOGIN' ? '계정 보호를 위해 접속 환경을 다시 확인해요. 본인 확인을 마치면 계속할 수 있어요.'
                     : '등록한 인증 수단으로 본인인지 확인해주세요.';
-    const motionKey = codes ? 'codes' : setup ? 'totp-setup' : changing ? 'manage' : view?.enrollmentRequired ? 'enroll' : 'verify-' + selected;
+    const motionKey = codes ? 'codes' : setup ? 'totp-setup' : changing ? 'manage' : verifiedLogin ? 'verified-login' : view?.enrollmentRequired ? 'enroll' : 'verify-' + selected;
     const previousMotion = useRef(motionKey);
     useEffect(() => {
         const changed = previousMotion.current !== motionKey;
@@ -168,6 +187,10 @@ export default function MfaFlow({ ref, initialView, settings, page = false, reve
         </>}
         {loadFailed && <div className="reserve-mfa-verification-actions"><IconTool label="인증 정보 다시 불러오기" icon={<ReloadOutlined aria-hidden="true" />}
             disabled={busy} onClick={() => { setLoadFailed(false); setStatusRetry(value => value + 1); }} /></div>}
+        {(view?.purpose === 'RISK_LOGIN' || allowRememberBrowser) && !codes && !setup && <Typography.Paragraph>
+            <Checkbox checked={rememberBrowser} disabled={busy} onChange={event => setRememberBrowser(event.target.checked)}>이 브라우저를 30일 동안 기억해요.</Checkbox>
+            <br /><Typography.Text type="secondary">공용 기기에서는 선택하지 마세요.</Typography.Text>
+        </Typography.Paragraph>}
         {codes ? <>
             <ul aria-label="복구코드" className="reserve-mfa-recovery-codes">{codes.map(code => <li key={code}><code>{code}</code></li>)}</ul>
             <div className={!page ? 'reserve-mfa-verification-actions' : undefined}><MfaAction page={page} label="보관했어요" icon={<CheckOutlined aria-hidden="true" />} loading={busy} onClick={() => perform(() => finish())} /></div>
@@ -186,7 +209,12 @@ export default function MfaFlow({ ref, initialView, settings, page = false, reve
                     <MfaAction page={page} label="등록" htmlType="submit" icon={<CheckOutlined aria-hidden="true" />} loading={busy} />
                 </div>
             </Form>
-        </> : view?.enrollmentRequired || changing ? <>
+        </> : verifiedAction ? <div className={!page ? 'reserve-mfa-verification-actions' : undefined}>
+            <MfaAction page={page} label="변경 계속하기" icon={<CheckOutlined aria-hidden="true" />} loading={busy}
+                onClick={() => perform(() => onVerified({ ...view, rememberBrowser }))} />
+        </div> : verifiedLogin ? <div className={!page ? 'reserve-mfa-verification-actions' : undefined}>
+            <MfaAction page={page} label="로그인 계속하기" icon={<CheckOutlined aria-hidden="true" />} loading={busy} onClick={() => perform(() => finish())} />
+        </div> : view?.enrollmentRequired || changing ? <>
             {!changing && <div className={!page ? 'reserve-mfa-management-actions' : (!settings || !settings.credentials.some(value => value.kind === 'TOTP')) ? 'reserve-login-actions' : undefined}>{registrationActions}</div>}
             {!changing && view.canDeferEnrollment && <div className="reserve-auth-secondary-actions">
                 <Button variant="ghost-sm" disabled={busy} onClick={() => perform(() => finish(true))}>다음에 할게요</Button>
@@ -222,6 +250,7 @@ export default function MfaFlow({ ref, initialView, settings, page = false, reve
         </> : view && <>
             {selected === 'EMAIL' ? <Form layout="vertical" requiredMark={false}
                 onFinish={({ code }) => perform(() => verify('EMAIL', code))}>
+                <Typography.Paragraph type="secondary">{emailSent ? '인증 코드를 보냈어요. 계정 이메일에서 확인해주세요.' : '코드발송을 누르면 계정 이메일로 인증 코드를 보내요.'}</Typography.Paragraph>
                 <Form.Item name="code" label="이메일 인증 코드" rules={[{ pattern: /^[0-9]{6}$/, required: true, message: '6자리 코드를 입력해주세요.' }]}>
                     <FormInput.WithButton inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="6자리 인증 코드"
                         buttonText={emailSent ? '재발송' : '코드발송'} buttonLoading={busy}
@@ -255,4 +284,4 @@ export default function MfaFlow({ ref, initialView, settings, page = false, reve
     </section></AnimatedContent>;
 }
 MfaFlow.propTypes = { ref: PropTypes.object, initialView: PropTypes.object, settings: PropTypes.object, page: PropTypes.bool, revealOnMount: PropTypes.bool,
-    onDone: PropTypes.func, onCancel: PropTypes.func };
+    onDone: PropTypes.func, onCancel: PropTypes.func, onVerified: PropTypes.func, allowRememberBrowser: PropTypes.bool };

@@ -137,6 +137,10 @@ waiting:
 
 reserve:
   security:
+    auth-limits:
+      enabled: ${RESERVE_SECURITY_AUTH_LIMITS_ENABLED:false}
+      fingerprint-key: ${RESERVE_SECURITY_AUTH_LIMITS_FINGERPRINT_KEY:}
+      epoch: ${RESERVE_SECURITY_AUTH_LIMITS_EPOCH:}
     ip-protection:
       enabled: ${RESERVE_SECURITY_IP_PROTECTION_ENABLED:false}
       fingerprint-key: ${RESERVE_SECURITY_IP_PROTECTION_FINGERPRINT_KEY:}

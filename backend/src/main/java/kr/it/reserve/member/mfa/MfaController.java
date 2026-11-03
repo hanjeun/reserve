@@ -38,6 +38,12 @@ public class MfaController {
         @Override public String toString() { return "Proof[redacted]"; }
     }
     public record Removal(@NotBlank @Size(max = 36) String id) { }
+    public record Finish(@Pattern(regexp = "[a-f0-9]{64}") String completionId, Boolean rememberBrowser) {
+        @Override public String toString() { return "Finish[redacted]"; }
+    }
+    public record CompletionReference(@NotBlank @Pattern(regexp = "[a-f0-9]{64}") String completionId) {
+        @Override public String toString() { return "CompletionReference[redacted]"; }
+    }
     public record CredentialRemoval(boolean sessionRenewed) { }
     public record Rename(@NotBlank @Size(max = 36) String id, @NotBlank @Size(max = 80) String name) {
         @Override public String toString() { return "Rename[redacted]"; }
@@ -111,18 +117,28 @@ public class MfaController {
         limit(request, member, false);
         if (!limiter.tryConsume("risk-email:" + IpExtractor.extract(request), RateLimiter.Policy.EMAIL_SEND))
             throw new AuthException("인증 요청이 많아요. 잠시 후 다시 시도해주세요.", org.springframework.http.HttpStatus.TOO_MANY_REQUESTS);
-        mfa.sendRiskEmail(ticket(request), member, SecurityUtil.getSessionId());
+        kr.it.reserve.email.service.EmailDelivery.await(mfa.sendRiskEmail(ticket(request), member, SecurityUtil.getSessionId()));
         return ok(null);
     }
     @PostMapping("/api/auth/mfa/finish")
-    public ApiResponse<Void> finish(HttpServletRequest request, HttpServletResponse response, @AuthenticationPrincipal Member member) {
+    public ApiResponse<java.util.Map<String, String>> finish(HttpServletRequest request, HttpServletResponse response, @AuthenticationPrincipal Member member,
+            @Valid @RequestBody(required = false) Finish body) {
         limit(request, member, false);
-        var result = mfa.finish(ticket(request), member, SecurityUtil.getSessionId());
+        var result = mfa.finish(ticket(request), member, SecurityUtil.getSessionId(), body == null ? null : body.completionId(), body == null ? null : body.rememberBrowser());
         if (result.session() != null) {
             cookies.addAuthCookies(response, result.session().accessToken(), result.session().refreshToken(),
                     (int) jwt.getAccessTokenExpiration().toSeconds(), (int) result.session().refreshMaxAge().toSeconds(), result.session().persistent());
         }
         cookies.deleteCookie(response, "mfa_ticket");
+        mfa.writeBrowserCookie(request, response);
+        String browser = mfa.browserResult();
+        return ok(browser == null ? java.util.Map.of() : java.util.Map.of("browser", browser));
+    }
+    @PostMapping("/api/auth/mfa/completion")
+    public ApiResponse<Void> completion(HttpServletRequest request, @AuthenticationPrincipal Member member,
+            @Valid @RequestBody CompletionReference body) {
+        limit(request, member, false);
+        mfa.confirmCompletion(body.completionId(), member, SecurityUtil.getSessionId());
         return ok(null);
     }
     @PostMapping("/api/auth/mfa/defer")

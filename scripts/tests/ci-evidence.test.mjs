@@ -6,12 +6,12 @@ import { eligibleRun, evidenceKey, evidenceInputPaths, freshProof, main } from '
 const entries = '100644 blob aaaa\tfrontend/src/App.jsx\0' +
     '100644 blob bbbb\tfrontend/package-lock.json\0' +
     '100644 blob cccc\tfrontend/src/App.test.jsx\0' +
-    '100644 blob dddd\t.github/workflows/CICD.yml\0';
+    '100644 blob dddd\t.github/workflows/CI.yml\0';
 const runtime = { node: 'v22.21.0', image: 'ubuntu24', imageVersion: '1', configRevision: '1' };
 test('backend evidence covers its code and test executor, not unrelated frontend tooling or PR labels', () => {
     assert.deepEqual(evidenceInputPaths('backend'), [
-        'backend', 'frontend/index.html', 'scripts/java/kr/it/reserve/tools/VerifyDatabaseSchema.java', 'scripts/java/kr/it/reserve/tools/VerifyChatImageRecovery.java', 'scripts/tests/kr/it/reserve/tools/VerifyChatImageRecoveryTest.java', 'scripts/java/kr/it/reserve/tools/PrepareAdmissionCampaign.java', 'scripts/java/kr/it/reserve/tools/PrepareServiceAdmission.java', 'scripts/tests/kr/it/reserve/tools/PrepareServiceAdmissionTest.java', 'scripts/test-backend-isolated.sh', 'scripts/ci-evidence.mjs', 'scripts/resolve-bin.mjs', 'scripts/coverage.init.gradle', 'scripts/dependency-notices.gradle', '.github/workflows/CICD.yml',
-        '.gitattributes', 'docker-compose-blue.yml', 'docker-compose-green.yml',
+        'backend', 'frontend/index.html', 'scripts/java/kr/it/reserve/tools/VerifyDatabaseSchema.java', 'scripts/java/kr/it/reserve/tools/VerifyChatImageRecovery.java', 'scripts/tests/kr/it/reserve/tools/VerifyChatImageRecoveryTest.java', 'scripts/java/kr/it/reserve/tools/PrepareAdmissionCampaign.java', 'scripts/java/kr/it/reserve/tools/PrepareServiceAdmission.java', 'scripts/tests/kr/it/reserve/tools/PrepareServiceAdmissionTest.java', 'scripts/test-backend-isolated.sh', 'scripts/ci-evidence.mjs', 'scripts/resolve-bin.mjs', 'scripts/coverage.init.gradle', 'scripts/dependency-notices.gradle', '.github/workflows/CI.yml',
+        '.gitattributes', 'infra/compose/docker-compose-blue.yml', 'infra/compose/docker-compose-green.yml',
     ]);
     assert.ok(evidenceInputPaths('frontend').includes('backend/src/main'));
     assert.throws(() => evidenceInputPaths('../outside'), /Unknown test component/);
@@ -50,7 +50,7 @@ test('reuse does not renew the original test expiration or accept output injecti
         assert.equal(freshProof({ executedAt }, now), false);
     }
 });
-const run = { conclusion: 'success', status: 'completed', path: '.github/workflows/CICD.yml',
+const run = { conclusion: 'success', status: 'completed', path: '.github/workflows/CI.yml',
     head_repository: { full_name: 'hanjeun/reserve' }, event: 'pull_request', head_branch: 'feature/ui',
     head_sha: 'a'.repeat(40), updated_at: '2026-09-27T00:00:00Z' };
 test('only recent same-repository successful CICD runs are eligible', () => {

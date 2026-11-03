@@ -12,6 +12,7 @@ import useMessengerSearch from '../../hooks/useMessengerSearch';
 import useMessengerStore from '../../store/useMessengerStore';
 import useSearchTransition from '../../hooks/useSearchTransition';
 import { SEARCH_MOTION_DURATION_MS } from '../layout/searchTransition';
+import { refetchFailedReads } from '../../hooks/liveUpdateQueries';
 
 const categories = [{ value: 'all', label: '전체' }, { value: 'conversations', label: '대화 상대' },
     { value: 'messages', label: '메시지' }, { value: 'stores', label: '가게' }];
@@ -46,7 +47,8 @@ export default function MessengerStoreSearch({ search, memberId, headingLevel = 
     const queries = [showPrivate && query, showStores && stores.query].filter(Boolean);
     const loading = queries.some(value => value.isLoading);
     const fetching = queries.some(value => value.isFetching);
-    const hasError = queries.some(value => value.isError);
+    const failedReads = queries.filter(value => value.isError);
+    const hasError = failedReads.length > 0;
     const hasData = result.hasData || stores.hasData;
     const more = (showPrivate && result.more) || (showStores && stores.total > (search.page + 1) * 20);
     const groups = [];
@@ -108,10 +110,9 @@ export default function MessengerStoreSearch({ search, memberId, headingLevel = 
             onScroll={event => update({ scrollTop: event.currentTarget.scrollTop }, identity)}>
             {!keyword ? <DataState state="empty" kind="message" title="대화와 가게를 찾아보세요." description="상대 이름이나 대화 내용을 입력해주세요." />
                 : !ready || loading ? <SearchSkeleton /> : <>
-                    {showPrivate && query.isError && <DataState state="error" kind="message" compact subject="채팅 검색" error={query.error}
-                        onRetry={query.refetch} retrying={query.isFetching} />}
-                    {showStores && stores.query.isError && <DataState state="error" kind="store" compact subject="가게 검색" error={stores.query.error}
-                        onRetry={stores.query.refetch} retrying={stores.query.isFetching} />}
+                    {hasError && <DataState state="error" kind="message" compact
+                        subject={failedReads.length > 1 ? '채팅·가게 검색' : failedReads[0] === query ? '채팅 검색' : '가게 검색'}
+                        error={failedReads[0].error} onRetry={() => refetchFailedReads(queries)} retrying={fetching} />}
                     {!count && !hasError && <DataState state="empty" kind="message" title="검색 결과가 없어요." description="다른 이름이나 대화 내용으로 찾아보세요." />}
                     {groups.filter(group => group.items.length > 0).map(group => <section key={group.key} aria-label={group.label + ' 검색 결과'}>
                         <h3 className="reserve-messenger-section-label">{group.label}</h3>

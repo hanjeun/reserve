@@ -35,7 +35,14 @@ final class OAuthStartRateLimitFilter extends OncePerRequestFilter {
             return;
         }
         if (limiter == null) { reject(response, 503, "로그인을 잠시 사용할 수 없어요. 잠시 후 다시 시도해주세요."); return; }
-        if (!limiter.tryConsume("oauth-start:" + IpExtractor.extract(request), RateLimiter.Policy.OAUTH_START)) {
+        boolean allowed;
+        try { allowed = limiter.tryConsume("oauth-start:" + IpExtractor.extract(request), RateLimiter.Policy.OAUTH_START); }
+        catch (kr.it.reserve.global.ratelimit.RedisAuthRateLimiter.Unavailable unavailable) {
+            response.setHeader("Retry-After", String.valueOf(unavailable.retrySeconds()));
+            reject(response, 503, unavailable.getMessage());
+            return;
+        }
+        if (!allowed) {
             response.setHeader("Retry-After", "60");
             reject(response, 429, "로그인 요청이 많아요. 잠시 후 다시 시도해주세요.");
             return;

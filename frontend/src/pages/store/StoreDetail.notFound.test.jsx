@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import StoreDetail from './StoreDetail';
 import { useStoreData } from '../../hooks';
@@ -32,6 +32,18 @@ describe('store detail for an address that is not a store', () => {
     beforeEach(() => {
         useStoreData.mockReturnValue(idle);
         useAuthStore.setState({ user: null, isLoggedIn: false, isLoggingOut: false });
+    });
+
+    it('keeps a cached store visible and exposes its refresh failure with a retry', () => {
+        const refetch = vi.fn();
+        useStoreData.mockReturnValue({ ...idle, store: { id: 12, ownerId: 7, name: '합성 가게', reservationEnabled: false },
+            error: { code: 'ERR_NETWORK' }, refetch });
+        renderAt('/store/12');
+        expect(screen.getByRole('alert')).toHaveTextContent('가게 정보를 갱신하지 못했어요.');
+        expect(screen.getByRole('alert')).toHaveTextContent('서버에 연결할 수 없어요.');
+        expect(screen.getByRole('heading', { name: '합성 가게' })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
+        expect(refetch).toHaveBeenCalledOnce();
     });
 
     it.each([

@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import useReservations from '../useReservations';
 import reservationService from '../../services/reservationService';
 import { reservationKeys } from '../queryKeys';
+import { handleApiError } from '../../utils/errorHandler';
 
 vi.mock('../../services/reservationService', () => ({ default: { getMyReservations: vi.fn(), cancelReservation: vi.fn() } }));
 vi.mock('../useMessage', () => ({ default: () => ({ message: { success: vi.fn(), error: vi.fn() } }) }));
@@ -18,6 +19,20 @@ beforeEach(() => {
     client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity }, mutations: { retry: false } } });
 });
 afterEach(() => client.clear());
+
+it('leaves read failures to the page state and keeps cancellation failure feedback', async () => {
+    const failure = { code: 'ERR_NETWORK' };
+    reservationService.getMyReservations.mockRejectedValue(failure);
+    reservationService.cancelReservation.mockRejectedValue(failure);
+    const hook = renderHook(() => useReservations(), { wrapper });
+    await waitFor(() => expect(hook.result.current.error).toBe(failure));
+    expect(handleApiError).not.toHaveBeenCalled();
+    await act(async () => {
+        await expect(hook.result.current.cancelReservation(7)).rejects.toBe(failure);
+    });
+    expect(handleApiError).toHaveBeenCalledOnce();
+    expect(handleApiError).toHaveBeenCalledWith(failure, expect.anything(), '예약 취소에 실패했어요');
+});
 
 it('keeps each server page in a separate cache and accepts nested and legacy page metadata', async () => {
     const first = { page: 0, size: 15, sort: 'recent' };

@@ -198,6 +198,7 @@ public class MemberService {
             throw new MemberException(PWNED_PASSWORD_MESSAGE, HttpStatus.BAD_REQUEST);
         }
 
+        mfa.consumeSensitive(member, kr.it.reserve.member.mfa.MfaService.SensitiveAction.CHANGE);
         member.setPassword(bCryptPasswordEncoder.encode(request.getNewPassword()));
         member.rotateAuthVersion();
         refreshTokenRepository.deleteByMemberId(memberId);

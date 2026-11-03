@@ -7,6 +7,21 @@ import chatService from '../../services/chatService';
 
 vi.mock('../../services/chatService', () => ({ default: { getImageConfig: vi.fn().mockResolvedValue({ enabled: true }) } }));
 describe('chat photo draft scope', () => {
+    it('exposes a failed config separately from a disabled feature and recovers through an explicit retry', async () => {
+        useAuthStore.setState({ isLoggedIn: true, sessionRevision: 98 });
+        const failure = { status: 503 };
+        chatService.getImageConfig.mockRejectedValueOnce(failure).mockResolvedValueOnce({ enabled: true });
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+        const wrapper = ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+        const hook = renderHook(() => useChatImageDraft('A'), { wrapper });
+        await waitFor(() => expect(hook.result.current.error).toBe(failure));
+        expect(hook.result.current.enabled).toBe(false);
+        await act(async () => { await hook.result.current.refetch(); });
+        await waitFor(() => expect(hook.result.current.enabled).toBe(true));
+        expect(hook.result.current.error).toBeNull();
+        hook.unmount(); client.clear();
+        useAuthStore.setState({ isLoggedIn: false });
+    });
     it('distinguishes a pending image setting from a confirmed disabled feature', async () => {
         useAuthStore.setState({ isLoggedIn: true, sessionRevision: 99 });
         let resolveConfig;

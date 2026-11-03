@@ -39,12 +39,14 @@ class MemberPasswordChangeTest {
     @Mock private RateLimiter rateLimiter;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private PwnedPasswordChecker pwnedPasswordChecker;
+    @Mock private kr.it.reserve.member.mfa.MfaService mfa;
     @InjectMocks private MemberService memberService;
 
     private Member member;
 
     @BeforeEach
     void setUp() {
+        org.springframework.test.util.ReflectionTestUtils.setField(memberService, "mfa", mfa);
         member = Member.builder()
                 .id(MEMBER_ID)
                 .email("password@example.com")
@@ -81,6 +83,7 @@ class MemberPasswordChangeTest {
 
         assertThat(member.getPassword()).isEqualTo("next-hash");
         assertThat(member.getAuthVersion()).isEqualTo(1);
+        verify(mfa).consumeSensitive(member, kr.it.reserve.member.mfa.MfaService.SensitiveAction.CHANGE);
         verify(refreshTokenRepository).deleteByMemberId(MEMBER_ID);
         verify(passwordResetTokenRepository).invalidateForEmail(member.getEmail());
     }
@@ -102,7 +105,8 @@ class MemberPasswordChangeTest {
         var methods = new kr.it.reserve.member.controller.LoginMethodController(
                 org.mockito.Mockito.mock(kr.it.reserve.member.service.LoginMethodService.class), apiLimiter, memberService);
         var legacy = new kr.it.reserve.member.controller.MemberApiController(memberService,
-                org.mockito.Mockito.mock(kr.it.reserve.config.util.CookieUtil.class), org.mockito.Mockito.mock(kr.it.reserve.member.service.MemberWithdrawalService.class));
+                org.mockito.Mockito.mock(kr.it.reserve.config.util.CookieUtil.class),
+                org.mockito.Mockito.mock(kr.it.reserve.member.service.MemberWithdrawalService.class), apiLimiter);
         var http = new org.springframework.mock.web.MockHttpServletRequest();
         http.addHeader("X-Reserve-Member-Id", String.valueOf(MEMBER_ID));
         org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(

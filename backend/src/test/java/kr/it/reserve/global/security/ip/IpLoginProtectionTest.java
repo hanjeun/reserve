@@ -55,17 +55,37 @@ class IpLoginProtectionTest {
         assertThatThrownBy(() -> protection.beforeSession(member, false)).isInstanceOf(AuthException.class);
         verify(store, never()).remember(anyString(), anyString());
     }
-    @Test void knownHistoryIsPseudonymousAndOnlyRecordedAfterSuccessfulIssuance() {
+    @Test void sameIpHistoryCannotAdmitANewBrowserAndSuccessfulPrimaryLoginDoesNotExtendTheLease() {
         when(store.known(anyString(), anyString())).thenReturn(true);
+        assertThat(protection.needsStepUp(member)).isTrue();
+        request.setCookies(new jakarta.servlet.http.Cookie("__Host-reserve_browser", "a".repeat(43)));
+        when(store.browser(anyString(), anyString(), anyString(), anyString(), anyString())).thenReturn(1L);
         assertThat(protection.needsStepUp(member)).isFalse();
-        Runnable committed = protection.beforeSession(member, false);
-        verify(store, never()).remember(anyString(), anyString());
+        protection.beforeSession(member, false).run();
+        verify(store, never()).rememberBrowser(anyString(), anyString(), anyString(), anyString(), anyString());
+    }
+    @Test void proofAndExplicitConsentRecordOnlyPseudonymousBrowserMetadataAfterCommit() {
+        protection.prepareBrowser(member, true);
+        Runnable committed = protection.beforeSession(member, true);
+        verify(store, never()).rememberBrowser(anyString(), anyString(), anyString(), anyString(), anyString());
+        var response = new org.springframework.mock.web.MockHttpServletResponse();
+        protection.writeBrowserCookie(request, response);
+        assertThat(response.getHeaders("Set-Cookie")).isEmpty();
         committed.run();
-        var owner = ArgumentCaptor.forClass(String.class);
-        var network = ArgumentCaptor.forClass(String.class);
-        verify(store).remember(owner.capture(), network.capture());
-        assertThat(owner.getValue()).matches("[0-9a-f]{64}");
-        assertThat(network.getValue()).matches("[0-9a-f]{64}").doesNotContain("192.0.2.7");
+        var captor = ArgumentCaptor.forClass(String.class);
+        verify(store).rememberBrowser(captor.capture(), captor.capture(), captor.capture(), captor.capture(), captor.capture());
+        assertThat(captor.getAllValues()).allMatch(value -> value.matches("[a-f0-9]{64}"));
+        protection.writeBrowserCookie(request, response);
+        assertThat(response.getHeader("Set-Cookie")).contains("__Host-reserve_browser=", "Max-Age=2592000", "Secure", "HttpOnly", "SameSite=Lax").doesNotContain("Domain=");
+    }
+    @Test void minorNetworkChangeRequiresAnExistingBrowserAndMajorOrFamilyChangesRequireProof() {
+        request.setCookies(new jakarta.servlet.http.Cookie("__Host-reserve_browser", "a".repeat(43)));
+        for (long risk : new long[]{0, 1, 2, 3, 4}) {
+            when(store.browser(anyString(), anyString(), anyString(), anyString(), anyString())).thenReturn(risk);
+            assertThat(protection.needsStepUp(member)).isEqualTo(risk != 1 && risk != 2);
+        }
+        request.setCookies(new jakarta.servlet.http.Cookie("__Host-reserve_browser", "a".repeat(43)), new jakarta.servlet.http.Cookie("__Host-reserve_browser", "a".repeat(43)));
+        assertThat(protection.needsStepUp(member)).isTrue();
     }
     @Test void verifiedFactorCanAdmitANewNetworkWithoutClearingPriorFailures() {
         protection.beforeSession(member, true).run();
@@ -94,7 +114,8 @@ class IpLoginProtectionTest {
         assertThatThrownBy(() -> protection.requireBinding("synthetic-ticket", member)).isInstanceOf(AuthException.class);
     }
     @Test void redisOutagePreservesExistingLimitsButDoesNotAdmitAnUnknownPrimaryLogin() {
-        when(store.known(anyString(), anyString())).thenThrow(new IpProtectionStore.Unavailable());
+        request.setCookies(new jakarta.servlet.http.Cookie("__Host-reserve_browser", "a".repeat(43)));
+        when(store.browser(anyString(), anyString(), anyString(), anyString(), anyString())).thenThrow(new IpProtectionStore.Unavailable());
         when(store.blocked(anyString())).thenThrow(new IpProtectionStore.Unavailable());
         doThrow(new IpProtectionStore.Unavailable()).when(store).remember(anyString(), anyString());
         assertThat(protection.blocked(request)).isZero();

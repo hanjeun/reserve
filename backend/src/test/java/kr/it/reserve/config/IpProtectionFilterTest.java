@@ -15,7 +15,7 @@ class IpProtectionFilterTest {
     private final IpLoginProtection protection = mock(IpLoginProtection.class);
     private final IpProtectionFilter filter = new IpProtectionFilter(protection, new ObjectMapper().findAndRegisterModules());
 
-    @ParameterizedTest @ValueSource(strings = {"/api/stores", "/api/v1/stores", "/oauth2/authorization/google"})
+    @ParameterizedTest @ValueSource(strings = {"/api/auth/login", "/api/v1/auth/mfa/verify", "/oauth2/authorization/google"})
     void blockedAnonymousRequestsHaveAFiniteRetryWithoutCallingTheApplication(String path) throws Exception {
         when(protection.enabled()).thenReturn(true);
         when(protection.blocked(any())).thenReturn(1501L);
@@ -26,11 +26,12 @@ class IpProtectionFilterTest {
         assertThat(response.getContentAsString()).contains("일시적으로 제한").doesNotContain("계정이 잠");
         verify(protection, never()).failed(any());
     }
-    @ParameterizedTest @ValueSource(strings = {"/hc", "/actuator/health", "/api/auth/logout", "/api/auth/refresh",
+    @ParameterizedTest @ValueSource(strings = {"/api/stores", "/api/v1/stores", "/api/member", "/api/reservations/my", "/api/updates/events", "/hc", "/actuator/health", "/api/auth/logout", "/api/auth/refresh",
             "/api/auth/mfa/cancel", "/api/payment/webhook/portone", "/api/v1/payment/webhook/portone",
             "/api/oauth/events/google", "/login/oauth2/code/google"})
     void recoveryAndSignedProviderCallbacksKeepTheirOwnAuthenticationBoundary(String path) throws Exception {
         when(protection.enabled()).thenReturn(true);
+        when(protection.blocked(any())).thenReturn(900000L);
         var response = new MockHttpServletResponse();
         filter.doFilter(new MockHttpServletRequest("POST", path), response, (request, reply) -> response.setStatus(204));
         assertThat(response.getStatus()).isEqualTo(204);

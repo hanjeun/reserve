@@ -1,0 +1,444 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  # PR에서 검증하고 서버 변경은 main push에서만 수행한다.
+  pull_request:
+    branches: [ "main", "dev" ]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+# PR의 오래된 실행은 취소하고, 운영 배포는 중간에 끊기지 않도록 순서대로 실행한다.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# 기본 권한은 읽기로 제한하고 배포 기록 쓰기는 해당 잡에서만 허용한다.
+permissions:
+  contents: read
+
+
+jobs:
+  label-pr:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]'
+    permissions:
+      pull-requests: write
+      issues: write
+    concurrency:
+      group: pr-labels-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    timeout-minutes: 3
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const TYPE_LABELS = {
+              feat: { name: 'feat', color: '0e8a16', description: 'New product functionality' },
+              fix: { name: 'fix', color: 'd73a4a', description: 'Bug fix' },
+              refactor: { name: 'refactor', color: '1d76db', description: 'Code change without behavior change' },
+              docs: { name: 'documentation', color: '0075ca', description: 'Improvements or additions to documentation' },
+              chore: { name: 'chore', color: '6f42c1', description: 'Maintenance, tooling, and repository operations' },
+              release: { name: 'release', color: '5319e7', description: 'Release to production' },
+              style: { name: 'style', color: 'c5def5', description: 'Visual or formatting change' },
+              test: { name: 'test', color: 'bfd4f2', description: 'Tests only' },
+              perf: { name: 'perf', color: 'fbca04', description: 'Performance improvement' },
+            };
+            const { owner, repo } = context.repo;
+            const { data: pr } = await github.rest.pulls.get({
+              owner, repo, pull_number: context.payload.pull_request.number,
+            });
+            if (pr.user.login === 'dependabot[bot]' || pr.head.repo.full_name !== `${owner}/${repo}`) return;
+
+            const ensureLabel = async ({ name, color, description }) => {
+              try {
+                await github.rest.issues.getLabel({ owner, repo, name });
+              } catch (error) {
+                if (error.status !== 404) throw error;
+                await github.rest.issues.createLabel({ owner, repo, name, color, description });
+              }
+            };
+
+            const typeMatch = /^(\w+)(\([^)]*\))?!?:/.exec(pr.title);
+            const typeLabel = typeMatch && Object.hasOwn(TYPE_LABELS, typeMatch[1]) ? TYPE_LABELS[typeMatch[1]] : undefined;
+            if (!typeLabel) return;
+
+            await ensureLabel(typeLabel);
+            const labels = await github.paginate(github.rest.issues.listLabelsOnIssue, {
+              owner, repo, issue_number: pr.number, per_page: 100,
+            });
+
+            // 자동 유형·영역 라벨과 옛 중복 유형만 정리하고 수동 상태 라벨은 보존한다.
+            const managedNames = new Set([
+              ...Object.values(TYPE_LABELS).map((label) => label.name),
+              'frontend', 'backend', 'infra', 'bug', 'enhancement',
+            ]);
+            for (const label of labels) {
+              if (managedNames.has(label.name) && label.name !== typeLabel.name) {
+                try {
+                  await github.rest.issues.removeLabel({ owner, repo, issue_number: pr.number, name: label.name });
+                } catch (error) {
+                  if (error.status !== 404) throw error;
+                }
+              }
+            }
+            if (!labels.some((label) => label.name === typeLabel.name)) {
+              await github.rest.issues.addLabels({ owner, repo, issue_number: pr.number, labels: [typeLabel.name] });
+            }
+
+  test-backend:
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: frontend/.nvmrc
+      - name: Install JDK 21
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+      - name: Restore verified backend test evidence
+        id: evidence
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CI_FORCE_TESTS: ${{ github.event_name == 'workflow_dispatch' || vars.CI_FORCE_TESTS == 'true' }}
+          CI_TEST_CONFIG_REVISION: ${{ vars.CI_TEST_CONFIG_REVISION }}
+        run: node scripts/ci-evidence.mjs restore backend
+      - name: Test backend (unit, Spring/H2, isolated MySQL and Redis)
+        id: backend_tests
+        if: steps.evidence.outputs.reused != 'true'
+        run: bash scripts/test-backend-isolated.sh
+      - name: Record successful backend test evidence
+        id: record
+        env:
+          EVIDENCE_ORIGIN: ${{ steps.evidence.outputs.origin_run }}
+          EVIDENCE_EXECUTED_AT: ${{ steps.evidence.outputs.executed_at }}
+          CI_TEST_CONFIG_REVISION: ${{ vars.CI_TEST_CONFIG_REVISION }}
+        run: node scripts/ci-evidence.mjs record backend
+      - name: Upload successful backend test evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-evidence-backend-${{ steps.record.outputs.key }}
+          overwrite: true
+          path: .ci-evidence/backend/evidence.json
+          retention-days: 7
+      - name: Upload test report on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: backend-test-report
+          path: |
+            backend/build/reports/tests/test/
+            backend/build/test-results/test/
+          retention-days: 7
+
+  test-frontend:
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Restore verified frontend test evidence
+        id: evidence
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CI_FORCE_TESTS: ${{ github.event_name == 'workflow_dispatch' || vars.CI_FORCE_TESTS == 'true' }}
+          CI_TEST_CONFIG_REVISION: ${{ vars.CI_TEST_CONFIG_REVISION }}
+        run: node scripts/ci-evidence.mjs restore frontend
+      - name: Validate Grafana dashboards
+        run: node scripts/validate-grafana-dashboards.mjs
+      - name: Validate documentation links
+        run: node scripts/check-doc-links.mjs
+      - name: Load published baseline for preservation checks
+        run: git fetch --no-tags --depth=1 origin c20ce59c4aec1cfc727fe1cba12960b0e7c78e74
+      - name: Verify immutable design-system snapshot
+        shell: pwsh
+        run: ./scripts/design-system-snapshot.ps1 -Stage Verify -InstallGitGuard
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Audit frontend dependencies
+        working-directory: frontend
+        run: npm audit --audit-level=high
+      - name: Validate operations scripts
+        run: |
+          node --test scripts/tests/observability-config.test.mjs scripts/tests/deployment-memory.test.mjs scripts/tests/release-schema-readonly.test.mjs scripts/tests/backup-engine.test.mjs scripts/tests/sync-release-notes.test.mjs
+          node --test scripts/tests/container-security.test.mjs scripts/tests/cd-source.test.mjs scripts/tests/compose-layout.test.mjs
+          python3 -m unittest discover -s scripts/tests -p 'ip_protection_test.py'
+          python3 -B scripts/tests/ubuntu-security_test.py
+          bash -n scripts/scan-container-security.sh
+          bash -n scripts/compose.sh
+          bash -n scripts/backup-mysql.sh
+          bash -n scripts/restore-mysql.sh
+          bash -n scripts/verify-post-deploy-readonly.sh
+          bash -n scripts/verify-mysql-row-lock.sh
+          bash -n scripts/test-backend-isolated.sh
+          bash -n scripts/check-deployment-memory.sh
+          bash -n scripts/test-frontend-release-swap.sh
+          bash -n scripts/preserve-frontend-assets.sh
+          bash -n scripts/test-frontend-assets.sh
+          bash -n scripts/domain-release.sh
+          bash scripts/test-frontend-assets.sh
+          bash scripts/test-frontend-release-swap.sh
+      - name: Run ESLint
+        working-directory: frontend
+        run: npm run lint:ci
+      - name: Test repository quality policies
+        working-directory: frontend
+        run: npm run test:policy
+      - name: Test frontend (unit and React components)
+        if: steps.evidence.outputs.reused != 'true'
+        working-directory: frontend
+        run: npm run test:run
+      - name: Install Playwright Chromium
+        if: steps.evidence.outputs.reused != 'true'
+        working-directory: frontend
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Test PC browser (Chromium)
+        id: browser_pc
+        if: steps.evidence.outputs.reused != 'true'
+        working-directory: frontend
+        run: npm run test:e2e -- --project=chromium --output=test-results/pc
+      - name: Test mobile browser (Pixel 7 Chromium)
+        id: browser_mobile
+        if: "!cancelled() && steps.evidence.outputs.reused != 'true' && (success() || (failure() && steps.browser_pc.outcome == 'failure'))"
+        working-directory: frontend
+        run: npm run test:e2e -- --project=mobile-chromium --output=test-results/mobile
+      - name: Record successful frontend test evidence
+        id: record
+        env:
+          EVIDENCE_ORIGIN: ${{ steps.evidence.outputs.origin_run }}
+          EVIDENCE_EXECUTED_AT: ${{ steps.evidence.outputs.executed_at }}
+          CI_TEST_CONFIG_REVISION: ${{ vars.CI_TEST_CONFIG_REVISION }}
+        run: node scripts/ci-evidence.mjs record frontend
+      - name: Upload successful frontend test evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-evidence-frontend-${{ steps.record.outputs.key }}
+          overwrite: true
+          path: .ci-evidence/frontend/evidence.json
+          retention-days: 7
+      - name: Upload browser evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: frontend-browser-failures
+          path: frontend/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  build-backend:
+    permissions:
+      contents: read
+      actions: read
+    needs: [test-backend, build-frontend]
+    # 의존 검사 실패가 필수 빌드의 성공이나 건너뜀으로 가려지지 않도록 직접 확인한다.
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require backend test success
+        env:
+          TEST_RESULT: ${{ needs.test-backend.result }}
+          FRONTEND_RESULT: ${{ needs.build-frontend.result }}
+        run: |
+          test "$TEST_RESULT" = success
+          test "$FRONTEND_RESULT" = success
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install JDK 21
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Download frontend HTML from this run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "frontend-release-$GITHUB_SHA" --dir frontend/dist
+
+      # 성공한 테스트 입력을 포장하며 테스트를 반복하거나 우회하지 않는다.
+      - name: Package backend bootJar
+        id: backend_package
+        working-directory: backend
+        run: |
+          chmod +x ./gradlew
+          ./gradlew bootJar --console=plain
+
+      # PR에서도 실제 이미지를 검사하고 검사를 통과한 같은 이미지에만 배포 태그를 붙여요.
+      - name: Build Docker image
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          docker build --pull --no-cache --platform linux/amd64 \
+            --label reserve.schema-compat=v280-mfa-completion-settlement-v1 \
+            --label reserve.feature-compat=waiting-signup-hidden-feed-oauth-login-session-admission-mfa-completion-test-settlement-v11 \
+            -t "reserve-security:$COMMIT_SHA" \
+            ./backend
+
+      - name: Scan backend image vulnerabilities
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: bash scripts/scan-container-security.sh "reserve-security:$COMMIT_SHA"
+
+      # 검사가 끝나기 전에는 레지스트리 쓰기 자격을 주입하지 않아요.
+      - name: Login to DockerHub
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push Docker image
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          docker tag "reserve-security:$COMMIT_SHA" "$DOCKERHUB_USERNAME/reserve:sha-$COMMIT_SHA"
+          docker tag "reserve-security:$COMMIT_SHA" "$DOCKERHUB_USERNAME/reserve:latest"
+          docker push "$DOCKERHUB_USERNAME/reserve:sha-$COMMIT_SHA"
+          docker push "$DOCKERHUB_USERNAME/reserve:latest"
+
+          IMAGE_REFERENCE=$(docker image inspect "$DOCKERHUB_USERNAME/reserve:sha-$COMMIT_SHA" --format '{{index .RepoDigests 0}}')
+          export IMAGE_REFERENCE
+          node --input-type=module <<'RESERVE_IMAGE'
+          import { writeFileSync } from 'node:fs';
+          const image = process.env.IMAGE_REFERENCE;
+          if (!/^[a-z0-9][a-z0-9_.\/-]*\/reserve@sha256:[a-f0-9]{64}$/.test(image || '')) throw new Error('Invalid immutable image reference');
+          writeFileSync('backend/build/release-image.json', JSON.stringify({
+            version: 1, sha: process.env.COMMIT_SHA, runId: process.env.GITHUB_RUN_ID, image,
+          }) + '\n');
+          RESERVE_IMAGE
+      - name: Upload immutable backend release
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: backend-release-${{ github.sha }}
+          overwrite: true
+          path: backend/build/release-image.json
+          if-no-files-found: error
+          retention-days: 7
+
+  # 빌드 산출물을 실행 SHA에 묶으며 서버 쓰기는 준비 작업과 배포 작업으로 제한한다.
+  build-frontend:
+    needs: test-frontend
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require frontend test success
+        env:
+          TEST_RESULT: ${{ needs.test-frontend.result }}
+        run: |
+          test "$TEST_RESULT" = success
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Create .env.production
+        working-directory: frontend
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          VITE_PORTONE_CHANNEL_KEY: ${{ secrets.VITE_PORTONE_CHANNEL_KEY }}
+          VITE_PORTONE_NAVERPAY_CHANNEL_KEY: ${{ secrets.VITE_PORTONE_NAVERPAY_CHANNEL_KEY }}
+          VITE_PORTONE_TOSS_CHANNEL_KEY: ${{ secrets.VITE_PORTONE_TOSS_CHANNEL_KEY }}
+          VITE_PORTONE_TOSS_EASY_PAY_PROVIDERS: ${{ vars.VITE_PORTONE_TOSS_EASY_PAY_PROVIDERS }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_KAKAO_JS_KEY: ${{ secrets.KAKAO_JS_KEY }}
+          RESERVE_DOMAIN_SPLIT: ${{ vars.RESERVE_DOMAIN_SPLIT || 'false' }}
+        run: |
+          case "$RESERVE_DOMAIN_SPLIT" in
+            true) VITE_API_BASE_URL=''; VITE_APP_ORIGIN=https://app.reserve.it.kr ;;
+            false) VITE_APP_ORIGIN=https://reserve.it.kr ;;
+            *) echo 'RESERVE_DOMAIN_SPLIT must be true or false'; exit 1 ;;
+          esac
+          cat > .env.production << EOF
+          VITE_API_BASE_URL=$VITE_API_BASE_URL
+          VITE_API_VERSION=v1
+          VITE_PORTONE_CHANNEL_KEY=$VITE_PORTONE_CHANNEL_KEY
+          VITE_PORTONE_NAVERPAY_CHANNEL_KEY=$VITE_PORTONE_NAVERPAY_CHANNEL_KEY
+          VITE_PORTONE_TOSS_CHANNEL_KEY=$VITE_PORTONE_TOSS_CHANNEL_KEY
+          VITE_PORTONE_TOSS_EASY_PAY_PROVIDERS=$VITE_PORTONE_TOSS_EASY_PAY_PROVIDERS
+          VITE_SKELETON_DELAY=0
+          VITE_SENTRY_DSN=$VITE_SENTRY_DSN
+          VITE_KAKAO_JS_KEY=$VITE_KAKAO_JS_KEY
+          VITE_APP_ORIGIN=$VITE_APP_ORIGIN
+          VITE_MARKETING_ORIGIN=https://reserve.it.kr
+          VITE_LEGACY_APP_ORIGIN=https://reserve.it.kr
+          EOF
+
+      - name: Check secret publication boundaries
+        run: node scripts/check-secret-boundaries.mjs --include frontend/.env.production
+
+      - name: Build React app
+        working-directory: frontend
+        run: npm run build
+
+      - name: Stamp frontend release
+        working-directory: frontend
+        env:
+          FRONTEND_RELEASE: ${{ github.sha }}
+        run: |
+          [[ "$FRONTEND_RELEASE" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          printf '%s\n' "$FRONTEND_RELEASE" > dist/release-id.txt
+
+      - name: Upload built frontend
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: frontend-release-${{ github.sha }}
+          overwrite: true
+          path: frontend/dist/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Build marketing site for domain split
+        if: vars.RESERVE_DOMAIN_SPLIT == 'true'
+        env:
+          RELEASE_ID: ${{ github.sha }}
+        run: node marketing/build.mjs
+      - name: Upload marketing release
+        if: vars.RESERVE_DOMAIN_SPLIT == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: marketing-release-${{ github.sha }}
+          path: marketing/dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  cd:
+    needs: [build-backend, build-frontend, test-backend, test-frontend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      actions: read
+      deployments: write
+    uses: ./.github/workflows/CD.yml
+    secrets: inherit

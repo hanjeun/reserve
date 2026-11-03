@@ -103,3 +103,49 @@ describe('브라우저 패스키 인계', () => {
         expect(api.post).toHaveBeenLastCalledWith('/api/auth/mfa/passkey/confirm', { credential, name: '패스키' }, expect.anything());
     });
 });
+
+describe('인증 완료의 응답 복구', () => {
+    beforeEach(() => vi.resetAllMocks());
+    it('세션 발급 뒤 회원 조회만 실패하면 발급을 반복하지 않고 조회만 다시 해요', async () => {
+        const completion = { reference: 'a'.repeat(64) };
+        api.post.mockResolvedValue(null);
+        api.get.mockRejectedValueOnce(new Error('read unavailable')).mockResolvedValueOnce({ id: 7 });
+        await expect(finishMfaSession(undefined, false, completion)).rejects.toThrow('read unavailable');
+        await expect(finishMfaSession(undefined, false, completion)).resolves.toEqual({ id: 7 });
+        expect(api.post).toHaveBeenCalledTimes(1);
+        expect(api.get).toHaveBeenCalledTimes(2);
+    });
+    it('발급 응답이 끊기면 서버가 같은 요청의 현재 세션임을 확인한 경우에만 이어가요', async () => {
+        const completion = { reference: 'a'.repeat(64) };
+        api.post.mockRejectedValueOnce(new Error('response lost')).mockResolvedValueOnce(null);
+        api.get.mockResolvedValue({ id: 7 });
+        await expect(finishMfaSession(undefined, false, completion)).resolves.toEqual({ id: 7 });
+        expect(api.post.mock.calls.map(([path]) => path)).toEqual(['/api/auth/mfa/finish', '/api/auth/mfa/completion']);
+        expect(api.post.mock.calls[1][1]).toEqual({ completionId: completion.reference });
+        expect(completion.issued).toBe(true);
+    });
+    it('같은 요청의 발급을 확인하지 못하면 완료로 표시하거나 회원을 조회하지 않아요', async () => {
+        const completion = { reference: 'a'.repeat(64) };
+        api.post.mockRejectedValueOnce(new Error('response lost')).mockRejectedValueOnce(new Error('not this session'));
+        await expect(finishMfaSession(undefined, false, completion)).rejects.toThrow('response lost');
+        expect(completion.issued).not.toBe(true);
+        expect(api.get).not.toHaveBeenCalled();
+    });
+    it('계정 전환 뒤의 발급 응답은 완료로 표시하거나 다른 계정을 조회하지 않아요', async () => {
+        const completion = { reference: 'a'.repeat(64) };
+        api.post.mockImplementationOnce(async () => { advanceSession(); return null; });
+        await expect(finishMfaSession(undefined, false, completion)).rejects.toHaveProperty('isStaleSession', true);
+        expect(completion.issued).not.toBe(true);
+        expect(api.get).not.toHaveBeenCalled();
+        expect(api.post).toHaveBeenCalledTimes(1);
+    });
+    it('이전 계정의 완료 상태는 새 계정에서 재시도할 수 없어요', async () => {
+        const completion = { reference: 'a'.repeat(64) };
+        api.post.mockResolvedValue(null); api.get.mockResolvedValue({ id: 7 });
+        await finishMfaSession(undefined, false, completion);
+        advanceSession();
+        api.get.mockClear();
+        await expect(finishMfaSession(undefined, false, completion)).rejects.toHaveProperty('isStaleSession', true);
+        expect(api.get).not.toHaveBeenCalled();
+    });
+});

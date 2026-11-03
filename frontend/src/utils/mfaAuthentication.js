@@ -51,9 +51,30 @@ export async function authenticateWithPasskey(registration, signal) {
         throw failure;
     }
 }
-export async function finishMfaSession(signal, defer = false) {
+export async function finishMfaSession(signal, defer = false, completion = {}) {
     const session = currentSession();
-    await api.post(defer ? '/api/auth/mfa/defer' : '/api/auth/mfa/finish', undefined, config(signal));
+    completion.epoch ??= session.epoch;
+    assertCurrentSession(completion.epoch);
+    signal?.throwIfAborted();
+    if (!completion.issued) {
+        try {
+            const result = await api.post(defer ? '/api/auth/mfa/defer' : '/api/auth/mfa/finish',
+                !defer && (completion.reference || completion.rememberBrowser != null)
+                    ? { ...(completion.reference ? { completionId: completion.reference } : {}),
+                        ...(completion.rememberBrowser != null ? { rememberBrowser: completion.rememberBrowser } : {}) } : undefined, config(signal));
+            completion.browser = result?.browser;
+        } catch (failure) {
+            assertCurrentSession(completion.epoch);
+            signal?.throwIfAborted();
+            if (defer || !completion.reference || failure?.isSessionExpired || failure?.isStaleSession) throw failure;
+            // 응답이 끊겨도 같은 요청이 발급한 현재 세션만 완료로 확인한다.
+            try { await api.post('/api/auth/mfa/completion', { completionId: completion.reference }, config(signal)); }
+            catch { throw failure; }
+        }
+        assertCurrentSession(completion.epoch);
+        signal?.throwIfAborted();
+        completion.issued = true;
+    }
     assertCurrentSession(session.epoch);
     signal?.throwIfAborted();
     return api.get('/api/member/me', config(signal));

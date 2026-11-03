@@ -26,6 +26,15 @@ class IpProtectionStore {
 
     boolean known(String member, String network) { return call("known", List.of(key(member, "known")), network) == 1; }
     void remember(String member, String network) { call("remember", List.of(key(member, "known")), network); }
+    long browser(String member, String browser, String network, String prefix, String family) {
+        return call("browser", List.of(key(member, "browsers"), key(member, "browser-details")), browser, network, prefix, family);
+    }
+    void rememberBrowser(String member, String browser, String network, String prefix, String family) {
+        call("remember-browser", List.of(key(member, "browsers"), key(member, "browser-details")), browser, network, prefix, family);
+    }
+    void forgetBrowser(String member, String browser) {
+        call("forget-browser", List.of(key(member, "browsers"), key(member, "browser-details")), browser);
+    }
     void bind(String ticket, String binding) { call("bind", List.of(key(ticket, "challenge")), binding); }
     boolean binding(String ticket, String binding) { return call("binding", List.of(key(ticket, "challenge")), binding) == 1; }
     long issueCode(String ticket, String binding, String hash) { return call("issue-code", List.of(key(ticket, "challenge")), binding, hash); }

@@ -12,12 +12,14 @@ import { useNavigate } from 'react-router-dom';
 import { colors, fontSize } from '../../styles/tokens';
 
 import styles from './myPageStyles';
+import useSensitiveAccountAction from '../../hooks/useSensitiveAccountAction';
 import { reportLoginMethodFormError } from './loginMethodFeedback';
 
 const { Text } = Typography;
 const PasswordTab = ({ onBusyChange, onCancel }) => {
     const { message } = useMessage();
     const navigate = useNavigate();
+    const sensitive = useSensitiveAccountAction();
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
     const submitting = useRef(false);
@@ -36,18 +38,18 @@ const PasswordTab = ({ onBusyChange, onCancel }) => {
         setLoading(true);
         onBusyChange?.(true, operation);
         try {
-            await memberService.changePassword({
+            await sensitive.run('CHANGE', currentPassword, () => memberService.changePassword({
                 currentPassword,
                 newPassword,
                 newPasswordConfirm: confirmPassword,
-            }, memberId);
+            }, memberId));
             if (!current()) return;
             useAuthStore.getState().logout();
             message.success('비밀번호가 변경됐어요. 다시 로그인해주세요.');
             // 비밀번호 변경 → 다시 로그인: 흐름이 이어지는 이동(오른쪽에서)
             navigate('/login', { replace: true, state: { reserveRouteMotion: 'from-right' } });
         } catch (err) {
-            if (current()) handleApiError(err, message, '비밀번호 변경에 실패했어요');
+            if (current() && err.name !== 'AbortError') handleApiError(err, message, '비밀번호 변경에 실패했어요');
         } finally {
             submitting.current = false;
             if (mounted.current) setLoading(false);
@@ -55,8 +57,9 @@ const PasswordTab = ({ onBusyChange, onCancel }) => {
         }
     };
 
-    return (
-        <Form form={form} aria-label="비밀번호 변경" layout="vertical" onFinish={onFinish} requiredMark={false} size="large" disabled={loading}
+    return (<>
+        {sensitive.panel}
+        <Form style={sensitive.confirming ? { display: 'none' } : undefined} form={form} aria-label="비밀번호 변경" layout="vertical" onFinish={onFinish} requiredMark={false} size="large" disabled={loading}
             onFinishFailed={failure => reportLoginMethodFormError(failure, form, message)}>
             <div style={styles.securityNotice}>
                 <Text style={{ fontSize: fontSize.xs, color: colors.text.secondary }}>
@@ -83,7 +86,7 @@ const PasswordTab = ({ onBusyChange, onCancel }) => {
             </Form.Item>
             <LoginMethodFormActions submitLabel="변경" busy={loading} onCancel={onCancel} />
         </Form>
-    );
+    </>);
 };
 
 export default PasswordTab;

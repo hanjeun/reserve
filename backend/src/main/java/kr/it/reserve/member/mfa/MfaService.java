@@ -40,10 +40,20 @@ public class MfaService {
         @Override public String toString() { return "Ticket[redacted]"; }
     }
     public record View(boolean mfaRequired, boolean enrollmentRequired, boolean verified, boolean passkeyAvailable,
-            boolean totpAvailable, String purpose, LocalDateTime expiresAt, boolean canDeferEnrollment, boolean emailAvailable) {
+            boolean totpAvailable, String purpose, LocalDateTime expiresAt, boolean canDeferEnrollment, boolean emailAvailable,
+            String completionId, boolean rememberedBrowser) {
+        public View(boolean required, boolean enrollment, boolean verified, boolean passkey, boolean totp, String purpose,
+                LocalDateTime expiresAt, boolean canDefer, boolean emailAvailable, String completionId) {
+            this(required, enrollment, verified, passkey, totp, purpose, expiresAt, canDefer, emailAvailable, completionId, false);
+        }
+        public View(boolean required, boolean enrollment, boolean verified, boolean passkey, boolean totp, String purpose,
+                LocalDateTime expiresAt, boolean canDefer, boolean emailAvailable) {
+            this(required, enrollment, verified, passkey, totp, purpose, expiresAt, canDefer, emailAvailable, null);
+        }
         public View(boolean required, boolean enrollment, boolean verified, boolean passkey, boolean totp, String purpose, LocalDateTime expiresAt, boolean canDefer) {
             this(required, enrollment, verified, passkey, totp, purpose, expiresAt, canDefer, false);
         }
+        @Override public String toString() { return "View[authentication metadata]"; }
     }
     public record CredentialView(String id, String kind, String name, LocalDateTime createdAt, LocalDateTime lastUsedAt) { }
     public record Settings(boolean available, boolean enabled, boolean required, List<CredentialView> credentials, long recoveryCodes,
@@ -108,9 +118,13 @@ public class MfaService {
     }
     @Transactional
     public Ticket beginManage(Member authenticated, String sessionId, LocalDateTime oauthAt, String password, boolean persistent, String previousTicket) {
+        return beginManagement(authenticated, sessionId, oauthAt, password, persistent, previousTicket, false);
+    }
+    private Ticket beginManagement(Member authenticated, String sessionId, LocalDateTime oauthAt, String password, boolean persistent,
+            String previousTicket, boolean sensitive) {
         int expectedVersion = authenticated.getAuthVersion();
         Member member = lock(authenticated.getId());
-        if (!enabled(member)) requireAvailable();
+        if (!sensitive && !enabled(member)) requireAvailable();
         if (member.getAuthVersion() != expectedVersion) throw expired();
         var session = sessions.findBySessionIdForUpdate(sessionId, member.getId()).filter(value -> value.isLiveAt(now()))
                 .orElseThrow(MfaService::expired);
@@ -130,13 +144,66 @@ public class MfaService {
                 : "PASSKEY".equals(session.getLoginMethod()) ? "PASSKEY"
                 : session.getLoginMethod().startsWith("OAUTH") ? "OAUTH" : "PASSWORD";
         // 선택 등록 계정은 기본 인증으로 관리하되 MFA 완료 세션으로 승격하지 않아요.
-        if (!member.isAdmin() && (local || social)) method += "_MANAGE";
+        if (!member.isAdmin() && (local || social)) {
+            boolean recheck = !sensitive && ipProtection != null && ipProtection.needsStepUp(member);
+            method += recheck ? "_CHECK" : "_MANAGE";
+        }
         if (Ticket.valid(previousTicket)) challenges.findLocked(MfaCrypto.digest(previousTicket))
                 .filter(value -> value.getPurpose() == MfaChallenge.Purpose.MANAGE
                         && Objects.equals(value.getMemberId(), member.getId()) && Objects.equals(value.getBoundSessionId(), sessionId))
                 .ifPresent(value -> value.consume(now()));
-        return ticket(member, MfaChallenge.Purpose.MANAGE, method, method.startsWith("OAUTH") ? session.getOauthAuthenticatedAt() : null, session.getSessionId(), null, persistent);
+        Ticket pending = ticket(member, MfaChallenge.Purpose.MANAGE, method, method.startsWith("OAUTH") ? session.getOauthAuthenticatedAt() : null, session.getSessionId(), null, persistent);
+        if (ipProtection != null && ipProtection.enabled()) ipProtection.bind(pending.value(), member);
+        return pending;
     }
+    public enum SensitiveAction { LINK, UNLINK, CHANGE, REMOVE, SET }
+    public record SensitiveProof(LocalDateTime expiresAt, boolean strong, String binding) {
+        @Override public String toString() { return "SensitiveProof[redacted]"; }
+    }
+    @Transactional
+    public Ticket beginSensitive(Member authenticated, String sid, LocalDateTime oauthAt, String password,
+            boolean persistent, String previous, SensitiveAction action) {
+        if (action == null) throw expired();
+        Ticket pending = beginManagement(authenticated, sid, oauthAt, password, persistent, previous, true);
+        Bound bound = bound(pending.value(), authenticated, sid, null);
+        boolean extra = bound.member().isAdmin() || ipProtection != null && ipProtection.needsStepUp(bound.member());
+        bound.challenge().sensitive(primaryMethod(bound.challenge()) + "_" + action.name(), !extra);
+        return pending;
+    }
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY, noRollbackFor = AuthException.class)
+    public SensitiveProof consumeSensitive(Member member, SensitiveAction action) {
+        try { return checkedSensitive(member, action); }
+        catch (AuthException failure) {
+            if (failure.getStatus() != org.springframework.http.HttpStatus.UNAUTHORIZED) throw failure;
+            throw new AuthException("변경 전 본인 확인을 다시 진행해주세요.", org.springframework.http.HttpStatus.PRECONDITION_REQUIRED);
+        }
+    }
+    private SensitiveProof checkedSensitive(Member member, SensitiveAction action) {
+        if (!(org.springframework.web.context.request.RequestContextHolder.getRequestAttributes()
+                instanceof org.springframework.web.context.request.ServletRequestAttributes attributes)) throw expired();
+        String ticket = kr.it.reserve.config.util.CookieUtil.getCookie(attributes.getRequest(), "mfa_ticket");
+        String sid = kr.it.reserve.config.util.SecurityUtil.getSessionId();
+        Bound bound = bound(ticket, member, sid, null);
+        MfaChallenge challenge = bound.challenge();
+        if (!sensitive(challenge) || !sensitiveAction(challenge).equals(action.name()) || !challenge.isFactorVerified()) throw expired();
+        boolean strong = challenge.getPrimaryMethod().endsWith("_MFA");
+        boolean email = challenge.getPrimaryMethod().endsWith("_MAIL");
+        if (member.isAdmin() && !strong || !strong && !email && ipProtection != null && ipProtection.needsStepUp(member)) throw expired();
+        challenge.consume(now());
+        return new SensitiveProof(challenge.getExpiresAt(), strong, ipProtection == null ? "disabled" : ipProtection.sensitiveBinding(member, sid));
+    }
+    public String linkBinding(Member member, String sid) { return ipProtection == null ? "disabled" : ipProtection.sensitiveBinding(member, sid); }
+    public void prepareLinkedSession(Member member, boolean strong, Boolean remember) {
+        if (policy.requires(member) && !strong) throw expired();
+        if (ipProtection != null) { ipProtection.approveCurrent(member); ipProtection.prepareBrowser(member, remember); }
+    }
+    public String browserStatus(Member member) { return ipProtection == null ? "DISABLED" : ipProtection.browserStatus(member); }
+    public void writeBrowserCookie(jakarta.servlet.http.HttpServletRequest request, jakarta.servlet.http.HttpServletResponse response) {
+        if (ipProtection != null) ipProtection.writeBrowserCookie(request, response);
+    }
+    public String browserResult() { return ipProtection == null ? "DISABLED" : ipProtection.browserResult(); }
+    public void forgetBrowser(Member member) { if (ipProtection != null) ipProtection.forgetBrowser(member); }
+
     private Ticket ticket(Member member, MfaChallenge.Purpose purpose, String method, LocalDateTime oauthAt, String sid, Instant proofExpiresAt, boolean persistent) {
         // 유지 선택도 요청 해시에 포함해 중간에 바뀌지 않게 한다.
         String raw = crypto.randomToken() + (persistent ? ".1" : ".0");
@@ -168,12 +235,12 @@ public class MfaService {
     }
     private View view(Member member, MfaChallenge challenge) {
         List<MfaCredential> values = member == null ? List.of() : credentials.findByMemberIdOrderByCreatedAtAsc(member.getId());
-        boolean risk = riskLogin(challenge);
+        boolean risk = riskLogin(challenge) || sensitive(challenge) || riskManagement(challenge);
         boolean registered = member != null && enabled(member);
         return new View(true, member != null && !registered && !risk, challenge.isFactorVerified(),
                 values.stream().anyMatch(value -> value.getKind() == MfaCredential.Kind.PASSKEY),
-                values.stream().anyMatch(value -> value.getKind() == MfaCredential.Kind.TOTP), risk ? "RISK_LOGIN" : challenge.getPurpose().name(),
-                challenge.getExpiresAt(), canDefer(member, challenge), risk && member != null && !registered && !member.isAdmin());
+                values.stream().anyMatch(value -> value.getKind() == MfaCredential.Kind.TOTP), riskLogin(challenge) ? "RISK_LOGIN" : challenge.getPurpose().name(),
+                challenge.getExpiresAt(), canDefer(member, challenge), risk && member != null && !registered && !member.isAdmin(), challenge.getId(), member != null && "REMEMBERED".equals(browserStatus(member)));
     }
     @Transactional
     public TotpSetup beginTotp(String ticket, Member authenticated, String sid) {
@@ -238,7 +305,7 @@ public class MfaService {
         }
         Bound bound = bound(ticket, authenticated, sid, located);
         Member member = bound.member();
-        boolean emailProof = "EMAIL".equals(kind) && riskLogin(bound.challenge()) && member != null && !member.isAdmin() && !enabled(member);
+        boolean emailProof = "EMAIL".equals(kind) && (riskLogin(bound.challenge()) || sensitive(bound.challenge()) || riskManagement(bound.challenge())) && member != null && !member.isAdmin() && !enabled(member);
         if (member == null || !enabled(member) && !emailProof) throw rejected(bound.challenge());
         if (!limiter.tryConsume("mfa-member:" + member.getId(), kr.it.reserve.global.ratelimit.RateLimiter.Policy.CODE_VERIFY_ACCOUNT))
             throw new AuthException("인증 시도가 많아요. 잠시 후 다시 시도해주세요.", org.springframework.http.HttpStatus.TOO_MANY_REQUESTS);
@@ -273,6 +340,8 @@ public class MfaService {
                     && result.getSignatureCount() <= value.getSignatureCount()) throw rejected(bound.challenge());
             value.usedPasskey(Math.max(value.getSignatureCount(), result.getSignatureCount()), result.isBackedUp(), now());
         } else { throw rejected(bound.challenge()); }
+        if (riskManagement(bound.challenge())) bound.challenge().sensitive(primaryMethod(bound.challenge()) + (emailProof ? "_MANAGE" : ""), false);
+        bound.challenge().sensitiveVerified(!emailProof);
         bound.challenge().verified();
         limiter.refund("mfa-member:" + member.getId(), kr.it.reserve.global.ratelimit.RateLimiter.Policy.CODE_VERIFY_ACCOUNT);
         TokenProvider.IssuedSession replacement = null;
@@ -284,32 +353,61 @@ public class MfaService {
         return new Verification(view(member, bound.challenge()), replacement);
     }
     @Transactional
-    public void sendRiskEmail(String ticket, Member authenticated, String sid) {
+    public java.util.concurrent.CompletableFuture<Void> sendRiskEmail(String ticket, Member authenticated, String sid) {
         Bound bound = bound(ticket, authenticated, sid, null);
-        if (!riskLogin(bound.challenge()) || bound.challenge().isFactorVerified() || bound.member().isAdmin() || enabled(bound.member())) throw expired();
+        if (!(riskLogin(bound.challenge()) || sensitive(bound.challenge()) || riskManagement(bound.challenge())) || bound.challenge().isFactorVerified() || bound.member().isAdmin() || enabled(bound.member())) throw expired();
         if (!limiter.tryConsume("risk-email-member:" + bound.member().getId(), kr.it.reserve.global.ratelimit.RateLimiter.Policy.LOGIN_METHOD_EMAIL))
             throw new AuthException("인증 요청이 많아요. 잠시 후 다시 시도해주세요.", org.springframework.http.HttpStatus.TOO_MANY_REQUESTS);
         String code = String.format(java.util.Locale.ROOT, "%06d", new java.security.SecureRandom().nextInt(1_000_000));
         ipProtection.issueEmailCode(ticket, bound.member(), code);
-        email.sendRiskLoginVerificationEmail(bound.member().getEmail(), code);
+        return kr.it.reserve.email.service.EmailDelivery.submit(() -> email.sendRiskLoginVerificationEmail(bound.member().getEmail(), code));
     }
     @Transactional
     public Completion finish(String ticket, Member authenticated, String sid) {
+        return finish(ticket, authenticated, sid, null);
+    }
+    @Transactional
+    public Completion finish(String ticket, Member authenticated, String sid, String completionId) {
+        return finish(ticket, authenticated, sid, completionId, null);
+    }
+    @Transactional
+    public Completion finish(String ticket, Member authenticated, String sid, String completionId, Boolean rememberBrowser) {
+        if (completionId != null && (!Ticket.valid(ticket) || !completionId.equals(MfaCrypto.digest(ticket)))) throw expired();
         Bound bound = bound(ticket, authenticated, sid, null);
-        if (!bound.challenge().isFactorVerified() || bound.member() == null) throw expired();
+        if (!bound.challenge().isFactorVerified() || bound.member() == null || sensitive(bound.challenge())) throw expired();
         MfaChallenge challenge = bound.challenge();
+        if (completionId != null && challenge.getPurpose() == MfaChallenge.Purpose.MANAGE) throw expired();
         challenge.consume(now());
         if (challenge.getPurpose() == MfaChallenge.Purpose.MANAGE) return new Completion(null);
+        if (ipProtection != null) ipProtection.prepareBrowser(bound.member(), rememberBrowser);
+        TokenProvider.IssuedSession session;
         if (riskLogin(challenge)) {
             ipProtection.approveCurrent(bound.member());
-            return new Completion(tokens.issueSession(bound.member(), challenge.getOauthAt(), new Ticket(ticket).persistent()));
-        }
-        return new Completion(continueSession(bound.member(), challenge, ticket));
+            session = tokens.issueSession(bound.member(), challenge.getOauthAt(), new Ticket(ticket).persistent());
+        } else session = continueSession(bound.member(), challenge, ticket);
+        challenge.bindSession(tokens.getSessionId(session.accessToken()));
+        return new Completion(session);
+    }
+    @Transactional
+    public void confirmCompletion(String completionId, Member authenticated, String sid) {
+        if (authenticated == null || sid == null || completionId == null || !completionId.matches("[a-f0-9]{64}")) throw expired();
+        Member member = lock(authenticated.getId());
+        var challenge = challenges.findLocked(completionId).orElseThrow(MfaService::expired);
+        entityManager.refresh(challenge, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+        if (challenge.getPurpose() == MfaChallenge.Purpose.MANAGE || !challenge.isFactorVerified()
+                || challenge.getConsumedAt() == null || !now().isBefore(challenge.getExpiresAt())
+                || !Objects.equals(challenge.getMemberId(), member.getId())
+                || challenge.getAuthVersion() != member.getAuthVersion() || authenticated.getAuthVersion() != member.getAuthVersion()
+                || !sid.equals(challenge.getBoundSessionId())
+                || !tokens.isPrimaryLoginCurrent(member, challenge.getOauthAt(), primaryMethod(challenge))) throw expired();
+        var session = sessions.findBySessionIdForUpdate(sid, member.getId()).filter(value -> value.isLiveAt(now())).orElseThrow(MfaService::expired);
+        if (session.getAuthVersion() != member.getAuthVersion() || policy.requires(member) && !MfaPolicy.strong(session.getLoginMethod())) throw expired();
     }
     private TokenProvider.IssuedSession continueSession(Member member, MfaChallenge challenge, String ticket) {
         if (primaryManagement(challenge))
             return tokens.issueSession(member, challenge.getOauthAt(), new Ticket(ticket).persistent());
-        String method = "PASSKEY".equals(challenge.getPrimaryMethod()) ? "PASSKEY" : challenge.getPrimaryMethod() + "_MFA";
+        String base = primaryMethod(challenge);
+        String method = "PASSKEY".equals(base) ? "PASSKEY" : base + "_MFA";
         return tokens.issueVerifiedSession(member, challenge.getOauthAt(), method, new Ticket(ticket).persistent());
     }
     private boolean canDefer(Member member, MfaChallenge challenge) {
@@ -430,7 +528,7 @@ public class MfaService {
         if (riskLogin(challenge)) {
             if (member == null || member.isAdmin() || ipProtection == null) throw expired();
             ipProtection.requireBinding(raw, member);
-        }
+        } else if (challenge.getPurpose() == MfaChallenge.Purpose.MANAGE && ipProtection != null && ipProtection.enabled()) ipProtection.requireBinding(raw, member);
         if (member != null && challenge.getMemberId() != null && (member.getAuthVersion() != challenge.getAuthVersion()
                 || member.isAdmin() && primaryManagement(challenge)
                 || !tokens.isPrimaryLoginCurrent(member, challenge.getOauthAt(), primaryMethod(challenge)))) throw expired();
@@ -472,19 +570,28 @@ public class MfaService {
     }
     private void requireEnrollment(Bound bound) {
         requireAvailable();
-        if (bound.member() == null || riskLogin(bound.challenge()) || bound.challenge().getPurpose() == MfaChallenge.Purpose.PASSKEY_LOGIN
+        if (bound.member() == null || sensitive(bound.challenge()) || riskManagement(bound.challenge()) || riskLogin(bound.challenge()) || bound.challenge().getPurpose() == MfaChallenge.Purpose.PASSKEY_LOGIN
                 || enabled(bound.member()) && !bound.challenge().isFactorVerified()) throw expired();
     }
     private void requireVerifiedManage(Bound bound) {
-        if (bound.challenge().getPurpose() != MfaChallenge.Purpose.MANAGE || !bound.challenge().isFactorVerified()) throw expired();
+        if (sensitive(bound.challenge()) || bound.challenge().getPurpose() != MfaChallenge.Purpose.MANAGE || !bound.challenge().isFactorVerified()) throw expired();
+    }
+    private static boolean riskManagement(MfaChallenge challenge) {
+        return "PASSWORD_CHECK".equals(challenge.getPrimaryMethod()) || "OAUTH_CHECK".equals(challenge.getPrimaryMethod());
     }
     private static boolean primaryManagement(MfaChallenge challenge) {
         return "PASSWORD_MANAGE".equals(challenge.getPrimaryMethod()) || "OAUTH_MANAGE".equals(challenge.getPrimaryMethod());
     }
+    private static boolean sensitive(MfaChallenge challenge) {
+        return challenge.getPurpose() == MfaChallenge.Purpose.MANAGE && challenge.getPrimaryMethod() != null
+                && challenge.getPrimaryMethod().matches("(?:PASSWORD|OAUTH|PASSKEY)_(?:LINK|UNLINK|CHANGE|REMOVE|SET)(?:_MFA|_MAIL)?");
+    }
+    private static String sensitiveAction(MfaChallenge challenge) { return challenge.getPrimaryMethod().split("_")[1]; }
     private static String primaryMethod(MfaChallenge challenge) {
+        if (sensitive(challenge)) return challenge.getPrimaryMethod().split("_")[0];
         return switch (challenge.getPrimaryMethod()) {
-            case "PASSWORD_MANAGE", "PASSWORD_RISK" -> "PASSWORD";
-            case "OAUTH_MANAGE", "OAUTH_RISK" -> "OAUTH";
+            case "PASSWORD_MANAGE", "PASSWORD_CHECK", "PASSWORD_RISK" -> "PASSWORD";
+            case "OAUTH_MANAGE", "OAUTH_CHECK", "OAUTH_RISK" -> "OAUTH";
             default -> challenge.getPrimaryMethod();
         };
     }

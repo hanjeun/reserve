@@ -32,6 +32,8 @@ public class RateLimiter {
         LOGIN_METHOD_CHANGE(5, Duration.ofMinutes(10)),
         LOGIN_METHOD_EMAIL(5, Duration.ofMinutes(10)),
         LOGIN_METHOD_VERIFY(20, Duration.ofMinutes(10)),
+        MEMBER_UPDATE(20, Duration.ofMinutes(1)),
+        MEMBER_UPDATE_IP(60, Duration.ofMinutes(1)),
         RESERVATION_CREATE(5, Duration.ofMinutes(1)),   // 1분에 5회 예약
         RESERVATION_REMOVE(30, Duration.ofMinutes(1)),
         PAYMENT_VERIFY(30, Duration.ofMinutes(1)),
@@ -120,6 +122,21 @@ public class RateLimiter {
     @Autowired(required = false)
     private RedisRequestLimiter sharedWaitingLimits;
 
+    @Autowired(required = false)
+    private RedisAuthRateLimiter sharedAuthenticationLimits;
+
+    private static final String AUTH_RECEIPTS = RateLimiter.class.getName() + ".receipts";
+
+    @SuppressWarnings("unchecked")
+    private java.util.Map<String, RedisAuthRateLimiter.Receipt> authenticationReceipts() {
+        if (!(org.springframework.web.context.request.RequestContextHolder.getRequestAttributes()
+                instanceof org.springframework.web.context.request.ServletRequestAttributes attributes)) return null;
+        var request = attributes.getRequest();
+        var values = (java.util.Map<String, RedisAuthRateLimiter.Receipt>) request.getAttribute(AUTH_RECEIPTS);
+        if (values == null) { values = new java.util.HashMap<>(); request.setAttribute(AUTH_RECEIPTS, values); }
+        return values;
+    }
+
     /** 버킷 + 마지막 접근 시각(ms). 접근 시각은 스윕 판단에만 쓰이므로 정확한 동기화가 필요 없다. */
     private static final class Entry {
         private final Bucket bucket;
@@ -137,6 +154,14 @@ public class RateLimiter {
      */
     public boolean tryConsume(String key, Policy policy) {
         if (key == null || key.length() > MAX_KEY_LENGTH) return false;
+        if (sharedAuthenticationLimits != null && sharedAuthenticationLimits.supports(policy)) {
+            var receipts = sharedAuthenticationLimits.refundable(policy) ? authenticationReceipts() : null;
+            String identity = policy.name() + ":" + key;
+            if (receipts != null) receipts.remove(identity);
+            var consumed = sharedAuthenticationLimits.consume(key, policy);
+            if (receipts != null && consumed.receipt() != null) receipts.put(identity, consumed.receipt());
+            return consumed.allowed();
+        }
         String bucketKey = policy.name() + ":" + key;
         Entry entry = touchEntry(bucketKey);
         if (entry == null) {
@@ -161,6 +186,14 @@ public class RateLimiter {
     /** 성공한 검증이 예약했던 토큰 1개만 반환한다. 기존 실패와 리필 시점은 유지한다. */
     public void refund(String key, Policy policy) {
         if (key == null || key.length() > MAX_KEY_LENGTH) return;
+        if (sharedAuthenticationLimits != null && sharedAuthenticationLimits.supports(policy)) {
+            var receipts = authenticationReceipts();
+            var receipt = receipts == null ? null : receipts.remove(policy.name() + ":" + key);
+            // 반환을 확인하지 못하면 소비를 유지하며 성공한 인증을 되돌리지 않는다.
+            try { sharedAuthenticationLimits.refund(receipt); }
+            catch (RedisAuthRateLimiter.Unavailable ignored) { log.warn("Shared authentication limit refund could not be confirmed"); }
+            return;
+        }
         buckets.computeIfPresent(policy.name() + ":" + key, (ignored, entry) -> {
             entry.lastAccessMs.set(System.currentTimeMillis());
             entry.bucket.addTokens(1);

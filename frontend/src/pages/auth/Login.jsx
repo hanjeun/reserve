@@ -6,7 +6,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Form, Typography, Divider, Flex, Modal, Checkbox } from 'antd';
 import { ExclamationCircleFilled, LockOutlined, MailOutlined, SafetyCertificateOutlined, InfoCircleOutlined } from '../../components/common/icons';
 import IconTool from '../../components/common/IconTool';
-import { PageContainer, Button, FormInput } from '../../components/common';
+import { PageContainer, Button, DataState, FormInput } from '../../components/common';
 import MfaFlow from '../../components/member/MfaFlow';
 import { authenticateWithPasskey, finishMfaSession } from '../../utils/mfaAuthentication';
 import SocialLoginButton from '../../components/common/SocialLoginButton';
@@ -48,18 +48,36 @@ const Login = () => {
     const [loading, setLoading] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
     const loginAttempt = useRef(false);
+    const socialNavigation = useRef(false);
     const nativeController = useRef(null);
     const mounted = useRef(true);
     const [rememberNotice, setRememberNotice] = useState(false);
     const [loginPolicy, setLoginPolicy] = useState(null);
-    useEffect(() => { mounted.current = true; return () => { mounted.current = false; nativeController.current?.abort(); }; }, []);
+    const [policyError, setPolicyError] = useState(null);
+    const [policyAttempt, setPolicyAttempt] = useState(0);
+    const [policyRetrying, setPolicyRetrying] = useState(false);
+    useEffect(() => {
+        mounted.current = true;
+        const restore = event => {
+            if (!event.persisted || !socialNavigation.current) return;
+            socialNavigation.current = false;
+            loginAttempt.current = false;
+            setLoading(false);
+        };
+        window.addEventListener('pageshow', restore);
+        return () => { mounted.current = false; nativeController.current?.abort(); window.removeEventListener('pageshow', restore); };
+    }, []);
     useEffect(() => {
         if (!rememberNotice) return;
         const controller = new AbortController();
         api.get('/api/auth/login-policy', { skipAuthRefresh: true, signal: controller.signal })
-            .then(policy => { if (!controller.signal.aborted) setLoginPolicy(policy); }).catch(() => {});
+            .then(policy => {
+                if (!controller.signal.aborted) { setLoginPolicy(policy); setPolicyError(null); }
+            })
+            .catch(error => { if (!controller.signal.aborted) setPolicyError(error); })
+            .finally(() => { if (!controller.signal.aborted) setPolicyRetrying(false); });
         return () => controller.abort();
-    }, [rememberNotice]);
+    }, [rememberNotice, policyAttempt]);
     const [mfa, setMfa] = useState(() => new URLSearchParams(location.search).get('mfa') === '1' ? {} : null);
     useEffect(() => {
         if (!registrationRequested || isLoggedIn || mfa || enrollmentNoticeRef.current === location.key) return;
@@ -210,9 +228,16 @@ const Login = () => {
         if (loginAttempt.current) return;
         loginAttempt.current = true;
         setLoading(true);
-        // 전체 페이지 이동에서도 복귀 경로를 유지한다.
-        if (fromRef.current) saveRedirect(fromRef.current);
-        window.location.href = oauthAuthorizationUrl(provider, undefined, rememberMe);
+        try {
+            if (fromRef.current) saveRedirect(fromRef.current);
+            socialNavigation.current = true;
+            window.location.href = oauthAuthorizationUrl(provider, undefined, rememberMe);
+        } catch (error) {
+            socialNavigation.current = false;
+            loginAttempt.current = false;
+            setLoading(false);
+            message.error(error.message || '소셜 로그인을 시작하지 못했어요. 다시 시도해주세요.');
+        }
     };
 
     return (
@@ -281,6 +306,8 @@ const Login = () => {
                 open={rememberNotice} centered okText="로그인 유지하기" cancelText="취소"
                 onOk={() => { setRememberMe(true); setRememberNotice(false); }} onCancel={() => setRememberNotice(false)}>
                 <Typography.Paragraph>개인 기기에서만 사용해주세요. 공용 PC에서는 사용 후 꼭 로그아웃해주세요.</Typography.Paragraph>
+                {policyError && <DataState compact state="error" title="로그인 유지 안내를 불러오지 못했어요."
+                    error={policyError} retrying={policyRetrying} onRetry={() => { setPolicyRetrying(true); setPolicyAttempt(value => value + 1); }} />}
                 <Typography.Paragraph type="secondary">{loginPolicy?.idleSeconds && loginPolicy?.absoluteSeconds
                     ? lifetimeLabel(loginPolicy.idleSeconds) + ' 동안 사용하지 않거나 로그인한 지 ' + lifetimeLabel(loginPolicy.absoluteSeconds) + '이 지나면 다시 로그인해요.'
                     : '일정 기간 접속하지 않거나 로그인 유지 기간이 끝나면 다시 로그인해야 해요.'}</Typography.Paragraph>

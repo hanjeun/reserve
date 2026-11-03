@@ -24,8 +24,8 @@ vi.mock('../../components/common', async () => ({
     Bone: () => <div />,
     PageContainer: () => null, FormTextArea: () => null, FavoriteButton: () => null,
     Badge: () => null, KakaoMap: () => null, StoreDetailSkeleton: () => null,
-    DataState: ({ state = 'empty', title, onRetry }) => (
-        <section role={state === 'error' ? 'alert' : undefined}>
+    DataState: ({ state = 'empty', title, error, onRetry }) => (
+        <section role={state === 'error' ? 'alert' : undefined} data-error-status={error?.status}>
             <span>{title}</span>
             {onRetry && <button type="button" onClick={onRetry}>다시 불러오기</button>}
         </section>
@@ -64,6 +64,14 @@ function PanelHarness({ initialTime, onForm, onFinish, bookingType = 'SLOT', ini
 
 describe('time slot lookup and submission boundaries', () => {
     beforeEach(() => api.get.mockReset());
+
+    it.each([403, 429, 503])('preserves HTTP %s for the shared failure state without rendering response text', async status => {
+        api.get.mockRejectedValueOnce(Object.assign(new Error('private response trace'), { status }));
+        render(picker({ form: fakeForm() }));
+        expect(await screen.findByRole('alert')).toHaveAttribute('data-error-status', String(status));
+        expect(screen.queryByText('private response trace')).not.toBeInTheDocument();
+        expect(api.get).toHaveBeenCalledOnce();
+    });
 
     it('separates successful no-slot results from lookup failure', async () => {
         api.get.mockResolvedValue([]);

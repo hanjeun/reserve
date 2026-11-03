@@ -35,6 +35,21 @@ public class CookieUtil {
                 .filter(value -> value != null && !value.isBlank()).distinct().toList();
     }
 
+    public String browserCookieName() { return secureCookie ? "__Host-reserve_browser" : "reserve_browser"; }
+    public String browserCookie(HttpServletRequest request) {
+        Cookie[] values = request.getCookies();
+        if (values == null) return null;
+        var matches = Arrays.stream(values).filter(value -> browserCookieName().equals(value.getName())).toList();
+        if (matches.size() != 1) return null;
+        String value = matches.getFirst().getValue();
+        return value != null && value.matches("[A-Za-z0-9_-]{43}") ? value : null;
+    }
+    public void rememberBrowser(HttpServletResponse response, String value) {
+        if (value == null || !value.matches("[A-Za-z0-9_-]{43}")) throw new IllegalArgumentException("Invalid browser identifier");
+        addCookie(response, browserCookieName(), value, 30 * 86400);
+    }
+    public void forgetBrowser(HttpServletResponse response) { deleteCookie(response, browserCookieName()); }
+
     public void addCookie(HttpServletResponse response, String name, String value, int maxAge) {
         if (REFRESH.equals(name)) {
             // 넓은 경로의 기존 쿠키를 지운 뒤 인증 경로별 쿠키를 설정한다. 다른 경로에는 원문 토큰을 두지 않는다.

@@ -3,6 +3,7 @@
 import argparse
 import base64
 import hashlib
+import hmac
 import ipaddress
 import json
 import os
@@ -163,11 +164,11 @@ def redis_metadata(*arguments):
     command = 'export REDISCLI_AUTH="$(sed -n \'s/^requirepass //p\' /usr/local/etc/redis/redis.conf)"; exec redis-cli --json "$@"'
     response = docker("exec", "reserve-redis-redis-1", "sh", "-c", command, "sh", *arguments)
     if arguments[:1] == ("INFO",):
-        return response
+        return json.loads(response) if response.startswith('"') else response
     return json.loads(response) if response else None
 
 
-def check_redis():
+def check_redis(require_auth=False):
     ports = json.loads(docker("inspect", "--format", "{{json .HostConfig.PortBindings}}", "reserve-redis-redis-1"))
     if any(ports.values()):
         raise RuntimeError("Redis must not publish host ports")
@@ -177,7 +178,10 @@ def check_redis():
     user = pairs(user)
     expected = {rule for rule in Path(__file__).with_name("redis-app.rules").read_text().split() if rule.startswith("+")}
     commands = set(user["commands"].split())
-    if (commands != expected | {"-@all"} or user["keys"] != "~reserve:prod:*"
+    compatible = [expected | {"-@all"}]
+    if not require_auth and os.environ.get("RESERVE_SECURITY_AUTH_LIMITS_ENABLED", "false") != "true":
+        compatible.append((expected - {"+info"}) | {"-@all"})
+    if (commands not in compatible or user["keys"] != "~reserve:prod:*"
             or user["channels"] != "&reserve:prod:*" or "on" not in user["flags"] or "nopass" in user["flags"]
             or len(user["passwords"]) != 1 or user.get("selectors")):
         raise RuntimeError("Redis application ACL differs from the required scope")
@@ -193,9 +197,45 @@ def check_redis():
             "memoryHeadroomAtLeast25Percent": True, "noeviction": True, "durableAcl": True}
 
 
+def auth_limit_state_key():
+    try:
+        key = base64.b64decode(os.environ.get("RESERVE_SECURITY_AUTH_LIMITS_FINGERPRINT_KEY", ""), validate=True)
+    except ValueError:
+        raise RuntimeError("Authentication limits require a dedicated base64 key") from None
+    epoch = os.environ.get("RESERVE_SECURITY_AUTH_LIMITS_EPOCH", "")
+    if len(key) != 32 or not re.fullmatch(r"[a-zA-Z0-9_-]{8,64}", epoch):
+        raise RuntimeError("Authentication limits require a dedicated key and versioned epoch")
+    identity = hmac.new(key, ("epoch:" + epoch).encode(), hashlib.sha256).hexdigest()
+    return "reserve:prod:auth-limits:v1:{" + identity + "}:state"
+
+
+def check_auth_limits(apply=False):
+    check_redis(require_auth=True)
+    state_key = auth_limit_state_key()
+    server = dict(line.split(":", 1) for line in redis_metadata("INFO", "server").splitlines() if ":" in line)
+    boot = server.get("run_id", "")
+    if not re.fullmatch(r"[a-f0-9]{40}", boot):
+        raise RuntimeError("Redis server identity is unavailable")
+    clock = redis_metadata("TIME")
+    now = int(clock[0]) * 1000 + int(clock[1]) // 1000
+    state = pairs(redis_metadata("HGETALL", state_key) or {})
+    if state.get("boot") != boot or not str(state.get("ready", "")).isdigit():
+        if not apply:
+            raise RuntimeError("Authentication limits require approved preparation and a full ten-minute recovery wait")
+        ready = now + 600000
+        redis_metadata("HSET", state_key, "boot", boot, "ready", str(ready))
+    else:
+        ready = int(state["ready"])
+    remaining = max(0, (ready - now + 999) // 1000)
+    if remaining and not apply:
+        raise RuntimeError("Authentication limit recovery wait has not completed")
+    return {"ready": remaining == 0, "recoveryWaitSeconds": remaining, "sharedAuthenticationLimits": True}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["check-network", "check-target", "check-redis", "prepare-network", "prepare-acl"])
+    parser.add_argument("action", choices=["check-network", "check-target", "check-redis", "check-auth-limits",
+                                          "prepare-network", "prepare-acl", "prepare-auth-limits"])
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--admin-config")
     parser.add_argument("--app-key")
@@ -211,6 +251,8 @@ def main():
             result = write_acl(args.admin_config, args.app_key, args.output)
         elif args.action == "check-redis":
             result = check_redis()
+        elif args.action in ("check-auth-limits", "prepare-auth-limits"):
+            result = check_auth_limits(args.action == "prepare-auth-limits")
         elif args.action == "check-target":
             result = check_target(args.target)
         else:

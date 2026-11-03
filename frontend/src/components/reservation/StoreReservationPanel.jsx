@@ -122,10 +122,10 @@ const useTimeSlotAvailability = ({ store, dateValue, form, onAvailabilityChange,
                 clearUnofferedTime(form, data, storeId, dateKey, editingReservation);
                 commitAvailability({ key: requestKey, status: 'success', slots: data });
             })
-            .catch(() => {
+            .catch(error => {
                 if (cancelled) return;
                 form?.setFields([{ name: 'reservationTime', value: undefined, errors: [] }]);
-                commitAvailability({ key: requestKey, status: 'error', slots: [] });
+                commitAvailability({ key: requestKey, status: 'error', slots: [], error });
             });
         return () => { cancelled = true; controller.abort(); };
     }, [dateKey, storeId, requestKey, retryCount, form, editingReservation, commitAvailability, onAvailabilityChange]);
@@ -151,14 +151,14 @@ const useTimeSlotAvailability = ({ store, dateValue, form, onAvailabilityChange,
         commitAvailability({ key: requestKey, status: 'loading', slots: [] });
         setRetryCount(count => count + 1);
     };
-    return { dateKey, storeId, loading, slots, failed, retry };
+    return { dateKey, storeId, loading, slots, failed, error: isCurrent ? availability.error : undefined, retry };
 };
 
 export const TimeSlotPicker = props => <div id={props.id} role="group" aria-labelledby={props['aria-labelledby']}
     aria-describedby={props['aria-describedby']} aria-invalid={props['aria-invalid']}><TimeSlotPickerContent {...props} /></div>;
 
 const TimeSlotPickerContent = ({ store, dateValue, value, onChange, form, onAvailabilityChange, editingReservation }) => {
-    const { dateKey, storeId, loading, slots, failed, retry } = useTimeSlotAvailability({
+    const { dateKey, storeId, loading, slots, failed, error, retry } = useTimeSlotAvailability({
         store, dateValue, form, onAvailabilityChange, editingReservation,
     });
 
@@ -182,7 +182,7 @@ const TimeSlotPickerContent = ({ store, dateValue, value, onChange, form, onAvai
     }
     if (failed) {
         return <DataState state="error" title="예약 가능한 시간을 불러오지 못했어요"
-            onRetry={retry} compact />;
+            error={error} onRetry={retry} compact />;
     }
     if (slots.length === 0) {
         return (

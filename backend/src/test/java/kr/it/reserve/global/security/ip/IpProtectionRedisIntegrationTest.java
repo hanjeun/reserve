@@ -30,6 +30,7 @@ class IpProtectionRedisIntegrationTest {
     private static StringRedisTemplate admin;
     private static StringRedisTemplate redis;
     private static IpProtectionStore left, right;
+    private static String fixtureAcl, fixtureConfig;
 
     @BeforeAll static void start() throws Exception {
         container = command(null, "run", "--pull=never", "-d", "--name", NAME,
@@ -43,11 +44,10 @@ class IpProtectionRedisIntegrationTest {
         String password = UUID.randomUUID().toString() + UUID.randomUUID();
         String appPassword = UUID.randomUUID().toString() + UUID.randomUUID();
         String rules = Files.readString(Path.of("../scripts/redis-app.rules")).replace("reserve:prod:", "reserve:local:").replaceAll("\\s+", " ").strip();
-        command("user default reset on #" + hash(password) + " ~* &* +@all\nuser reserve_app " + rules + " #" + hash(appPassword) + "\n",
-                "exec", "-i", container, "sh", "-c", "umask 077; cat > /tmp/app-test.acl");
-        command("bind 0.0.0.0\nprotected-mode yes\nport 6379\nrequirepass " + password
-                        + "\naclfile /tmp/app-test.acl\nsave \"\"\nappendonly no\nmaxmemory 64mb\nmaxmemory-policy noeviction\n",
-                "exec", "-i", container, "sh", "-c", "umask 077; cat > /tmp/ip-test.next && mv /tmp/ip-test.next /tmp/ip-test.conf");
+        fixtureAcl = "user default reset on #" + hash(password) + " ~* &* +@all\nuser reserve_app " + rules + " #" + hash(appPassword) + "\n";
+        fixtureConfig = "bind 0.0.0.0\nprotected-mode yes\nport 6379\nrequirepass " + password
+                + "\naclfile /tmp/app-test.acl\nsave \"\"\nappendonly no\nmaxmemory 64mb\nmaxmemory-policy noeviction\n";
+        configureFixture();
         String address = command(null, "port", container, "6379/tcp").strip();
         if (!address.matches("127\\.0\\.0\\.1:[0-9]+")) throw new IllegalStateException("Disposable Redis must use loopback");
         var endpoint = new RedisStandaloneConfiguration("127.0.0.1", Integer.parseInt(address.substring(address.lastIndexOf(':') + 1)));
@@ -84,6 +84,28 @@ class IpProtectionRedisIntegrationTest {
     private static String id() { return UUID.randomUUID().toString().replace("-", ""); }
     private static String hash(String value) throws Exception {
         return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    @Test void browserConsentIsSharedBoundedVersionedRevocableAndNeverExtendedByReads() {
+        String owner = id(), browser = id();
+        assertThat(left.browser(owner, browser, "ip", "prefix", "family")).isZero();
+        left.rememberBrowser(owner, browser, "ip", "prefix", "family");
+        Double expiry = admin.opsForZSet().score(key(owner, "browsers"), browser);
+        assertThat(right.browser(owner, browser, "ip", "prefix", "family")).isEqualTo(1);
+        assertThat(right.browser(owner, browser, "ip2", "prefix", "family")).isEqualTo(2);
+        assertThat(right.browser(owner, browser, "ip2", "prefix2", "family")).isEqualTo(3);
+        assertThat(right.browser(owner, browser, "ip", "prefix", "other-family")).isEqualTo(4);
+        assertThat(left.browser(id(), browser, "ip", "prefix", "family")).isZero();
+        assertThat(admin.opsForZSet().score(key(owner, "browsers"), browser)).isEqualTo(expiry);
+        right.forgetBrowser(owner, browser);
+        assertThat(left.browser(owner, browser, "ip", "prefix", "family")).isZero();
+        left.rememberBrowser(owner, browser, "ip", "prefix", "family");
+        admin.opsForZSet().add(key(owner, "browsers"), browser, 1);
+        assertThat(right.browser(owner, browser, "ip", "prefix", "family")).isZero();
+        assertThat(admin.opsForHash().hasKey(key(owner, "browser-details"), browser)).isFalse();
+        for (int i = 0; i < 12; i++) left.rememberBrowser(owner, id(), "ip", "prefix", "family");
+        assertThat(admin.opsForZSet().zCard(key(owner, "browsers"))).isEqualTo(8);
+        assertThat(admin.opsForHash().size(key(owner, "browser-details"))).isEqualTo(8);
     }
 
     @BeforeEach void resetBackoff() {
@@ -230,6 +252,135 @@ class IpProtectionRedisIntegrationTest {
         assertThat(right.known(member, "expired-network")).isFalse();
         assertThat(redis.getExpire(key(member, "known"), TimeUnit.MILLISECONDS)).isPositive().isLessThanOrEqualTo(Duration.ofDays(30).toMillis());
     }
+    private static void configureFixture() throws Exception {
+        command(fixtureAcl, "exec", "-i", container, "sh", "-c", "umask 077; cat > /tmp/app-test.next && mv /tmp/app-test.next /tmp/app-test.acl");
+        command(fixtureConfig, "exec", "-i", container, "sh", "-c", "umask 077; cat > /tmp/ip-test.next && mv /tmp/ip-test.next /tmp/ip-test.conf");
+    }
+
+    private record AuthPair(kr.it.reserve.global.ratelimit.RedisAuthRateLimiter first,
+            kr.it.reserve.global.ratelimit.RedisAuthRateLimiter second,
+            kr.it.reserve.global.ratelimit.AuthRateLimitProperties properties, String prefix) { }
+    private static AuthPair authPair() {
+        var settings = new kr.it.reserve.global.ratelimit.AuthRateLimitProperties();
+        settings.setEnabled(true); settings.setEpoch("synthetic-" + id());
+        settings.setFingerprintKey("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
+        var first = new kr.it.reserve.global.ratelimit.RedisAuthRateLimiter(redis, RedisNamespace.LOCAL, new RedisFailureBackoff(), settings);
+        var second = new kr.it.reserve.global.ratelimit.RedisAuthRateLimiter(redis, RedisNamespace.LOCAL, new RedisFailureBackoff(), settings);
+        String prefix = (String) org.springframework.test.util.ReflectionTestUtils.getField(first, "prefix");
+        assertThatThrownBy(() -> first.consume("synthetic", kr.it.reserve.global.ratelimit.RateLimiter.Policy.LOGIN_ACCOUNT))
+                .isInstanceOf(kr.it.reserve.global.ratelimit.RedisAuthRateLimiter.Unavailable.class);
+        readyAuth(prefix);
+        return new AuthPair(first, second, settings, prefix);
+    }
+    private static String bootId() {
+        return admin.execute((org.springframework.data.redis.core.RedisCallback<java.util.Properties>)
+                session -> session.serverCommands().info("server")).getProperty("run_id");
+    }
+    private static void readyAuth(String prefix) {
+        // 긴 복구 대기의 경과만 격리 Redis에서 모의하며 운영 marker는 변경하지 않는다.
+        admin.opsForHash().putAll(prefix + "state", java.util.Map.of("boot", bootId(), "ready", "0"));
+    }
+    @Test void sharedAuthenticationHistorySurvivesApplicationRecreationAndReturnsOnlyOneSuccessfulToken() {
+        var pair = authPair();
+        var policy = kr.it.reserve.global.ratelimit.RateLimiter.Policy.LOGIN_ACCOUNT;
+        var first = pair.first().consume("synthetic-account", policy);
+        for (int i = 1; i < policy.capacity(); i++) assertThat(pair.second().consume("synthetic-account", policy).allowed()).isTrue();
+        var recreated = new kr.it.reserve.global.ratelimit.RedisAuthRateLimiter(redis, RedisNamespace.LOCAL, new RedisFailureBackoff(), pair.properties());
+        assertThat(recreated.consume("synthetic-account", policy).allowed()).isFalse();
+        recreated.refund(first.receipt());
+        assertThat(pair.second().consume("synthetic-account", policy).allowed()).isTrue();
+        pair.first().refund(first.receipt());
+        assertThat(recreated.consume("synthetic-account", policy).allowed()).isFalse();
+    }
+    @Test void sharedAuthenticationConcurrentConsumptionAndDuplicateRefundKeepTheCapacity() throws Exception {
+        var pair = authPair();
+        var policy = kr.it.reserve.global.ratelimit.RateLimiter.Policy.LOGIN_ACCOUNT;
+        var start = new CountDownLatch(1);
+        var receipts = new java.util.concurrent.ConcurrentLinkedQueue<kr.it.reserve.global.ratelimit.RedisAuthRateLimiter.Receipt>();
+        try (var workers = Executors.newFixedThreadPool(8)) {
+            var jobs = new java.util.ArrayList<Future<Boolean>>();
+            for (int i = 0; i < 16; i++) {
+                var limiter = i % 2 == 0 ? pair.first() : pair.second();
+                jobs.add(workers.submit(() -> {
+                    start.await();
+                    var result = limiter.consume("synthetic-concurrent", policy);
+                    if (result.receipt() != null) receipts.add(result.receipt());
+                    return result.allowed();
+                }));
+            }
+            start.countDown();
+            int allowed = 0;
+            for (var job : jobs) if (job.get(10, TimeUnit.SECONDS)) allowed++;
+            assertThat(allowed).isEqualTo(policy.capacity());
+            var receipt = receipts.element();
+            var refunds = new java.util.ArrayList<Future<?>>();
+            for (int i = 0; i < 8; i++) refunds.add(workers.submit(() -> pair.second().refund(receipt)));
+            for (var refund : refunds) refund.get(10, TimeUnit.SECONDS);
+        }
+        assertThat(pair.first().consume("synthetic-concurrent", policy).allowed()).isTrue();
+        assertThat(pair.second().consume("synthetic-concurrent", policy).allowed()).isFalse();
+    }
+    @Test void sharedAuthenticationRestartAndMissingMarkerRequireTheFullRecoveryWait() throws Exception {
+        var pair = authPair();
+        var policy = kr.it.reserve.global.ratelimit.RateLimiter.Policy.LOGIN_ACCOUNT;
+        var old = pair.first().consume("synthetic-restart", policy).receipt();
+        String previousBoot = bootId();
+        assertThat(command(null, "inspect", "--format", "{{.Name}}", container).strip()).isEqualTo("/" + NAME);
+        command(null, "restart", "--time", "0", container);
+        configureFixture();
+        String address = command(null, "port", container, "6379/tcp").strip();
+        assertThat(address).matches("127\\.0\\.0\\.1:[0-9]+");
+        int port = Integer.parseInt(address.substring(address.lastIndexOf(':') + 1));
+        var appEndpoint = connection.getStandaloneConfiguration();
+        var adminEndpoint = administrator.getStandaloneConfiguration();
+        var client = connection.getClientConfiguration();
+        connection.destroy(); administrator.destroy();
+        appEndpoint.setPort(port); adminEndpoint.setPort(port);
+        connection = new LettuceConnectionFactory(appEndpoint, client);
+        administrator = new LettuceConnectionFactory(adminEndpoint, client);
+        connection.afterPropertiesSet(); connection.start();
+        administrator.afterPropertiesSet(); administrator.start();
+        redis = new StringRedisTemplate(connection); admin = new StringRedisTemplate(administrator);
+        boolean ready = false;
+        for (int attempt = 0; attempt < 50; attempt++) {
+            try { ready = !previousBoot.equals(bootId()); } catch (RuntimeException reconnecting) { Thread.sleep(100); }
+            if (ready) break;
+        }
+        assertThat(ready).isTrue();
+        var restarted = new kr.it.reserve.global.ratelimit.RedisAuthRateLimiter(redis, RedisNamespace.LOCAL, new RedisFailureBackoff(), pair.properties());
+        var warming = catchThrowableOfType(() -> restarted.consume("synthetic-restart", policy),
+                kr.it.reserve.global.ratelimit.RedisAuthRateLimiter.Unavailable.class);
+        assertThat(warming.retrySeconds()).isEqualTo(600);
+        assertThatThrownBy(() -> restarted.refund(old)).isInstanceOf(kr.it.reserve.global.ratelimit.RedisAuthRateLimiter.Unavailable.class);
+        readyAuth(pair.prefix());
+        for (int i = 0; i < policy.capacity(); i++) assertThat(restarted.consume("synthetic-restart", policy).allowed()).isTrue();
+        restarted.refund(old);
+        assertThat(restarted.consume("synthetic-restart", policy).allowed()).isFalse();
+        admin.delete(pair.prefix() + "state");
+        assertThat(catchThrowableOfType(() -> restarted.consume("synthetic-restart", policy),
+                kr.it.reserve.global.ratelimit.RedisAuthRateLimiter.Unavailable.class).retrySeconds()).isEqualTo(600);
+    }
+    @Test void sharedAuthenticationOldWindowReceiptsAndRedisFailuresNeverResetTheBudget() {
+        var pair = authPair();
+        var policy = kr.it.reserve.global.ratelimit.RateLimiter.Policy.LOGIN_ACCOUNT;
+        var old = pair.first().consume("synthetic-window", policy).receipt();
+        admin.opsForHash().put(old.bucket(), "refilled", "1");
+        for (int i = 0; i < policy.capacity(); i++) assertThat(pair.second().consume("synthetic-window", policy).allowed()).isTrue();
+        pair.first().refund(old);
+        assertThat(pair.second().consume("synthetic-window", policy).allowed()).isFalse();
+        adminCommand("ACL", "SETUSER", "reserve_app", "-info");
+        try {
+            assertThatThrownBy(() -> pair.first().consume("synthetic-permission", policy))
+                    .isInstanceOf(kr.it.reserve.global.ratelimit.RedisAuthRateLimiter.Unavailable.class);
+        } finally { adminCommand("ACL", "SETUSER", "reserve_app", "+info"); }
+        var reset = new kr.it.reserve.global.ratelimit.RedisAuthRateLimiter(redis, RedisNamespace.LOCAL, new RedisFailureBackoff(), pair.properties());
+        adminCommand("CONFIG", "SET", "maxmemory", "1");
+        try {
+            assertThatThrownBy(() -> reset.consume("synthetic-memory", policy))
+                    .isInstanceOf(kr.it.reserve.global.ratelimit.RedisAuthRateLimiter.Unavailable.class);
+        } finally { adminCommand("CONFIG", "SET", "maxmemory", "67108864"); }
+    }
+
     private static String command(String input, String... args) throws Exception {
         var command = new java.util.ArrayList<String>(); command.add("docker"); command.addAll(java.util.List.of(args));
         Process process = new ProcessBuilder(command).redirectErrorStream(true).start();

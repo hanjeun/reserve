@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import useGeolocation from '../useGeolocation';
+import { advanceSession } from '../../api/sessionScope';
 
 const { warning } = vi.hoisted(() => ({ warning: vi.fn() }));
 vi.mock('../useMessage', () => ({ default: () => ({ message: { warning } }) }));
@@ -19,8 +20,53 @@ describe('useGeolocation failure recovery', () => {
     });
 
     afterEach(() => {
+        vi.useRealTimers();
         if (originalGeolocation) Object.defineProperty(navigator, 'geolocation', originalGeolocation);
         else delete navigator.geolocation;
+    });
+
+    it('bounds a missing permission response and ignores its late result after a new request', async () => {
+        vi.useFakeTimers();
+        const { result } = renderHook(() => useGeolocation());
+        let first;
+        act(() => { first = result.current.request(); });
+        act(() => { expect(result.current.request()).toBe(first); });
+        expect(getCurrentPosition).toHaveBeenCalledOnce();
+        await act(async () => { await vi.advanceTimersByTimeAsync(8000); expect(await first).toBeNull(); });
+        expect(result.current.requesting).toBe(false);
+        expect(warning).toHaveBeenCalledExactlyOnceWith(expect.stringContaining('위치 확인 시간이 초과됐어요'));
+        let second;
+        act(() => { second = result.current.request({ showError: false }); });
+        act(() => { getCurrentPosition.mock.calls[0][0]({ coords: { latitude: 1, longitude: 2 } }); });
+        expect(result.current.requesting).toBe(true);
+        await act(async () => {
+            getCurrentPosition.mock.calls[1][0]({ coords: { latitude: 3, longitude: 4 } });
+            expect(await second).toEqual({ latitude: 3, longitude: 4 });
+        });
+        expect(result.current.requesting).toBe(false);
+    });
+
+    it('settles a closed screen silently without accepting a late permission result', async () => {
+        const { result, unmount } = renderHook(() => useGeolocation());
+        let pending;
+        act(() => { pending = result.current.request(); });
+        unmount();
+        expect(await pending).toBeNull();
+        getCurrentPosition.mock.calls[0][1]({ code: 1 });
+        expect(warning).not.toHaveBeenCalled();
+    });
+
+    it('does not return a location from the previous account session', async () => {
+        const { result } = renderHook(() => useGeolocation());
+        let pending;
+        act(() => { pending = result.current.request(); });
+        advanceSession();
+        await act(async () => {
+            getCurrentPosition.mock.calls[0][0]({ coords: { latitude: 1, longitude: 2 } });
+            expect(await pending).toBeNull();
+        });
+        expect(result.current.requesting).toBe(false);
+        expect(warning).not.toHaveBeenCalled();
     });
 
     it('requests only on demand and retains the existing accuracy, timeout and browser cache options', async () => {

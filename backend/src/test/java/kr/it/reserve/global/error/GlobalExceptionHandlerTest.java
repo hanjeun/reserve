@@ -60,6 +60,8 @@ class GlobalExceptionHandlerTest {
 
     @RestController
     static class Probe {
+        @GetMapping("/error-probe/auth-limits")
+        void authLimits() { throw new kr.it.reserve.global.ratelimit.RedisAuthRateLimiter.Unavailable(600); }
         @GetMapping("/error-probe")
         int getPage(@RequestParam int page) { return page; }
 
@@ -78,4 +80,11 @@ class GlobalExceptionHandlerTest {
     }
 
     record Body(int value) { }
+
+    @Test void authenticationRecoveryWaitReturns503WithARetryBoundWithoutInternalDetails() throws Exception {
+        mvc.perform(get("/error-probe/auth-limits"))
+                .andExpect(status().isServiceUnavailable()).andExpect(header().string("Retry-After", "600"))
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(content().string(not(containsString("Redis"))));
+    }
 }

@@ -22,7 +22,7 @@ import useMessage from '../../hooks/useMessage';
 import useQueryParamsState from '../../hooks/useQueryParamState';
 import AnimatedContent from '../common/AnimatedContent';
 import useLiveUpdatesStatus from '../../hooks/useLiveUpdatesStatus';
-import { isBlockingListReadError, isReadAccessDenied } from '../../hooks/liveUpdateQueries';
+import { isBlockingListReadError, isReadAccessDenied, refetchFailedReads } from '../../hooks/liveUpdateQueries';
 
 const PAGE_SIZE = 12;
 const QUERY_DEFAULTS = { newsStore: 'ALL', newsState: 'ALL', newsPage: '1' };
@@ -52,6 +52,9 @@ export default function StoreNewsTab() {
     useListRefreshAnchor(listRef, `${storeId}:${selectedState}:${page}`, list.isFetching, list.data);
     const visibleNews = (list.data?.content || []).filter(item => item.state !== 'DELETED');
     const blockingError = isBlockingListReadError(list.error, visibleNews);
+    const backgroundFailure = !blockingError && [list, config, stores].find(query => query.isError);
+    const retryReads = () => refetchFailedReads([config, list, stores]);
+    const retrying = [config, list, stores].some(query => query.isFetching);
     const [editor, setEditor] = useState({ open: false, id: undefined });
     const [preview, setPreview] = useState({ open: false, news: null });
     const previewQuery = useQuery({ queryKey: storeNewsKeys.detail(preview.news?.id),
@@ -73,7 +76,7 @@ export default function StoreNewsTab() {
         okText: '삭제', okButtonProps: { danger: true }, onOk: () => remove.mutateAsync(item.id).catch(error => { if (!error.isStaleSession) message.error(error.message); throw error; }) });
     if (!business) return <DataState state="empty" title="가게 소식 관리는 사업자 계정에서 이용할 수 있어요." />;
     if (config.isPending) return <StoreNewsSkeleton showRefresh={!automatic} />;
-    if (config.isError && !config.data) return <DataState state="error" title="가게 소식 상태를 불러오지 못했어요." error={config.error} onRetry={config.refetch} retrying={config.isFetching} />;
+    if (config.isError && (!config.data || isReadAccessDenied(config.error))) return <DataState state="error" title="가게 소식 상태를 불러오지 못했어요." error={config.error} onRetry={retryReads} retrying={retrying} />;
     if (!enabled) return <DataState state="empty" kind="news" title="가게 소식 작성을 준비하고 있어요." description="작성 기능이 준비되면 이 화면에서 소식을 작성하고 관리할 수 있어요." />;
     const writeUnavailable = stores.isPending ? '내 가게를 불러오고 있어요.'
         : stores.isError ? '내 가게를 불러오지 못했어요. 다시 불러온 뒤 작성해주세요.'
@@ -84,11 +87,11 @@ export default function StoreNewsTab() {
                 loading={stores.isPending} disabled={stores.isPending || stores.isError && !stores.data} onChange={value => change({ newsStore: value })} />
                 <FilterMenu appearance="plain" value={selectedState} options={STORE_NEWS_STATES} aria-label="내 소식 상태 필터" onChange={value => change({ newsState: value })} />
                 {!automatic && <RefreshButton onReload={() => Promise.allSettled([list.refetch(), stores.refetch(), ...(preview.open ? [previewQuery.refetch()] : [])])} loading={list.isFetching || stores.isFetching || preview.open && previewQuery.isFetching} label={mobile ? '' : '새로고침'} aria-label="내 가게 소식 새로고침" />}</div></div>
-        {stores.isError && <DataState state="error" compact title="내 가게를 불러오지 못했어요." error={stores.error} onRetry={stores.refetch} retrying={stores.isFetching} />}
+        {backgroundFailure && <DataState state="error" compact title={backgroundFailure === stores ? '내 가게를 불러오지 못했어요.' : '가게 소식을 갱신하지 못했어요.'}
+            error={backgroundFailure.error} onRetry={retryReads} retrying={retrying} />}
         {stores.isSuccess && !owned.length && <p className="reserve-feed-note" role="status">소식을 게시할 수 있는 내 가게가 없어요. <Link to="/my-stores">내 가게 확인</Link></p>}
         <AnimatedContent motionKey={`${storeId || 'ALL'}:${selectedState}:${page}`} ready={!list.isPending && !list.isPlaceholderData}>
-        {list.isRefetchError && !blockingError && <DataState compact state="error" title="목록을 갱신하지 못했어요. 현재 내용은 유지했어요." error={list.error} onRetry={list.refetch} retrying={list.isFetching} />}
-        {list.isPending ? <StoreNewsSkeleton contentOnly /> : blockingError ? <DataState state="error" title="내 소식을 불러오지 못했어요." error={list.error} onRetry={list.refetch} retrying={list.isFetching} />
+        {list.isPending ? <StoreNewsSkeleton contentOnly /> : blockingError ? <DataState state="error" title="내 소식을 불러오지 못했어요." error={list.error} onRetry={retryReads} retrying={retrying} />
             : !visibleNews.length ? <DataState state="empty" kind="news" title="조건에 맞는 가게 소식이 없어요." />
                 : <div className="reserve-store-news-manage-list" aria-busy={list.isFetching}>{visibleNews.map(item => <article className="reserve-store-news-manage-row" key={item.id} data-list-item-id={item.id}>
                     <h3>{item.title || '제목 없는 소식'}</h3>

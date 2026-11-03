@@ -46,11 +46,18 @@ class LoginMethodServiceTest {
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(4);
     private final Map<String, LoginMethodChallenge> rows = new HashMap<>();
     private LoginMethodService service;
+    private final kr.it.reserve.member.mfa.MfaService mfa = mock(kr.it.reserve.member.mfa.MfaService.class);
     private Member member;
 
     @BeforeEach void setUp() {
         service = new LoginMethodService(members, challenges, subjects, refresh, resets, emails, tokens,
                 mock(PwnedPasswordChecker.class), mock(ApplicationEventPublisher.class));
+        ReflectionTestUtils.setField(service, "mfa", mfa);
+        when(mfa.browserStatus(any())).thenReturn("DISABLED");
+        when(mfa.linkBinding(any(), any())).thenReturn("disabled");
+        when(mfa.consumeSensitive(any(), any())).thenReturn(new kr.it.reserve.member.mfa.MfaService.SensitiveProof(NOW.plusMinutes(5), false, "disabled"));
+        when(tokens.getSessionId("test-session")).thenReturn("test-session-id");
+        when(tokens.issueSession(any(), any(), anyBoolean())).thenReturn(new TokenProvider.IssuedSession("test-issued-access", "test-issued-refresh", Duration.ofDays(14)));
         ReflectionTestUtils.setField(service, "passwords", encoder);
         ReflectionTestUtils.setField(service, "entityManager", mock(EntityManager.class));
         member = Member.builder().id(7L).name("사업자 기존 이름").email("owner@naver.com").role(Role.BUSINESS)
@@ -72,6 +79,17 @@ class LoginMethodServiceTest {
         when(challenges.saveAndFlush(any())).thenAnswer(call -> { LoginMethodChallenge row = call.getArgument(0); rows.put(row.getId(), row); return row; });
         when(challenges.findById(anyString())).thenAnswer(call -> Optional.ofNullable(rows.get(call.getArgument(0))));
         when(challenges.findForUpdate(anyString())).thenAnswer(call -> Optional.ofNullable(rows.get(call.getArgument(0))));
+    }
+
+    @Test void missingSensitiveProofCannotCreateALinkChallengeOrMutateTheAccount() {
+        when(mfa.consumeSensitive(any(), any())).thenThrow(new kr.it.reserve.global.error.AuthException("인증을 다시 시작해주세요."));
+        var request = new MockHttpServletRequest();
+        request.setCookies(new Cookie("access_token", "test-session"));
+        assertThatThrownBy(() -> service.beginOAuth(member, AuthProvider.NAVER, "Original123!", false, request))
+                .isInstanceOf(kr.it.reserve.global.error.AuthException.class);
+        assertThat(rows).isEmpty();
+        assertThat(member.getProvider()).isEqualTo(AuthProvider.LOCAL);
+        verify(refresh, never()).deleteByMemberId(anyLong());
     }
 
     @ParameterizedTest

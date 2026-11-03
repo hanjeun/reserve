@@ -118,7 +118,7 @@ class ServiceAdmissionBudgetConfigurationTest {
         Path root = Path.of("").toAbsolutePath();
         if (root.getFileName().toString().equals("backend")) root = root.getParent();
         var options = new LoaderOptions(); options.setAllowDuplicateKeys(false);
-        try (var input = Files.newInputStream(root.resolve(file))) {
+        try (var input = Files.newInputStream(root.resolve("infra/compose").resolve(file))) {
             Map<String, Object> document = new Yaml(new SafeConstructor(options)).load(input);
             return (Map<String, Object>) ((Map<?, ?>) document.get("services")).get(service);
         }

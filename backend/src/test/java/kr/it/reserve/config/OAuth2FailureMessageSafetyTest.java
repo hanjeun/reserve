@@ -56,7 +56,7 @@ class OAuth2FailureMessageSafetyTest {
         String message = ReflectionTestUtils.invokeMethod(handler, "resolveMessage", exception);
 
         assertThat(message)
-                .isEqualTo("이미 가입된 이메일이에요. 기존 가입 방식으로 로그인해주세요.")
+                .isEqualTo("이미 가입된 이메일이에요. 기존 가입 방식으로 로그인한 뒤 마이페이지의 로그인 및 보안에서 소셜 계정을 연결해주세요.")
                 .doesNotContain("private-user@example.com", "GOOGLE account");
     }
 

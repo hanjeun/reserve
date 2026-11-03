@@ -16,7 +16,7 @@ const posix = value => value.replaceAll('\\', '/').replace(/^([A-Za-z]):/, (_, d
 const sha = 'a'.repeat(40);
 
 test('every image is scanned before registry credentials and the same image is pushed only on main', () => {
-  const workflow = yaml.load(read('.github/workflows/CICD.yml'));
+  const workflow = yaml.load(read('.github/workflows/CI.yml'));
   const validation = workflow.jobs['test-frontend'].steps;
   const install = validation.findIndex(s => s.name === 'Install dependencies');
   assert.ok(install >= 0 && install < validation.findIndex(s => s.name === 'Validate operations scripts'));
@@ -40,7 +40,7 @@ test('every image is scanned before registry credentials and the same image is p
 
 test('both app containers remove kernel capabilities and cannot gain privileges', () => {
   for (const color of ['blue', 'green']) {
-    const service = yaml.load(read(`docker-compose-${color}.yml`)).services[color];
+    const service = yaml.load(read(`infra/compose/docker-compose-${color}.yml`)).services[color];
     assert.deepEqual(service.cap_drop, ['ALL']);
     assert.deepEqual(service.security_opt, ['no-new-privileges:true']);
     assert.equal(service.privileged, undefined);
@@ -51,8 +51,8 @@ test('both app containers remove kernel capabilities and cannot gain privileges'
 });
 
 test('runtime privilege failures stop deployment before health checks or cutover', t => {
-  const workflow = yaml.load(read('.github/workflows/CICD.yml'));
-  const steps = workflow.jobs['deploy-backend'].steps;
+  const workflow = yaml.load(read('.github/workflows/CI.yml'));
+  const steps = yaml.load(read('.github/workflows/CD.yml')).jobs['deploy-backend'].steps;
   const health = steps.find(s => s.name === 'Health check (new server)');
   assert.equal(health['continue-on-error'], undefined);
   assert.ok(steps.indexOf(health) < steps.findIndex(s => s.name === 'Cut over frontend and backend'));

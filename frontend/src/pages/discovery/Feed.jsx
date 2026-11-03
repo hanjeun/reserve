@@ -24,7 +24,7 @@ import { saveRedirect } from '../../utils/redirect';
 import useListQueryNormalization from '../../hooks/useListQueryNormalization';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
 import { httpStatusOf } from '../../utils/listErrorMessage';
-import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
+import { isBlockingListReadError, refetchFailedReads } from '../../hooks/liveUpdateQueries';
 
 const FeedReportModal = lazy(() => import('../../components/feed/FeedReportModal'));
 
@@ -55,10 +55,16 @@ export default function Feed() {
         queryFn: ({ signal }) => ownView ? feedService.myPosts(listParams, signal) : feedService.list(listParams, signal),
         enabled: enabled && (!requiresLogin || Boolean(user)), staleTime: 30_000, placeholderData: keepPreviousData });
     const listRef = useRef(null);
-    const unavailable = [config, list].some(query => [401, 403].includes(httpStatusOf(query.error)));
+    const listEnabled = enabled && (!requiresLogin || Boolean(user));
+    const unavailable = [config, ...(listEnabled ? [list] : [])].some(query => [401, 403].includes(httpStatusOf(query.error)));
     const posts = (list.data?.content || []).filter(post => post.state !== 'DELETED');
-    const blockingError = isBlockingListReadError(list.error, posts);
-    const backgroundFailure = [config, ...(!blockingError ? [list] : [])].find(query => query.isError && query.data !== undefined);
+    const blockingError = listEnabled && isBlockingListReadError(list.error, posts);
+    const blockingFailure = config.isError && (!config.data || unavailable) || enabled && blockingError;
+    const backgroundFailure = !blockingFailure && [...(enabled && (!requiresLogin || user) ? [list] : []), config].find(query => query.isError && query.data !== undefined);
+    const profileFailure = !blockingFailure && !backgroundFailure && enabled && user && profile.isError;
+    const reads = [config, ...(enabled && (!requiresLogin || user) ? [list] : []), ...(enabled && user ? [profile] : [])];
+    const retryReads = () => refetchFailedReads(reads);
+    const retrying = reads.some(query => query.isFetching);
     useListRefreshAnchor(listRef, `${view}:${region || ''}:${page}`, list.isFetching && !list.isPlaceholderData, unavailable ? null : list.data);
     const totalPages = Math.max(1, Math.ceil(feedTotal(list.data) / FEED_PAGE_SIZE));
     useEffect(() => {
@@ -82,11 +88,11 @@ export default function Feed() {
     const write = () => { mountModal('compose'); setComposer({ post: null }); };
     const renderList = () => {
         if (config.isPending && !config.data) return <FeedSkeleton />;
-        if (config.isError && (!config.data || [401, 403].includes(httpStatusOf(config.error)))) return <DataState state="error" title="피드 상태를 불러오지 못했어요." error={config.error} onRetry={config.refetch} retrying={config.isFetching} />;
+        if (config.isError && (!config.data || [401, 403].includes(httpStatusOf(config.error)))) return <DataState state="error" title="피드 상태를 불러오지 못했어요." error={config.error} onRetry={retryReads} retrying={retrying} />;
         if (!enabled) return <DataState state="empty" kind="feed" title="피드를 준비하고 있어요." description="글·사진을 나눌 수 있도록 준비 중이에요." />;
         if (requiresLogin && !user) return <DataState state="empty" title="로그인하면 이용할 수 있어요." action={<Link to="/login" state={{ from: loginFrom }} onClick={rememberLogin}>로그인</Link>} />;
         if (list.isPending && !list.data) return <FeedSkeleton />;
-        if (blockingError || list.isError && unavailable) return <DataState state="error" title="게시물을 불러오지 못했어요." error={list.error} onRetry={list.refetch} retrying={list.isFetching} />;
+        if (blockingError || list.isError && unavailable) return <DataState state="error" title="게시물을 불러오지 못했어요." error={list.error} onRetry={retryReads} retrying={retrying} />;
         if (!posts.length) return <DataState state="empty" kind="feed" title={view === 'drafts' ? '임시저장한 글이 없어요.' : !ownView && region ? '이 지역에 게시된 글이 없어요.' : '아직 게시물이 없어요.'}
             description={view === 'favorites' ? '찜한 가게가 연결된 게시물을 모아 보여줘요.' : undefined} />;
         return <div className="reserve-feed-list" aria-busy={list.isFetching}>
@@ -115,9 +121,8 @@ export default function Feed() {
             <FilterMenu appearance="plain" options={views} value={view} aria-label="피드 보기" onChange={value => setFilter('view', value)} />
             </div>
         </div>}
-        {enabled && user && profile.isError && (profile.data === undefined || [401, 403].includes(httpStatusOf(profile.error))) && <DataState state="error" title="공개 프로필을 불러오지 못했어요." error={profile.error} onRetry={profile.refetch} retrying={profile.isFetching} />}
-        {enabled && user && profile.isError && profile.data !== undefined && ![401, 403].includes(httpStatusOf(profile.error)) && <DataState compact state="error" title="공개 프로필을 갱신하지 못했어요." error={profile.error} onRetry={profile.refetch} retrying={profile.isFetching} />}
-        {!unavailable && backgroundFailure && <DataState compact state="error" title="피드를 갱신하지 못했어요." error={backgroundFailure.error} onRetry={backgroundFailure.refetch} retrying={backgroundFailure.isFetching} />}
+        {profileFailure && <DataState compact state="error" title={profile.data === undefined ? '공개 프로필을 불러오지 못했어요.' : '공개 프로필을 갱신하지 못했어요.'} error={profile.error} onRetry={retryReads} retrying={retrying} />}
+        {!unavailable && backgroundFailure && <DataState compact state="error" title="피드를 갱신하지 못했어요." error={backgroundFailure.error} onRetry={retryReads} retrying={retrying} />}
         <AnimatedContent className="reserve-feed-content" motionKey={`${view}:${region || ''}:${page}`} ready={!list.isPlaceholderData && !list.isPending}>{renderList()}</AnimatedContent>
         {enabled && !unavailable && !blockingError && list.data && (!requiresLogin || user) && feedTotal(list.data) > FEED_PAGE_SIZE && <nav className="reserve-feed-pagination" aria-label="피드 페이지">
             <Pagination current={page} total={feedTotal(list.data)} pageSize={FEED_PAGE_SIZE} showSizeChanger={false}

@@ -1,7 +1,7 @@
 import { PageTitle } from '../../components/common/PageTypography';
 import React from 'react';
 import { Typography } from 'antd';
-import { PageContainer } from '../../components/common';
+import { DataState, PageContainer } from '../../components/common';
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import TextLink from '../../components/common/TextLink';
@@ -11,12 +11,11 @@ import waitingService from '../../services/waitingService';
 import { useFeedConfig } from '../../hooks/feedQueries';
 import { useStoreNewsConfig } from '../../hooks/storeNewsQueries';
 import { useFeedInteractions } from '../../hooks/feedInteractionQueries';
+import { refetchFailedReads } from '../../hooks/liveUpdateQueries';
 
 const { Title, Paragraph, Text } = Typography;
 
-const RetentionDates = () => {
-    const { data } = useQuery({ queryKey: ['public', 'chatRetentionPolicy'], queryFn: chatRetentionService.policy,
-        staleTime: 60_000, retry: false });
+const RetentionDates = ({ data }) => {
     if (!data?.noticePublishedAt || !data?.effectiveAt) return null;
     if ([data.noticePublishedAt, data.effectiveAt].some((value) => Number.isNaN(new Date(value).getTime()))) return null;
     const format = (value) => new Intl.DateTimeFormat('ko-KR', {
@@ -25,9 +24,7 @@ const RetentionDates = () => {
     return <Paragraph>보존기간 변경 고지: {format(data.noticePublishedAt)} · 적용 시작: {format(data.effectiveAt)}</Paragraph>;
 };
 
-const WaitingNoticeDate = () => {
-    const { data } = useQuery({ queryKey: ['public', 'waitingRetentionPolicy'], queryFn: waitingService.getRetentionPolicy,
-        staleTime: 60_000, retry: false });
+const WaitingNoticeDate = ({ data }) => {
     if (!data?.noticePublishedAt || !Number.isFinite(Date.parse(data.noticePublishedAt))) return null;
     const publishedAt = new Intl.DateTimeFormat('ko-KR', {
         timeZone: 'Asia/Seoul', dateStyle: 'long', timeStyle: 'short',
@@ -42,10 +39,7 @@ const Section = ({ title, children }) => (
     </div>
 );
 
-const FeedPrivacy = () => {
-    const { data } = useFeedConfig();
-    const news = useStoreNewsConfig(true);
-    const interactions = useFeedInteractions();
+const FeedPrivacy = ({ data, news, interactions }) => {
     if (!data?.enabled && !news.data?.enabled) return null;
     return <Section title="피드·가게 소식의 공개 정보와 보관">
         {data?.enabled && <Paragraph>피드를 이용하면 공개 닉네임·소개, 직접 공개에 동의한 프로필 사진, 게시물 글·사진과 선택한 지역·가게 연결 정보를 처리합니다. 공개 프로필과 게시물은 로그인하지 않아도 볼 수 있습니다. 계정의 이름·이메일을 공개 프로필에 자동으로 표시하지 않습니다.</Paragraph>}
@@ -60,12 +54,23 @@ const FeedPrivacy = () => {
 const Privacy = () => {
     // 색인 대상 경로다 — 위 Terms.jsx 와 같은 이유로 설명을 직접 준다.
     useDocumentTitle('개인정보 처리방침', 'RESERVE 개인정보 처리방침 — 수집하는 항목, 이용 목적, 보관 기간, 파기 절차와 이용자 권리를 안내합니다.');
+    const chat = useQuery({ queryKey: ['public', 'chatRetentionPolicy'], queryFn: chatRetentionService.policy,
+        staleTime: 60_000, retry: false });
+    const waiting = useQuery({ queryKey: ['public', 'waitingRetentionPolicy'], queryFn: waitingService.getRetentionPolicy,
+        staleTime: 60_000, retry: false });
+    const feed = useFeedConfig();
+    const news = useStoreNewsConfig(true);
+    const interactions = useFeedInteractions();
+    const policies = [chat, waiting, feed, news, interactions];
+    const failure = policies.find(query => query.isError);
     return (
         <PageContainer size="md" paddingTop="60px">
             <div style={{ marginBottom: 40 }}>
                 <PageTitle>개인정보 처리방침</PageTitle>
-                <Text style={{ color: colors.text.tertiary, fontSize: fontSize.sm }}>시행일: 2026년 5월 17일 · 최종 수정: 2026년 10월 27일</Text>
+                <Text style={{ color: colors.text.tertiary, fontSize: fontSize.sm }}>시행일: 2026년 5월 17일 · 최종 수정: 2026년 11월 3일</Text>
             </div>
+            {failure && <DataState compact state="error" title="최신 개인정보 안내를 확인하지 못했어요."
+                error={failure.error} onRetry={() => refetchFailedReads(policies)} retrying={policies.some(query => query.isFetching)} />}
 
             <Section title="1. 수집하는 개인정보 항목">
                 <Paragraph>RESERVE는 서비스 제공을 위해 다음과 같은 정보를 수집합니다.</Paragraph>
@@ -106,11 +111,11 @@ const Privacy = () => {
                     <li style={{ marginBottom: 6 }}>법령에 따라 보존이 필요한 경우 해당 기간 동안 별도 보관</li>
                 </ul>
                 <Paragraph>미처리·미분류 신고, 진행 중인 분쟁·조사와 미결 거래 자료는 파기를 보류합니다. 법정 보존 자료는 일반 이용 자료와 분리하여 접근을 제한합니다. 채팅·신고의 보존기간 변경은 실제 서비스 고지 게시일부터 30일 유예 후 기존 자료에도 적용하며, 유예 중에는 이미 기간이 지난 자료도 자동 파기하지 않습니다.</Paragraph>
-                <RetentionDates />
-                <WaitingNoticeDate />
+                <RetentionDates data={chat.data} />
+                <WaitingNoticeDate data={waiting.data} />
             </Section>
 
-            <FeedPrivacy />
+            <FeedPrivacy data={feed.data} news={news} interactions={interactions} />
 
             <Section title="4. 개인정보 파기 절차 및 방법">
                 <Paragraph><strong>파기 절차:</strong> 탈퇴 전 운영 중인 가게와 미결 예약·환불·결제 상태를 확인합니다. 처리가 완료되면 계정 식별정보를 같은 트랜잭션에서 비식별화하고, 보존 목적이 없는 개인화·커뮤니티 데이터는 삭제합니다.</Paragraph>
@@ -165,6 +170,7 @@ const Privacy = () => {
 
             <Section title="8. 쿠키 및 세션">
                 <Paragraph>서비스는 로그인 상태 유지를 위해 HttpOnly 쿠키를 사용합니다. 쿠키는 브라우저에서 삭제할 수 있으나, 삭제 시 로그인이 유지되지 않을 수 있습니다.</Paragraph>
+                <Paragraph>접속 환경 확인을 마친 후 이용자가 선택하면 브라우저 식별용 임의 쿠키를 최대 30일 동안 저장합니다. 회원별로 IP 대역과 운영체제·브라우저 종류를 해시 처리해 함께 확인하며, 이 쿠키만으로 로그인할 수 없습니다. 로그인 및 보안 설정에서 기억을 해제하거나 브라우저에서 쿠키를 삭제할 수 있습니다.</Paragraph>
             </Section>
 
             <Section title="9. 이용자의 권리">
@@ -176,7 +182,7 @@ const Privacy = () => {
                     이름: 한재은<br />
                     이메일: hanjeun111@gmail.com<br />
                     서비스 문의: reserve@reserve.it.kr<br />
-                    서비스: reserve.it.kr
+                    서비스: app.reserve.it.kr · 소개: reserve.it.kr
                 </Paragraph>
             </Section>
 
@@ -189,11 +195,15 @@ const Privacy = () => {
                     </li>
                     <li style={{ marginBottom: 8 }}>
                         <strong>개인정보분쟁조정위원회</strong><br />
-                        <span style={{ color: colors.text.tertiary }}>국번없이 <TextLink href="tel:1833-6972" style={{ color: colors.primary.main }}>1833-6972</TextLink> ·{' '}<TextLink href="https://www.koprc.go.kr" target="_blank" rel="noopener noreferrer">koprc.go.kr</TextLink></span>
+                        <span style={{ color: colors.text.tertiary }}>국번없이 <TextLink href="tel:1833-6972" style={{ color: colors.primary.main }}>1833-6972</TextLink> ·{' '}<TextLink href="https://kopico.go.kr/main/main.do" target="_blank" rel="noopener noreferrer">kopico.go.kr</TextLink></span>
                     </li>
                     <li style={{ marginBottom: 8 }}>
-                        <strong>대검찰청 사이버범죄수사단</strong><br />
-                        <span style={{ color: colors.text.tertiary }}><TextLink href="tel:02-3480-3573" style={{ color: colors.primary.main }}>02-3480-3573</TextLink> ·{' '}<TextLink href="https://www.spo.go.kr" target="_blank" rel="noopener noreferrer">spo.go.kr</TextLink></span>
+                        <strong>공소청</strong><br />
+                        <span style={{ color: colors.text.tertiary }}>국번없이 <TextLink href="tel:1301" style={{ color: colors.primary.main }}>1301</TextLink>(유료) ·{' '}<TextLink href="https://www.spo.go.kr/" target="_blank" rel="noopener noreferrer">spo.go.kr</TextLink></span>
+                    </li>
+                    <li style={{ marginBottom: 8 }}>
+                        <strong>경찰청 사이버범죄 신고시스템</strong><br />
+                        <span style={{ color: colors.text.tertiary }}>국번없이 <TextLink href="tel:182" style={{ color: colors.primary.main }}>182</TextLink>(유료) ·{' '}<TextLink href="https://ecrm.police.go.kr/" target="_blank" rel="noopener noreferrer">ecrm.police.go.kr</TextLink></span>
                     </li>
                 </ul>
             </Section>

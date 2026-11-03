@@ -92,6 +92,70 @@ class ProxyNetworkTest(unittest.TestCase):
         self.assertFalse(any("disconnect" in call or "rm" in call for call in calls))
 
 
+class AuthLimitPreparationTest(unittest.TestCase):
+    def setUp(self):
+        environment = patch.dict(os.environ, {"RESERVE_SECURITY_AUTH_LIMITS_FINGERPRINT_KEY": base64.b64encode(bytes(32)).decode(),
+                                              "RESERVE_SECURITY_AUTH_LIMITS_EPOCH": "synthetic-v1"})
+        environment.start()
+        self.addCleanup(environment.stop)
+        check = patch.object(OPS, "check_redis", return_value={"ready": True})
+        self.check = check.start()
+        self.addCleanup(check.stop)
+        metadata = patch.object(OPS, "redis_metadata", side_effect=self.metadata)
+        self.redis = metadata.start()
+        self.addCleanup(metadata.stop)
+        self.state, self.clock, self.boot = {}, 1000, "a" * 40
+
+    def metadata(self, *args):
+        if args == ("INFO", "server"):
+            return "run_id:" + self.boot + "\r\n"
+        if args == ("TIME",):
+            return [str(self.clock), "0"]
+        if args[0] == "HGETALL":
+            return dict(self.state)
+        if args[0] == "HSET":
+            self.state.update(dict(zip(args[2::2], args[3::2])))
+            return 1
+        raise AssertionError("Unexpected metadata operation")
+
+    def writes(self):
+        return [call for call in self.redis.call_args_list if call.args[0] == "HSET"]
+
+    def test_read_only_check_never_initializes_missing_security_state(self):
+        with self.assertRaises(RuntimeError):
+            OPS.check_auth_limits()
+        self.assertEqual(self.writes(), [])
+        self.check.assert_called_once_with(require_auth=True)
+
+    def test_approved_preparation_waits_a_full_window_and_repeated_checks_do_not_extend_it(self):
+        self.assertEqual(OPS.check_auth_limits(True)["recoveryWaitSeconds"], 600)
+        self.clock += 10
+        self.assertEqual(OPS.check_auth_limits(True)["recoveryWaitSeconds"], 590)
+        self.assertEqual(len(self.writes()), 1)
+        with self.assertRaises(RuntimeError):
+            OPS.check_auth_limits()
+        self.clock += 590
+        self.assertTrue(OPS.check_auth_limits()["ready"])
+        self.assertEqual(len(self.writes()), 1)
+
+    def test_a_new_redis_boot_requires_recovery_even_when_a_marker_was_restored(self):
+        self.state = {"boot": "b" * 40, "ready": "0"}
+        with self.assertRaises(RuntimeError):
+            OPS.check_auth_limits()
+        self.assertEqual(OPS.check_auth_limits(True)["recoveryWaitSeconds"], 600)
+        self.assertEqual(self.state["boot"], self.boot)
+
+    def test_epoch_is_hmac_scoped_and_missing_or_malformed_secrets_are_rejected(self):
+        first = OPS.auth_limit_state_key()
+        self.assertTrue(first.startswith("reserve:prod:auth-limits:v1:{"))
+        self.assertNotIn("synthetic-v1", first)
+        with patch.dict(os.environ, {"RESERVE_SECURITY_AUTH_LIMITS_EPOCH": "synthetic-v2"}):
+            self.assertNotEqual(first, OPS.auth_limit_state_key())
+        for value in ["", "invalid", base64.b64encode(bytes(16)).decode()]:
+            with patch.dict(os.environ, {"RESERVE_SECURITY_AUTH_LIMITS_FINGERPRINT_KEY": value}), self.assertRaises(RuntimeError):
+                OPS.auth_limit_state_key()
+
+
 class RedisAclTest(unittest.TestCase):
     def test_generated_acl_preserves_admin_and_never_contains_plaintext_passwords(self):
         admin = "synthetic-administrator-credential" * 2
@@ -120,6 +184,18 @@ class RedisAclTest(unittest.TestCase):
     def metadata(self, user=None, memory=None, policy="noeviction", aclfile="/private/users.acl"):
         return [user if user is not None else self.user(), memory or "maxmemory:67108864\r\nused_memory:1048576\r\n",
                 ["maxmemory-policy", policy], ["aclfile", aclfile]]
+
+    @patch.dict(os.environ, {"RESERVE_SECURITY_AUTH_LIMITS_ENABLED": "false"})
+    @patch.object(OPS, "docker", return_value="{}")
+    @patch.object(OPS, "redis_metadata")
+    def test_legacy_acl_is_compatible_only_before_shared_authentication_is_enabled(self, redis, docker):
+        user = self.user()
+        user["commands"] = " ".join(value for value in user["commands"].split() if value != "+info")
+        redis.side_effect = self.metadata(user=user)
+        self.assertTrue(OPS.check_redis()["ready"])
+        redis.side_effect = self.metadata(user=user)
+        with self.assertRaises(RuntimeError):
+            OPS.check_redis(require_auth=True)
 
     @patch.object(OPS, "docker", return_value="{}")
     @patch.object(OPS, "redis_metadata")

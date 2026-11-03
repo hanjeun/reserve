@@ -26,7 +26,15 @@ public class LoginMethodController {
     private final RateLimiter limiter;
     private final kr.it.reserve.member.service.MemberService memberService;
 
-    public record OAuthRequest(@NotNull AuthProvider provider, @Size(max = 64) String currentPassword, boolean reauthenticate) { }
+    @org.springframework.beans.factory.annotation.Autowired private kr.it.reserve.member.mfa.MfaService mfa;
+    @org.springframework.beans.factory.annotation.Autowired private kr.it.reserve.config.util.CookieUtil cookies;
+    public record Confirmation(@NotNull kr.it.reserve.member.mfa.MfaService.SensitiveAction action, @Size(max = 64) String password) {
+        @Override public String toString() { return "Confirmation[redacted]"; }
+    }
+    public record OAuthRequest(@NotNull AuthProvider provider, @Size(max = 64) String currentPassword, boolean reauthenticate, Boolean rememberBrowser) {
+        public OAuthRequest(AuthProvider provider, String password, boolean reauthenticate) { this(provider, password, reauthenticate, null); }
+        @Override public String toString() { return "OAuthRequest[redacted]"; }
+    }
     public record EmailRequest(@NotBlank @Email @Size(max = 254) String email) { }
     public record PasswordRequest(@NotBlank @Size(max = 36) String challengeId,
             @NotBlank @Size(max = 6) String code, @NotBlank @Size(max = 64) String password,
@@ -38,17 +46,38 @@ public class LoginMethodController {
         return ApiResponse.success(methods.status(SecurityUtil.getCurrentMember(), SecurityUtil.getOAuthAuthenticationAt()), "로그인 방법 조회 성공");
     }
 
+    @PostMapping("/confirm")
+    public ApiResponse<kr.it.reserve.member.mfa.MfaService.View> confirm(@Valid @RequestBody Confirmation body,
+            HttpServletRequest request, jakarta.servlet.http.HttpServletResponse response) {
+        Member member = limitedIp(request, RateLimiter.Policy.CODE_VERIFY);
+        if (!limiter.tryConsume("mfa-sensitive-member:" + member.getId(), RateLimiter.Policy.MFA_LIFECYCLE_ACCOUNT))
+            throw new MemberException("인증 요청이 많아요. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+        var ticket = mfa.beginSensitive(member, SecurityUtil.getSessionId(), SecurityUtil.getOAuthAuthenticationAt(),
+                body.password(), SecurityUtil.isPersistentLogin(), kr.it.reserve.config.util.CookieUtil.getCookie(request, "mfa_ticket"), body.action());
+        cookies.addCookie(response, "mfa_ticket", ticket.value(), ticket.persistent() ? 300 : -1);
+        return ApiResponse.success(mfa.status(ticket.value(), member, SecurityUtil.getSessionId()), "변경 전 본인 확인을 시작해요.");
+    }
+    @DeleteMapping("/browser")
+    public ApiResponse<Void> forgetBrowser(HttpServletRequest request, jakarta.servlet.http.HttpServletResponse response) {
+        Member member = limited(request, RateLimiter.Policy.LOGIN_METHOD_CHANGE);
+        mfa.forgetBrowser(member);
+        mfa.writeBrowserCookie(request, response);
+        return ApiResponse.success(null, "이 브라우저의 기억을 해제했어요.");
+    }
+
     @PostMapping("/oauth")
     public ApiResponse<Map<String, String>> oauth(@Valid @RequestBody OAuthRequest body, HttpServletRequest request) {
         Member member = limited(request, RateLimiter.Policy.LOGIN_METHOD_CHANGE);
         return ApiResponse.success(Map.of("authorizationUrl", methods.beginOAuth(member, body.provider(), body.currentPassword(),
-                body.reauthenticate(), request)), "본인 확인을 시작해요.");
+                body.reauthenticate(), request, body.rememberBrowser())), "본인 확인을 시작해요.");
     }
 
     @PostMapping("/password/code")
     public ApiResponse<LoginMethodService.EmailChallenge> code(@Valid @RequestBody EmailRequest body, HttpServletRequest request) {
         Member member = limited(request, RateLimiter.Policy.LOGIN_METHOD_EMAIL);
-        return ApiResponse.success(methods.sendPasswordCode(member, SecurityUtil.getOAuthAuthenticationAt(), body.email()), "인증 코드를 발송했어요.");
+        var challenge = methods.sendPasswordCode(member, SecurityUtil.getOAuthAuthenticationAt(), body.email());
+        kr.it.reserve.email.service.EmailDelivery.await(challenge.delivery());
+        return ApiResponse.success(challenge, "인증 메일 발송 요청을 처리했어요.");
     }
 
     @PostMapping("/password")

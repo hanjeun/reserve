@@ -4,6 +4,25 @@ import { describe, expect, it, vi } from 'vitest';
 import DataState from './DataState';
 
 describe('DataState', () => {
+    it.each([
+        [{ code: 'ERR_NETWORK' }, '서버에 연결할 수 없어요'],
+        [{ response: { status: 403 } }, '조회 권한이 없어요'],
+        [{ status: 429 }, '요청이 잠시 제한됐어요'],
+        [{ status: 503 }, '서버에서 요청을 처리하지 못했어요'],
+    ])('keeps a custom title and exposes the safe cause (%j)', (error, reason) => {
+        render(<DataState state="error" title="게시물을 불러오지 못했어요." error={error} compact />);
+        expect(screen.getByRole('alert')).toHaveTextContent('게시물을 불러오지 못했어요.');
+        expect(screen.getByRole('alert')).toHaveTextContent(reason);
+        expect(screen.getAllByRole('alert')).toHaveLength(1);
+    });
+
+    it('preserves action guidance alongside the cause without reflecting unknown server text', () => {
+        const view = render(<DataState state="error" title="설정을 불러오지 못했어요." error={{ status: 503 }} description="기존 설정은 유지돼요." />);
+        expect(screen.getByRole('alert')).toHaveTextContent('서버에서 요청을 처리하지 못했어요.');
+        expect(screen.getByRole('alert')).toHaveTextContent('기존 설정은 유지돼요.');
+        view.rerender(<DataState state="error" title="설정을 불러오지 못했어요." error={{ message: 'private trace' }} />);
+        expect(screen.getByRole('alert')).not.toHaveTextContent('private trace');
+    });
     it('shows the empty store illustration with a fallback without inventing a retry action', () => {
         const { container } = render(<DataState state="empty" kind="store" title="등록된 가게가 없어요." />);
 

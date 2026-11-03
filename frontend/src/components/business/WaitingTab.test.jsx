@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import WaitingTab from './WaitingTab';
 import waitingService from '../../services/waitingService';
 
-const state = vi.hoisted(() => ({ revision: 1, stores: [{ id: 5, name: '가게 A' }], success: vi.fn(), error: vi.fn(), confirm: vi.fn() }));
+const state = vi.hoisted(() => ({ revision: 1, stores: [{ id: 5, name: '가게 A' }], storesError: null, refetchStores: vi.fn(), success: vi.fn(), error: vi.fn(), confirm: vi.fn() }));
 vi.mock('../../store/useAuthStore', () => {
     const useAuthStore = selector => selector({ sessionRevision: state.revision });
     useAuthStore.getState = () => ({ sessionRevision: state.revision });
@@ -13,7 +13,7 @@ vi.mock('../../store/useAuthStore', () => {
 });
 vi.mock('../../hooks', async () => ({
     useQueryParamsState: (await import('../../hooks/useQueryParamState')).useQueryParamsState,
-    useMyStores: () => ({ stores: state.stores, loading: false, error: null, refetch: vi.fn() }),
+    useMyStores: () => ({ stores: state.stores, loading: false, error: state.storesError, refetch: state.refetchStores }),
 }));
 vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: { success: state.success, error: state.error }, confirm: state.confirm }) }));
 vi.mock('../../services/waitingService', () => ({ default: { getBoard: vi.fn(), create: vi.fn(), updateStatus: vi.fn(), updateIntake: vi.fn() } }));
@@ -23,7 +23,8 @@ vi.mock('../common', () => {
     return {
     Card,
     Button: ({ children, onClick, disabled, loading, ...props }) => <button onClick={onClick} disabled={disabled || loading} aria-label={props['aria-label']}>{children}</button>,
-    DataState: ({ title, error, compact }) => <div data-compact={Boolean(compact)}>{title || error?.message}</div>,
+    DataState: ({ title, error, compact, onRetry }) => <div data-compact={Boolean(compact)}>{title || error?.message}
+        {onRetry && <button onClick={onRetry}>다시 불러오기</button>}</div>,
     FilterMenu: ({ options, value, onChange, ...props }) => <select aria-label={props['aria-label']}
         value={value} onChange={event => onChange(event.target.value)}>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select>,
     FilterToolbar: ({ search }) => <input placeholder={search.placeholder} value={search.value} onChange={search.onChange} />,
@@ -50,6 +51,7 @@ function setup() {
 beforeEach(() => {
     state.revision = 1;
     state.stores = [{ id: 5, name: '가게 A' }];
+    state.storesError = null; state.refetchStores.mockReset().mockResolvedValue(null);
     state.success.mockReset(); state.error.mockReset(); state.confirm.mockReset();
     waitingService.getBoard.mockReset().mockResolvedValue(board([]));
     waitingService.create.mockReset(); waitingService.updateStatus.mockReset(); waitingService.updateIntake.mockReset();
@@ -74,6 +76,24 @@ it('opens read-only details from the managed board without changing call or canc
     view.unmount(); view.client.clear();
 });
 afterEach(() => vi.restoreAllMocks());
+
+it('collapses failed store and board refreshes and retries both without losing the cached board', async () => {
+    waitingService.getBoard.mockResolvedValue(board([entry(9)]));
+    const view = setup();
+    const row = await screen.findByRole('listitem', { name: '9번 대기 접수' });
+    state.storesError = new Error('가게 목록 갱신 실패');
+    view.updateActor();
+    waitingService.getBoard.mockRejectedValueOnce(new Error('대기 명단 갱신 실패'));
+    await act(async () => { await view.client.invalidateQueries({ queryKey: ['waiting', 1, 5] }); });
+    await screen.findByText('대기 명단 갱신 실패');
+    expect(screen.queryByText('가게 목록 갱신 실패')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: '다시 불러오기' })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
+    await waitFor(() => expect(state.refetchStores).toHaveBeenCalledOnce());
+    await waitFor(() => expect(waitingService.getBoard).toHaveBeenCalledTimes(3));
+    expect(screen.getByRole('listitem', { name: '9번 대기 접수' })).toBe(row);
+    view.unmount(); view.client.clear();
+});
 
 it('places a failed cached refresh in the list body with a full illustration state instead of a false empty result', async () => {
     const view = setup();

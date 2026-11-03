@@ -46,14 +46,16 @@ public class EmailService {
     }
 
     @Async("mailExecutor")
-    public void sendLoginMethodVerificationEmail(String toEmail, String verificationCode) {
+    public java.util.concurrent.CompletableFuture<Void> sendLoginMethodVerificationEmail(String toEmail, String verificationCode) {
         sendVerificationMessage(toEmail, verificationCode, true);
+        return java.util.concurrent.CompletableFuture.completedFuture(null);
     }
 
     @Async("mailExecutor")
-    public void sendRiskLoginVerificationEmail(String toEmail, String verificationCode) {
+    public java.util.concurrent.CompletableFuture<Void> sendRiskLoginVerificationEmail(String toEmail, String verificationCode) {
         if (verificationCode == null || !verificationCode.matches("[0-9]{6}")) throw new IllegalArgumentException("Invalid login verification code");
         sendVerificationMessage(toEmail, verificationCode, false, true);
+        return java.util.concurrent.CompletableFuture.completedFuture(null);
     }
 
     private void sendVerificationMessage(String toEmail, String verificationCode, boolean loginMethod) {

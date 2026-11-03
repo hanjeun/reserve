@@ -55,10 +55,10 @@ const BusinessTab = ({ user }) => {
                 setRejectionReason(res?.rejectionReason ?? null);
                 setStatusLookup({ scope: editScope, phase: 'success' });
             })
-            .catch(() => {
+            .catch(error => {
                 if (statusRequestRef.current !== request) return;
                 setStatus(null);
-                setStatusLookup({ scope: editScope, phase: 'error' });
+                setStatusLookup({ scope: editScope, phase: 'error', error });
             });
     }, [editScope]);
 
@@ -126,8 +126,8 @@ const BusinessTab = ({ user }) => {
             });
             setEditState({ scope: editScope, status: 'ready' });
             setIsEditing(true);
-        } catch {
-            if (isCurrent()) setEditState({ scope: editScope, status: 'error' });
+        } catch (error) {
+            if (isCurrent()) setEditState({ scope: editScope, status: 'error', error });
         } finally {
             if (isCurrent()) {
                 editRequestRef.current = null;
@@ -210,6 +210,7 @@ const BusinessTab = ({ user }) => {
 
     if (statusError && !isBusiness) return <DataState state="error" kind="member"
         title="사업자 인증 상태를 불러오지 못했어요."
+        error={statusLookup.error}
         description="신청 상태를 확인한 뒤 인증 신청을 진행할 수 있어요."
         onRetry={retryStatus} />;
 
@@ -276,6 +277,7 @@ const BusinessTab = ({ user }) => {
                 </div>}
                 {editError && <DataState state="error" kind="member"
                     title="사업자 신청 내용을 불러오지 못했어요."
+                    error={editState.error}
                     description="기존 신청은 변경되지 않았어요. 다시 확인한 뒤 수정할 수 있어요."
                     onRetry={handleStartEdit} compact />}
                 <div style={{ display: 'flex', gap: 8 }}>

@@ -1,7 +1,7 @@
 reset on -@all resetkeys ~reserve:prod:* resetchannels &reserve:prod:*
 +auth +hello +ping +quit +client|setname +client|setinfo
 +eval +evalsha +script|load
-+time +get +set +del +incr +pexpire +pexpireat +pttl
++time +info +get +set +del +incr +pexpire +pexpireat +pttl
 +hget +hmget +hset +hdel +hlen
 +zadd +zscore +zcard +zrange +zrangebyscore +zrank +zrem +zremrangebyrank +zremrangebyscore
 +publish +subscribe +psubscribe +unsubscribe +punsubscribe

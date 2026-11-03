@@ -46,7 +46,8 @@ export default function ChatIntroTab() {
     } else if (!store) {
         content = <DataState state="empty" kind="store" title="등록된 가게가 없어요." style={{ marginTop: 80 }} />;
     } else if (isError) {
-        content = <DataState state="error" requestType="detail" kind="message" subject="채팅 설정" error={error} onRetry={refetch} retrying={isFetching} />;
+        content = <DataState state="error" requestType="detail" kind="message" subject="채팅 설정" error={error}
+            onRetry={storesError ? () => Promise.allSettled([refetch(), refetchStores()]) : refetch} retrying={isFetching || storesLoading} />;
     } else {
         content = (
             <ChatIntroEditor
@@ -76,7 +77,7 @@ export default function ChatIntroTab() {
                 loading={storesLoading || isFetching}
                 initialLoading={storesLoading || isLoading}
             />
-            {storesError && stores.length > 0 && <DataState state="error" kind="store" subject="가게 목록" error={storesError}
+            {storesError && !isError && stores.length > 0 && <DataState state="error" kind="store" subject="가게 목록" error={storesError}
                 onRetry={refetchStores} retrying={storesLoading} compact style={{ marginBottom: 16 }} />}
             {content}
         </div>

@@ -119,8 +119,8 @@ const renderMainContent = ({ error, blockingError, myStoresError, myStoresLoadin
         <ListingContent notice={!blockingError && <>
             {error && <DataState state="error" kind="reservation" subject="예약 목록" error={error}
                 title="최신 예약을 확인하지 못해 이전 목록을 보여드리고 있어요."
-                onRetry={refetch} retrying={busy} compact />}
-            {myStoresError && (
+                onRetry={myStoresError ? retryAll : refetch} retrying={busy || myStoresLoading} compact />}
+            {!error && myStoresError && (
                 <DataState state="error" kind="store" subject="가게별 필터용 가게 목록" error={myStoresError}
                     onRetry={retryStores} retrying={myStoresLoading} compact />
             )}

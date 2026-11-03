@@ -37,6 +37,11 @@ public class MfaChallenge {
         this.expiresAt = expiresAt.truncatedTo(java.time.temporal.ChronoUnit.MICROS);
     }
     public void limitExpiry(LocalDateTime expiry) { if (expiry.isBefore(expiresAt)) expiresAt = expiry.truncatedTo(java.time.temporal.ChronoUnit.MICROS); }
+    public void sensitive(String method, boolean verified) { primaryMethod = method; factorVerified = verified; clearCeremony(); }
+    public void sensitiveVerified(boolean strong) {
+        if (primaryMethod != null && primaryMethod.matches("(?:PASSWORD|OAUTH|PASSKEY)_(?:LINK|UNLINK|CHANGE|REMOVE|SET)"))
+            primaryMethod += strong ? "_MFA" : "_MAIL";
+    }
     public void loginContinuation() { purpose = Purpose.LOGIN; boundSessionId = null; }
     public void bindMember(Long id, int version) { memberId = id; authVersion = version; }
     public void updateAuthVersion(int version) { authVersion = version; }

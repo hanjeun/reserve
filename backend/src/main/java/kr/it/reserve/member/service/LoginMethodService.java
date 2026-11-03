@@ -63,10 +63,19 @@ public class LoginMethodService {
     // SecurityConfig가 OAuth 관문을 생성할 때 encoder bean을 앞당겨 만들지 않는다.
     @Autowired @Lazy private BCryptPasswordEncoder passwords;
     @PersistenceContext private EntityManager entityManager;
+    @Autowired @Lazy private kr.it.reserve.member.mfa.MfaService mfa;
+    private static final String LINKED = LoginMethodService.class.getName() + ".linked";
 
     public record Status(Long memberId, boolean passwordEnabled, AuthProvider socialProvider, String email, boolean socialProofFresh,
-            AuthProvider linkableSocialProvider) { }
-    public record EmailChallenge(String challengeId, Instant expiresAt) { }
+            AuthProvider linkableSocialProvider, String browserTrust) {
+        public Status(Long id, boolean password, AuthProvider provider, String email, boolean fresh, AuthProvider linkable) {
+            this(id, password, provider, email, fresh, linkable, "DISABLED");
+        }
+    }
+    public record EmailChallenge(String challengeId, Instant expiresAt,
+            @com.fasterxml.jackson.annotation.JsonIgnore java.util.concurrent.CompletableFuture<Void> delivery) {
+        public EmailChallenge(String challengeId, Instant expiresAt) { this(challengeId, expiresAt, null); }
+    }
     private record Issued(String id, String nonce) implements Serializable { }
     private record Bound(String id, String state) implements Serializable { }
 
@@ -76,12 +85,16 @@ public class LoginMethodService {
         if (current.getAuthVersion() != authenticated.getAuthVersion() || current.isSuspended()) throw expired();
         return new Status(current.getId(), current.getPassword() != null, current.isOAuthUser() ? current.getProvider() : null,
                 current.getEmail(), freshSocial(current, oauthAt), current.isOAuthUser() || current.getPassword() == null
-                        ? null : providerForEmail(current.getEmail()));
+                        ? null : providerForEmail(current.getEmail()), mfa.browserStatus(current));
     }
 
     @Transactional
     public String beginOAuth(Member authenticated, AuthProvider provider, String password, boolean reauthenticate,
-            HttpServletRequest request) {
+            HttpServletRequest request) { return beginOAuth(authenticated, provider, password, reauthenticate, request, null); }
+
+    @Transactional
+    public String beginOAuth(Member authenticated, AuthProvider provider, String password, boolean reauthenticate,
+            HttpServletRequest request, Boolean rememberBrowser) {
         if (provider == null || !SOCIAL.contains(provider)) throw invalid("지원하지 않는 로그인 방법이에요.");
         Member current = locked(authenticated);
         if (reauthenticate) {
@@ -91,8 +104,15 @@ public class LoginMethodService {
             if (providerForEmail(current.getEmail()) != provider) throw invalid("현재 이메일에 해당하는 소셜 계정만 연결할 수 있어요.");
             requirePassword(current, password);
         }
+        var proof = reauthenticate ? null : mfa.consumeSensitive(current, kr.it.reserve.member.mfa.MfaService.SensitiveAction.LINK);
         LoginMethodChallenge challenge = issue(current, reauthenticate ? Purpose.SOCIAL_REAUTH : Purpose.SOCIAL_LINK,
                 provider, null, null);
+        if (proof != null) {
+            boolean remember = rememberBrowser != null ? rememberBrowser : "REMEMBERED".equals(mfa.browserStatus(current));
+            challenge.seal(null, proof.expiresAt());
+            String flags = (proof.strong() ? "S" : "P") + (remember ? "1" : "0");
+            challenge.seal(flags + ":" + linkSeal(challenge, request, flags, proof.binding()), proof.expiresAt());
+        }
         byte[] nonce = new byte[32];
         RANDOM.nextBytes(nonce);
         String value = Base64.getUrlEncoder().withoutPadding().encodeToString(nonce);
@@ -164,14 +184,20 @@ public class LoginMethodService {
         subjects.requireFreshAuthentication(authenticatedAt, tokenExpiresAt);
         if (!subject.acceptsAuthentication(authenticatedAt)) throw oauthExpired();
         var owners = members.findActiveIdsByProviderAndProviderIdForUpdate(provider.name(), info.getProviderId());
+        String linkFlags = null;
         if (challenge.getPurpose() == Purpose.SOCIAL_LINK) {
             if (current.isOAuthUser() || current.getPassword() == null || !owners.isEmpty()) throw oauthConflict();
             if (providerForEmail(current.getEmail()) != provider || !sameLinkEmail(current.getEmail(), provider, info))
                 throw new OAuth2AuthenticationException("login_method_email_mismatch");
+            String seal = challenge.getCodeHash();
+            String flags = seal != null && seal.matches("[SP][01]:[a-f0-9]{64}") ? seal.substring(0, 2) : null;
+            if (flags == null || current.isAdmin() && flags.charAt(0) != 'S'
+                    || !equal(seal.substring(3), linkSeal(challenge, request, flags, mfa.linkBinding(current, sessionId(request))))) throw oauthExpired();
             current.setProvider(provider);
             current.setProviderId(info.getProviderId());
             current.setOauthSecurityRevokedAt(null);
             changed(current);
+            linkFlags = flags;
         } else if (current.getProvider() != provider || !info.getProviderId().equals(current.getProviderId())
                 || owners.size() != 1 || !owners.getFirst().equals(current.getId()))
             throw new OAuth2AuthenticationException("login_method_identity_mismatch");
@@ -184,7 +210,35 @@ public class LoginMethodService {
         subjects.requireFreshAuthentication(authenticatedAt, tokenExpiresAt);
         subject.authenticated(authenticatedAt, subjects.now());
         if (challenge.getPurpose() == Purpose.SOCIAL_REAUTH) request.setAttribute(REAUTHENTICATED, Boolean.TRUE);
+        if (linkFlags != null) {
+            // 연결 저장과 새 세션 발급은 같은 트랜잭션으로 완료해요.
+            mfa.prepareLinkedSession(current, linkFlags.charAt(0) == 'S', linkFlags.charAt(1) == '1');
+            boolean persistent = tokens.isPersistentLogin(CookieUtil.getCookie(request, "access_token"));
+            var issued = linkFlags.charAt(0) == 'S' ? tokens.issueVerifiedSession(current, authenticatedAt, "OAUTH_MFA", persistent)
+                    : tokens.issueSession(current, authenticatedAt, persistent);
+            members.flush();
+            subjects.requireFreshAuthentication(authenticatedAt, tokenExpiresAt);
+            request.setAttribute(LINKED, new kr.it.reserve.config.oauth2.OAuthSessionIssuer.SessionTokens(
+                    issued.accessToken(), issued.refreshToken(), issued.refreshMaxAge(), null, issued.persistent()));
+        }
         return current;
+    }
+
+    public static kr.it.reserve.config.oauth2.OAuthSessionIssuer.SessionTokens consumeLinkedSession(HttpServletRequest request) {
+        Object session = request.getAttribute(LINKED);
+        request.removeAttribute(LINKED);
+        return session instanceof kr.it.reserve.config.oauth2.OAuthSessionIssuer.SessionTokens result ? result : null;
+    }
+    private String sessionId(HttpServletRequest request) {
+        String sid = tokens.getSessionId(CookieUtil.getCookie(request, "access_token"));
+        if (sid == null || sid.isBlank()) throw oauthExpired();
+        return sid;
+    }
+    private String linkSeal(LoginMethodChallenge challenge, HttpServletRequest request, String flags, String binding) {
+        String value = challenge.getId() + ":" + challenge.getMember().getId() + ":" + challenge.getAuthVersion() + ":"
+                + challenge.getProvider() + ":" + sessionId(request) + ":" + challenge.getExpiresAt() + ":" + flags + ":" + binding;
+        try { return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
+        catch (java.security.NoSuchAlgorithmException impossible) { throw new IllegalStateException("SHA-256 is required", impossible); }
     }
 
     /** 클라이언트 쿼리가 아닌 검증된 공급자 콜백에서만 재인증 의도를 전달한다. */
@@ -206,8 +260,8 @@ public class LoginMethodService {
             throw new MemberException("인증 코드는 1분 뒤 다시 받을 수 있어요.", HttpStatus.TOO_MANY_REQUESTS);
         String code = String.format(Locale.ROOT, "%06d", RANDOM.nextInt(1_000_000));
         LoginMethodChallenge challenge = issue(current, Purpose.PASSWORD_SETUP, current.getProvider(), normalized, passwords.encode(code));
-        emails.sendLoginMethodVerificationEmail(normalized, code);
-        return new EmailChallenge(challenge.getId(), challenge.getExpiresAt().toInstant(ZoneOffset.UTC));
+        var delivery = kr.it.reserve.email.service.EmailDelivery.submit(() -> emails.sendLoginMethodVerificationEmail(normalized, code));
+        return new EmailChallenge(challenge.getId(), challenge.getExpiresAt().toInstant(ZoneOffset.UTC), delivery);
     }
 
     @Transactional(noRollbackFor = BusinessException.class)
@@ -227,6 +281,7 @@ public class LoginMethodService {
         if (violation != null) throw invalid(violation);
         if (!PasswordPolicy.matches(password, confirmation)) throw invalid(PasswordPolicy.MISMATCH_MESSAGE);
         if (pwnedPasswords.isPwned(password)) throw invalid("유출된 이력이 있는 비밀번호예요. 다른 비밀번호를 사용해주세요.");
+        mfa.consumeSensitive(current, kr.it.reserve.member.mfa.MfaService.SensitiveAction.SET);
         passwordResets.invalidateForEmail(current.getEmail());
         String previousEmail = current.getEmail();
         current.setEmail(challenge.getEmail());
@@ -241,6 +296,7 @@ public class LoginMethodService {
         Member current = locked(authenticated);
         requireFreshSocial(current, oauthAt);
         if (current.getPassword() == null) throw invalid("이메일 로그인이 설정돼 있지 않아요.");
+        mfa.consumeSensitive(current, kr.it.reserve.member.mfa.MfaService.SensitiveAction.REMOVE);
         current.setPassword(null);
         changed(current);
     }
@@ -255,6 +311,7 @@ public class LoginMethodService {
         Member current = locked(authenticated.getId(), expectedVersion);
         if (current.getProvider() != provider || !providerId.equals(current.getProviderId())) throw expired();
         requirePassword(current, password);
+        mfa.consumeSensitive(current, kr.it.reserve.member.mfa.MfaService.SensitiveAction.UNLINK);
         subject.mergeMemberState(current.getOauthAuthenticatedAt(), current.getOauthSecurityRevokedAt());
         LocalDateTime now = subjects.now();
         subject.revoked(subject.getLastAuthenticatedAt() != null && subject.getLastAuthenticatedAt().isAfter(now)

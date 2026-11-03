@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import test, { before } from 'node:test';
 
 const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
-const config = read('promtail-config.yml');
+const config = read('infra/logging/promtail-config.yml');
 const nginxJob = config.slice(config.indexOf('  - job_name: nginx'));
 const quotedPattern = nginxJob.match(/selector: '\{job="nginx"\} !~ (".+")'/)?.[1];
 let allowedTiming;
@@ -69,7 +69,7 @@ test('collector separates user/system/iowait/steal while keeping the legacy aggr
 });
 
 test('compose overlay mounts only the selected directory read-only without creating it', () => {
-  const overlay = read('docker-compose-observability.yml');
+  const overlay = read('infra/compose/docker-compose-observability.yml');
   assert.ok(overlay.includes('RESERVE_NGINX_LOG_DIR:?'));
   assert.ok(overlay.includes('source: /home/ubuntu/promtail-config.yml'));
   assert.ok(overlay.includes('target: /etc/promtail/config.yml'));

@@ -65,7 +65,7 @@ public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationF
             case "access_denied"                   -> "소셜 로그인을 취소했어요.";
             case "authorization_request_not_found" -> "이 인증 요청은 이미 사용했거나 만료됐어요. 원래 화면에서 다시 시작해주세요.";
             case "invalid_state"                   -> "인증 요청을 확인할 수 없어요. 원래 화면에서 다시 시작해주세요.";
-            case "email_conflict"                  -> "이미 가입된 이메일이에요. 기존 가입 방식으로 로그인해주세요.";
+            case "email_conflict"                  -> "이미 가입된 이메일이에요. 기존 가입 방식으로 로그인한 뒤 마이페이지의 로그인 및 보안에서 소셜 계정을 연결해주세요.";
             case "login_method_expired"            -> "본인 확인·연결 요청이 만료됐어요. 설정 화면에서 다시 시작해주세요.";
             case "login_method_conflict"           -> "이미 연결된 소셜 계정이에요. 기존 연결을 확인해주세요.";
             case "login_method_email_mismatch"     -> "현재 RESERVE 계정과 같은 이메일의 인증된 소셜 계정을 사용해주세요.";

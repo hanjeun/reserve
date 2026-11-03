@@ -19,7 +19,7 @@ const baseline = new Map(git('ls-tree', '-rz', baseSha).split('\0').filter(Boole
 }));
 const groupOf = path => {
     if (/^(Claude outputs\/|docs\/design-system\/snapshots\/|frontend\/design-previews\/)/.test(path)) return 'preserve-evidence';
-    if (/(CICD|docker|nginx|backup|restore|post-deploy|grafana|promtail|metrics|monitoring)/i.test(path)) return 'deploy-recovery-monitoring';
+    if (/(CICD|workflows\/(?:CI|CD)\.yml|docker|nginx|backup|restore|post-deploy|grafana|promtail|metrics|monitoring)/i.test(path)) return 'deploy-recovery-monitoring';
     if (/(config\/|member\/|auth|session|password|oauth|Token|Cookie)/i.test(path)) return 'account-session';
     if (/(payment|refund|advertisement|AdBanner|AdPreview|AdMark)/i.test(path)) return 'payment-advertising';
     if (/(chat|messenger|conversation|inquiry|EmailService)/i.test(path)) return 'messaging-inquiry';

@@ -11,7 +11,7 @@ export default function useChatImageDraft(threadKey) {
     const isLoggedIn = useAuthStore(state => state.isLoggedIn);
     const scope = `${sessionRevision}:${threadKey}`;
     const [draft, setDraft] = useState(null);
-    const { data, isLoading } = useQuery({
+    const { data, isLoading, error, isFetching, refetch } = useQuery({
         queryKey: ['chat', 'image-config', sessionRevision],
         queryFn: () => chatService.getImageConfig(),
         enabled: isLoggedIn && threadKey != null,
@@ -23,6 +23,9 @@ export default function useChatImageDraft(threadKey) {
         files,
         enabled: Boolean(data?.enabled),
         loading: isLoading,
+        error,
+        refetching: isFetching,
+        refetch,
         choose: selected => setDraft(current => {
             const next = [...(current?.scope === scope ? current.files : EMPTY_FILES), ...selected];
             return next.length <= 3 ? { scope, files: next } : current;

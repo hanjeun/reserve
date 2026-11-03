@@ -6,7 +6,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Form, Typography, Divider, Flex, Modal, Checkbox } from 'antd';
 import { ExclamationCircleFilled, LockOutlined, MailOutlined, SafetyCertificateOutlined, InfoCircleOutlined } from '../../components/common/icons';
 import IconTool from '../../components/common/IconTool';
-import { PageContainer, Button, FormInput } from '../../components/common';
+import { PageContainer, Button, DataState, FormInput } from '../../components/common';
 import MfaFlow from '../../components/member/MfaFlow';
 import { authenticateWithPasskey, finishMfaSession } from '../../utils/mfaAuthentication';
 import SocialLoginButton from '../../components/common/SocialLoginButton';
@@ -48,18 +48,36 @@ const Login = () => {
     const [loading, setLoading] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
     const loginAttempt = useRef(false);
+    const socialNavigation = useRef(false);
     const nativeController = useRef(null);
     const mounted = useRef(true);
     const [rememberNotice, setRememberNotice] = useState(false);
     const [loginPolicy, setLoginPolicy] = useState(null);
-    useEffect(() => { mounted.current = true; return () => { mounted.current = false; nativeController.current?.abort(); }; }, []);
+    const [policyError, setPolicyError] = useState(null);
+    const [policyAttempt, setPolicyAttempt] = useState(0);
+    const [policyRetrying, setPolicyRetrying] = useState(false);
+    useEffect(() => {
+        mounted.current = true;
+        const restore = event => {
+            if (!event.persisted || !socialNavigation.current) return;
+            socialNavigation.current = false;
+            loginAttempt.current = false;
+            setLoading(false);
+        };
+        window.addEventListener('pageshow', restore);
+        return () => { mounted.current = false; nativeController.current?.abort(); window.removeEventListener('pageshow', restore); };
+    }, []);
     useEffect(() => {
         if (!rememberNotice) return;
         const controller = new AbortController();
         api.get('/api/auth/login-policy', { skipAuthRefresh: true, signal: controller.signal })
-            .then(policy => { if (!controller.signal.aborted) setLoginPolicy(policy); }).catch(() => {});
+            .then(policy => {
+                if (!controller.signal.aborted) { setLoginPolicy(policy); setPolicyError(null); }
+            })
+            .catch(error => { if (!controller.signal.aborted) setPolicyError(error); })
+            .finally(() => { if (!controller.signal.aborted) setPolicyRetrying(false); });
         return () => controller.abort();
-    }, [rememberNotice]);
+    }, [rememberNotice, policyAttempt]);
     const [mfa, setMfa] = useState(() => new URLSearchParams(location.search).get('mfa') === '1' ? {} : null);
     useEffect(() => {
         if (!registrationRequested || isLoggedIn || mfa || enrollmentNoticeRef.current === location.key) return;
@@ -145,13 +163,31 @@ const Login = () => {
         const direction = preventedRef.current && target !== '/' ? 'from-right' : 'from-left';
         navigate(target, { replace: true, state: { reserveRouteMotion: direction } });
     };
-    const nativePasskeyLogin = async () => {
+    const nativePasskeyLogin = async view => {
         if (!mounted.current) return;
         const controller = new AbortController();
         nativeController.current = controller;
-        await authenticateWithPasskey(false, controller.signal);
-        const member = await finishMfaSession(controller.signal);
-        if (mounted.current && !controller.signal.aborted) completeLogin(member);
+        const completionState = { reference: view?.completionId };
+        let verified;
+        try {
+            verified = await authenticateWithPasskey(false, controller.signal, completionState);
+            if (!mounted.current || controller.signal.aborted) return;
+            completionState.reference ??= verified?.completionId;
+            if (verified?.purpose === 'RISK_LOGIN') {
+                setMfa({ ...verified, mfaRequired: true, completionState });
+                return;
+            }
+            const member = await finishMfaSession(controller.signal, false, completionState);
+            if (mounted.current && !controller.signal.aborted) completeLogin(member);
+        } catch (failure) {
+            if (mounted.current && !controller.signal.aborted && !failure.isStaleSession && !failure.isSessionExpired
+                && !['NotAllowedError', 'AbortError'].includes(failure.name)) {
+                setMfa({ ...(verified || view), mfaRequired: true, completionState,
+                    preferredFactor: view?.totpAvailable ? 'TOTP' : 'PASSKEY', initialError: failure.message });
+                return;
+            }
+            throw failure;
+        }
     };
     const onLoginSubmit = async (values) => {
         if (loginAttempt.current) return;
@@ -162,7 +198,7 @@ const Login = () => {
             if (!mounted.current) return;
             if (res?.mfaRequired) {
                 if (res.passkeyAvailable && !res.enrollmentRequired) {
-                    try { await nativePasskeyLogin(); return; }
+                    try { await nativePasskeyLogin(res); return; }
                     catch (failure) {
                         if (failure.isSessionExpired || failure.isStaleSession || nativeController.current?.signal.aborted) return;
                         setMfa({ ...res, preferredFactor: res.totpAvailable ? 'TOTP' : 'PASSKEY',
@@ -194,9 +230,9 @@ const Login = () => {
         loginAttempt.current = true;
         setLoading(true);
         try {
-            await api.post('/api/auth/mfa/passkey/login', { rememberMe }, { skipAuthRefresh: true });
+            const view = await api.post('/api/auth/mfa/passkey/login', { rememberMe }, { skipAuthRefresh: true });
             if (!mounted.current) return;
-            await nativePasskeyLogin();
+            await nativePasskeyLogin(view);
         } catch (failure) {
             if (!mounted.current || failure.isSessionExpired || failure.isStaleSession || nativeController.current?.signal.aborted) return;
             await api.post('/api/auth/mfa/cancel', undefined, { skipAuthRefresh: true }).catch(() => {});
@@ -210,9 +246,16 @@ const Login = () => {
         if (loginAttempt.current) return;
         loginAttempt.current = true;
         setLoading(true);
-        // 전체 페이지 이동에서도 복귀 경로를 유지한다.
-        if (fromRef.current) saveRedirect(fromRef.current);
-        window.location.href = oauthAuthorizationUrl(provider, undefined, rememberMe);
+        try {
+            if (fromRef.current) saveRedirect(fromRef.current);
+            socialNavigation.current = true;
+            window.location.href = oauthAuthorizationUrl(provider, undefined, rememberMe);
+        } catch (error) {
+            socialNavigation.current = false;
+            loginAttempt.current = false;
+            setLoading(false);
+            message.error(error.message || '소셜 로그인을 시작하지 못했어요. 다시 시도해주세요.');
+        }
     };
 
     return (
@@ -281,6 +324,8 @@ const Login = () => {
                 open={rememberNotice} centered okText="로그인 유지하기" cancelText="취소"
                 onOk={() => { setRememberMe(true); setRememberNotice(false); }} onCancel={() => setRememberNotice(false)}>
                 <Typography.Paragraph>개인 기기에서만 사용해주세요. 공용 PC에서는 사용 후 꼭 로그아웃해주세요.</Typography.Paragraph>
+                {policyError && <DataState compact state="error" title="로그인 유지 안내를 불러오지 못했어요."
+                    error={policyError} retrying={policyRetrying} onRetry={() => { setPolicyRetrying(true); setPolicyAttempt(value => value + 1); }} />}
                 <Typography.Paragraph type="secondary">{loginPolicy?.idleSeconds && loginPolicy?.absoluteSeconds
                     ? lifetimeLabel(loginPolicy.idleSeconds) + ' 동안 사용하지 않거나 로그인한 지 ' + lifetimeLabel(loginPolicy.absoluteSeconds) + '이 지나면 다시 로그인해요.'
                     : '일정 기간 접속하지 않거나 로그인 유지 기간이 끝나면 다시 로그인해야 해요.'}</Typography.Paragraph>

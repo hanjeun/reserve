@@ -52,7 +52,7 @@ class LoginPersistenceMfaCookieTest {
         String raw = "A".repeat(43) + (persistent ? ".1" : ".0");
         when(service.beginPasskeyLogin(persistent)).thenReturn(new MfaService.Ticket(raw));
         when(service.status(raw, null, null)).thenReturn(new MfaService.View(true, false, false, true, false, "PASSKEY_LOGIN", LocalDateTime.now().plusMinutes(5), false));
-        when(service.finish(raw, null, null)).thenReturn(new MfaService.Completion(
+        when(service.finish(raw, null, null, null, null)).thenReturn(new MfaService.Completion(
                 new TokenProvider.IssuedSession("synthetic-access", "synthetic-refresh", Duration.ofDays(14), persistent)));
         var jwt = JwtSessionFixture.properties();
         var mvc = MockMvcBuilders.standaloneSetup(new MfaController(service, new CookieUtil("prod"), jwt, limiter))

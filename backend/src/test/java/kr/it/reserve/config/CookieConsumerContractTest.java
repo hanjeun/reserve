@@ -6,6 +6,7 @@ import kr.it.reserve.config.oauth2.OAuth2AuthenticationFailureHandler;
 import kr.it.reserve.config.oauth2.CustomOAuth2User;
 import kr.it.reserve.config.oauth2.OAuth2AuthenticationSuccessHandler;
 import kr.it.reserve.config.util.CookieUtil;
+import kr.it.reserve.global.ratelimit.RateLimiter;
 import kr.it.reserve.member.controller.MemberApiController;
 import kr.it.reserve.member.dto.PasswordChangeRequest;
 import kr.it.reserve.member.entity.Member;
@@ -46,7 +47,7 @@ class CookieConsumerContractTest {
         request.setNewPassword("new-test-password-2");
         request.setNewPasswordConfirm("new-test-password-2");
         var response = new MockHttpServletResponse();
-        new MemberApiController(memberService, new CookieUtil("prod"), withdrawal).changePassword(request, response);
+        new MemberApiController(memberService, new CookieUtil("prod"), withdrawal, mock(RateLimiter.class)).changePassword(request, response);
         verify(memberService).changePassword(7L, request);
         assertClearedCookies(response);
     }
@@ -54,7 +55,7 @@ class CookieConsumerContractTest {
     @Test void withdrawalClearsBothSecureCookiesAfterTheServiceSucceeds() {
         authenticate();
         var response = new MockHttpServletResponse();
-        new MemberApiController(memberService, new CookieUtil("prod"), withdrawal).deleteMember(response);
+        new MemberApiController(memberService, new CookieUtil("prod"), withdrawal, mock(RateLimiter.class)).deleteMember(response);
         verify(withdrawal).withdraw(member, null);
         assertClearedCookies(response);
     }
@@ -63,7 +64,7 @@ class CookieConsumerContractTest {
         authenticate();
         doThrow(new IllegalStateException("active reservation")).when(withdrawal).withdraw(member, null);
         var response = new MockHttpServletResponse();
-        var controller = new MemberApiController(memberService, new CookieUtil("prod"), withdrawal);
+        var controller = new MemberApiController(memberService, new CookieUtil("prod"), withdrawal, mock(RateLimiter.class));
         assertThatThrownBy(() -> controller.deleteMember(response))
                 .isInstanceOf(IllegalStateException.class).hasMessage("active reservation");
         assertThat(response.getHeaders(HttpHeaders.SET_COOKIE)).isEmpty();

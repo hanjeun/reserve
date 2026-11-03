@@ -21,7 +21,7 @@ import useAuthStore from '../../store/useAuthStore';
 import { STORE_NEWS_TYPES } from '../../utils/storeNews';
 import useListQueryNormalization from '../../hooks/useListQueryNormalization';
 import useLiveUpdatesStatus from '../../hooks/useLiveUpdatesStatus';
-import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
+import { isBlockingListReadError, isReadAccessDenied, refetchFailedReads } from '../../hooks/liveUpdateQueries';
 import { readQuerySelection, writeQuerySelection } from '../../utils/querySelection';
 
 export const BENEFIT_PAGE_SIZE = 12;
@@ -67,6 +67,10 @@ export default function Benefits() {
     });
     const items = Array.isArray(data?.content) ? data.content : [];
     const blockingError = isBlockingListReadError(error, items);
+    const configFailure = config.isError && (!config.data || isReadAccessDenied(config.error));
+    const refreshFailure = !configFailure && !(approvalReady && blockingError) && (approvalReady && isError ? { error } : config.isError ? config : null);
+    const retryReads = () => refetchFailedReads([config, ...(approvalReady ? [{ isError, refetch }] : [])]);
+    const retrying = isFetching || config.isFetching;
     useListRefreshAnchor(listRef, `${page}:${type}:${period}`, isFetching, data);
     const rawTotal = data?.page?.totalElements ?? data?.totalElements ?? 0;
     const total = Number.isSafeInteger(rawTotal) && rawTotal >= 0 ? rawTotal : 0;
@@ -88,14 +92,14 @@ export default function Benefits() {
 
     const renderNews = () => {
         if (config.isPending) return <BenefitsSkeleton />;
-        if (config.isError && !config.data) return <DataState state="error" title="혜택 상태를 불러오지 못했어요." error={config.error} onRetry={config.refetch} retrying={config.isFetching} />;
+        if (configFailure) return <DataState state="error" title="혜택 상태를 불러오지 못했어요." error={config.error} onRetry={retryReads} retrying={retrying} />;
         if (config.data?.benefitApprovalEnabled !== true) return <DataState state="empty" kind="news" title="관리자 승인형 혜택을 준비하고 있어요."
             description="혜택은 사진과 이용 조건을 확인하고 승인 후 공개해요." />;
         if (isPending) return <BenefitsSkeleton />;
         if (blockingError) {
             return (
                 <DataState state="error" kind="news" subject="가게 소식" error={error}
-                    title="가게 소식을 불러오지 못했어요." onRetry={refetch} retrying={isFetching} />
+                    title="가게 소식을 불러오지 못했어요." onRetry={retryReads} retrying={retrying} />
             );
         }
         if (items.length === 0) {
@@ -122,11 +126,12 @@ export default function Benefits() {
             </div>}
             <section ref={listRef} id="benefit-news" className="reserve-benefits-news" aria-label="가게 소식">
                 <div className="reserve-benefits-news-content">
-                    {isError && !blockingError && <DataState compact state="error" title="목록을 갱신하지 못했어요. 현재 내용은 유지했어요." error={error} onRetry={refetch} retrying={isFetching} />}
+                    {refreshFailure && <DataState compact state="error" title={approvalReady && isError ? '목록을 갱신하지 못했어요. 현재 내용은 유지했어요.' : '혜택 상태를 갱신하지 못했어요.'}
+                        error={refreshFailure.error} onRetry={retryReads} retrying={retrying} />}
                     {renderNews()}
                 </div>
                 {isFetching && !isPending && !isError && <p className="reserve-discovery-visually-hidden"><output>소식을 새로 불러오는 중</output></p>}
-                {!isPending && !blockingError && data && total > BENEFIT_PAGE_SIZE && (
+                {!configFailure && !isPending && !blockingError && data && total > BENEFIT_PAGE_SIZE && (
                     <nav aria-label="가게 소식 페이지" className="reserve-benefits-pagination"><Pagination current={page} pageSize={BENEFIT_PAGE_SIZE} total={total} showSizeChanger={false} showLessItems={isMobile} size={isMobile ? 'small' : 'default'} onChange={next => { const updated = new URLSearchParams(params); updated.set('page', String(next)); setParams(updated); window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }} /></nav>
                 )}
             </section>

@@ -505,8 +505,9 @@ const AdManageTab = () => {
         onPay: handlePay, onEdit: handleEdit, onCancel: handleCancel, onRemove: handleRemove,
     });
 
+    const retryReads = () => Promise.allSettled([refetch(), ...(storesError ? [refetchStores()] : [])]);
     const adsContent = renderAdsContent({
-        adsError, refetch, isFetching, loading: loading || search.trim() !== debouncedSearch.trim(), isPlaceholderData, totalElements, page, columns, ads,
+        adsError, refetch: retryReads, isFetching: isFetching || storesLoading, loading: loading || search.trim() !== debouncedSearch.trim(), isPlaceholderData, totalElements, page, columns, ads,
         onPageChange: (nextPage) => setAdListParams({ advertisementPage: String(nextPage - 1) }),
     });
 
@@ -554,7 +555,7 @@ const AdManageTab = () => {
             {/*
              * 가게 선택 조회가 실패해도 광고 목록은 유지하고 필터 아래에 재시도를 표시한다.
              */}
-            {storesError && (
+            {storesError && !adsError && (
                 <DataState state="error" kind="store" subject="가게 필터 목록" error={storesError}
                     onRetry={refetchStores} retrying={storesLoading} compact style={{ marginBottom: 16 }} />
             )}

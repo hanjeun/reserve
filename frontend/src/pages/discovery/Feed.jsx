@@ -55,9 +55,10 @@ export default function Feed() {
         queryFn: ({ signal }) => ownView ? feedService.myPosts(listParams, signal) : feedService.list(listParams, signal),
         enabled: enabled && (!requiresLogin || Boolean(user)), staleTime: 30_000, placeholderData: keepPreviousData });
     const listRef = useRef(null);
-    const unavailable = [config, list].some(query => [401, 403].includes(httpStatusOf(query.error)));
+    const listEnabled = enabled && (!requiresLogin || Boolean(user));
+    const unavailable = [config, ...(listEnabled ? [list] : [])].some(query => [401, 403].includes(httpStatusOf(query.error)));
     const posts = (list.data?.content || []).filter(post => post.state !== 'DELETED');
-    const blockingError = isBlockingListReadError(list.error, posts);
+    const blockingError = listEnabled && isBlockingListReadError(list.error, posts);
     const blockingFailure = config.isError && (!config.data || unavailable) || enabled && blockingError;
     const backgroundFailure = !blockingFailure && [...(enabled && (!requiresLogin || user) ? [list] : []), config].find(query => query.isError && query.data !== undefined);
     const profileFailure = !blockingFailure && !backgroundFailure && enabled && user && profile.isError;

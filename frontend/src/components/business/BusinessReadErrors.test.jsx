@@ -52,6 +52,19 @@ beforeEach(() => {
 });
 
 describe('business read failure ownership', () => {
+    it('retains a failed policy refresh after news is disabled and retries no inactive reads', async () => {
+        state.config = query({ enabled: false }, failure);
+        state.stores = query(state.stores.data, { status: 403 });
+        state.list = query(state.list.data, { status: 403 });
+        show(<StoreNewsTab />);
+        expect(screen.getAllByRole('alert')).toHaveLength(1);
+        expect(screen.getByRole('alert')).toHaveTextContent('가게 소식 상태를 갱신하지 못했어요.');
+        expect(screen.queryByText('합성 소식')).not.toBeInTheDocument();
+        await act(async () => fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' })));
+        expect(state.config.refetch).toHaveBeenCalledOnce();
+        expect(state.stores.refetch).not.toHaveBeenCalled();
+        expect(state.list.refetch).not.toHaveBeenCalled();
+    });
     it.each([false, true])('collapses store, policy and news failures while preserving usable rows (%s)', async cached => {
         state.config = query(state.config.data, failure);
         state.stores = query(state.stores.data, failure);

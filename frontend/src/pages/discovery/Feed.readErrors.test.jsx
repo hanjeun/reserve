@@ -65,6 +65,45 @@ describe('feed read failure ownership', () => {
         ['author', <FeedAuthor />, `/feed/authors/${publicId}`, '/feed/authors/:publicId'],
         ['detail', <FeedDetail />, '/feed/posts/3', '/feed/posts/:id'],
         ['notifications', <FeedNotifications />, '/feed/notifications', '/feed/notifications'],
+    ])('retries only policy after %s is disabled even with stale denied content', async (_kind, element, path, route) => {
+        state.config = query({ enabled: false, notificationsEnabled: false }, offline);
+        for (const key of ['list', 'post', 'author', 'profile']) state[key] = query(state[key].data, { status: 403 });
+        show(element, path, route);
+        expect(screen.getAllByRole('alert')).toHaveLength(1);
+        await act(async () => fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' })));
+        expect(state.config.refetch).toHaveBeenCalledOnce();
+        for (const key of ['list', 'post', 'author', 'profile']) expect(state[key].refetch).not.toHaveBeenCalled();
+        expect(screen.queryByRole('article')).not.toBeInTheDocument();
+    });
+    it.each([
+        [<FeedAuthor />, `/feed/authors/${publicId}`, '/feed/authors/:publicId'],
+        [<FeedDetail />, '/feed/posts/3', '/feed/posts/:id'],
+    ].flatMap(row => [offline, { status: 403 }].map(error => [...row, error])))('shows a profile-only failure beside usable primary content without repeating successful reads', async (element, path, route, error) => {
+        state.profile = query(undefined, error);
+        show(element, path, route);
+        expect(screen.getAllByRole('alert')).toHaveLength(1);
+        expect(screen.getByRole('alert')).toHaveTextContent('공개 프로필을 불러오지 못했어요.');
+        expect(screen.getByRole('article')).toHaveTextContent('합성 게시물');
+        await act(async () => fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' })));
+        expect(state.profile.refetch).toHaveBeenCalledOnce();
+        for (const key of ['config', 'list', 'post', 'author']) expect(state[key].refetch).not.toHaveBeenCalled();
+    });
+    it('does not retry author posts until the failed author has been recovered', async () => {
+        state.config = query(state.config.data, offline);
+        state.author = query(undefined, offline);
+        state.list = query(state.list.data, offline);
+        show(<FeedAuthor />, `/feed/authors/${publicId}`, '/feed/authors/:publicId');
+        expect(screen.getAllByRole('alert')).toHaveLength(1);
+        await act(async () => fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' })));
+        expect(state.author.refetch).toHaveBeenCalledOnce();
+        expect(state.config.refetch).toHaveBeenCalledOnce();
+        expect(state.list.refetch).not.toHaveBeenCalled();
+    });
+    it.each([
+        ['feed', <Feed />, '/feed', '/feed'],
+        ['author', <FeedAuthor />, `/feed/authors/${publicId}`, '/feed/authors/:publicId'],
+        ['detail', <FeedDetail />, '/feed/posts/3', '/feed/posts/:id'],
+        ['notifications', <FeedNotifications />, '/feed/notifications', '/feed/notifications'],
     ])('does not show inactive cached read failures after %s is disabled', (_kind, element, path, route) => {
         state.config = query({ enabled: false, notificationsEnabled: false });
         for (const key of ['list', 'post', 'author', 'profile']) state[key] = query(state[key].data, offline);

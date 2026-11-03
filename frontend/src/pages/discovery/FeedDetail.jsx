@@ -36,11 +36,14 @@ export default function FeedDetail() {
     const [reportId, setReportId] = useState(null);
     const post = useQuery({ queryKey: feedKeys.detail(postId), queryFn: ({ signal }) => feedService.detail(postId, signal),
         enabled: enabled && validId, staleTime: 30_000 });
-    const unavailable = [config, post].some(query => [401, 403].includes(httpStatusOf(query.error))) || isMissingRequestError(post.error);
-    const blockingFailure = config.isError && (!config.data || unavailable) || enabled && post.isError && (!post.data || unavailable);
-    const backgroundFailure = !blockingFailure && [...(enabled ? [post] : []), config].find(query => query.isError && query.data !== undefined);
-    const retryReads = () => refetchFailedReads([config, post]);
-    const retrying = config.isFetching || post.isFetching;
+    const postEnabled = enabled && validId;
+    const reads = [config, ...(postEnabled ? [post] : []), ...(postEnabled && user ? [profile] : [])];
+    const unavailable = [config, ...(postEnabled ? [post] : [])].some(query => [401, 403].includes(httpStatusOf(query.error))) || postEnabled && isMissingRequestError(post.error);
+    const blockingFailure = config.isError && (!config.data || unavailable) || postEnabled && post.isError && (!post.data || unavailable);
+    const backgroundFailure = !blockingFailure && [...(postEnabled ? [post] : []), config].find(query => query.isError && query.data !== undefined);
+    const profileFailure = !blockingFailure && !backgroundFailure && postEnabled && user && post.data && profile.isError;
+    const retryReads = () => refetchFailedReads(reads);
+    const retrying = reads.some(query => query.isFetching);
     useDocumentTitle(!unavailable && post.data?.author?.nickname ? `${post.data.author.nickname}의 게시물` : '피드 게시물');
     const back = discoveryTabDestination('/feed');
     const goBack = useGoBack(back);
@@ -62,6 +65,8 @@ export default function FeedDetail() {
     if (!editing && !reportId && validId && (!config.data && config.isPending || enabled && !post.data && post.isPending)) return <FeedPageSkeleton kind="feed-detail" postId={postId} />;
     return <PageContainer size="md" paddingTop="12px" paddingX="0px" paddingBottom="40px" style={{ maxWidth: 640, backgroundColor: 'transparent' }} className="reserve-feed-page" aria-labelledby="feed-post-title">
         <header className="reserve-feed-heading"><IconTool kind="navigation" label="이전 화면으로 돌아가기" icon={<ArrowLeftOutlined aria-hidden="true" />} onClick={goBack} /><PageTitle level={1} id="feed-post-title">게시물</PageTitle></header>
+        {profileFailure && <DataState compact state="error" title={profile.data === undefined ? '공개 프로필을 불러오지 못했어요.' : '공개 프로필을 갱신하지 못했어요.'}
+            error={profile.error} onRetry={retryReads} retrying={retrying} />}
         {!unavailable && backgroundFailure && <DataState compact state="error" title="게시물을 갱신하지 못했어요." error={backgroundFailure.error} onRetry={retryReads} retrying={retrying} />}
         {renderPost()}
         {enabled && !unavailable && !blockingFailure && post.data?.state === 'PUBLISHED' && <FeedComments key={postId} postId={postId} />}

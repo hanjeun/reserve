@@ -49,13 +49,16 @@ export default function FeedAuthor() {
         queryFn: ({ signal }) => feedService.authorPosts(publicId, listParams, signal), enabled: enabled && Boolean(author.data) && !authorUnavailable,
         staleTime: 30_000, placeholderData: keepPreviousData, retry: retryProfileRead });
     const listRef = useRef(null);
-    const unavailable = authorUnavailable || [config, posts].some(query => [401, 403].includes(httpStatusOf(query.error)));
-    const blockingError = isBlockingListReadError(posts.error, posts.data?.content);
+    const postsEnabled = enabled && Boolean(author.data) && !authorUnavailable;
+    const reads = [config, ...(enabled ? [author] : []), ...(postsEnabled ? [posts] : []), ...(enabled && user ? [ownProfile] : [])];
+    const unavailable = enabled && authorUnavailable || [config, ...(postsEnabled ? [posts] : [])].some(query => [401, 403].includes(httpStatusOf(query.error)));
+    const blockingError = postsEnabled && isBlockingListReadError(posts.error, posts.data?.content);
     const blockingFailure = config.isError && (!config.data || unavailable)
         || enabled && (author.isError && (!author.data || authorUnavailable) || blockingError);
-    const backgroundFailure = !blockingFailure && [...(enabled ? [posts, author] : []), config].find(query => query.isError && query.data !== undefined);
-    const retryReads = () => refetchFailedReads([config, author, posts]);
-    const retrying = [config, author, posts].some(query => query.isFetching);
+    const backgroundFailure = !blockingFailure && [...(postsEnabled ? [posts] : []), ...(enabled ? [author] : []), config].find(query => query.isError && query.data !== undefined);
+    const profileFailure = !blockingFailure && !backgroundFailure && enabled && user && author.data && posts.data && ownProfile.isError;
+    const retryReads = () => refetchFailedReads(reads);
+    const retrying = reads.some(query => query.isFetching);
     useListRefreshAnchor(listRef, `${publicId}:${page}`, posts.isFetching && !posts.isPlaceholderData, unavailable ? null : posts.data);
     const totalPages = Math.max(1, Math.ceil(feedTotal(posts.data) / FEED_PAGE_SIZE));
     useEffect(() => {
@@ -94,6 +97,8 @@ export default function FeedAuthor() {
             <div><h2>{author.data.nickname}</h2><p>{author.data.bio}</p></div>
             {mine && <IconTool label="공개 프로필 수정" icon={<InterfaceIcon name="edit" />}
                 onClick={() => navigate('/my-page?tab=public-profile')} />}</div>}
+        {profileFailure && <DataState compact state="error" title={ownProfile.data === undefined ? '공개 프로필을 불러오지 못했어요.' : '공개 프로필을 갱신하지 못했어요.'}
+            error={ownProfile.error} onRetry={retryReads} retrying={retrying} />}
         {!unavailable && backgroundFailure && <DataState compact state="error" title="게시물을 갱신하지 못했어요." error={backgroundFailure.error} onRetry={retryReads} retrying={retrying} />}
         {renderList()}
         {enabled && !unavailable && !blockingError && posts.data && feedTotal(posts.data) > FEED_PAGE_SIZE && <nav className="reserve-feed-pagination" aria-label="작성자 게시물 페이지">

@@ -51,10 +51,11 @@ export default function StoreNewsTab() {
     const total = feedTotal(list.data), lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
     useListRefreshAnchor(listRef, `${storeId}:${selectedState}:${page}`, list.isFetching, list.data);
     const visibleNews = (list.data?.content || []).filter(item => item.state !== 'DELETED');
-    const blockingError = isBlockingListReadError(list.error, visibleNews);
-    const backgroundFailure = !blockingError && [list, config, stores].find(query => query.isError);
-    const retryReads = () => refetchFailedReads([config, list, stores]);
-    const retrying = [config, list, stores].some(query => query.isFetching);
+    const reads = [config, ...(active && enabled ? [list, stores] : [])];
+    const blockingError = active && enabled && isBlockingListReadError(list.error, visibleNews);
+    const backgroundFailure = !blockingError && [...(active && enabled ? [list] : []), config, ...(active && enabled ? [stores] : [])].find(query => query.isError);
+    const retryReads = () => refetchFailedReads(reads);
+    const retrying = reads.some(query => query.isFetching);
     const [editor, setEditor] = useState({ open: false, id: undefined });
     const [preview, setPreview] = useState({ open: false, news: null });
     const previewQuery = useQuery({ queryKey: storeNewsKeys.detail(preview.news?.id),
@@ -77,7 +78,10 @@ export default function StoreNewsTab() {
     if (!business) return <DataState state="empty" title="가게 소식 관리는 사업자 계정에서 이용할 수 있어요." />;
     if (config.isPending) return <StoreNewsSkeleton showRefresh={!automatic} />;
     if (config.isError && (!config.data || isReadAccessDenied(config.error))) return <DataState state="error" title="가게 소식 상태를 불러오지 못했어요." error={config.error} onRetry={retryReads} retrying={retrying} />;
-    if (!enabled) return <DataState state="empty" kind="news" title="가게 소식 작성을 준비하고 있어요." description="작성 기능이 준비되면 이 화면에서 소식을 작성하고 관리할 수 있어요." />;
+    if (!enabled) return <>
+        {config.isError && <DataState state="error" compact title="가게 소식 상태를 갱신하지 못했어요." error={config.error} onRetry={retryReads} retrying={retrying} />}
+        <DataState state="empty" kind="news" title="가게 소식 작성을 준비하고 있어요." description="작성 기능이 준비되면 이 화면에서 소식을 작성하고 관리할 수 있어요." />
+    </>;
     const writeUnavailable = stores.isPending ? '내 가게를 불러오고 있어요.'
         : stores.isError ? '내 가게를 불러오지 못했어요. 다시 불러온 뒤 작성해주세요.'
             : !owned.length ? '소식을 게시할 수 있는 내 가게가 있어야 작성할 수 있어요.' : '';

@@ -38,12 +38,13 @@ export default function FeedNotifications() {
     const list = useQuery({ queryKey: interactionKeys.notifications(request), queryFn: ({ signal }) => service.notifications(request, signal),
         enabled, placeholderData: keepPreviousData, staleTime: 20_000 });
     const listRef = useRef(null);
-    const unavailable = [config, list].some(query => [401, 403].includes(httpStatusOf(query.error)));
-    const blockingError = isBlockingListReadError(list.error, list.data?.content);
+    const reads = [config, ...(enabled ? [list] : [])];
+    const unavailable = reads.some(query => [401, 403].includes(httpStatusOf(query.error)));
+    const blockingError = enabled && isBlockingListReadError(list.error, list.data?.content);
     const blockingFailure = config.isError && (!config.data || unavailable) || enabled && blockingError;
     const backgroundFailure = !blockingFailure && [...(enabled ? [list] : []), config].find(query => query.isError && query.data !== undefined);
-    const retryReads = () => refetchFailedReads([config, list]);
-    const retrying = config.isFetching || list.isFetching;
+    const retryReads = () => refetchFailedReads(reads);
+    const retrying = reads.some(query => query.isFetching);
     useListRefreshAnchor(listRef, `${view}:${page}`, list.isFetching && !list.isPlaceholderData, unavailable ? null : list.data);
     const lastPage = Math.max(1, Math.ceil(feedTotal(list.data) / 20));
     useEffect(() => {

@@ -29,7 +29,7 @@ function MfaAction({ page, label, icon, loading, disabled, htmlType = 'button', 
 MfaAction.propTypes = { page: PropTypes.bool, label: PropTypes.string.isRequired, icon: PropTypes.node.isRequired,
     loading: PropTypes.bool, disabled: PropTypes.bool, htmlType: PropTypes.oneOf(['button', 'submit']), onClick: PropTypes.func, variant: PropTypes.string,
     kind: PropTypes.oneOf(['navigation', 'tool']) };
-export default function MfaFlow({ ref, initialView, settings, page = false, onDone, onCancel }) {
+export default function MfaFlow({ ref, initialView, settings, page = false, revealOnMount = true, onDone, onCancel }) {
     const revision = useAuthStore(state => state.sessionRevision);
     const { message } = useMessage();
     const [view, setView] = useState(initialView);
@@ -140,10 +140,13 @@ export default function MfaFlow({ ref, initialView, settings, page = false, onDo
                 : view?.purpose === 'RISK_LOGIN' ? '새 접속 환경에서 로그인하고 있어요. 본인 확인을 마치면 계속할 수 있어요.'
                     : '등록한 인증 수단으로 본인인지 확인해주세요.';
     const motionKey = codes ? 'codes' : setup ? 'totp-setup' : changing ? 'manage' : view?.enrollmentRequired ? 'enroll' : 'verify-' + selected;
+    const previousMotion = useRef(motionKey);
     useEffect(() => {
-        if (!page) return revealSecurityPanel(sectionRef.current, reducedMotion);
+        const changed = previousMotion.current !== motionKey;
+        previousMotion.current = motionKey;
+        if (!page && (revealOnMount || changed)) return revealSecurityPanel(sectionRef.current, reducedMotion);
         return undefined;
-    }, [page, motionKey, reducedMotion]);
+    }, [page, motionKey, reducedMotion, revealOnMount]);
     const alternatives = view && view.purpose !== 'PASSKEY_LOGIN' && <Flex gap={16} wrap className="reserve-mfa-alternatives">
         {view.passkeyAvailable && selected !== 'PASSKEY' && <IconTool label="패스키 사용" icon={<LockOutlined aria-hidden="true" />} disabled={busy} onClick={() => { setMethod('PASSKEY'); void passkey(false); }} />}
         {view.totpAvailable && selected !== 'TOTP' && <IconTool label="인증 앱 사용" icon={<MobileOutlined aria-hidden="true" />} disabled={busy} onClick={() => setMethod('TOTP')} />}
@@ -251,5 +254,5 @@ export default function MfaFlow({ ref, initialView, settings, page = false, onDo
         </div>}
     </section></AnimatedContent>;
 }
-MfaFlow.propTypes = { ref: PropTypes.object, initialView: PropTypes.object, settings: PropTypes.object, page: PropTypes.bool,
+MfaFlow.propTypes = { ref: PropTypes.object, initialView: PropTypes.object, settings: PropTypes.object, page: PropTypes.bool, revealOnMount: PropTypes.bool,
     onDone: PropTypes.func, onCancel: PropTypes.func };

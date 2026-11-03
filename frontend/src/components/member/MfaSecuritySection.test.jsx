@@ -9,9 +9,9 @@ import useAuthStore from '../../store/useAuthStore';
 const fixture = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), message: { error: vi.fn(), info: vi.fn() } }));
 vi.mock('../../api/axios', () => ({ default: { get: fixture.get, post: fixture.post } }));
 vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: fixture.message }) }));
-vi.mock('./MfaFlow', () => ({ default: function ManagedFlow({ ref, initialView, onCancel }) {
+vi.mock('./MfaFlow', () => ({ default: function ManagedFlow({ ref, initialView, onCancel, revealOnMount }) {
     useImperativeHandle(ref, () => ({ cancel: onCancel }));
-    return <span>{initialView.verified ? '인증 수단 관리' : '기존 인증 수단 확인'}</span>;
+    return <span data-reveal-on-mount={String(revealOnMount)}>{initialView.verified ? '인증 수단 관리' : '기존 인증 수단 확인'}</span>;
 } }));
 const methods = { passwordEnabled: true, socialProofFresh: false, socialProvider: 'NAVER' };
 const connected = { available: true, enabled: true, required: false, credentials: [{ id: 'fixture-key', kind: 'PASSKEY' }] };
@@ -29,6 +29,9 @@ describe('계정별 인증 관리', () => {
         const props = { loginMethods: { ...methods, socialProofFresh: true }, resumeRequest };
         const page = render(<AntApp><MemoryRouter><MfaSecuritySection {...props} /></MemoryRouter></AntApp>);
         expect(await screen.findByText('인증 수단 관리')).toBeVisible();
+        const surface = document.querySelector('.reserve-login-security-surface');
+        await waitFor(() => expect(surface).toHaveFocus());
+        expect(screen.getByText('인증 수단 관리')).toHaveAttribute('data-reveal-on-mount', 'false');
         expect(fixture.post).toHaveBeenCalledTimes(1);
         page.rerender(<AntApp><MemoryRouter><MfaSecuritySection {...props} /></MemoryRouter></AntApp>);
         expect(fixture.post).toHaveBeenCalledTimes(1);
@@ -74,6 +77,7 @@ describe('계정별 인증 관리', () => {
         show();
         fireEvent.click(await screen.findByRole('button', { name: '패스키·인증 앱 관리' }));
         expect(await screen.findByText('기존 인증 수단 확인')).toBeInTheDocument();
+        expect(screen.getByText('기존 인증 수단 확인')).toHaveAttribute('data-reveal-on-mount', 'false');
         expect(screen.queryByLabelText('현재 비밀번호')).toBeNull();
         expect(fixture.post).toHaveBeenCalledWith('/api/member/mfa/manage', { password: undefined }, { skipAuthRefresh: true, signal: expect.any(AbortSignal) });
     });

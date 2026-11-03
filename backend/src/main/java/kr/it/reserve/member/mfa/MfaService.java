@@ -404,8 +404,11 @@ public class MfaService {
         if (session.getAuthVersion() != member.getAuthVersion() || policy.requires(member) && !MfaPolicy.strong(session.getLoginMethod())) throw expired();
     }
     private TokenProvider.IssuedSession continueSession(Member member, MfaChallenge challenge, String ticket) {
-        if (primaryManagement(challenge))
+        if (primaryManagement(challenge)) {
+            // 인증 버전을 바꾼 뒤에도 같은 환경에서 확인한 관리 작업만 이어줘요.
+            if (ipProtection != null) ipProtection.approveCurrent(member);
             return tokens.issueSession(member, challenge.getOauthAt(), new Ticket(ticket).persistent());
+        }
         String base = primaryMethod(challenge);
         String method = "PASSKEY".equals(base) ? "PASSKEY" : base + "_MFA";
         return tokens.issueVerifiedSession(member, challenge.getOauthAt(), method, new Ticket(ticket).persistent());
@@ -528,7 +531,8 @@ public class MfaService {
         if (riskLogin(challenge)) {
             if (member == null || member.isAdmin() || ipProtection == null) throw expired();
             ipProtection.requireBinding(raw, member);
-        } else if (challenge.getPurpose() == MfaChallenge.Purpose.MANAGE && ipProtection != null && ipProtection.enabled()) ipProtection.requireBinding(raw, member);
+        } else if ((challenge.getPurpose() == MfaChallenge.Purpose.MANAGE || primaryManagement(challenge))
+                && ipProtection != null && ipProtection.enabled()) ipProtection.requireBinding(raw, member);
         if (member != null && challenge.getMemberId() != null && (member.getAuthVersion() != challenge.getAuthVersion()
                 || member.isAdmin() && primaryManagement(challenge)
                 || !tokens.isPrimaryLoginCurrent(member, challenge.getOauthAt(), primaryMethod(challenge)))) throw expired();

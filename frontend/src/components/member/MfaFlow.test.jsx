@@ -84,6 +84,22 @@ describe('추가 인증', () => {
         expect(performPasskey).not.toHaveBeenCalled();
         expect(fixture.post).not.toHaveBeenCalled();
     });
+    it('연필로 처음 연 패널은 화면을 내리지 않고 다음 인증 단계의 이동은 유지해요', async () => {
+        render(<><button type="button">관리 연필</button><MfaFlow revealOnMount={false} settings={{ credentials: [] }}
+            initialView={{ purpose: 'MANAGE', passkeyAvailable: true }} /></>);
+        const trigger = screen.getByRole('button', { name: '관리 연필' });
+        trigger.focus();
+        const section = screen.getByRole('region', { name: '추가 인증' });
+        section.scrollIntoView = vi.fn();
+        await act(async () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+        expect(section.scrollIntoView).not.toHaveBeenCalled();
+        expect(trigger).toHaveFocus();
+        fireEvent.click(screen.getByRole('button', { name: '복구코드 사용' }));
+        await waitFor(() => expect(section.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' }));
+        expect(section).toHaveFocus();
+        expect(screen.getByLabelText('복구코드')).toBeVisible();
+        expect(fixture.post).not.toHaveBeenCalled();
+    });
     it('패스키는 WebAuthn 등록을 사용하고 인증 앱 설정과 구분해요', async () => {
         fixture.post.mockImplementation(path => Promise.resolve(path.endsWith('/passkey/options') ? 'synthetic-options' : { codes: ['SYNTHETIC-CODE'] }));
         performPasskey.mockResolvedValue('synthetic-credential');

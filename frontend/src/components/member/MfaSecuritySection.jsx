@@ -138,7 +138,7 @@ export default function MfaSecuritySection({ loginMethods, disabled = false, res
                     <Bone width={160} height={20} pageLoading={false} />
                     <Bone height={16} pageLoading={false} style={{ marginTop: 12 }} />
                     <Bone width={44} height={44} pageLoading={false} style={{ marginTop: 16, marginInlineStart: 'auto' }} />
-                </div> : view?.revision === revision ? <MfaFlow ref={flowRef} initialView={view.value} settings={status} onDone={() => { setRetry(value => value + 1); close(); }} onCancel={close} />
+                </div> : view?.revision === revision ? <MfaFlow ref={flowRef} initialView={view.value} settings={status} revealOnMount={false} onDone={() => { setRetry(value => value + 1); close(); }} onCancel={close} />
                     : <Form key={revision} aria-label={label} layout="vertical" requiredMark={false} onFinish={manage}>
                         {showPassword && <Form.Item name="password" label="현재 비밀번호" rules={[{ required: !loginMethods.socialProofFresh, message: '현재 비밀번호를 입력해주세요.' }]}>
                             <FormInput type="password" autoComplete="current-password" maxLength={64} disabled={busy} />

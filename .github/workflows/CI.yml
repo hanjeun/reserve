@@ -193,6 +193,7 @@ jobs:
           bash -n scripts/verify-mysql-row-lock.sh
           bash -n scripts/test-backend-isolated.sh
           bash -n scripts/check-deployment-memory.sh
+          bash -n scripts/check-auth-limits-image.sh
           bash -n scripts/test-frontend-release-swap.sh
           bash -n scripts/preserve-frontend-assets.sh
           bash -n scripts/test-frontend-assets.sh

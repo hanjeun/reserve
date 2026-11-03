@@ -38,7 +38,7 @@ export default function FeedDetail() {
         enabled: enabled && validId, staleTime: 30_000 });
     const unavailable = [config, post].some(query => [401, 403].includes(httpStatusOf(query.error))) || isMissingRequestError(post.error);
     const blockingFailure = config.isError && (!config.data || unavailable) || enabled && post.isError && (!post.data || unavailable);
-    const backgroundFailure = !blockingFailure && [post, config].find(query => query.isError && query.data !== undefined);
+    const backgroundFailure = !blockingFailure && [...(enabled ? [post] : []), config].find(query => query.isError && query.data !== undefined);
     const retryReads = () => refetchFailedReads([config, post]);
     const retrying = config.isFetching || post.isFetching;
     useDocumentTitle(!unavailable && post.data?.author?.nickname ? `${post.data.author.nickname}의 게시물` : '피드 게시물');

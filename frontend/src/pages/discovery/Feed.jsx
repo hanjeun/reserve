@@ -59,7 +59,7 @@ export default function Feed() {
     const posts = (list.data?.content || []).filter(post => post.state !== 'DELETED');
     const blockingError = isBlockingListReadError(list.error, posts);
     const blockingFailure = config.isError && (!config.data || unavailable) || enabled && blockingError;
-    const backgroundFailure = !blockingFailure && [list, config].find(query => query.isError && query.data !== undefined);
+    const backgroundFailure = !blockingFailure && [...(enabled && (!requiresLogin || user) ? [list] : []), config].find(query => query.isError && query.data !== undefined);
     const profileFailure = !blockingFailure && !backgroundFailure && enabled && user && profile.isError;
     const reads = [config, ...(enabled && (!requiresLogin || user) ? [list] : []), ...(enabled && user ? [profile] : [])];
     const retryReads = () => refetchFailedReads(reads);

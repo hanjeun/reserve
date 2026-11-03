@@ -73,6 +73,10 @@ Redis 계정 전환도 별도 승인해요. 기존 관리자 설정과 독립된
 
 첫 배포는 IP 보호를 끈 상태로 프록시·제한 Redis 계정·새 앱을 전환하고 같은 SHA의 호환 복구를 확인해요. `check-redis`·필수 CI·외부 앱 포트의 직접 연결 차단·실제 프록시 경유 로그인 확인 뒤 같은 검증 이미지로 IP 보호만 활성화해요. 인증 상태가 새로 생긴 뒤에는 IP 변수를 끈 같은 SHA를 우선 복구 대상으로 사용해요. 최초 인프라 전환이 실패하면 직전 앱·nginx·프론트와 Redis 설정·인증으로 복귀하며 새 내부망은 롤백 확인 전에 제거하지 않아요. 격리 프록시 검사는 `RESERVE_PROXY_INTEGRATION=true python3 scripts/tests/ip_protection_test.py ProxyIntegrationTest`예요.
 
+공유 인증 제한은 기본 비활성이에요. 활성화 전에 제한을 끈 새 이미지를 먼저 배포하고, 실제 새 JAR을 포함하는 `reserve.auth-compat=browser-sensitive-shared-limits-v1` 후보·복구 이미지와 대응 설정을 준비해요. 구형 v11 이미지에 라벨만 붙여 복구 대상으로 사용하지 않아요. 활성 상태의 자동 배포는 대상 시작 전과 경로 전환 직전에 후보·복구 이미지의 인증 호환 표시를 모두 확인해요.
+
+활성화는 전용 HMAC 키·epoch·제한 ACL을 준비한 뒤 `prepare-auth-limits --apply`와 10분 복구 대기, 읽기 전용 `check-auth-limits`를 마친 같은 이미지로 별도 승인해요. 장애 중에는 공유 제한을 로컬 제한으로 자동 전환하지 않아요. 복구도 같은 인증 계약·키·epoch를 우선 유지하며 Redis 재시작·복원·marker 소실 후에는 다시 10분 대기해요. 비활성화나 이전 이미지로의 복귀는 공유 제한이 사라지는 별도 설정 변경으로 승인받아요.
+
 ## 관련 코드
 
 - [CI](../../.github/workflows/CI.yml) · [CD](../../.github/workflows/CD.yml)

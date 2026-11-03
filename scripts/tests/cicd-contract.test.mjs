@@ -20,6 +20,44 @@ const staging = cd.jobs['stage-release'];
 const detectionScript = read('scripts/detect-active-upstream.sh');
 const step = (job, id) => job.steps.find(entry => entry.id === id);
 
+test('shared authentication activation refuses an unsupported recovery image before startup and again at cutover', () => {
+    const launch = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
+    const transfer = deployment.steps.find(entry => entry.name === 'Deploy deployment guards to EC2');
+    const check = 'sudo bash /home/ubuntu/scripts/check-auth-limits-image.sh';
+    assert.ok(transfer.with.source.split(',').includes('scripts/check-auth-limits-image.sh'));
+    const preflight = launch.with.script.indexOf(check);
+    assert.ok(preflight > launch.with.script.indexOf('sudo docker pull'));
+    assert.ok(preflight < launch.with.script.indexOf('sudo -E docker compose'));
+    assert.match(launch.with.script.slice(preflight).split('\n')[0], /"\$RESERVE_IMAGE_REFERENCE" "\$CURRENT_IMAGE"/);
+    const cutover = deployment.steps.find(entry => entry.with?.script?.includes('RESERVE_CUTOVER'));
+    assert.match(cutover.env.RESERVE_SECURITY_AUTH_LIMITS_ENABLED, /false/);
+    assert.ok(cutover.with.envs.split(',').includes('RESERVE_SECURITY_AUTH_LIMITS_ENABLED'));
+    assert.ok(cutover.with.script.includes(check + ' "$RESERVE_SECURITY_AUTH_LIMITS_ENABLED" "$COMPATIBLE_IMAGE"'));
+    assert.match(read('backend/Dockerfile'), /LABEL reserve\.auth-compat="browser-sensitive-shared-limits-v1"/);
+    for (const required of ['BrowserCookies.class', 'RedisAuthRateLimiter.class', 'redis/auth-rate-limit.lua', 'redis/ip-protection.lua'])
+        assert.ok(read('backend/Dockerfile').includes(required));
+    const image = 'sha256:' + 'a'.repeat(64);
+    const recovery = 'sha256:' + 'b'.repeat(64);
+    const script = read('scripts/check-auth-limits-image.sh');
+    const run = (flag, first, second, references = [image, recovery]) => spawnSync(
+        process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash',
+        ['-c', `docker() { case "\${!#}" in "$TASK_IMAGE") printf '%s' "$TASK_FIRST" ;; "$TASK_RECOVERY") printf '%s' "$TASK_SECOND" ;; *) return 9 ;; esac; }
+${script}`, '_', flag, ...references],
+        { encoding: 'utf8', timeout: 5000, env: { ...process.env, TASK_IMAGE: image, TASK_RECOVERY: recovery, TASK_FIRST: first, TASK_SECOND: second } });
+    const compatible = 'browser-sensitive-shared-limits-v1';
+    assert.equal(run('false', '', '', ['invalid']).status, 0);
+    assert.equal(run('true', compatible, compatible).status, 0);
+    for (const [flag, first, second, references] of [
+        ['true', compatible, '<no value>'], ['true', '', compatible], ['true', compatible, 'legacy'],
+        ['maybe', compatible, compatible], ['true', compatible, compatible, ['mutable:latest']],
+        ['true', compatible, compatible, []], ['true', compatible, compatible, ['sha256:' + 'c'.repeat(64)]],
+    ]) {
+        const result = run(flag, first, second, references);
+        assert.ifError(result.error);
+        assert.notEqual(result.status, 0, result.stderr + result.stdout);
+    }
+});
+
 test('shared authentication activation requires Redis key epoch and a completed recovery wait before startup', () => {
     const launch = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
     const names = ['RESERVE_SECURITY_AUTH_LIMITS_ENABLED', 'RESERVE_SECURITY_AUTH_LIMITS_FINGERPRINT_KEY', 'RESERVE_SECURITY_AUTH_LIMITS_EPOCH'];

@@ -281,7 +281,7 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
-          source: "scripts/check-deployment-memory.sh,scripts/prepare-ip-protection.py,scripts/redis-app.rules"
+          source: "scripts/check-deployment-memory.sh,scripts/check-auth-limits-image.sh,scripts/prepare-ip-protection.py,scripts/redis-app.rules"
           target: "/home/ubuntu/"
 
       - name: Docker compose up (target)
@@ -462,6 +462,8 @@ jobs:
               *) echo 'Immutable deployment image is required'; exit 1 ;;
             esac
             sudo docker pull "$RESERVE_IMAGE_REFERENCE"
+            CURRENT_IMAGE=$(sudo docker inspect --format '{{.Image}}' "${{ env.CURRENT_UPSTREAM }}")
+            sudo bash /home/ubuntu/scripts/check-auth-limits-image.sh "$RESERVE_SECURITY_AUTH_LIMITS_ENABLED" "$RESERVE_IMAGE_REFERENCE" "$CURRENT_IMAGE"
             sudo python3 /home/ubuntu/scripts/prepare-ip-protection.py check-network
             if [ "$RESERVE_SECURITY_IP_PROTECTION_ENABLED" = true ] || [ "$RESERVE_SECURITY_AUTH_LIMITS_ENABLED" = true ]; then
               sudo --preserve-env=RESERVE_SECURITY_AUTH_LIMITS_ENABLED python3 /home/ubuntu/scripts/prepare-ip-protection.py check-redis
@@ -552,12 +554,13 @@ jobs:
           TARGET_UPSTREAM: ${{ env.TARGET_UPSTREAM }}
           CURRENT_UPSTREAM: ${{ env.CURRENT_UPSTREAM }}
           DEPLOY_ATTEMPT: ${{ github.run_id }}-${{ github.run_attempt }}
+          RESERVE_SECURITY_AUTH_LIMITS_ENABLED: ${{ vars.RESERVE_SECURITY_AUTH_LIMITS_ENABLED || 'false' }}
         with:
           username: ubuntu
           host: ${{ secrets.RESERVE_SERVER_IP }}
           key: ${{ secrets.EC2_SSH_KEY }}
           fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
-          envs: FRONTEND_RELEASE,TARGET_UPSTREAM,CURRENT_UPSTREAM,DEPLOY_ATTEMPT
+          envs: FRONTEND_RELEASE,TARGET_UPSTREAM,CURRENT_UPSTREAM,DEPLOY_ATTEMPT,RESERVE_SECURITY_AUTH_LIMITS_ENABLED
           script: |
             bash -Eeuo pipefail <<'RESERVE_CUTOVER'
 
@@ -600,6 +603,7 @@ jobs:
             fi
             for COMPATIBLE_UPSTREAM in "$CURRENT_UPSTREAM" "$TARGET_UPSTREAM"; do
               COMPATIBLE_IMAGE=$(sudo docker inspect --format '{{.Image}}' "$COMPATIBLE_UPSTREAM")
+              sudo bash /home/ubuntu/scripts/check-auth-limits-image.sh "$RESERVE_SECURITY_AUTH_LIMITS_ENABLED" "$COMPATIBLE_IMAGE"
               SCHEMA_COMPAT=$(sudo docker image inspect --format '{{index .Config.Labels "reserve.schema-compat"}}' "$COMPATIBLE_IMAGE")
               FEATURE_COMPAT=$(sudo docker image inspect --format '{{index .Config.Labels "reserve.feature-compat"}}' "$COMPATIBLE_IMAGE")
               if [ "$SCHEMA_COMPAT" != 'v280-mfa-completion-settlement-v1' ] || [ "$FEATURE_COMPAT" != 'waiting-signup-hidden-feed-oauth-login-session-admission-mfa-completion-test-settlement-v11' ]; then

@@ -60,6 +60,18 @@ beforeEach(() => {
 });
 
 describe('feed read failure ownership', () => {
+    it.each([
+        ['feed', <Feed />, '/feed', '/feed'],
+        ['author', <FeedAuthor />, `/feed/authors/${publicId}`, '/feed/authors/:publicId'],
+        ['detail', <FeedDetail />, '/feed/posts/3', '/feed/posts/:id'],
+        ['notifications', <FeedNotifications />, '/feed/notifications', '/feed/notifications'],
+    ])('does not show inactive cached read failures after %s is disabled', (_kind, element, path, route) => {
+        state.config = query({ enabled: false, notificationsEnabled: false });
+        for (const key of ['list', 'post', 'author', 'profile']) state[key] = query(state[key].data, offline);
+        show(element, path, route);
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+        expect(screen.queryByRole('article')).not.toBeInTheDocument();
+    });
     it('shows one blocking post error for the three simultaneous failures and retries all failed reads', async () => {
         state.config = query({ enabled: true }, offline);
         state.profile = query({ publicId }, offline);

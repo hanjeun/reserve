@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { authenticateWithPasskey, finishMfaSession } from './mfaAuthentication';
+import { authenticateWithPasskey, confirmMfaEnrollment, finishMfaSession, verifyMfaProof } from './mfaAuthentication';
 import { performPasskey } from './passkey';
 import api from '../api/axios';
 import { advanceSession } from '../api/sessionScope';
@@ -101,6 +101,87 @@ describe('브라우저 패스키 인계', () => {
         performPasskey.mockResolvedValue(credential);
         await authenticateWithPasskey(true);
         expect(api.post).toHaveBeenLastCalledWith('/api/auth/mfa/passkey/confirm', { credential, name: '패스키' }, expect.anything());
+    });
+});
+
+describe('일회용 인증 확인의 응답 복구', () => {
+    const reference = 'b'.repeat(64);
+    beforeEach(() => vi.resetAllMocks());
+    it.each(['EMAIL', 'TOTP', 'BACKUP'])('%s 확인 응답이 끊겨도 같은 요청의 서버 확인만 이어가요', async kind => {
+        const state = { reference };
+        const verified = { completionId: reference, verified: true, purpose: 'RISK_LOGIN' };
+        api.post.mockRejectedValueOnce(new Error('response lost')).mockResolvedValueOnce(verified);
+        await expect(verifyMfaProof(kind, 'synthetic-proof', undefined, state)).resolves.toEqual(verified);
+        expect(api.post.mock.calls.map(([path]) => path)).toEqual(['/api/auth/mfa/verify', '/api/auth/mfa/status']);
+    });
+    it('서버 상태까지 일시 실패하면 재시도는 코드를 보내기 전에 같은 요청을 확인해요', async () => {
+        const state = { reference };
+        const verified = { completionId: reference, verified: true };
+        api.post.mockRejectedValueOnce(new Error('response lost')).mockRejectedValueOnce(new Error('status unavailable'))
+            .mockResolvedValueOnce(verified);
+        await expect(verifyMfaProof('TOTP', 'synthetic-proof', undefined, state)).rejects.toThrow('response lost');
+        await expect(verifyMfaProof('TOTP', 'synthetic-proof', undefined, state)).resolves.toEqual(verified);
+        expect(api.post.mock.calls.filter(([path]) => path.endsWith('/verify'))).toHaveLength(1);
+    });
+    it('이전 요청과 다른 완료 상태는 받아들이지 않아요', async () => {
+        api.post.mockRejectedValueOnce(new Error('response lost')).mockResolvedValueOnce({ completionId: 'c'.repeat(64), verified: true });
+        await expect(verifyMfaProof('EMAIL', 'synthetic-proof', undefined, { reference })).rejects.toThrow();
+        expect(api.get).not.toHaveBeenCalled();
+    });
+    it.each([400, 401, 403, 429])('명시적으로 거절한 %s 응답은 완료 확인으로 우회하지 않아요', async status => {
+        api.post.mockRejectedValue(Object.assign(new Error('rejected'), { status }));
+        await expect(verifyMfaProof('TOTP', 'synthetic-proof', undefined, { reference })).rejects.toThrow('rejected');
+        expect(api.post).toHaveBeenCalledTimes(1);
+    });
+    it('계정 전환 뒤에는 이전 인증의 상태를 조회하지 않아요', async () => {
+        api.post.mockImplementationOnce(async () => { advanceSession(); throw new Error('late failure'); });
+        await expect(verifyMfaProof('TOTP', 'synthetic-proof', undefined, { reference })).rejects.toHaveProperty('isStaleSession', true);
+        expect(api.post).toHaveBeenCalledTimes(1);
+    });
+    it('패스키 확인 응답의 복구에서도 브라우저 인증 창을 다시 열지 않아요', async () => {
+        const state = { reference };
+        const verified = { completionId: reference, verified: true };
+        api.post.mockResolvedValueOnce('options').mockRejectedValueOnce(new Error('response lost'))
+            .mockRejectedValueOnce(new Error('status unavailable')).mockResolvedValueOnce(verified);
+        performPasskey.mockResolvedValue('signed-credential');
+        await expect(authenticateWithPasskey(false, undefined, state)).rejects.toThrow('response lost');
+        await expect(authenticateWithPasskey(false, undefined, state)).resolves.toEqual(verified);
+        expect(performPasskey).toHaveBeenCalledTimes(1);
+        expect(api.post.mock.calls.filter(([path]) => path.endsWith('/verify'))).toHaveLength(1);
+    });
+});
+
+describe('인증 수단 등록의 응답 복구', () => {
+    const reference = 'd'.repeat(64);
+    beforeEach(() => vi.resetAllMocks());
+    it.each(['totp', 'passkey'])('%s 등록 응답이 끊겨도 새 로그인 단계의 서버 확인만 복원하고 코드는 재노출하지 않아요', async kind => {
+        api.post.mockRejectedValueOnce(new Error('response lost'))
+            .mockResolvedValueOnce({ completionId: reference, verified: true, purpose: 'LOGIN', enrollmentRequired: false });
+        await expect(confirmMfaEnrollment(kind, { code: 'synthetic' }, undefined, { reference })).resolves.toEqual({ codes: [], recovered: true });
+        expect(api.post.mock.calls.map(([path]) => path)).toEqual(['/api/auth/mfa/' + kind + '/confirm', '/api/auth/mfa/status']);
+    });
+    it('등록 전의 확인된 관리 상태는 등록 성공으로 받아들이지 않아요', async () => {
+        api.post.mockRejectedValueOnce(new Error('response lost'))
+            .mockResolvedValueOnce({ completionId: reference, verified: true, purpose: 'MANAGE', enrollmentRequired: false });
+        await expect(confirmMfaEnrollment('totp', {}, undefined, { reference })).rejects.toThrow('response lost');
+    });
+    it('패스키 저장 응답과 상태 조회가 모두 끊기면 다시 저장하기 전에 완료 상태를 확인해요', async () => {
+        const state = { reference };
+        api.post.mockResolvedValueOnce('options').mockRejectedValueOnce(new Error('response lost'))
+            .mockRejectedValueOnce(new Error('status unavailable'))
+            .mockResolvedValueOnce({ completionId: reference, verified: true, purpose: 'LOGIN', enrollmentRequired: false });
+        performPasskey.mockResolvedValue('signed-registration');
+        await expect(authenticateWithPasskey(true, undefined, state)).rejects.toThrow('response lost');
+        await expect(authenticateWithPasskey(true, undefined, state)).resolves.toEqual({ codes: [], recovered: true });
+        expect(performPasskey).toHaveBeenCalledTimes(1);
+        expect(api.post.mock.calls.filter(([path]) => path.endsWith('/passkey/confirm'))).toHaveLength(1);
+    });
+    it('다른 요청의 등록 상태와 계정 전환은 복구하지 않아요', async () => {
+        api.post.mockRejectedValueOnce(new Error('response lost')).mockResolvedValueOnce({ completionId: 'e'.repeat(64), verified: true, purpose: 'LOGIN', enrollmentRequired: false });
+        await expect(confirmMfaEnrollment('totp', {}, undefined, { reference })).rejects.toThrow('response lost');
+        api.post.mockReset().mockImplementationOnce(async () => { advanceSession(); return { codes: [] }; });
+        await expect(confirmMfaEnrollment('totp', {}, undefined, { reference })).rejects.toHaveProperty('isStaleSession', true);
+        expect(api.post).toHaveBeenCalledTimes(1);
     });
 });
 

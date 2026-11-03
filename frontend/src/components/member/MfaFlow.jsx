@@ -12,7 +12,7 @@ import { PageTitle, PageDescription } from '../common/PageTypography';
 import { SafetyCertificateOutlined, LockOutlined, MobileOutlined, CheckOutlined, DisconnectOutlined, ReloadOutlined, PlusOutlined, ArrowLeftOutlined, CloseOutlined } from '../common/icons';
 import api from '../../api/axios';
 import useAuthStore from '../../store/useAuthStore';
-import { authenticateWithPasskey, finishMfaSession } from '../../utils/mfaAuthentication';
+import { authenticateWithPasskey, confirmMfaEnrollment, finishMfaSession, verifyMfaProof } from '../../utils/mfaAuthentication';
 import { AUTHENTICATION_BACK } from '../../utils/authenticationNavigation';
 import { fontSize } from '../../styles/tokens';
 import useMessage from '../../hooks/useMessage';
@@ -45,25 +45,40 @@ export default function MfaFlow({ ref, initialView, settings, page = false, reve
     const active = useRef(false);
     const controller = useRef(null);
     const completion = useRef(initialView?.completionState || {});
+    const enrollmentHold = useRef(null);
     const mounted = useRef(true);
     const sectionRef = useRef(null);
     const reducedMotion = useReducedMotion();
     useEffect(() => {
         mounted.current = true;
-        return () => { mounted.current = false; controller.current?.abort(); };
+        return () => { mounted.current = false; controller.current?.abort(); enrollmentHold.current?.(); enrollmentHold.current = null; };
     }, []);
     useEffect(() => {
         if (!initialView?.initialError || initialNotice.current === initialView.initialError) return;
         initialNotice.current = initialView.initialError;
         message.error(initialView.initialError);
     }, [initialView?.initialError, message]);
-    const finish = async (defer = false) => {
+    const holdEnrollment = () => {
+        if (enrollmentHold.current) return;
+        let release;
+        const pending = new Promise(resolve => { release = resolve; });
+        enrollmentHold.current = release;
+        void useAuthStore.getState().withAuthTransition(() => pending);
+    };
+    const releaseEnrollment = () => { enrollmentHold.current?.(); enrollmentHold.current = null; };
+    const finish = async (defer = false, purpose = view?.purpose) => {
         if (view?.completionId && completion.current.reference !== view.completionId)
             completion.current = { reference: view.completionId };
-        if (view?.purpose === 'RISK_LOGIN') completion.current.rememberBrowser = rememberBrowser;
-        const member = await finishMfaSession(controller.current?.signal, defer, completion.current);
+        if (purpose === 'RISK_LOGIN') completion.current.rememberBrowser = rememberBrowser;
+        let member;
+        if (purpose === 'MANAGE') {
+            // 복구코드 재발급은 이미 세션을 교체했으므로 관리 요청만 닫는다.
+            if (!completion.current.closed) { await post('cancel'); completion.current.closed = true; }
+            member = await api.get('/api/member/me', config);
+        } else member = await finishMfaSession(controller.current?.signal, defer, completion.current);
         if (!mounted.current) return;
         if (completion.current.browser === 'UNAVAILABLE') message.info('로그인은 완료했지만 브라우저 기억 설정을 완료하지 못했어요. 로그인 및 보안에서 다시 확인해주세요.');
+        releaseEnrollment();
         useAuthStore.getState().login(member);
         onDone?.(member);
     };
@@ -79,17 +94,24 @@ export default function MfaFlow({ ref, initialView, settings, page = false, reve
             else message.error(failure.message || '인증을 다시 시작해주세요.');
             if (cancelled && totpAvailable) setMethod('TOTP');
         }
-        finally { active.current = false; if (mounted.current) setBusy(false); }
+        finally {
+            if (!completion.current.enrollmentPending && !completion.current.enrollmentConfirmed) releaseEnrollment();
+            active.current = false;
+            if (mounted.current) setBusy(false);
+        }
     };
     const enrolled = async result => {
         if (!mounted.current) return;
+        completion.current.enrollmentConfirmed = true;
+        if (result.recovered && view?.enrollmentRequired) message.info('인증 수단은 등록됐어요. 복구코드는 다시 표시할 수 없으니 로그인 및 보안에서 재발급해주세요.');
         setSetup(null);
         setView(current => ({ ...current, verified: true, enrollmentRequired: false, purpose: 'LOGIN' }));
         if (result.codes?.length) setCodes(result.codes);
-        else await finish();
+        else await finish(false, 'LOGIN');
     };
     const verify = async (kind, proof) => {
-        const request = () => post('verify', { kind, proof });
+        completion.current.reference ??= view?.completionId;
+        const request = () => verifyMfaProof(kind, proof, controller.current?.signal, completion.current);
         const result = kind === 'BACKUP' ? await useAuthStore.getState().withAuthTransition(request) : await request();
         if (!mounted.current) return;
         setView(result);
@@ -100,7 +122,9 @@ export default function MfaFlow({ ref, initialView, settings, page = false, reve
     };
     const passkey = (registration, availableView = view) => perform(async () => {
         controller.current = new AbortController();
-        const result = await authenticateWithPasskey(registration, controller.current.signal);
+        completion.current.reference ??= availableView?.completionId;
+        if (registration) holdEnrollment();
+        const result = await authenticateWithPasskey(registration, controller.current.signal, completion.current);
         if (!mounted.current) return;
         if (registration) await enrolled(result);
         else {
@@ -108,7 +132,7 @@ export default function MfaFlow({ ref, initialView, settings, page = false, reve
             if (result.completionId && completion.current.reference !== result.completionId)
                 completion.current = { reference: result.completionId };
             if (result.purpose === 'MANAGE') { if (onVerified) await onVerified({ ...result, rememberBrowser }); }
-            else await finish();
+            else if (result.purpose !== 'RISK_LOGIN') await finish();
         }
     }, availableView?.totpAvailable);
     const receiveInitial = useEffectEvent(result => {
@@ -130,7 +154,7 @@ export default function MfaFlow({ ref, initialView, settings, page = false, reve
         return () => { live = false; };
     }, [initialView, revision, statusRetry, message]);
     const cancel = () => {
-        void perform(async () => { await post('cancel'); if (mounted.current) onCancel?.(); });
+        void perform(async () => { await post('cancel'); releaseEnrollment(); if (mounted.current) onCancel?.(); });
     };
     useImperativeHandle(ref, () => ({ cancel }));
     const back = () => {
@@ -200,7 +224,11 @@ export default function MfaFlow({ ref, initialView, settings, page = false, reve
                 <Typography.Text type="secondary">QR을 스캔할 수 없나요? 아래 키를 직접 입력해주세요.</Typography.Text>
                 <CopyableText value={setup.secret} label="인증 앱 등록 키" />
             </div>
-            <Form layout="vertical" requiredMark={false} onFinish={({ code }) => perform(async () => enrolled(await post('totp/confirm', { code })))}>
+            <Form layout="vertical" requiredMark={false} onFinish={({ code }) => perform(async () => {
+                completion.current.reference ??= view?.completionId;
+                holdEnrollment();
+                await enrolled(await confirmMfaEnrollment('totp', { code }, controller.current?.signal, completion.current));
+            })}>
                 <Form.Item name="code" label="인증 앱 코드" rules={[{ pattern: /^[0-9]{6}$/, required: true, message: '6자리 코드를 입력해주세요.' }]}>
                     <FormInput inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="6자리 인증 코드" />
                 </Form.Item>

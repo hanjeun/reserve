@@ -53,7 +53,7 @@ export default function FeedAuthor() {
     const blockingError = isBlockingListReadError(posts.error, posts.data?.content);
     const blockingFailure = config.isError && (!config.data || unavailable)
         || enabled && (author.isError && (!author.data || authorUnavailable) || blockingError);
-    const backgroundFailure = !blockingFailure && [posts, author, config].find(query => query.isError && query.data !== undefined);
+    const backgroundFailure = !blockingFailure && [...(enabled ? [posts, author] : []), config].find(query => query.isError && query.data !== undefined);
     const retryReads = () => refetchFailedReads([config, author, posts]);
     const retrying = [config, author, posts].some(query => query.isFetching);
     useListRefreshAnchor(listRef, `${publicId}:${page}`, posts.isFetching && !posts.isPlaceholderData, unavailable ? null : posts.data);

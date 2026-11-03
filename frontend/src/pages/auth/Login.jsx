@@ -163,13 +163,31 @@ const Login = () => {
         const direction = preventedRef.current && target !== '/' ? 'from-right' : 'from-left';
         navigate(target, { replace: true, state: { reserveRouteMotion: direction } });
     };
-    const nativePasskeyLogin = async () => {
+    const nativePasskeyLogin = async view => {
         if (!mounted.current) return;
         const controller = new AbortController();
         nativeController.current = controller;
-        await authenticateWithPasskey(false, controller.signal);
-        const member = await finishMfaSession(controller.signal);
-        if (mounted.current && !controller.signal.aborted) completeLogin(member);
+        const completionState = { reference: view?.completionId };
+        let verified;
+        try {
+            verified = await authenticateWithPasskey(false, controller.signal, completionState);
+            if (!mounted.current || controller.signal.aborted) return;
+            completionState.reference ??= verified?.completionId;
+            if (verified?.purpose === 'RISK_LOGIN') {
+                setMfa({ ...verified, mfaRequired: true, completionState });
+                return;
+            }
+            const member = await finishMfaSession(controller.signal, false, completionState);
+            if (mounted.current && !controller.signal.aborted) completeLogin(member);
+        } catch (failure) {
+            if (mounted.current && !controller.signal.aborted && !failure.isStaleSession && !failure.isSessionExpired
+                && !['NotAllowedError', 'AbortError'].includes(failure.name)) {
+                setMfa({ ...(verified || view), mfaRequired: true, completionState,
+                    preferredFactor: view?.totpAvailable ? 'TOTP' : 'PASSKEY', initialError: failure.message });
+                return;
+            }
+            throw failure;
+        }
     };
     const onLoginSubmit = async (values) => {
         if (loginAttempt.current) return;
@@ -180,7 +198,7 @@ const Login = () => {
             if (!mounted.current) return;
             if (res?.mfaRequired) {
                 if (res.passkeyAvailable && !res.enrollmentRequired) {
-                    try { await nativePasskeyLogin(); return; }
+                    try { await nativePasskeyLogin(res); return; }
                     catch (failure) {
                         if (failure.isSessionExpired || failure.isStaleSession || nativeController.current?.signal.aborted) return;
                         setMfa({ ...res, preferredFactor: res.totpAvailable ? 'TOTP' : 'PASSKEY',
@@ -212,9 +230,9 @@ const Login = () => {
         loginAttempt.current = true;
         setLoading(true);
         try {
-            await api.post('/api/auth/mfa/passkey/login', { rememberMe }, { skipAuthRefresh: true });
+            const view = await api.post('/api/auth/mfa/passkey/login', { rememberMe }, { skipAuthRefresh: true });
             if (!mounted.current) return;
-            await nativePasskeyLogin();
+            await nativePasskeyLogin(view);
         } catch (failure) {
             if (!mounted.current || failure.isSessionExpired || failure.isStaleSession || nativeController.current?.signal.aborted) return;
             await api.post('/api/auth/mfa/cancel', undefined, { skipAuthRefresh: true }).catch(() => {});

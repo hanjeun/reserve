@@ -41,7 +41,7 @@ export default function FeedNotifications() {
     const unavailable = [config, list].some(query => [401, 403].includes(httpStatusOf(query.error)));
     const blockingError = isBlockingListReadError(list.error, list.data?.content);
     const blockingFailure = config.isError && (!config.data || unavailable) || enabled && blockingError;
-    const backgroundFailure = !blockingFailure && [list, config].find(query => query.isError && query.data !== undefined);
+    const backgroundFailure = !blockingFailure && [...(enabled ? [list] : []), config].find(query => query.isError && query.data !== undefined);
     const retryReads = () => refetchFailedReads([config, list]);
     const retrying = config.isFetching || list.isFetching;
     useListRefreshAnchor(listRef, `${view}:${page}`, list.isFetching && !list.isPlaceholderData, unavailable ? null : list.data);

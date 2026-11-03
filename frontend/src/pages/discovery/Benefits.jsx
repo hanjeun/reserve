@@ -68,8 +68,8 @@ export default function Benefits() {
     const items = Array.isArray(data?.content) ? data.content : [];
     const blockingError = isBlockingListReadError(error, items);
     const configFailure = config.isError && (!config.data || isReadAccessDenied(config.error));
-    const refreshFailure = !configFailure && !blockingError && (isError ? { error } : config.isError ? config : null);
-    const retryReads = () => refetchFailedReads([config, { isError, refetch }]);
+    const refreshFailure = !configFailure && !(approvalReady && blockingError) && (approvalReady && isError ? { error } : config.isError ? config : null);
+    const retryReads = () => refetchFailedReads([config, ...(approvalReady ? [{ isError, refetch }] : [])]);
     const retrying = isFetching || config.isFetching;
     useListRefreshAnchor(listRef, `${page}:${type}:${period}`, isFetching, data);
     const rawTotal = data?.page?.totalElements ?? data?.totalElements ?? 0;
@@ -126,7 +126,7 @@ export default function Benefits() {
             </div>}
             <section ref={listRef} id="benefit-news" className="reserve-benefits-news" aria-label="가게 소식">
                 <div className="reserve-benefits-news-content">
-                    {refreshFailure && <DataState compact state="error" title={isError ? '목록을 갱신하지 못했어요. 현재 내용은 유지했어요.' : '혜택 상태를 갱신하지 못했어요.'}
+                    {refreshFailure && <DataState compact state="error" title={approvalReady && isError ? '목록을 갱신하지 못했어요. 현재 내용은 유지했어요.' : '혜택 상태를 갱신하지 못했어요.'}
                         error={refreshFailure.error} onRetry={retryReads} retrying={retrying} />}
                     {renderNews()}
                 </div>

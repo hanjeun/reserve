@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     outputs:
-      image: ${{ steps.image.outputs.image }}
+      digest: ${{ steps.image.outputs.digest }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -288,7 +288,7 @@ jobs:
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         env:
           IMAGE_TAG: sha-${{ github.sha }}
-          RESERVE_IMAGE_REFERENCE: ${{ needs.verify-source.outputs.image }}
+          RESERVE_IMAGE_REFERENCE: ${{ format('{0}/reserve@{1}', secrets.DOCKERHUB_USERNAME, needs.verify-source.outputs.digest) }}
           RESERVE_SECURITY_AUTH_LIMITS_ENABLED: ${{ vars.RESERVE_SECURITY_AUTH_LIMITS_ENABLED || 'false' }}
           RESERVE_SECURITY_AUTH_LIMITS_FINGERPRINT_KEY: ${{ secrets.RESERVE_SECURITY_AUTH_LIMITS_FINGERPRINT_KEY }}
           RESERVE_SECURITY_AUTH_LIMITS_EPOCH: ${{ vars.RESERVE_SECURITY_AUTH_LIMITS_EPOCH }}

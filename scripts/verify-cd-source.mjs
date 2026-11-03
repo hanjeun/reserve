@@ -61,7 +61,8 @@ async function main(command) {
         if (statSync(file).size > 4096) throw new Error('Image manifest exceeds its size limit');
         const image = validateImage(JSON.parse(readFileSync(file, 'utf8')), process.env);
         if (!process.env.GITHUB_OUTPUT) throw new Error('GitHub output is required');
-        appendFileSync(process.env.GITHUB_OUTPUT, 'image=' + image + '\n');
+        // 저장소명은 비밀값으로 등록될 수 있어 잡 출력에는 검증한 digest만 전달한다.
+        appendFileSync(process.env.GITHUB_OUTPUT, 'digest=' + image.split('@')[1] + '\n');
         console.log('Verified immutable image from this CI run');
         return;
     }

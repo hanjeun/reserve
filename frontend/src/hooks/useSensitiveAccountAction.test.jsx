@@ -34,21 +34,25 @@ it('확인 전에는 변경 요청을 보내지 않고 확인한 같은 작업�
     await waitFor(() => expect(fixture.execute).toHaveBeenCalledExactlyOnceWith({ rememberBrowser: true }));
     await waitFor(() => expect(screen.getByRole('button', { name: '연결' })).toBeEnabled());
 });
-it('인증을 중간에 닫으면 원래 작업을 취소하고 로딩을 끝내요', async () => {
+it('인증을 중간에 닫으면 원래 작업을 취소하고 로딩과 원래 포커스를 복원해요', async () => {
     render(<Harness />);
-    fireEvent.click(screen.getByRole('button', { name: '연결' }));
-    fireEvent.click(await screen.findByRole('button', { name: '인증 취소' }));
+    const trigger = screen.getByRole('button', { name: '연결' }); trigger.focus();
+    fireEvent.click(trigger);
+    const cancel = await screen.findByRole('button', { name: '인증 취소' }); cancel.focus();
+    fireEvent.click(cancel);
     await waitFor(() => expect(screen.getByRole('button', { name: '연결' })).toBeEnabled());
     expect(fixture.execute).not.toHaveBeenCalled();
     expect(fixture.failure).toHaveBeenCalledWith(expect.objectContaining({ name: 'AbortError' }));
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
 });
 it('확인 중 계정이 바뀌면 이전 작업을 이어가지 않아요', async () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole('button', { name: '연결' }));
-    await screen.findByRole('button', { name: '본인 확인' });
+    const oldProof = await screen.findByRole('button', { name: '본인 확인' }); oldProof.focus();
     act(() => useAuthStore.getState().login({ id: 8, role: 'USER' }));
     await waitFor(() => expect(screen.getByRole('button', { name: '연결' })).toBeEnabled());
     expect(screen.queryByRole('button', { name: '본인 확인' })).toBeNull();
+    expect(document.activeElement).not.toBe(screen.getByRole('button', { name: '연결' }));
     expect(fixture.execute).not.toHaveBeenCalled();
 });
 it('초기 확인 요청 실패도 로딩을 해제하고 다시 시작할 수 있어요', async () => {

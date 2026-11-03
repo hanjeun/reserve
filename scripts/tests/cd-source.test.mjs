@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { basename, dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import process from 'node:process';
 import { validateContext, validateSource, codeqlState, validateImage } from '../verify-cd-source.mjs';
 
 const require = createRequire(new URL('../../frontend/package.json', import.meta.url));
@@ -45,6 +50,62 @@ test('image identity requires this run, this SHA and an immutable digest in the 
         assert.throws(() => validateImage({ ...manifest, ...change }, env));
 });
 
+test('image CLI exposes only the verified digest and emits nothing for a mismatched run', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'reserve-cd-image-'));
+    try {
+        const target = join(directory, 'backend/build/cd-source');
+        mkdirSync(target, { recursive: true });
+        const file = join(target, 'release-image.json');
+        const output = join(directory, 'image-output');
+        const script = fileURLToPath(new URL('../verify-cd-source.mjs', import.meta.url));
+        const execute = destination => spawnSync(process.execPath, [script, 'image'], {
+            cwd: directory, env: { ...process.env, ...env, GITHUB_OUTPUT: destination }, encoding: 'utf8',
+        });
+        writeFileSync(file, JSON.stringify(manifest));
+        assert.equal(execute(output).status, 0);
+        assert.equal(readFileSync(output, 'utf8'), 'digest=sha256:' + 'b'.repeat(64) + '\n');
+        assert.ok(!readFileSync(output, 'utf8').includes(env.IMAGE_REPOSITORY));
+        writeFileSync(file, JSON.stringify({ ...manifest, runId: '124' }));
+        const rejected = join(directory, 'rejected-output');
+        assert.equal(execute(rejected).status, 1);
+        assert.equal(existsSync(rejected), false);
+    } finally {
+        assert.equal(resolve(dirname(directory)), resolve(tmpdir()));
+        assert.ok(basename(directory).startsWith('reserve-cd-image-'));
+        rmSync(directory, { recursive: true, force: true });
+    }
+});
+
+test('post-deploy smoke accepts only the verified immutable image reference', () => {
+    const cd = yaml.load(read('.github/workflows/CD.yml'));
+    const deployment = cd.jobs['deploy-backend'];
+    const smoke = deployment.steps.find(step => step.name === 'Post-deploy smoke');
+    const source = smoke.with.script;
+    const begin = source.indexOf('RUNNING_IMAGE=');
+    const end = source.indexOf('echo "Post-deploy smoke passed through nginx"', begin);
+    assert.ok(begin >= 0 && end > begin);
+    const execute = image => spawnSync(process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash',
+        ['-c', `set -euo pipefail
+sudo() { test "$1" = docker && test "$2" = inspect || return 9; printf '%s\\n' "$TASK_RUNNING_IMAGE"; }
+${source.slice(begin, end)}`], { encoding: 'utf8', timeout: 5000,
+            env: { ...process.env, TARGET_UPSTREAM: 'blue', FRONTEND_RELEASE: env.GITHUB_SHA,
+                RESERVE_IMAGE_REFERENCE: manifest.image, TASK_RUNNING_IMAGE: image } });
+    for (const [image, accepted] of [
+        [manifest.image, true],
+        [manifest.image.replace('b'.repeat(64), 'c'.repeat(64)), false],
+        [env.IMAGE_REPOSITORY + ':sha-' + env.GITHUB_SHA, false],
+        [manifest.image.replace('/reserve@', '/another@'), false],
+        ['', false],
+    ]) {
+        const result = execute(image);
+        assert.ifError(result.error);
+        assert.equal(result.status === 0, accepted, result.stderr + result.stdout);
+    }
+    const start = deployment.steps.find(step => step.name === 'Docker compose up (target)');
+    assert.equal(smoke.env.RESERVE_IMAGE_REFERENCE, start.env.RESERVE_IMAGE_REFERENCE);
+    assert.ok(smoke.with.envs.split(',').includes('RESERVE_IMAGE_REFERENCE'));
+});
+
 test('CI calls reusable CD after required checks and only CD can reach the server', () => {
     const ci = yaml.load(read('.github/workflows/CI.yml'));
     const cd = yaml.load(read('.github/workflows/CD.yml'));
@@ -67,7 +128,8 @@ test('CI calls reusable CD after required checks and only CD can reach the serve
         assert.equal(steps[0].with['persist-credentials'], false);
     }
     const start = cd.jobs['deploy-backend'].steps.find(step => step.name === 'Docker compose up (target)');
-    assert.equal(start.env.RESERVE_IMAGE_REFERENCE, '${{ needs.verify-source.outputs.image }}');
+    assert.deepEqual(cd.jobs['verify-source'].outputs, { digest: '${{ steps.image.outputs.digest }}' });
+    assert.equal(start.env.RESERVE_IMAGE_REFERENCE, "${{ format('{0}/reserve@{1}', secrets.DOCKERHUB_USERNAME, needs.verify-source.outputs.digest) }}");
     assert.ok(start.with.envs.split(',').includes('RESERVE_IMAGE_REFERENCE'));
     assert.match(start.with.script, /sudo docker pull "\$RESERVE_IMAGE_REFERENCE"/);
 });

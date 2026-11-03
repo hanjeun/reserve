@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     outputs:
-      image: ${{ steps.image.outputs.image }}
+      digest: ${{ steps.image.outputs.digest }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -288,7 +288,7 @@ jobs:
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         env:
           IMAGE_TAG: sha-${{ github.sha }}
-          RESERVE_IMAGE_REFERENCE: ${{ needs.verify-source.outputs.image }}
+          RESERVE_IMAGE_REFERENCE: ${{ format('{0}/reserve@{1}', secrets.DOCKERHUB_USERNAME, needs.verify-source.outputs.digest) }}
           RESERVE_SECURITY_AUTH_LIMITS_ENABLED: ${{ vars.RESERVE_SECURITY_AUTH_LIMITS_ENABLED || 'false' }}
           RESERVE_SECURITY_AUTH_LIMITS_FINGERPRINT_KEY: ${{ secrets.RESERVE_SECURITY_AUTH_LIMITS_FINGERPRINT_KEY }}
           RESERVE_SECURITY_AUTH_LIMITS_EPOCH: ${{ vars.RESERVE_SECURITY_AUTH_LIMITS_EPOCH }}
@@ -716,12 +716,13 @@ jobs:
           FRONTEND_RELEASE: ${{ github.sha }}
           TARGET_UPSTREAM: ${{ env.TARGET_UPSTREAM }}
           RESERVE_DOMAIN_SPLIT: ${{ vars.RESERVE_DOMAIN_SPLIT || 'false' }}
+          RESERVE_IMAGE_REFERENCE: ${{ format('{0}/reserve@{1}', secrets.DOCKERHUB_USERNAME, needs.verify-source.outputs.digest) }}
         with:
           username: ubuntu
           host: ${{ secrets.RESERVE_SERVER_IP }}
           key: ${{ secrets.EC2_SSH_KEY }}
           fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
-          envs: FRONTEND_RELEASE,TARGET_UPSTREAM,RESERVE_DOMAIN_SPLIT
+          envs: FRONTEND_RELEASE,TARGET_UPSTREAM,RESERVE_DOMAIN_SPLIT,RESERVE_IMAGE_REFERENCE
           script: |
             bash -Eeuo pipefail <<'RESERVE_SMOKE'
             RELEASE_DIR="/usr/share/nginx/html/releases/$FRONTEND_RELEASE"
@@ -765,10 +766,9 @@ jobs:
               | tr -d '\r\n')
             test "$SERVICE_ENV_LINE" = "set \$service_url $TARGET_UPSTREAM;"
             RUNNING_IMAGE=$(sudo docker inspect --format '{{.Config.Image}}' "$TARGET_UPSTREAM")
-            case "$RUNNING_IMAGE" in
-              *":sha-$FRONTEND_RELEASE") ;;
-              *) echo "Target backend image does not match the deployed commit"; exit 1 ;;
-            esac
+            if [ "$RUNNING_IMAGE" != "$RESERVE_IMAGE_REFERENCE" ]; then
+              echo "Target backend image does not match the verified digest"; exit 1
+            fi
             echo "Post-deploy smoke passed through nginx"
             RESERVE_SMOKE
 

@@ -76,6 +76,36 @@ test('image CLI exposes only the verified digest and emits nothing for a mismatc
     }
 });
 
+test('post-deploy smoke accepts only the verified immutable image reference', () => {
+    const cd = yaml.load(read('.github/workflows/CD.yml'));
+    const deployment = cd.jobs['deploy-backend'];
+    const smoke = deployment.steps.find(step => step.name === 'Post-deploy smoke');
+    const source = smoke.with.script;
+    const begin = source.indexOf('RUNNING_IMAGE=');
+    const end = source.indexOf('echo "Post-deploy smoke passed through nginx"', begin);
+    assert.ok(begin >= 0 && end > begin);
+    const execute = image => spawnSync(process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash',
+        ['-c', `set -euo pipefail
+sudo() { test "$1" = docker && test "$2" = inspect || return 9; printf '%s\\n' "$TASK_RUNNING_IMAGE"; }
+${source.slice(begin, end)}`], { encoding: 'utf8', timeout: 5000,
+            env: { ...process.env, TARGET_UPSTREAM: 'blue', FRONTEND_RELEASE: env.GITHUB_SHA,
+                RESERVE_IMAGE_REFERENCE: manifest.image, TASK_RUNNING_IMAGE: image } });
+    for (const [image, accepted] of [
+        [manifest.image, true],
+        [manifest.image.replace('b'.repeat(64), 'c'.repeat(64)), false],
+        [env.IMAGE_REPOSITORY + ':sha-' + env.GITHUB_SHA, false],
+        [manifest.image.replace('/reserve@', '/another@'), false],
+        ['', false],
+    ]) {
+        const result = execute(image);
+        assert.ifError(result.error);
+        assert.equal(result.status === 0, accepted, result.stderr + result.stdout);
+    }
+    const start = deployment.steps.find(step => step.name === 'Docker compose up (target)');
+    assert.equal(smoke.env.RESERVE_IMAGE_REFERENCE, start.env.RESERVE_IMAGE_REFERENCE);
+    assert.ok(smoke.with.envs.split(',').includes('RESERVE_IMAGE_REFERENCE'));
+});
+
 test('CI calls reusable CD after required checks and only CD can reach the server', () => {
     const ci = yaml.load(read('.github/workflows/CI.yml'));
     const cd = yaml.load(read('.github/workflows/CD.yml'));

@@ -12,17 +12,11 @@ const SWIPE_RATIO = 1.2;
 // 이 배율을 넘으면 확대 상태로 본다 — 그때의 드래그는 넘김이 아니라 팬(이동)이다.
 const ZOOM_THRESHOLD = 1.05;
 
-const openPreview = ownerDocument => {
-    // 여러 개가 DOM 에 남아 있을 수 있다(닫힘 애니메이션 중). 화면에 보이는 것만 고른다.
-    const roots = [...ownerDocument.querySelectorAll(PREVIEW_ROOT)];
-    return roots.find((el) => el.offsetParent !== null || getComputedStyle(el).display !== 'none') ?? null;
-};
-
-const isZoomed = (root) => {
+const isZoomed = (root, view) => {
     const img = root.querySelector('img');
     if (!img) return false;
     try {
-        const m = new DOMMatrixReadOnly(getComputedStyle(img).transform);
+        const m = new view.DOMMatrixReadOnly(view.getComputedStyle(img).transform);
         return m.a > ZOOM_THRESHOLD;
     } catch {
         return false;
@@ -30,16 +24,14 @@ const isZoomed = (root) => {
 };
 
 export function stepImagePreview(root, forward) {
-    const button = root.querySelector(forward
-        ? '.ant-image-preview-switch-next, .ant-image-preview-switch-right'
-        : '.ant-image-preview-switch-prev, .ant-image-preview-switch-left');
-    if (button && !button.classList.contains('ant-image-preview-switch-disabled')) button.click();
+    const direction = forward ? 'next' : 'prev';
+    root.querySelector(`.ant-image-preview-switch-${direction}`)?.click();
 }
 
-const useImagePreviewSwipe = previewDocument => {
+const useImagePreviewSwipe = (ownerDocument = globalThis.document) => {
     useEffect(() => {
-        const ownerDocument = previewDocument === undefined ? document : previewDocument;
-        if (!ownerDocument) return undefined;
+        const view = ownerDocument?.defaultView;
+        if (!view) return undefined;
         let startX = 0;
         let startY = 0;
         let root = null;
@@ -48,9 +40,8 @@ const useImagePreviewSwipe = previewDocument => {
             root = null;
             // 마우스는 제외 — 데스크톱에는 좌우 버튼이 있고, 드래그는 팬에 쓰인다.
             if (e.pointerType === 'mouse' || !e.isPrimary) return;
-            const el = openPreview(ownerDocument);
-            if (!el?.contains(e.target)) return;
-            if (isZoomed(el)) return;
+            const el = e.target.closest?.(PREVIEW_ROOT);
+            if (!el || isZoomed(el, view)) return;
             root = el;
             startX = e.clientX;
             startY = e.clientY;
@@ -68,16 +59,13 @@ const useImagePreviewSwipe = previewDocument => {
         };
 
         // passive: true — preventDefault 를 하지 않는다(핀치 줌·팬을 막으면 안 된다).
-        const opts = { capture: true, passive: true };
+        const controller = new view.AbortController();
+        const opts = { capture: true, passive: true, signal: controller.signal };
         ownerDocument.addEventListener('pointerdown', onDown, opts);
         ownerDocument.addEventListener('pointerup', onUp, opts);
         ownerDocument.addEventListener('pointercancel', onUp, opts);
-        return () => {
-            ownerDocument.removeEventListener('pointerdown', onDown, opts);
-            ownerDocument.removeEventListener('pointerup', onUp, opts);
-            ownerDocument.removeEventListener('pointercancel', onUp, opts);
-        };
-    }, [previewDocument]);
+        return () => controller.abort();
+    }, [ownerDocument]);
 };
 
 export default useImagePreviewSwipe;

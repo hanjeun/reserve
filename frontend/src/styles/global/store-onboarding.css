@@ -19,18 +19,39 @@
 .reserve-onboarding-edit-selection .reserve-service-domain-picker { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px 16px; }
 .reserve-onboarding-preview { display: flex; flex-direction: column; gap: 20px; }
 .reserve-onboarding-preview-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; line-height: 24px; }
-.reserve-onboarding-preview-controls { display: flex; align-items: center; gap: 12px; }
-.reserve-onboarding-preview-help { display: flex; flex-direction: column; gap: 8px; color: var(--c-text-secondary); font-size: 14px; line-height: 1.7; }
-.reserve-onboarding-preview-help p { margin: 0; }
+.reserve-onboarding-preview-help { margin: 0; color: var(--c-text-secondary); font-size: 14px; line-height: 1.7; }
+.reserve-onboarding-preview-header { display: contents; }
+.reserve-onboarding-preview-edits { margin: 0; }
 .reserve-onboarding-preview-host { position: relative; width: 100%; min-width: 0; box-sizing: border-box; }
-.reserve-onboarding-preview-host[data-device="mobile"] { display: flex; justify-content: center; }
-.reserve-onboarding-preview-host[data-device="pc"] { overflow-x: auto; overflow-y: hidden; border: 1px solid var(--c-border-light); border-radius: 14px; }
-.reserve-onboarding-preview-stage { position: relative; flex-shrink: 0; }
+.reserve-onboarding-preview-host[data-device="pc"] { overflow: hidden; border: 1px solid var(--c-border-light); border-radius: 14px; }
+.reserve-onboarding-preview-host[data-zoomed="true"] { overflow-x: auto; overflow-y: hidden; }
+.reserve-onboarding-preview-stage { position: relative; margin-inline: auto; overflow: clip; }
 .reserve-onboarding-preview-device { position: absolute; inset: 0; box-sizing: border-box; transform-origin: top left; }
-.reserve-onboarding-preview-device[data-device="mobile"] { padding: 9px; border: 3px solid var(--c-text-primary); border-radius: 38px; background: var(--c-bg-paper); box-shadow: 0 8px 24px rgb(0 0 0 / 10%); overflow: hidden; }
+.reserve-onboarding-preview-device[data-device="mobile"] .reserve-onboarding-preview-window {
+    position: absolute; inset: 23px 24px; overflow: hidden; border-radius: 13% / 6%; background: var(--c-bg-paper);
+}
 .reserve-onboarding-preview-host iframe { display: block; border: 0; }
+.reserve-onboarding-phone-status {
+    position: relative; left: -1px; display: flex; justify-content: space-between; align-items: center;
+    box-sizing: border-box; height: 62px; padding: 21px 24px 19px; color: var(--c-text-primary);
+    font: 17px / 22px -apple-system, BlinkMacSystemFont, "SF Pro Text", "Pretendard Variable", sans-serif;
+}
+.reserve-onboarding-phone-status strong { position: relative; top: .75px; width: 100px; text-align: center; font-weight: 590; }
+.reserve-onboarding-phone-status span {
+    box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 7px;
+    width: 100px; height: 22px; padding-top: 1px; padding-right: 1px;
+}
+.reserve-onboarding-phone-status img { display: block; flex-shrink: 0; }
+[data-theme="dark"] .reserve-onboarding-phone-status img { filter: invert(1); }
+.reserve-onboarding-phone-home {
+    position: absolute; bottom: 9px; left: 50%; width: 136px; height: 5px;
+    transform: translateX(-50%); border-radius: 4px; background: var(--c-text-primary); pointer-events: none;
+}
+.reserve-onboarding-phone-hardware { position: absolute; inset: 0; display: block; pointer-events: none; }
+:root[data-store-preview-device="mobile"] { scrollbar-width: none; scrollbar-gutter: auto; }
+:root[data-store-preview-zoom] { touch-action: manipulation; }
+:root[data-store-preview-photo-open] { overflow: hidden; overscroll-behavior: contain; }
 .reserve-store-detail--preview { --c-input-disabled-fg: var(--c-text-secondary); }
-.reserve-store-detail--preview .reserve-onboarding-summary { margin-top: 20px; }
 .reserve-store-detail--preview .reserve-cal-trigger:disabled { opacity: 1; }
 .reserve-service-domain-picker { display: grid; grid-template-columns: repeat(var(--reserve-choice-columns, 6), minmax(0, 1fr)); gap: 12px; }
 .reserve-store-form-skeleton .reserve-service-domain-picker { margin-bottom: 24px; }

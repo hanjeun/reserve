@@ -34,6 +34,7 @@ const BREAKPOINT = 900;
 
 // 인원 수 입력 스텝퍼
 export { StoreInfoSection };
+const hasWaitingIntake = store => ['ONSITE', 'REMOTE', 'BOTH'].includes(store.waitingIntakeMode);
 
 // PC·모바일의 가게명/평점/소개/빠른 연락은 같은 구조를 사용한다.
 export const StoreIdentity = ({ store, nearby, canContact, onContact, preview = false }) => {
@@ -44,8 +45,8 @@ export const StoreIdentity = ({ store, nearby, canContact, onContact, preview = 
             <div className="reserve-store-identity-title-row">
                 <PageTitle level={1}>{store.name}</PageTitle>
                 <fieldset className="reserve-store-identity-actions" aria-label="가게 빠른 작업" style={{ border: 0, padding: 0, minWidth: 0, marginInline: 0 }}>
-                    {!preview && <FavoriteButton storeId={store.id} appearance="plain" inactiveColor={colors.text.primary} />}
-                    {!preview && ['ONSITE', 'REMOTE', 'BOTH'].includes(store.waitingIntakeMode)
+                    <FavoriteButton storeId={preview ? store.id ?? 'preview' : store.id} appearance="plain" preview={preview} inactiveColor={colors.text.primary} />
+                    {!preview && hasWaitingIntake(store)
                         && <WaitingStoreSummary store={store} detail />}
                     {canContact && onContact && (
                         <Tooltip title="가게에 채팅 문의하기"><button type="button" className="reserve-store-contact-action reserve-icon-tool" data-icon-kind="navigation"
@@ -110,13 +111,13 @@ const StoreNotFound = ({ error, onRetry, onGoToList }) => (
 
 // 상세 이미지 캐러셀 — PC·모바일이 래퍼/이미지 스타일만 다르고 구조는 같다.
 const storeDetailImageUrl = (url, preview) => preview && url?.startsWith('blob:') ? url : getDetailImageUrl(url);
-const StoreImageCarousel = ({ store, storeName, sliderImages, autoplay, wrapperStyle, imageStyle, preview = false }) => {
+const StoreImageCarousel = ({ store, storeName, sliderImages, autoplay, wrapperStyle, imageStyle, preview = false, previewDocument }) => {
     const sources = sliderImages.map(url => storeDetailImageUrl(url, preview));
     const metadata = storeGalleryImages(store);
     const imageSizes = sliderImages.map(url => metadata.find(image => image.url === url));
     return <PhotoGallery label={storeName} sources={sources} autoplay={autoplay}
         imageSizes={imageSizes}
-        wrapperStyle={wrapperStyle} imageStyle={imageStyle} previewEnabled={!preview} />;
+        wrapperStyle={wrapperStyle} imageStyle={imageStyle} previewDocument={previewDocument} />;
 };
 
 const StoreReviewSection = ({ sectionRef, isPC, ...reviewListProps }) => (
@@ -126,15 +127,15 @@ const StoreReviewSection = ({ sectionRef, isPC, ...reviewListProps }) => (
     </section>
 );
 
-export const StoreDetailPCLayout = ({ sliderImages, identityProps, panelProps, reviewProps, preview = false, infoContent }) => {
+export const StoreDetailPCLayout = ({ sliderImages, identityProps, panelProps, reviewProps, preview = false, previewDocument, infoContent }) => {
     const { store } = identityProps;
-    const showPanel = !preview || store.reservationEnabled !== false;
+    const showPanel = !preview || store.reservationEnabled !== false || hasWaitingIntake(store);
     return (
         <>
             <div style={showPanel ? styles.pcGrid : { ...styles.pcGrid, justifyContent: 'center' }}>
                 <div style={showPanel ? styles.pcLeft : { ...styles.pcLeft, flex: 1, maxWidth: 640 }}>
                     <StoreImageCarousel store={store} storeName={store.name} sliderImages={sliderImages}
-                        autoplay={!preview && store.imageAutoplayEnabled !== false} preview={preview}
+                        autoplay={store.imageAutoplayEnabled !== false} preview={preview} previewDocument={previewDocument}
                         wrapperStyle={styles.pcImageWrapper} imageStyle={styles.pcMainImg} />
                     <StoreIdentity {...identityProps} preview={preview} />
                     {infoContent ?? <StoreInfoSection store={store} />}
@@ -145,7 +146,7 @@ export const StoreDetailPCLayout = ({ sliderImages, identityProps, panelProps, r
                 </div>
                 {showPanel && <div style={styles.pcRight}>
                     {store.reservationEnabled !== false && <ReservationPanel {...panelProps} isPC={true} preview={preview} />}
-                    {!preview && <WaitingJoin key={store.id} store={store} isPC />}
+                    <WaitingJoin key={store.id} store={store} preview={preview} isPC />
                 </div>}
             </div>
             {/*
@@ -156,14 +157,14 @@ export const StoreDetailPCLayout = ({ sliderImages, identityProps, panelProps, r
     );
 };
 
-export const StoreDetailMobileLayout = ({ sliderImages, identityProps, panelProps, reviewProps, preview = false, infoContent }) => {
+export const StoreDetailMobileLayout = ({ sliderImages, identityProps, panelProps, reviewProps, preview = false, previewDocument, infoContent }) => {
     const { store } = identityProps;
-    const showPanel = !preview || store.reservationEnabled !== false;
+    const showPanel = !preview || store.reservationEnabled !== false || hasWaitingIntake(store);
     return (
         <>
             <section style={{ padding: 0 }}>
                 <StoreImageCarousel store={store} storeName={store.name} sliderImages={sliderImages}
-                    autoplay={!preview && store.imageAutoplayEnabled !== false} preview={preview}
+                    autoplay={store.imageAutoplayEnabled !== false} preview={preview} previewDocument={previewDocument}
                     wrapperStyle={styles.mobileImageWrapper} imageStyle={styles.mainImg} />
                 <div>
                     <StoreIdentity {...identityProps} preview={preview} />
@@ -180,7 +181,7 @@ export const StoreDetailMobileLayout = ({ sliderImages, identityProps, panelProp
                 <Divider style={styles.divider} />
                 <section>
                     {store.reservationEnabled !== false && <ReservationPanel {...panelProps} isPC={false} preview={preview} />}
-                    {!preview && <WaitingJoin key={store.id} store={store} isPC={false} />}
+                    <WaitingJoin key={store.id} store={store} preview={preview} isPC={false} />
                 </section>
             </>}
             {!preview && <><Divider style={styles.divider} /><StoreReviewSection {...reviewProps} isPC={false} /></>}

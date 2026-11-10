@@ -46,7 +46,7 @@ HeaderControlSlot.propTypes = {
     children: PropTypes.node,
 };
 
-const Header = () => {
+const Header = ({ restoreControls = false }) => {
     const skeletonShown = useSkeletonShown();
     const documentEntry = useDocumentEntry();
     const navigate = useWorkspaceNavigate();
@@ -159,7 +159,7 @@ const Header = () => {
             style={{ ...(isDiscoveryRoot ? { ...styles.header, boxShadow: 'none' } : styles.header), '--reserve-search-motion-duration': `${SEARCH_MOTION_DURATION_MS}ms` }}>
             <div className="reserve-header-inner" style={styles.inner}>
                 <div className="reserve-header-brand">
-                    {renderWorkspaceMenu && <HeaderControlSlot kind="workspace-menu" leaving={workspaceLeaving} skipEntry={skeletonShown || documentEntry}>
+                    {renderWorkspaceMenu && <HeaderControlSlot kind="workspace-menu" leaving={workspaceLeaving} skipEntry={skeletonShown || documentEntry || restoreControls}>
                     <Tooltip title={menuLabel} disabled={workspaceLeaving || searchLeaving || menu?.mobile && menu.expanded}><button type="button" id={menu?.buttonId} className="reserve-header-workspace-menu"
                         onClick={menu?.toggle} disabled={!menu || workspaceLeaving}
                         data-input-modality={workspaceControls?.inputModality}
@@ -169,7 +169,7 @@ const Header = () => {
                         <MenuOutlined aria-hidden="true" />
                     </button></Tooltip></HeaderControlSlot>}
                     {renderBack && (
-                        <HeaderControlSlot kind="back" leaving={backLeaving} skipEntry={skeletonShown || documentEntry}>
+                        <HeaderControlSlot kind="back" leaving={backLeaving} skipEntry={skeletonShown || documentEntry || restoreControls}>
                         <button type="button" className={'reserve-header-back' + (backLeaving ? ' reserve-header-back--leaving' : '')}
                             onClick={handleBack} aria-label="이전 화면으로 돌아가기" disabled={backLeaving}
                             >
@@ -262,4 +262,5 @@ const styles = {
     avatarFallback: { width: 36, height: 36, borderRadius: radius.full, background: colors.primary.light },
 };
 
+Header.propTypes = { restoreControls: PropTypes.bool };
 export default Header;

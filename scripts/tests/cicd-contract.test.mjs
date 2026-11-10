@@ -505,6 +505,27 @@ test('backend tests are explicit, required, and run before packaging', () => {
     assert.doesNotMatch(tests.run + packaging.run, /-x\s+test|--exclude-task[=\s]+test/);
 });
 
+test('backend packaging can restore Java compilation from the same CI attempt', () => {
+    const tests = step(backendTests, 'backend_tests');
+    const compile = backendTests.steps.find(entry => entry.name === 'Compile backend Java when test evidence is reused');
+    const upload = backendTests.steps.find(entry => entry.name === 'Upload Java compilation cache');
+    const restore = step(backend, 'java_cache');
+    const packaging = step(backend, 'backend_package');
+    const directory = '${{ runner.temp }}/reserve-ci-java-cache';
+    assert.equal(tests.env.RESERVE_CI_JAVA_CACHE_DIR, directory);
+    assert.equal(compile.env.RESERVE_CI_JAVA_CACHE_DIR, directory);
+    assert.equal(compile.if, "steps.evidence.outputs.reused == 'true'");
+    assert.match(compile.run, /gradlew compileJava .*--build-cache/);
+    assert.equal(upload.with.path, directory + '/');
+    assert.equal(upload.with.name, 'backend-java-cache-${{ github.sha }}-${{ github.run_attempt }}');
+    assert.ok(backendTests.steps.indexOf(upload) > backendTests.steps.indexOf(compile));
+    assert.match(restore.run, /backend-java-cache-\$GITHUB_SHA-\$GITHUB_RUN_ATTEMPT/);
+    assert.match(restore.run, /if gh run download "\$GITHUB_RUN_ID".*; then\n\s+printf 'directory=/);
+    assert.equal(packaging.env.RESERVE_CI_JAVA_CACHE_DIR, '${{ steps.java_cache.outputs.directory }}');
+    assert.match(packaging.run, /cache_option=--no-build-cache/);
+    assert.ok(backend.steps.indexOf(restore) < backend.steps.indexOf(packaging));
+});
+
 test('snapshot verification installs a scoped Git byte guard without changing the baseline', () => {
     const baseline = frontendTests.steps.find(entry => entry.name === 'Load published baseline for preservation checks');
     assert.equal(baseline.run, 'git fetch --no-tags --depth=1 origin c20ce59c4aec1cfc727fe1cba12960b0e7c78e74');

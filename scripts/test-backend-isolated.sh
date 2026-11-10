@@ -158,6 +158,11 @@ runtime_environment=()
 for variable in PATH HOME USERPROFILE USERNAME APPDATA LOCALAPPDATA SYSTEMROOT SystemRoot WINDIR windir COMSPEC ComSpec PATHEXT TEMP TMP TMPDIR JAVA_HOME GRADLE_USER_HOME LANG LC_ALL LC_CTYPE MSYSTEM; do
     if [[ -v "$variable" ]]; then runtime_environment+=("$variable=${!variable}"); fi
 done
+gradle_cache_options=()
+if [[ -n "${RESERVE_CI_JAVA_CACHE_DIR:-}" ]]; then
+    runtime_environment+=("RESERVE_CI_JAVA_CACHE_DIR=$RESERVE_CI_JAVA_CACHE_DIR")
+    gradle_cache_options+=(--build-cache)
+fi
 fixture_environment=(
     "RESERVE_SEARCH_COST_TEST=$measure_search"
     "DOCKER_CONTEXT=default" "DOCKER_CONFIG=$HOME/.docker" "MSYS_NO_PATHCONV=1" "AWS_EC2_METADATA_DISABLED=true"
@@ -179,7 +184,7 @@ fixture_environment=(
 )
 (
     cd -- "$repo_root/backend"
-    env -i "${runtime_environment[@]}" "${fixture_environment[@]}" bash ./gradlew test --rerun --no-daemon --console=plain "${gradle_filters[@]}"
+    env -i "${runtime_environment[@]}" "${fixture_environment[@]}" bash ./gradlew test --rerun --no-daemon --console=plain "${gradle_cache_options[@]}" "${gradle_filters[@]}"
 ) 2>&1 | env -i "${runtime_environment[@]}" \
     RESERVE_ISOLATED_REDACT_SECRETS="$fixture_root_password:$fixture_login_password:$fixture_admission_password:$fixture_capacity_password:$fixture_oauth_password:$fixture_mfa_password:$fixture_signup_password" \
     awk 'BEGIN { n = split(ENVIRON["RESERVE_ISOLATED_REDACT_SECRETS"], secrets, ":") }

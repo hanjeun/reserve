@@ -19,3 +19,20 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = 'reserve'
+
+def ciJavaCacheDirectory = providers.environmentVariable('RESERVE_CI_JAVA_CACHE_DIR').getOrNull()
+if (ciJavaCacheDirectory) {
+    buildCache {
+        local {
+            directory = ciJavaCacheDirectory
+        }
+    }
+    // 테스트 결과와 리소스는 잡 사이에 공유하지 않는다.
+    gradle.beforeProject { project ->
+        project.tasks.configureEach { task ->
+            if (task.name != 'compileJava') {
+                task.outputs.doNotCacheIf('Only main Java compilation is shared between CI jobs') { true }
+            }
+        }
+    }
+}

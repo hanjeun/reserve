@@ -1,0 +1,304 @@
+diff --git a/node_modules/@rc-component/image/es/util.js b/node_modules/@rc-component/image/es/util.js
+--- a/node_modules/@rc-component/image/es/util.js
++++ b/node_modules/@rc-component/image/es/util.js
+@@ -14,5 +14,5 @@
+ // ============================= Legacy =============================
+-export function getClientSize() {
+-  const width = document.documentElement.clientWidth;
+-  const height = window.innerHeight || document.documentElement.clientHeight;
++export function getClientSize(ownerDocument = document) {
++  const width = ownerDocument.documentElement.clientWidth;
++  const height = ownerDocument.defaultView?.innerHeight || ownerDocument.documentElement.clientHeight;
+   return {
+diff --git a/node_modules/@rc-component/image/es/getFixScaleEleTransPosition.js b/node_modules/@rc-component/image/es/getFixScaleEleTransPosition.js
+--- a/node_modules/@rc-component/image/es/getFixScaleEleTransPosition.js
++++ b/node_modules/@rc-component/image/es/getFixScaleEleTransPosition.js
+@@ -35,7 +35,7 @@
+  */
+-export default function getFixScaleEleTransPosition(width, height, left, top) {
++export default function getFixScaleEleTransPosition(width, height, left, top, ownerDocument) {
+   const {
+     width: clientWidth,
+     height: clientHeight
+-  } = getClientSize();
++  } = getClientSize(ownerDocument);
+   let fixPos = null;
+diff --git a/node_modules/@rc-component/image/es/hooks/useImageTransform.js b/node_modules/@rc-component/image/es/hooks/useImageTransform.js
+--- a/node_modules/@rc-component/image/es/hooks/useImageTransform.js
++++ b/node_modules/@rc-component/image/es/hooks/useImageTransform.js
+@@ -75,26 +75,28 @@
+     /** Default center point scaling */
+-    const mergedCenterX = centerX ?? innerWidth / 2;
+-    const mergedCenterY = centerY ?? innerHeight / 2;
++    const ownerDocument = imgRef.current.ownerDocument;
++    const view = ownerDocument.defaultView ?? window;
++    const mergedCenterX = centerX ?? view.innerWidth / 2;
++    const mergedCenterY = centerY ?? view.innerHeight / 2;
+     const diffRatio = newRatio - 1;
+     /** Deviation calculated from image size */
+     const diffImgX = diffRatio * width * 0.5;
+     const diffImgY = diffRatio * height * 0.5;
+     /** The difference between the click position and the edge of the document */
+     const diffOffsetLeft = diffRatio * (mergedCenterX - transform.x - offsetLeft);
+     const diffOffsetTop = diffRatio * (mergedCenterY - transform.y - offsetTop);
+     /** Final positioning */
+     let newX = transform.x - (diffOffsetLeft - diffImgX);
+     let newY = transform.y - (diffOffsetTop - diffImgY);
+-
++
+     /**
+      * When zooming the image
+      * When the image size is smaller than the width and height of the window, the position is initialized
+      */
+     if (ratio < 1 && newScale === 1) {
+       const mergedWidth = offsetWidth * newScale;
+       const mergedHeight = offsetHeight * newScale;
+       const {
+         width: clientWidth,
+         height: clientHeight
+-      } = getClientSize();
++      } = getClientSize(ownerDocument);
+       if (mergedWidth <= clientWidth && mergedHeight <= clientHeight) {
+diff --git a/node_modules/@rc-component/image/es/hooks/useMouseEvent.js b/node_modules/@rc-component/image/es/hooks/useMouseEvent.js
+--- a/node_modules/@rc-component/image/es/hooks/useMouseEvent.js
++++ b/node_modules/@rc-component/image/es/hooks/useMouseEvent.js
+@@ -58,47 +58,48 @@
+       const isRotate = rotate % 180 !== 0;
+-      const fixState = getFixScaleEleTransPosition(isRotate ? height : width, isRotate ? width : height, left, top);
++      const fixState = getFixScaleEleTransPosition(isRotate ? height : width, isRotate ? width : height, left, top, imgRef.current.ownerDocument);
+       if (fixState) {
+         updateTransform({
+           ...fixState
+         }, 'dragRebound');
+       }
+     }
+   };
+   const onWheel = event => {
+     if (!open || !wheel || event.deltaY == 0) return;
+     // Scale ratio depends on the deltaY size
+     const scaleRatio = Math.abs(event.deltaY / 100);
+     // Limit the maximum scale ratio
+     const mergedScaleRatio = Math.min(scaleRatio, WHEEL_MAX_SCALE_RATIO);
+     // Scale the ratio each time
+     let ratio = BASE_SCALE_RATIO + mergedScaleRatio * scaleStep;
+     if (event.deltaY > 0) {
+       ratio = BASE_SCALE_RATIO / ratio;
+     }
+     dispatchZoomChange(ratio, 'wheel', event.clientX, event.clientY);
+   };
+   useEffect(() => {
++    const view = imgRef.current?.ownerDocument.defaultView ?? window;
+     if (movable) {
+-      window.addEventListener('mouseup', onMouseUp, false);
+-      window.addEventListener('mousemove', onMouseMove, false);
++      view.addEventListener('mouseup', onMouseUp, false);
++      view.addEventListener('mousemove', onMouseMove, false);
+       try {
+         // Resolve if in iframe lost event
+         /* istanbul ignore next */
+-        if (window.top !== window.self) {
+-          window.top.addEventListener('mouseup', onMouseUp, false);
+-          window.top.addEventListener('mousemove', onMouseMove, false);
++        if (view.top !== view.self) {
++          view.top.addEventListener('mouseup', onMouseUp, false);
++          if (view === window) view.top.addEventListener('mousemove', onMouseMove, false);
+         }
+       } catch (error) {
+         /* istanbul ignore next */
+         warning(false, `[rc-image] ${error}`);
+       }
+     }
+     return () => {
+-      window.removeEventListener('mouseup', onMouseUp);
+-      window.removeEventListener('mousemove', onMouseMove);
+-
++      view.removeEventListener('mouseup', onMouseUp);
++      view.removeEventListener('mousemove', onMouseMove);
++
+       /* istanbul ignore next */
+       try {
+-        window.top?.removeEventListener('mouseup', onMouseUp);
+-        window.top?.removeEventListener('mousemove', onMouseMove);
++        view.top?.removeEventListener('mouseup', onMouseUp);
++        if (view === window) view.top?.removeEventListener('mousemove', onMouseMove);
+       } catch (error) {
+diff --git a/node_modules/@rc-component/image/es/hooks/useTouchEvent.js b/node_modules/@rc-component/image/es/hooks/useTouchEvent.js
+--- a/node_modules/@rc-component/image/es/hooks/useTouchEvent.js
++++ b/node_modules/@rc-component/image/es/hooks/useTouchEvent.js
+@@ -143,20 +143,21 @@
+     const isRotate = rotate % 180 !== 0;
+-    const fixState = getFixScaleEleTransPosition(isRotate ? height : width, isRotate ? width : height, left, top);
++    const fixState = getFixScaleEleTransPosition(isRotate ? height : width, isRotate ? width : height, left, top, imgRef.current.ownerDocument);
+     if (fixState) {
+       updateTransform({
+         ...fixState
+       }, 'dragRebound');
+     }
+   };
+   useEffect(() => {
++    const view = imgRef.current?.ownerDocument.defaultView ?? window;
+     const preventDefault = e => {
+       e.preventDefault();
+     };
+     if (open && movable) {
+-      window.addEventListener('touchmove', preventDefault, {
++      view.addEventListener('touchmove', preventDefault, {
+         passive: false
+       });
+     }
+     return () => {
+-      window.removeEventListener('touchmove', preventDefault);
++      view.removeEventListener('touchmove', preventDefault);
+     };
+diff --git a/node_modules/@rc-component/image/lib/util.js b/node_modules/@rc-component/image/lib/util.js
+--- a/node_modules/@rc-component/image/lib/util.js
++++ b/node_modules/@rc-component/image/lib/util.js
+@@ -21,5 +21,5 @@
+ // ============================= Legacy =============================
+-function getClientSize() {
+-  const width = document.documentElement.clientWidth;
+-  const height = window.innerHeight || document.documentElement.clientHeight;
++function getClientSize(ownerDocument = document) {
++  const width = ownerDocument.documentElement.clientWidth;
++  const height = ownerDocument.defaultView?.innerHeight || ownerDocument.documentElement.clientHeight;
+   return {
+diff --git a/node_modules/@rc-component/image/lib/getFixScaleEleTransPosition.js b/node_modules/@rc-component/image/lib/getFixScaleEleTransPosition.js
+--- a/node_modules/@rc-component/image/lib/getFixScaleEleTransPosition.js
++++ b/node_modules/@rc-component/image/lib/getFixScaleEleTransPosition.js
+@@ -41,7 +41,7 @@
+  */
+-function getFixScaleEleTransPosition(width, height, left, top) {
++function getFixScaleEleTransPosition(width, height, left, top, ownerDocument) {
+   const {
+     width: clientWidth,
+     height: clientHeight
+-  } = (0, _util.getClientSize)();
++  } = (0, _util.getClientSize)(ownerDocument);
+   let fixPos = null;
+diff --git a/node_modules/@rc-component/image/lib/hooks/useImageTransform.js b/node_modules/@rc-component/image/lib/hooks/useImageTransform.js
+--- a/node_modules/@rc-component/image/lib/hooks/useImageTransform.js
++++ b/node_modules/@rc-component/image/lib/hooks/useImageTransform.js
+@@ -81,26 +81,28 @@
+     /** Default center point scaling */
+-    const mergedCenterX = centerX ?? innerWidth / 2;
+-    const mergedCenterY = centerY ?? innerHeight / 2;
++    const ownerDocument = imgRef.current.ownerDocument;
++    const view = ownerDocument.defaultView ?? window;
++    const mergedCenterX = centerX ?? view.innerWidth / 2;
++    const mergedCenterY = centerY ?? view.innerHeight / 2;
+     const diffRatio = newRatio - 1;
+     /** Deviation calculated from image size */
+     const diffImgX = diffRatio * width * 0.5;
+     const diffImgY = diffRatio * height * 0.5;
+     /** The difference between the click position and the edge of the document */
+     const diffOffsetLeft = diffRatio * (mergedCenterX - transform.x - offsetLeft);
+     const diffOffsetTop = diffRatio * (mergedCenterY - transform.y - offsetTop);
+     /** Final positioning */
+     let newX = transform.x - (diffOffsetLeft - diffImgX);
+     let newY = transform.y - (diffOffsetTop - diffImgY);
+-
++
+     /**
+      * When zooming the image
+      * When the image size is smaller than the width and height of the window, the position is initialized
+      */
+     if (ratio < 1 && newScale === 1) {
+       const mergedWidth = offsetWidth * newScale;
+       const mergedHeight = offsetHeight * newScale;
+       const {
+         width: clientWidth,
+         height: clientHeight
+-      } = (0, _util2.getClientSize)();
++      } = (0, _util2.getClientSize)(ownerDocument);
+       if (mergedWidth <= clientWidth && mergedHeight <= clientHeight) {
+diff --git a/node_modules/@rc-component/image/lib/hooks/useMouseEvent.js b/node_modules/@rc-component/image/lib/hooks/useMouseEvent.js
+--- a/node_modules/@rc-component/image/lib/hooks/useMouseEvent.js
++++ b/node_modules/@rc-component/image/lib/hooks/useMouseEvent.js
+@@ -65,47 +65,48 @@
+       const isRotate = rotate % 180 !== 0;
+-      const fixState = (0, _getFixScaleEleTransPosition.default)(isRotate ? height : width, isRotate ? width : height, left, top);
++      const fixState = (0, _getFixScaleEleTransPosition.default)(isRotate ? height : width, isRotate ? width : height, left, top, imgRef.current.ownerDocument);
+       if (fixState) {
+         updateTransform({
+           ...fixState
+         }, 'dragRebound');
+       }
+     }
+   };
+   const onWheel = event => {
+     if (!open || !wheel || event.deltaY == 0) return;
+     // Scale ratio depends on the deltaY size
+     const scaleRatio = Math.abs(event.deltaY / 100);
+     // Limit the maximum scale ratio
+     const mergedScaleRatio = Math.min(scaleRatio, _previewConfig.WHEEL_MAX_SCALE_RATIO);
+     // Scale the ratio each time
+     let ratio = _previewConfig.BASE_SCALE_RATIO + mergedScaleRatio * scaleStep;
+     if (event.deltaY > 0) {
+       ratio = _previewConfig.BASE_SCALE_RATIO / ratio;
+     }
+     dispatchZoomChange(ratio, 'wheel', event.clientX, event.clientY);
+   };
+   (0, _react.useEffect)(() => {
++    const view = imgRef.current?.ownerDocument.defaultView ?? window;
+     if (movable) {
+-      window.addEventListener('mouseup', onMouseUp, false);
+-      window.addEventListener('mousemove', onMouseMove, false);
++      view.addEventListener('mouseup', onMouseUp, false);
++      view.addEventListener('mousemove', onMouseMove, false);
+       try {
+         // Resolve if in iframe lost event
+         /* istanbul ignore next */
+-        if (window.top !== window.self) {
+-          window.top.addEventListener('mouseup', onMouseUp, false);
+-          window.top.addEventListener('mousemove', onMouseMove, false);
++        if (view.top !== view.self) {
++          view.top.addEventListener('mouseup', onMouseUp, false);
++          if (view === window) view.top.addEventListener('mousemove', onMouseMove, false);
+         }
+       } catch (error) {
+         /* istanbul ignore next */
+         (0, _util.warning)(false, `[rc-image] ${error}`);
+       }
+     }
+     return () => {
+-      window.removeEventListener('mouseup', onMouseUp);
+-      window.removeEventListener('mousemove', onMouseMove);
+-
++      view.removeEventListener('mouseup', onMouseUp);
++      view.removeEventListener('mousemove', onMouseMove);
++
+       /* istanbul ignore next */
+       try {
+-        window.top?.removeEventListener('mouseup', onMouseUp);
+-        window.top?.removeEventListener('mousemove', onMouseMove);
++        view.top?.removeEventListener('mouseup', onMouseUp);
++        if (view === window) view.top?.removeEventListener('mousemove', onMouseMove);
+       } catch (error) {
+diff --git a/node_modules/@rc-component/image/lib/hooks/useTouchEvent.js b/node_modules/@rc-component/image/lib/hooks/useTouchEvent.js
+--- a/node_modules/@rc-component/image/lib/hooks/useTouchEvent.js
++++ b/node_modules/@rc-component/image/lib/hooks/useTouchEvent.js
+@@ -150,20 +150,21 @@
+     const isRotate = rotate % 180 !== 0;
+-    const fixState = (0, _getFixScaleEleTransPosition.default)(isRotate ? height : width, isRotate ? width : height, left, top);
++    const fixState = (0, _getFixScaleEleTransPosition.default)(isRotate ? height : width, isRotate ? width : height, left, top, imgRef.current.ownerDocument);
+     if (fixState) {
+       updateTransform({
+         ...fixState
+       }, 'dragRebound');
+     }
+   };
+   (0, _react.useEffect)(() => {
++    const view = imgRef.current?.ownerDocument.defaultView ?? window;
+     const preventDefault = e => {
+       e.preventDefault();
+     };
+     if (open && movable) {
+-      window.addEventListener('touchmove', preventDefault, {
++      view.addEventListener('touchmove', preventDefault, {
+         passive: false
+       });
+     }
+     return () => {
+-      window.removeEventListener('touchmove', preventDefault);
++      view.removeEventListener('touchmove', preventDefault);
+     };

@@ -9,7 +9,9 @@ export const withPhotoPreviewHint = (preview = true) => preview === false ? fals
 export const rememberPhotoPreviewOrigin = event => {
     const source = event.target?.closest?.('.ant-image') ?? event.currentTarget;
     const rect = source?.getBoundingClientRect?.();
-    if (!rect || typeof document === 'undefined') return;
-    document.documentElement.style.setProperty('--reserve-store-preview-origin-x', `${rect.left + rect.width / 2}px`);
-    document.documentElement.style.setProperty('--reserve-store-preview-origin-y', `${rect.top + rect.height / 2}px`);
+    if (!rect) return;
+    const owner = source.ownerDocument;
+    const { style } = owner === document ? owner.documentElement : owner.body;
+    style.setProperty('--reserve-store-preview-origin-x', `${rect.left + rect.width / 2}px`);
+    style.setProperty('--reserve-store-preview-origin-y', `${rect.top + rect.height / 2}px`);
 };

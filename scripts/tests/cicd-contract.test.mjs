@@ -455,16 +455,18 @@ test('forks, Dependabot and unrecognized titles do not perform label writes', as
     }
 });
 
-test('required checks remain present and deployment waits for both builds', () => {
+test('required CI checks remain present and independent deployment requires verified main CI', () => {
     assert.ok(backend && frontend && deployment && backendTests && frontendTests);
     assert.equal(backendTests.if, undefined);
     assert.equal(frontendTests.if, undefined);
     assert.deepEqual(backend.needs, ['test-backend', 'build-frontend']);
     assert.equal(frontend.needs, 'test-frontend');
-    assert.deepEqual(workflow.jobs.cd.needs, ['build-backend', 'build-frontend', 'test-backend', 'test-frontend']);
+    assert.equal(workflow.jobs.cd, undefined);
+    assert.deepEqual(Object.keys(cd.on), ['workflow_dispatch']);
     assert.deepEqual(deployment.needs, ['verify-source', 'stage-release']);
     assert.deepEqual(staging.needs, ['verify-source']);
     assert.equal(staging.if, deployment.if);
+    assert.equal(staging.if, undefined);
     assert.equal(staging.environment, undefined);
     assert.deepEqual(deployment.environment, { name: 'production', url: "${{ vars.RESERVE_DOMAIN_SPLIT == 'true' && 'https://app.reserve.it.kr' || 'https://reserve.it.kr' }}" });
     assert.ok(!deployment.steps.some(entry => /Create GitHub deployment|Mark deployment/.test(entry.name ?? '')));
@@ -478,8 +480,9 @@ test('required checks remain present and deployment waits for both builds', () =
     assert.match(shell.run, /GITHUB_RUN_ID/);
     assert.match(shell.run, /frontend-release-\$GITHUB_SHA/);
     assert.ok(backend.steps.indexOf(shell) < backend.steps.indexOf(step(backend, 'backend_package')));
-    assert.match(deployment.if, /github\.ref == 'refs\/heads\/main'/);
-    assert.match(deployment.if, /github\.event_name == 'push'/);
+    assert.match(cd.jobs['verify-source'].if, /github\.ref == 'refs\/heads\/main'/);
+    assert.match(cd.jobs['verify-source'].if, /github\.sha == inputs\.source_sha/);
+    assert.match(workflow.jobs['dispatch-cd'].if, /github\.event_name == 'push'/);
     assert.equal(workflow.concurrency['cancel-in-progress'], "${{ github.event_name == 'pull_request' }}");
 });
 
@@ -539,18 +542,21 @@ test('PC and mobile browser checks use separate projects and failure evidence', 
     assert.ok(frontend.steps.some(entry => entry.run === 'npm run build'));
 });
 
-test('image publication and frontend staging remain main-push-only', () => {
+test('image publication remains main-push-only and staging downloads only verified source CI artifacts', () => {
     const mainPush = "github.ref == 'refs/heads/main' && github.event_name == 'push'";
     assert.ok(!frontend.steps.some(entry => /^appleboy\//.test(entry.uses ?? '')));
-    assert.match(staging.steps.find(entry => entry.name === "Download this run's frontend").run, /GITHUB_RUN_ID/);
-    assert.equal(staging.if, mainPush);
+    const download = staging.steps.find(entry => entry.name === 'Download source CI frontend');
+    assert.match(download.run, /gh run download "\$SOURCE_RUN_ID"/);
+    assert.match(download.run, /frontend-release-\$SOURCE_SHA/);
+    assert.deepEqual(staging.needs, ['verify-source']);
+    assert.equal(staging.env.SOURCE_RUN_ID, '${{ needs.verify-source.outputs.run-id }}');
+    assert.equal(staging.env.SOURCE_SHA, '${{ needs.verify-source.outputs.sha }}');
     assert.equal(staging.steps.find(entry => entry.name === 'Stage marketing files').if, "vars.RESERVE_DOMAIN_SPLIT == 'true'");
-    for (const job of [backend, staging]) {
-        const writes = job.steps.filter(entry => /^docker\/login-action@|^appleboy\/(scp|ssh)-action@/.test(entry.uses ?? '')
+    for (const job of [backend]) {
+        const writes = job.steps.filter(entry => /^docker\/login-action@/.test(entry.uses ?? '')
             || /docker push\b|docker (?:build|buildx build)[^\n]*--push\b/.test(entry.run ?? ''));
         assert.ok(writes.length > 0);
         for (const entry of writes) {
-            // GitHub는 단계 조건과 별개로 작업 조건도 요구한다.
             if (job.if !== mainPush) assert.equal(entry.if, mainPush, entry.name);
         }
     }

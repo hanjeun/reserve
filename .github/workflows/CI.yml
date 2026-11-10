@@ -12,7 +12,7 @@ on:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
 
-# PR의 오래된 실행은 취소하고, 운영 배포는 중간에 끊기지 않도록 순서대로 실행한다.
+# PR의 오래된 실행은 취소하고 main의 후보 검사는 순서대로 실행한다.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -327,7 +327,8 @@ jobs:
           const image = process.env.IMAGE_REFERENCE;
           if (!/^[a-z0-9][a-z0-9_.\/-]*\/reserve@sha256:[a-f0-9]{64}$/.test(image || '')) throw new Error('Invalid immutable image reference');
           writeFileSync('backend/build/release-image.json', JSON.stringify({
-            version: 1, sha: process.env.COMMIT_SHA, runId: process.env.GITHUB_RUN_ID, image,
+            version: 2, sha: process.env.COMMIT_SHA, runId: process.env.GITHUB_RUN_ID,
+            runAttempt: process.env.GITHUB_RUN_ATTEMPT, image,
           }) + '\n');
           RESERVE_IMAGE
       - name: Upload immutable backend release
@@ -434,12 +435,20 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  cd:
-    needs: [build-backend, build-frontend, test-backend, test-frontend]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  dispatch-cd:
+    needs: [test-backend, test-frontend, build-backend, build-frontend]
+    if: >-
+      always() && !cancelled() && github.repository == 'hanjeun/reserve' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
     permissions:
-      contents: read
-      actions: read
-      deployments: write
-    uses: ./.github/workflows/CD.yml
-    secrets: inherit
+      actions: write
+    steps:
+      - name: Queue CD on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run CD.yml --repo "$GITHUB_REPOSITORY" --ref main \
+            -f source_sha="$GITHUB_SHA" -f source_run_id="$GITHUB_RUN_ID" \
+            -f source_run_attempt="$GITHUB_RUN_ATTEMPT"

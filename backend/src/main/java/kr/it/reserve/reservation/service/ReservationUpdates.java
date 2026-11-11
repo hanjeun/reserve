@@ -1,8 +1,6 @@
 package kr.it.reserve.reservation.service;
 
 import kr.it.reserve.config.updates.EntityUpdates;
-import kr.it.reserve.notification.entity.ReservationNotification.Kind;
-import kr.it.reserve.notification.service.ReservationNotificationService;
 import kr.it.reserve.reservation.entity.Reservation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -10,21 +8,27 @@ import java.util.HashSet;
 
 @Component @RequiredArgsConstructor
 public class ReservationUpdates {
+    public enum NotificationKind { APPROVED, CHANGED, CANCELLED }
+
+    public interface NotificationSink {
+        void enqueue(Reservation reservation, NotificationKind kind);
+    }
+
     private final EntityUpdates updates;
-    private final ReservationNotificationService notifications;
+    private final NotificationSink notifications;
 
     public void created(Reservation reservation) {
         if (reservation.getStatus() == Reservation.ReservationStatus.CONFIRMED) {
-            notifications.enqueue(reservation, Kind.APPROVED);
+            notifications.enqueue(reservation, NotificationKind.APPROVED);
         }
         changed(reservation, EntityUpdates.Operation.CREATED);
     }
 
-    public void approved(Reservation reservation) { notifyChange(reservation, Kind.APPROVED); }
-    public void rescheduled(Reservation reservation) { notifyChange(reservation, Kind.CHANGED); }
-    public void cancelled(Reservation reservation) { notifyChange(reservation, Kind.CANCELLED); }
+    public void approved(Reservation reservation) { notifyChange(reservation, NotificationKind.APPROVED); }
+    public void rescheduled(Reservation reservation) { notifyChange(reservation, NotificationKind.CHANGED); }
+    public void cancelled(Reservation reservation) { notifyChange(reservation, NotificationKind.CANCELLED); }
 
-    private void notifyChange(Reservation reservation, Kind kind) {
+    private void notifyChange(Reservation reservation, NotificationKind kind) {
         notifications.enqueue(reservation, kind);
         updated(reservation);
     }

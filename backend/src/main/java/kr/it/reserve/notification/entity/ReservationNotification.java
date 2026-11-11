@@ -3,6 +3,7 @@ package kr.it.reserve.notification.entity;
 import jakarta.persistence.*;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.reservation.entity.Reservation;
+import kr.it.reserve.reservation.service.ReservationUpdates.NotificationKind;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.OnDelete;
@@ -26,8 +27,6 @@ import java.time.LocalTime;
             @Index(name = "idx_reservation_notification_unread", columnList = "recipient_id, read_at, delivered_at")
         })
 public class ReservationNotification {
-    public enum Kind { APPROVED, CHANGED, CANCELLED }
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -48,7 +47,7 @@ public class ReservationNotification {
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 16, updatable = false)
-    private Kind kind;
+    private NotificationKind kind;
 
     @Column(name = "owner_notice", nullable = false, updatable = false)
     private boolean ownerNotice;
@@ -78,7 +77,7 @@ public class ReservationNotification {
     private LocalDateTime readAt;
 
     public static ReservationNotification pending(String eventKey, Reservation reservation, Member recipient,
-                                                  Kind kind, boolean ownerNotice, LocalDateTime now) {
+                                                  NotificationKind kind, boolean ownerNotice, LocalDateTime now) {
         ReservationNotification item = new ReservationNotification();
         item.eventKey = eventKey;
         item.reservation = reservation;

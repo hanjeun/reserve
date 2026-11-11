@@ -5,12 +5,12 @@ import kr.it.reserve.config.updates.EntityUpdates;
 import kr.it.reserve.global.common.ServiceTime;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.Role;
-import kr.it.reserve.notification.entity.ReservationNotification.Kind;
 import kr.it.reserve.notification.service.ReservationNotificationDispatcher;
 import kr.it.reserve.notification.service.ReservationNotificationService;
 import kr.it.reserve.notification.service.ReservationNotificationService.Item;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.service.ReservationUpdates;
+import kr.it.reserve.reservation.service.ReservationUpdates.NotificationKind;
 import kr.it.reserve.store.entity.Store;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -79,8 +79,9 @@ class ReservationNotificationIntegrationTest {
         dispatcher.dispatch();
         var customerItems = notifications.inbox(customer, null).items();
         var ownerItems = notifications.inbox(owner, null).items();
-        assertThat(customerItems).extracting(Item::kind).containsExactly(Kind.CANCELLED, Kind.CHANGED, Kind.APPROVED);
-        assertThat(ownerItems).extracting(Item::kind).containsExactly(Kind.CANCELLED, Kind.CHANGED);
+        assertThat(customerItems).extracting(Item::kind)
+                .containsExactly(NotificationKind.CANCELLED, NotificationKind.CHANGED, NotificationKind.APPROVED);
+        assertThat(ownerItems).extracting(Item::kind).containsExactly(NotificationKind.CANCELLED, NotificationKind.CHANGED);
         assertThat(customerItems.getLast().reservationTime()).isEqualTo(LocalTime.NOON);
         assertThat(ownerItems.getFirst().reservationTime()).isEqualTo(LocalTime.of(13, 0));
         assertThat(notifications.inbox(outsider, null).items()).isEmpty();

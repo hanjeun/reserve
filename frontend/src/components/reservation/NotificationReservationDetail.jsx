@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import PropTypes from 'prop-types';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import Bone from '../common/Bone';
@@ -7,29 +8,15 @@ import LoadingStatus from '../common/LoadingStatus';
 import ReservationDetailModal from './ReservationDetailModal';
 import chatService from '../../services/chatService';
 
-export default function NotificationReservationDetail() {
-    const [params, setParams] = useSearchParams();
-    const value = params.get('notification');
-    const parsed = Number(value);
-    const id = /^[1-9]\d*$/.test(value ?? '') && Number.isSafeInteger(parsed) ? parsed : null;
-    const [lastId, setLastId] = useState(id);
-    if (id != null && id !== lastId) setLastId(id);
-    const target = id ?? lastId;
+function NotificationReservationModal({ id, open, onClose }) {
     const detail = useQuery({
-        queryKey: ['notification-reservation', target],
-        queryFn: ({ signal }) => chatService.getNotificationReservation(target, signal),
-        enabled: id != null,
+        queryKey: ['notification-reservation', id],
+        queryFn: ({ signal }) => chatService.getNotificationReservation(id, signal),
+        enabled: open,
         staleTime: 0,
         gcTime: 0,
         retry: false,
     });
-    if (target == null) return null;
-
-    const close = () => setParams(current => {
-        const next = new URLSearchParams(current);
-        next.delete('notification');
-        return next;
-    }, { replace: true });
     let placeholder;
     if (detail.isPending || detail.isFetching) {
         placeholder = <LoadingStatus aria-label="예약 상세를 불러오는 중" aria-busy="true">
@@ -40,5 +27,29 @@ export default function NotificationReservationDetail() {
             error={detail.error} compact onRetry={detail.refetch} />;
     }
     return <ReservationDetailModal reservation={placeholder ? null : detail.data}
-        open={id != null} onClose={close} placeholder={placeholder} />;
+        open={open} onClose={onClose} placeholder={placeholder} />;
+}
+
+NotificationReservationModal.propTypes = {
+    id: PropTypes.number.isRequired,
+    open: PropTypes.bool.isRequired,
+    onClose: PropTypes.func.isRequired,
+};
+
+export default function NotificationReservationDetail() {
+    const [params, setParams] = useSearchParams();
+    const value = params.get('notification');
+    const parsed = Number(value);
+    const id = /^[1-9]\d*$/.test(value ?? '') && Number.isSafeInteger(parsed) ? parsed : null;
+    const [lastId, setLastId] = useState(id);
+    if (id != null && id !== lastId) setLastId(id);
+    const target = id ?? lastId;
+    if (target == null) return null;
+
+    const close = () => setParams(current => {
+        const next = new URLSearchParams(current);
+        next.delete('notification');
+        return next;
+    }, { replace: true });
+    return <NotificationReservationModal id={target} open={id != null} onClose={close} />;
 }

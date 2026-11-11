@@ -581,7 +581,7 @@ test('snapshot verification installs a scoped Git byte guard without changing th
     assert.match(read('scripts/design-system-snapshot.ps1'), /Get-ChildItem -LiteralPath \$snapshotRoot -Recurse -File -Force/);
 });
 
-test('both HTML CSP policies allow verified Kakao scripts without enabling eval or enforcement', () => {
+test('both HTML CSP policies allow the exact Kakao and Turnstile origins without enabling eval or enforcement', () => {
     const nginx = read('nginx/default.conf');
     const policies = [...nginx.matchAll(/add_header Content-Security-Policy-Report-Only "([^"]+)" always;/g)].map(match => match[1]);
     assert.equal(policies.length, 2);
@@ -589,8 +589,10 @@ test('both HTML CSP policies allow verified Kakao scripts without enabling eval 
     const scripts = policies[0].split(';').map(value => value.trim()).find(value => value.startsWith('script-src ')).split(/\s+/);
     assert.deepEqual(scripts, [
         'script-src', "'self'", 'https://cdn.portone.io', 'https://dapi.kakao.com',
-        'https://t1.kakaocdn.net', 'https://*.daumcdn.net',
+        'https://t1.kakaocdn.net', 'https://*.daumcdn.net', 'https://challenges.cloudflare.com',
     ]);
+    const frames = policies[0].split(';').map(value => value.trim()).find(value => value.startsWith('frame-src ')).split(/\s+/);
+    assert.ok(frames.includes('https://challenges.cloudflare.com'));
     assert.doesNotMatch(nginx, /add_header\s+Content-Security-Policy\s/);
 });
 

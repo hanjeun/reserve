@@ -30,8 +30,13 @@ public class ApiResponse<T> {
 
     // 실패 응답 전용 정적 메소드
     public static <T> ApiResponse<T> error(String message) {
+        return error(message, null);
+    }
+
+    public static <T> ApiResponse<T> error(String message, T data) {
         return ApiResponse.<T>builder()
                 .success(false)
+                .data(data)
                 .message(message)
                 .timestamp(LocalDateTime.now(Clock.systemDefaultZone()))
                 .build();

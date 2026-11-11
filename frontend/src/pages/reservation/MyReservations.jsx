@@ -16,6 +16,7 @@ import ReservationRow from '../../components/reservation/ReservationRow';
 import ReservationListingToolbar from '../../components/reservation/ReservationListingToolbar';
 import ReservationSummaryCard from '../../components/reservation/ReservationSummaryCard';
 import ReservationDetailModal from '../../components/reservation/ReservationDetailModal';
+import NotificationReservationDetail from '../../components/reservation/NotificationReservationDetail';
 import QrCodeModal from '../../components/reservation/QrCodeModal';
 import { useReservations, useMessage, usePayment } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
@@ -402,10 +403,12 @@ const MyReservations = () => {
             onChange={value => setParams(current => {
                 const next = new URLSearchParams(current);
                 next.set('tab', value);
+                next.delete('notification');
                 return next;
             })} /></div>
         <PersonalSearchHandoff key={`search:${revision}`} />
         {waiting ? <MyWaiting key={`waiting:${revision}`} /> : <ReservationHistory key={`history:${revision}`} />}
+        {!waiting && <NotificationReservationDetail />}
     </PageContainer>;
 };
 

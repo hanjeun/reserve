@@ -16,6 +16,7 @@ vi.mock('../../services/storeService', () => ({ default: { getStores: vi.fn() } 
 vi.mock('../../services', () => ({
     chatService: {
         search: vi.fn(),
+        getUnread: vi.fn().mockResolvedValue({ messages: 0, notifications: 0 }),
         getSearchContext: vi.fn(),
         listConversations: vi.fn(),
         listStoreInbox: vi.fn(),

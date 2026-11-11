@@ -1,6 +1,8 @@
 package kr.it.reserve.reservation.service;
 
 import kr.it.reserve.config.updates.EntityUpdates;
+import kr.it.reserve.notification.entity.ReservationNotification.Kind;
+import kr.it.reserve.notification.service.ReservationNotificationService;
 import kr.it.reserve.reservation.entity.Reservation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -9,6 +11,23 @@ import java.util.HashSet;
 @Component @RequiredArgsConstructor
 public class ReservationUpdates {
     private final EntityUpdates updates;
+    private final ReservationNotificationService notifications;
+
+    public void created(Reservation reservation) {
+        if (reservation.getStatus() == Reservation.ReservationStatus.CONFIRMED) {
+            notifications.enqueue(reservation, Kind.APPROVED);
+        }
+        changed(reservation, EntityUpdates.Operation.CREATED);
+    }
+
+    public void approved(Reservation reservation) { notifyChange(reservation, Kind.APPROVED); }
+    public void rescheduled(Reservation reservation) { notifyChange(reservation, Kind.CHANGED); }
+    public void cancelled(Reservation reservation) { notifyChange(reservation, Kind.CANCELLED); }
+
+    private void notifyChange(Reservation reservation, Kind kind) {
+        notifications.enqueue(reservation, kind);
+        updated(reservation);
+    }
 
     public void updated(Reservation reservation) { changed(reservation, EntityUpdates.Operation.UPDATED); }
 

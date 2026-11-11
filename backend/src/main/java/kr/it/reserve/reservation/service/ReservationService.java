@@ -54,6 +54,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -193,7 +194,7 @@ public class ReservationService {
         ReservationResponse response = ReservationResponse.fromEntity(reservationRepository.save(reservation));
         consents.record(reservation, consentNotice);
         creationGuard.saved(attempt, reservation.getId());
-        changed(reservation, EntityUpdates.Operation.CREATED);
+        if (updates != null) updates.created(reservation);
 
         // 사장님에게 새 예약 알림 (비동기) — 이메일 알림 설정 ON일 때만
         notifyOwnerOfNewReservation(store, freshMember, request);
@@ -420,6 +421,11 @@ public class ReservationService {
         // 생성과 동일한 검증 — 단, 자기 자신은 정원/중복 계산에서 제외
         validateReservationSlot(store, member, newDate, newTime, newGuestCount, reservation.getId());
 
+        boolean detailsChanged = !Objects.equals(reservation.getReservationDate(), newDate)
+                || !Objects.equals(reservation.getReservationTime(), newTime)
+                || !Objects.equals(reservation.getGuestCount(), newGuestCount)
+                || (request.getSpecialRequest() != null && !Objects.equals(reservation.getSpecialRequest(), request.getSpecialRequest()));
+        var oldStatus = reservation.getStatus();
         reservation.setUsageEndsAt(ReservationCompletionPolicy.endsAt(store, newDate, newTime, reservation.getServiceDurationMinutes()));
         reservation.setReservationDate(newDate);
         reservation.setReservationTime(newTime);
@@ -437,7 +443,10 @@ public class ReservationService {
 
         log.info("Reservation updated: id={}, memberId={}, newStatus={}", id, member.getId(), newStatus);
         Reservation saved = reservationRepository.save(reservation);
-        changed(saved, EntityUpdates.Operation.UPDATED);
+        if (updates != null) {
+            if (detailsChanged || oldStatus != newStatus) updates.rescheduled(saved);
+            else updates.updated(saved);
+        }
         return ReservationResponse.fromEntity(saved);
     }
 
@@ -459,7 +468,7 @@ public class ReservationService {
             throw new ReservationException("종료된 예약은 취소할 수 없어요.", HttpStatus.CONFLICT);
         }
         reservation.setStatus(Reservation.ReservationStatus.CANCELLED);
-        changed(reservation, EntityUpdates.Operation.UPDATED);
+        if (updates != null) updates.cancelled(reservation);
 
         // 취소 결정과 미발신 환불 의도를 함께 커밋한다. PG 오류는 이미 커밋한 취소를 되돌리지 않는다.
         if (Boolean.TRUE.equals(reservation.getDepositPaid())) {
@@ -501,7 +510,7 @@ public class ReservationService {
         }
 
         reservation.setStatus(Reservation.ReservationStatus.CONFIRMED);
-        changed(reservation, EntityUpdates.Operation.UPDATED);
+        if (updates != null) updates.approved(reservation);
 
         // 유저에게 승인 알림 (비동기) — 개인 알림 설정 ON일 때만
         if (reservation.getMember().isEmailNotificationEnabled()) {
@@ -581,7 +590,7 @@ public class ReservationService {
 
         // 취소 결정과 미발신 의도를 함께 저장한다. 외부 PG 호출은 커밋 후 실행한다.
         reservation.setStatus(Reservation.ReservationStatus.CANCELLED);
-        changed(reservation, EntityUpdates.Operation.UPDATED);
+        if (updates != null) updates.cancelled(reservation);
         reservation.setCancelReason(cancelReason);
 
         prepareStoreDecisionRefund(id, "가게의 예약 취소에 따른 전액 환불", reservation);

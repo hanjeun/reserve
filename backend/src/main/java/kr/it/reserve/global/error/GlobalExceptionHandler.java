@@ -86,7 +86,7 @@ public class GlobalExceptionHandler {
      * 비즈니스 예외 통합 처리 (도메인별 Custom Exception들)
      */
     @ExceptionHandler(BusinessException.class)
-    protected ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException e) {
+    protected ResponseEntity<ApiResponse<?>> handleBusinessException(BusinessException e) {
         // 500대 에러는 ERROR, 400대는 WARN으로 로그 레벨 차등 적용
         if (e.getStatus().is5xxServerError()) {
             log.error("Server business error: type={}, status={}",
@@ -96,9 +96,11 @@ public class GlobalExceptionHandler {
                     e.getClass().getSimpleName(), e.getStatus().value());
         }
 
+        var data = e instanceof ReservationException reservation && reservation.getCode() != null
+                ? Map.of("code", reservation.getCode()) : null;
         return ResponseEntity
                 .status(e.getStatus())
-                .body(ApiResponse.error(e.getMessage()));
+                .body(ApiResponse.error(e.getMessage(), data));
     }
 
     /**

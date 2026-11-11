@@ -9,6 +9,7 @@ import kr.it.reserve.feed.repository.*;
 import kr.it.reserve.feed.service.*;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.Role;
+import kr.it.reserve.notification.service.ReservationNotificationService;
 import kr.it.reserve.promotion.repository.PromotionRepository;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.service.ReservationUpdates;
@@ -65,7 +66,9 @@ class EntityUpdateProducerBoundaryTest {
         Member owner = EntityUpdateStreamTest.member(2, Role.BUSINESS);
         Store store = Store.builder().id(7L).owner(owner).build();
         Reservation reservation = Reservation.builder().id(17L).member(customer).store(store).build();
-        new ReservationUpdates(updates).changed(reservation, EntityUpdates.Operation.UPDATED);
+        var notifications = mock(ReservationNotificationService.class);
+        new ReservationUpdates(updates, notifications).changed(reservation, EntityUpdates.Operation.UPDATED);
+        verifyNoInteractions(notifications);
         assertThat(changes).hasSize(1);
         assertThat(changes.getFirst().members()).isEqualTo(Set.of(1L, 2L));
         assertThat(changes.getFirst().publiclyVisible()).isFalse();

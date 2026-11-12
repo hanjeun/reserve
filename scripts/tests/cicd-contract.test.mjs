@@ -586,13 +586,15 @@ test('both HTML CSP policies allow the exact Kakao and Turnstile origins without
     const policies = [...nginx.matchAll(/add_header Content-Security-Policy-Report-Only "([^"]+)" always;/g)].map(match => match[1]);
     assert.equal(policies.length, 2);
     assert.equal(policies[0], policies[1]);
-    const scripts = policies[0].split(';').map(value => value.trim()).find(value => value.startsWith('script-src ')).split(/\s+/);
-    assert.deepEqual(scripts, [
+    const directives = policies[0].split(';').map(value => value.trim().split(/\s+/));
+    assert.deepEqual(directives.find(([name]) => name === 'script-src'), [
         'script-src', "'self'", 'https://cdn.portone.io', 'https://dapi.kakao.com',
         'https://t1.kakaocdn.net', 'https://*.daumcdn.net', 'https://challenges.cloudflare.com',
     ]);
-    const frames = policies[0].split(';').map(value => value.trim()).find(value => value.startsWith('frame-src ')).split(/\s+/);
-    assert.ok(frames.includes('https://challenges.cloudflare.com'));
+    assert.deepEqual(directives.find(([name]) => name === 'frame-src'), [
+        'frame-src', "'self'", 'https://*.portone.io', 'https://*.iamport.kr',
+        'https://*.kakao.com', 'https://*.kakaopay.com', 'https://challenges.cloudflare.com',
+    ]);
     assert.doesNotMatch(nginx, /add_header\s+Content-Security-Policy\s/);
 });
 

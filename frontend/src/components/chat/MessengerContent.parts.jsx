@@ -178,7 +178,8 @@ function ConversationSections({ lists, canAdminSupport, canOwnStores, showHidden
 }
 
 export function ConversationListPanel({
-    headingLevel, inert, lists, showHidden, onToggleHidden, onFindStore, canAdminSupport, canOwnStores, rowProps, navigation,
+    headingLevel, inert, lists, showHidden, onToggleHidden, onFindStore, canAdminSupport, canOwnStores,
+    rowProps, notificationEntry, navigation,
 }) {
     return (
         <aside className="reserve-messenger-list" aria-label="대화 목록"
@@ -189,6 +190,7 @@ export function ConversationListPanel({
                 showHidden={showHidden} onToggleHidden={onToggleHidden} onFindStore={onFindStore} />
 
             <div className="reserve-messenger-list-scroll" aria-busy={lists.conversationListsLoading}>
+                {notificationEntry}
                 {lists.allConversationListsFailed ? (
                     <DataState state="error" kind="message" subject="대화 목록" error={lists.allConversationListsError}
                         onRetry={lists.refreshConversationLists} retrying={lists.conversationListsFetching} />

@@ -1,4 +1,4 @@
-const DOMAINS = new Set(['NEWS', 'WAITING', 'FEED', 'COMMENT', 'LIKE', 'NOTIFICATION', 'STORE', 'REVIEW', 'FAVORITE', 'RESERVATION']);
+const DOMAINS = new Set(['NEWS', 'WAITING', 'FEED', 'COMMENT', 'LIKE', 'NOTIFICATION', 'STORE', 'REVIEW', 'FAVORITE', 'RESERVATION', 'SYSTEM_NOTIFICATION']);
 const OPERATIONS = new Set(['CREATED', 'UPDATED', 'DELETED', 'INVALIDATED']);
 const same = (a, b) => a != null && b != null && String(a) === String(b);
 const affected = (value, id) => !id || same(value, id);
@@ -26,6 +26,7 @@ const feedOwn = key => key[0] === 'feed' && key[1] === 'me' && key[2] === 'posts
 const interaction = (key, kind) => key[0] === 'feed' && key[1] === 'interactions' && key[2] === kind;
 const storeRead = key => key[0] === 'stores' && ['list', 'detail', 'my', 'regions'].includes(key[1]) && !key.includes('edit');
 const reservationRead = key => key[0] === 'reservations' && ['my', 'manage'].includes(key[1]);
+const systemNotificationRead = key => key[0] === 'chat' && (key[1] === 'unread' || key[1] === 'notifications');
 
 export function liveUpdateMatches(query, event) {
     const key = query.queryKey;
@@ -64,6 +65,7 @@ export function liveUpdateMatches(query, event) {
     if (domain === 'LIKE') return interaction(key, 'mine')
         || interaction(key, 'status') && (!event.targetType || key[3] === event.targetType) && affected(key[4], id);
     if (domain === 'NOTIFICATION') return interaction(key, 'notifications');
+    if (domain === 'SYSTEM_NOTIFICATION') return systemNotificationRead(key);
     if (domain === 'STORE') {
         if (storeRead(key)) return key[1] !== 'detail' || affected(key[2], id);
         return key[0] === 'waiting-stores' || key[0] === 'favorites' && key[1] === 'my'
@@ -80,7 +82,7 @@ export function liveUpdateMatches(query, event) {
 /* 재연결은 지원하는 조회만 갱신하며 QR 발급·결제·관리자 감사 경로를 제외한다. */
 export function isLiveReadQuery(query) {
     const key = query.queryKey;
-    return feedRead(key) || feedOwn(key) || storeRead(key) || reservationRead(key)
+    return feedRead(key) || feedOwn(key) || storeRead(key) || reservationRead(key) || systemNotificationRead(key)
         || key[0] === 'waiting-stores' || key[0] === 'waiting'
         || key[0] === 'reviews' || key[0] === 'favorites'
         || key[0] === 'public-promotions' && ['list', 'detail'].includes(key[1])
@@ -141,7 +143,8 @@ export function createLiveQueryRefresh(client, current) {
         const matches = query => {
             const auditRead = query.queryKey[0] === 'store-news'
                 && ['applications', 'application'].includes(query.queryKey[1]);
-            return isLiveReadQuery(query) && (all && (!periodic || !auditRead)
+            const badgeRead = query.queryKey[0] === 'chat' && query.queryKey[1] === 'unread';
+            return isLiveReadQuery(query) && (all && (!periodic || !auditRead && !badgeRead)
                 || events.some(event => liveUpdateMatches(query, event)));
         };
         const queries = client.getQueryCache().findAll({ predicate: matches });

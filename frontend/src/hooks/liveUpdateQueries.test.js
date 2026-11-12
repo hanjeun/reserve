@@ -22,6 +22,19 @@ const deferred = () => {
 afterEach(() => { clients.forEach(value => value.clear()); clients.length = 0; });
 
 describe('metadata update routing', () => {
+    it('refreshes reservation notifications and the combined badge without touching human chat or feed', () => {
+        const event = signal({ domain: 'SYSTEM_NOTIFICATION', entityId: 0, operation: 'INVALIDATED' });
+        expect(parseLiveUpdate(event)).toEqual(event);
+        for (const key of [query('chat', 'unread'), query('chat', 'notifications', null)]) {
+            expect(liveUpdateMatches(key, event)).toBe(true);
+            expect(isLiveReadQuery(key)).toBe(true);
+        }
+        for (const key of [query('chat', 'conversations'), query('feed', 'interactions', 'notifications', 'count'),
+            query('notification-reservation', 12)]) {
+            expect(liveUpdateMatches(key, event)).toBe(false);
+        }
+    });
+
     it('rejects malformed or incompatible signals', () => {
         expect(parseLiveUpdate(JSON.stringify(signal()))).toEqual(signal());
         for (const invalid of ['{', null, signal({ domain: 'PAYMENT' }), signal({ entityId: -1 }),

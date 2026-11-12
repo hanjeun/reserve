@@ -2,8 +2,10 @@ package kr.it.reserve.global.ratelimit;
 
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -12,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * 정책별 로컬 Bucket4j 제한을 적용하고 구성된 대기 접수·QR 정책에는 Redis 공유 제한도 확인한다.
+ * 정책별 로컬 Bucket4j 제한을 적용하고 구성된 정책에는 Redis 공유 제한도 확인한다.
  * 제한 수치와 축은 Policy를 정본으로 사용한다.
  * 유휴 버킷은 제한 창을 보존하는 만료 기준으로 정리해 키가 무한히 누적되지 않게 한다.
  */
@@ -35,6 +37,8 @@ public class RateLimiter {
         MEMBER_UPDATE(20, Duration.ofMinutes(1)),
         MEMBER_UPDATE_IP(60, Duration.ofMinutes(1)),
         RESERVATION_CREATE(5, Duration.ofMinutes(1)),   // 1분에 5회 예약
+        RESERVATION_MEMBER_CREATE(6, Duration.ofMinutes(1)),
+        RESERVATION_CHALLENGE_THRESHOLD(3, Duration.ofMinutes(1)),
         RESERVATION_REMOVE(30, Duration.ofMinutes(1)),
         PAYMENT_VERIFY(30, Duration.ofMinutes(1)),
         WAITING_JOIN(5, Duration.ofMinutes(1)),         // 회원·IP별 고객 웨이팅 접수 제한
@@ -122,6 +126,16 @@ public class RateLimiter {
     @Autowired(required = false)
     private RedisRequestLimiter sharedWaitingLimits;
 
+    @Value("${reserve.reservation-protection.shared-limits-enabled:false}")
+    private boolean shareReservationLimits;
+
+    @PostConstruct
+    void requireSharedReservationLimits() {
+        if (shareReservationLimits && sharedWaitingLimits == null) {
+            throw new IllegalStateException("Shared reservation limits require the RESERVE Redis configuration");
+        }
+    }
+
     @Autowired(required = false)
     private RedisAuthRateLimiter sharedAuthenticationLimits;
 
@@ -176,11 +190,16 @@ public class RateLimiter {
             }
         }
         if (!entry.bucket.tryConsume(1)) return false;
-        if (sharedWaitingLimits == null || (policy != Policy.WAITING_JOIN && policy != Policy.QR_CHECKIN)) return true;
+        if (sharedWaitingLimits == null || !usesSharedRequestLimits(policy)) return true;
         Boolean shared = sharedWaitingLimits.tryConsume(key, policy, policy.capacity, policy.refillDuration);
         if (Boolean.FALSE.equals(shared)) entry.bucket.addTokens(1);
         // 공유 거부는 거부하고, 장애 때는 이미 소비한 로컬 버킷을 사용한다. 무제한 허용하지 않는다.
         return !Boolean.FALSE.equals(shared);
+    }
+
+    private boolean usesSharedRequestLimits(Policy policy) {
+        return policy == Policy.WAITING_JOIN || policy == Policy.QR_CHECKIN
+                || shareReservationLimits && (policy == Policy.RESERVATION_MEMBER_CREATE || policy == Policy.RESERVATION_CHALLENGE_THRESHOLD);
     }
 
     /** 성공한 검증이 예약했던 토큰 1개만 반환한다. 기존 실패와 리필 시점은 유지한다. */

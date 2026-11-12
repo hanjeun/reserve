@@ -15,6 +15,7 @@ import kr.it.reserve.global.common.ApiResponse;
 import kr.it.reserve.global.error.MemberException;
 import kr.it.reserve.global.ratelimit.RateLimiter;
 import kr.it.reserve.member.entity.Member;
+import kr.it.reserve.notification.service.ReservationNotificationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -178,7 +179,10 @@ class ChatControllerResponseContractTest {
                 }),
                 success("ChatApi.totalUnread", f -> {
                     when(f.chatService.totalUnreadCount(f.member)).thenReturn(13L);
-                    assertSuccess(f.chat.totalUnread(), 13L, EXPECTED_QUERY_SUCCESS);
+                    when(f.reservationNotifications.unread(f.member)).thenReturn(2L);
+                    var response = f.chat.totalUnread();
+                    assertSuccess(response, 15L, EXPECTED_QUERY_SUCCESS);
+                    assertThat(response.getHeaders().getCacheControl()).isEqualTo("no-store");
                     verify(f.chatService).totalUnreadCount(same(f.member));
                 }),
                 success("ChatApi.poll", f -> {
@@ -298,8 +302,9 @@ class ChatControllerResponseContractTest {
         private final ChatModerationService moderationService = mock(ChatModerationService.class);
         private final ChatImageService imageService = mock(ChatImageService.class);
         private final RateLimiter rateLimiter = mock(RateLimiter.class);
+        private final ReservationNotificationService reservationNotifications = mock(ReservationNotificationService.class);
         private final AdminChatController admin = new AdminChatController(chatService, moderationService, imageService);
-        private final ChatApiController chat = new ChatApiController(chatService, moderationService, rateLimiter);
+        private final ChatApiController chat = new ChatApiController(chatService, moderationService, rateLimiter, reservationNotifications);
         private final Member member = Member.builder().id(ACTOR_ID).name("계약 검사")
                 .email("chat-contract@example.test").build();
         private final SendMessageRequest sendRequest = new SendMessageRequest();

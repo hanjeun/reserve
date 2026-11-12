@@ -86,6 +86,50 @@ test('shared authentication activation requires Redis key epoch and a completed 
     assert.ok(ready < source.indexOf('sudo -E docker compose'));
 });
 
+test('production forwards reservation protection settings and validates them before starting the target', () => {
+    const launch = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
+    const prefix = 'RESERVE_RESERVATION_TURNSTILE_';
+    const shared = 'RESERVE_RESERVATION_SHARED_LIMITS_ENABLED';
+    const flags = [shared, prefix + 'ENABLED'];
+    const names = [...flags, prefix + 'SITE_KEY', prefix + 'SECRET_KEY', prefix + 'HOSTNAME'];
+    for (const name of flags) assert.ok(launch.env[name].includes('vars.' + name + " || 'false'"));
+    assert.ok(launch.env[prefix + 'SECRET_KEY'].includes('secrets.' + prefix + 'SECRET_KEY'));
+    for (const name of names) {
+        assert.ok(launch.with.envs.split(',').includes(name));
+        for (const side of ['blue', 'green']) {
+            const compose = read('infra/compose/docker-compose-' + side + '.yml');
+            const fallback = flags.includes(name) ? 'false' : '';
+            assert.ok(compose.includes(name + '=${' + name + ':-' + fallback + '}'));
+        }
+    }
+
+    const script = launch.with.script;
+    const start = script.indexOf('case "$RESERVE_RESERVATION_SHARED_LIMITS_ENABLED"');
+    const end = script.indexOf('case "$RESERVE_IMAGE_REFERENCE"', start);
+    assert.ok(start >= 0 && end > start && end < script.indexOf('sudo docker pull'));
+    assert.match(script, /\[ "\$RESERVE_RESERVATION_SHARED_LIMITS_ENABLED" = true \]; then\s+sudo [^\n]+ check-redis/);
+    const defaults = { [shared]: 'false', [prefix + 'ENABLED']: 'false', RESERVE_REDIS_ENABLED: 'false',
+        RESERVE_REDIS_USERNAME: '', APP_FRONTEND_URL: 'https://app.reserve.it.kr',
+        [prefix + 'SITE_KEY']: '', [prefix + 'SECRET_KEY']: '', [prefix + 'HOSTNAME']: '' };
+    const run = settings => spawnSync(process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash',
+        ['-eu', '-c', script.slice(start, end)], { encoding: 'utf8', timeout: 5000,
+            env: { ...process.env, ...defaults, ...settings } });
+    const enabled = { [shared]: 'true', [prefix + 'ENABLED']: 'true', RESERVE_REDIS_ENABLED: 'true',
+        RESERVE_REDIS_USERNAME: 'reserve_app', [prefix + 'SITE_KEY']: 'fixture-site', [prefix + 'SECRET_KEY']: 'fixture-private',
+        [prefix + 'HOSTNAME']: 'app.reserve.it.kr' };
+    assert.equal(run({}).status, 0);
+    assert.equal(run(enabled).status, 0);
+    for (const [name, value] of [[shared, 'invalid'], [prefix + 'ENABLED', 'invalid'], ['RESERVE_REDIS_ENABLED', 'false'],
+        ['RESERVE_REDIS_USERNAME', 'default'], [prefix + 'HOSTNAME', 'reserve.it.kr'], [prefix + 'SITE_KEY', ''],
+        [prefix + 'SECRET_KEY', ''], [prefix + 'SITE_KEY', '1x' + '0'.repeat(20) + 'AA'],
+        [prefix + 'SECRET_KEY', '1x' + '0'.repeat(31) + 'AA']]) {
+        const failure = run({ ...enabled, [name]: value });
+        assert.ifError(failure.error);
+        assert.notEqual(failure.status, 0);
+        assert.doesNotMatch(failure.stderr + failure.stdout, /fixture-private/);
+    }
+});
+
 test('target app creation checks physical RAM immediately before compose and never ignores a rejection', () => {
     const validation = frontendTests.steps.find(entry => entry.name === 'Validate operations scripts');
     assert.match(validation.run, /node --test[^\n]*scripts\/tests\/deployment-memory\.test\.mjs/);
@@ -537,15 +581,19 @@ test('snapshot verification installs a scoped Git byte guard without changing th
     assert.match(read('scripts/design-system-snapshot.ps1'), /Get-ChildItem -LiteralPath \$snapshotRoot -Recurse -File -Force/);
 });
 
-test('both HTML CSP policies allow verified Kakao scripts without enabling eval or enforcement', () => {
+test('both HTML CSP policies allow the exact Kakao and Turnstile origins without enabling eval or enforcement', () => {
     const nginx = read('nginx/default.conf');
     const policies = [...nginx.matchAll(/add_header Content-Security-Policy-Report-Only "([^"]+)" always;/g)].map(match => match[1]);
     assert.equal(policies.length, 2);
     assert.equal(policies[0], policies[1]);
-    const scripts = policies[0].split(';').map(value => value.trim()).find(value => value.startsWith('script-src ')).split(/\s+/);
-    assert.deepEqual(scripts, [
+    const directives = policies[0].split(';').map(value => value.trim().split(/\s+/));
+    assert.deepEqual(directives.find(([name]) => name === 'script-src'), [
         'script-src', "'self'", 'https://cdn.portone.io', 'https://dapi.kakao.com',
-        'https://t1.kakaocdn.net', 'https://*.daumcdn.net',
+        'https://t1.kakaocdn.net', 'https://*.daumcdn.net', 'https://challenges.cloudflare.com',
+    ]);
+    assert.deepEqual(directives.find(([name]) => name === 'frame-src'), [
+        'frame-src', "'self'", 'https://*.portone.io', 'https://*.iamport.kr',
+        'https://*.kakao.com', 'https://*.kakaopay.com', 'https://challenges.cloudflare.com',
     ]);
     assert.doesNotMatch(nginx, /add_header\s+Content-Security-Policy\s/);
 });

@@ -14,6 +14,7 @@ import { httpStatusOf } from '../utils/listErrorMessage';
 import useAuthStore from '../store/useAuthStore';
 import useReducedMotion from './useReducedMotion';
 import useReservationAdmission from './useReservationAdmission';
+import useReservationChallenge, { reservationChallengeOf } from './useReservationChallenge';
 import { reservationRequestAttempt, completeReservationRequest } from '../utils/reservationRequest';
 import { currentSession, assertCurrentSession } from '../api/sessionScope';
 import { prepareCoreWork } from '../services/serviceAdmissionService';
@@ -47,6 +48,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
 
     const sessionRevision = useAuthStore(state => state.sessionRevision);
     const lookupScope = `${id}:${isLoggedIn}:${user?.id ?? user?.email}:${user?.role}:${sessionRevision}`;
+    const challenge = useReservationChallenge(lookupScope);
     useEffect(() => {
         if (!reservationEntry || reservationEntry.scope !== lookupScope) return undefined;
         const timer = setTimeout(() => setReservationEntry(value => value === reservationEntry ? null : value),
@@ -305,7 +307,19 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
                 await reservationRequestAttempt(requestScope, data, data.requestId);
                 assertCurrentSession(submissionSession.epoch);
             }
-            const reservation = await reservationService.createReservation(data);
+            let reservation;
+            try {
+                reservation = await reservationService.createReservation(data);
+            } catch (error) {
+                const required = reservationChallengeOf(error, data.requestId);
+                if (!required) throw error;
+                const token = await challenge.solve(required, submissionSession.signal);
+                if (!token) throw new DOMException('예약 확인을 취소했어요.', 'AbortError');
+                assertCurrentSession(submissionSession.epoch);
+                reservation = await reservationService.createReservation(data, {
+                    headers: { 'X-Reserve-Turnstile': token }, signal: submissionSession.signal,
+                });
+            }
             assertCurrentSession(submissionSession.epoch);
             return reservation;
         };
@@ -406,6 +420,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
                 completeReservationRequest(requestScope, (attempt || pendingAttempt || normalAttempt).requestId);
             }
         } catch (err) {
+            if (err?.name === 'AbortError' || err?.isStaleSession) return;
             const errMsg = toErrorMessage(err);
             if (httpStatusOf(err) === 409 && errMsg?.includes('예약 안내가 변경')) {
                 void queryClient.invalidateQueries({ queryKey: ['reservation-consent', user?.id, useAuthStore.getState().sessionRevision, Number(id)] });
@@ -433,6 +448,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
         editRetrying,
         retryEditLoad,
         admissionModalProps: admission.modalProps,
+        reservationChallengeProps: challenge.dialogProps,
         reservationSubmitting,
         reservationEntry: !editId && reservationEntry?.scope === lookupScope ? reservationEntry : null,
     };

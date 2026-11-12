@@ -87,6 +87,7 @@ export const chatKeys = {
     adminInbox:    () => ['chat', 'admin-support-inbox'],
     thread:        (key) => ['chat', 'thread', key],
     unread:        () => ['chat', 'unread'],
+    notifications: (before) => ['chat', 'notifications', before],
     // 채팅 첫 안내 — scope: 'support' | 'store:{id}'. 설정 화면과 손님 메신저가 같은 키를 쓴다.
     intro:         (scope) => ['chat', 'intro', scope],
 };

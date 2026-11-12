@@ -9,6 +9,7 @@ import WorkspacePanels from '../../components/layout/WorkspacePanels';
 import useWorkspaceNavigate from '../../hooks/useWorkspaceNavigate';
 import { BUSINESS_WORKSPACE_GROUPS, resolveBusinessTab } from '../../constants/workspaces';
 import ReservationCard from '../../components/reservation/ReservationCard';
+import NotificationReservationDetail from '../../components/reservation/NotificationReservationDetail';
 import ReservationListingToolbar from '../../components/reservation/ReservationListingToolbar';
 import QrScannerSheet from '../../components/reservation/QrScannerSheet';
 import AdManageTab from '../../components/advertisement/AdManageTab';
@@ -286,6 +287,7 @@ const BusinessPanel = () => {
         onSelect={key => navigateWorkspace(hrefFor(key), key === 'qr-checkin'
             ? { state: { workspaceQrOriginIndex: window.history.state?.idx } } : undefined)}>
         <WorkspacePanels activeKey={contentTab} items={tabItems} />
+        {activeTab === 'reservations' && <NotificationReservationDetail />}
         <QrScannerSheet open={activeTab === 'qr-checkin'} onClose={() => {
             const origin = location.state?.workspaceQrOriginIndex;
             if (Number.isInteger(origin) && window.history.state?.idx === origin + 1) navigate(-1);

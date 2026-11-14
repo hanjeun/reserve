@@ -22,10 +22,10 @@ const useAdPayment = () => {
         active.current = false; setHandoff(null);
         navigate('/payment/result?type=ad&merchant_uid=' + encodeURIComponent(order.merchantUid));
     });
-    const runPayment = useCallback(async (prepared, origin) => {
+    const runPayment = useCallback(async (prepared, origin, summary) => {
         const revision = useAuthStore.getState().sessionRevision;
         const current = () => revision === useAuthStore.getState().sessionRevision;
-        const method = await choosePayment(prepared, { kind: 'ADVERTISEMENT' });
+        const method = await choosePayment(prepared, { ...summary, kind: 'ADVERTISEMENT' });
         if (!method || !current()) return { success: false, cancelled: true };
         const { merchantUid, storeId, amount, productName, buyerName, buyerEmail, buyerTel } = prepared;
         const payment = await beginHandoff({ merchantUid }, () => PortOne.requestPayment({
@@ -52,7 +52,7 @@ const useAdPayment = () => {
         message.success('광고가 등록됐어요.');
         return { success: true, ad };
     }, [message, navigate, choosePayment, beginHandoff]);
-    const operate = async (prepare, origin) => {
+    const operate = async (prepare, origin, summary) => {
         if (active.current) return { success: false };
         active.current = true;
         const operation = ++attempt.current;
@@ -62,7 +62,7 @@ const useAdPayment = () => {
             if (!configuredPaymentMethods().length) throw new Error('사용 가능한 결제 수단을 불러오지 못했어요.');
             const prepared = await prepare();
             if (revision !== useAuthStore.getState().sessionRevision) return { success: false, stale: true };
-            const result = await runPayment(prepared, origin);
+            const result = await runPayment(prepared, origin, summary);
             handedOff = Boolean(result.redirected);
             return result;
         } catch (error) {
@@ -71,8 +71,14 @@ const useAdPayment = () => {
         } finally { if (!handedOff && operation === attempt.current) active.current = false; }
     };
     const invalidateMyAds = useCallback(() => { void invalidateAdData(queryClient); }, [queryClient]);
-    const createMutation = useMutation({ mutationFn: formData => operate(() => adService.createAd(formData), { kind: 'create' }), onSuccess: invalidateMyAds });
-    const payExistingMutation = useMutation({ mutationFn: adId => operate(() => adService.preparePayment(adId), { kind: 'existing', id: adId }), onSuccess: invalidateMyAds });
+    const createMutation = useMutation({
+        mutationFn: ({ formData, summary }) => operate(() => adService.createAd(formData), { kind: 'create' }, summary),
+        onSuccess: invalidateMyAds,
+    });
+    const payExistingMutation = useMutation({
+        mutationFn: ({ adId, summary }) => operate(() => adService.preparePayment(adId), { kind: 'existing', id: adId }, summary),
+        onSuccess: invalidateMyAds,
+    });
     const resetCreate = createMutation.reset;
     const resetExisting = payExistingMutation.reset;
     useEffect(() => useAuthStore.subscribe((state, before) => {
@@ -80,8 +86,9 @@ const useAdPayment = () => {
             attempt.current++; active.current = false; setHandoff(null); resetCreate(); resetExisting();
         }
     }), [resetCreate, resetExisting]);
-    return { pay: createMutation.mutateAsync, payExisting: payExistingMutation.mutateAsync,
+    return { pay: (formData, summary) => createMutation.mutateAsync({ formData, summary }),
+        payExisting: (adId, summary) => payExistingMutation.mutateAsync({ adId, summary }),
         paying: createMutation.isPending || handoff?.kind === 'create',
-        payingId: payExistingMutation.isPending ? payExistingMutation.variables : handoff?.kind === 'existing' ? handoff.id : null, paymentDialog };
+        payingId: payExistingMutation.isPending ? payExistingMutation.variables?.adId : handoff?.kind === 'existing' ? handoff.id : null, paymentDialog };
 };
 export default useAdPayment;

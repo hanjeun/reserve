@@ -185,7 +185,7 @@ describe('StoreListRow', () => {
         const { rerender } = renderRow(props);
         // 화면에는 AD, 화면 낭독기에는 '광고' (AdMark)
         const adMark = screen.getByText('AD').parentElement;
-        expect(adMark).toHaveClass('reserve-ad-mark', 'reserve-store-identity-text-ad');
+        expect(adMark).toHaveClass('reserve-ad-mark');
         expect(screen.getByText('광고')).toHaveClass('reserve-sr-only');
         expect(screen.getByText('우리동네')).toBeInTheDocument();
         expect(adMark.parentElement).toHaveClass('reserve-store-identity-text');

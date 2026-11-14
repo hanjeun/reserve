@@ -53,6 +53,8 @@ public class InquiryDto {
         private String content;
         private String status;
         private String statusDisplayName;
+        private boolean inboundEmail;
+        private String replySubject;
         private String answer;
         private String memberName;
         private String memberEmail;
@@ -72,13 +74,19 @@ public class InquiryDto {
                     .content(inquiry.getContent())
                     .status(inquiry.getStatus().name())
                     .statusDisplayName(inquiry.getStatus().getDisplayName())
+                    .inboundEmail(inquiry.isInboundEmail())
+                    .replySubject(inquiry.replySubject())
                     .answer(inquiry.getAnswer())
-                    .memberName(isGuest ? inquiry.getGuestName() + " (비회원)" : inquiry.getMember().getName())
+                    .memberName(isGuest ? guestDisplayName(inquiry) : inquiry.getMember().getName())
                     .memberEmail(isGuest ? inquiry.getGuestEmail() : inquiry.getMember().getEmail())
                     .memberId(isGuest ? null : inquiry.getMember().getId())
                     .createdAt(inquiry.getCreatedAt().format(formatter))
                     .answeredAt(inquiry.getAnsweredAt() != null ? inquiry.getAnsweredAt().format(formatter) : null)
                     .build();
+        }
+
+        private static String guestDisplayName(Inquiry inquiry) {
+            return inquiry.isInboundEmail() ? inquiry.getGuestName() : inquiry.getGuestName() + " (비회원)";
         }
     }
 

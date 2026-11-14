@@ -20,6 +20,10 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
     @Query("SELECT a FROM AuditLog a WHERE a.id = :id")
     Optional<AuditLog> findByIdForUpdate(@Param("id") Long id);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM AuditLog a WHERE a.entityType = :type AND a.entityId = :entityId AND a.action = 'SOFT_DELETE'")
+    Optional<AuditLog> findSoftDeleteForUpdate(String type, Long entityId);
+
     Page<AuditLog> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
     Page<AuditLog> findByEntityTypeOrderByCreatedAtDesc(String entityType, Pageable pageable);

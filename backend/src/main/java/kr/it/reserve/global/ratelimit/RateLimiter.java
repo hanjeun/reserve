@@ -83,7 +83,12 @@ public class RateLimiter {
          * 비로그인 문의 작성으로 인한 DB·알림 메일 도배를 제한한다.
          * 가입 인증 메일과 버킷을 분리해 문의 요청이 인증 메일 한도까지 소진하지 못하게 한다.
          */
-        INQUIRY_CREATE(5, Duration.ofMinutes(10)),
+        INQUIRY_CREATE(4, Duration.ofMinutes(10)),
+        INQUIRY_MEMBER_CREATE(3, Duration.ofMinutes(10)),
+        ADMIN_MAIL_SEND(10, Duration.ofMinutes(1)),
+        MAIL_PREVIEW(20, Duration.ofMinutes(1)),
+        RESEND_WEBHOOK_IP(120, Duration.ofMinutes(1)),
+        RESEND_MAIL_RETRIEVE(2, Duration.ofSeconds(1)),
         // 공개 지역 선택 화면이 외부 관광 API·이미지 프록시를 비용 없이 소진하지 않도록 IP 기준으로 제한한다.
         TOURISM_REGION_PHOTO(60, Duration.ofMinutes(1));
 

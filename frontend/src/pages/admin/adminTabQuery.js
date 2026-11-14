@@ -3,7 +3,7 @@ import { normalizeQuerySelections } from '../../utils/querySelection';
 import { reportTabSearch } from '../../components/admin/managementReviewQuery';
 
 export const ADMIN_TAB_QUERY_KEYS = {
-    pending: ['search', 'page'], all: ['search', 'page'], mailbox: ['search', 'page'],
+    pending: ['search', 'page'], all: ['search', 'page'], mailbox: ['mailFolder', 'page'],
     reports: ['chatReportStatus', 'chatReportPage'],
     'feed-reports': ['reportMode', 'reportStatus', 'reportPage', 'commentReportStatus', 'commentReportPage', 'reportAuditAction', 'reportAuditPage'],
     'benefit-applications': ['benefitState', 'benefitPage'],

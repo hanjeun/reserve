@@ -32,6 +32,9 @@
 | [mfa-completion-settlement.sql](../../backend/src/main/resources/db/manual/mfa-completion-settlement.sql) | MFA·예약 종료 기준·방문 보증금·TEST 가상 정산 |
 | [reservation-consent.sql](../../backend/src/main/resources/db/manual/reservation-consent.sql) | 예약 안내·동의의 버전과 거래 증거 |
 | [reservation-retention.sql](../../backend/src/main/resources/db/manual/reservation-retention.sql) | 예약 증거의 사건별 파기 보류와 해제 이력 |
+| [inquiry-inbound-email.sql](../../backend/src/main/resources/db/manual/inquiry-inbound-email.sql) | 지원 이메일 발신 주소 길이와 Resend의 수신 식별자 고유 제약 |
+| [inquiry-trash.sql](../../backend/src/main/resources/db/manual/inquiry-trash.sql) | 받은 문의 휴지통 이동 시각 |
+| [support-mail-photos.sql](../../backend/src/main/resources/db/manual/support-mail-photos.sql) | 받은 문의·보낸 메일의 비공개 사진과 영구 삭제 연동 |
 
 새 로그인 세션을 사용하는 버전은 기존 로그인 정보를 다시 사용하지 않아요. 적용 후 한 번 다시 로그인해야 하며, 복구 이미지도 새 세션과 예약 요청 기록을 이해하는 버전이어야 해요. SQL 파일의 준비와 실제 운영 적용은 별도예요.
 

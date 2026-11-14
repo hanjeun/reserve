@@ -26,7 +26,7 @@
 
 /* 선택된 행의 면을 hover·focus가 덮지 않게 한다. */
 .reserve-maillist-item:not(.is-selected):hover { background: var(--c-bg-subtle, rgba(0, 0, 0, 0.03)); }
-.reserve-maillist-item:not(.is-selected):active { background: rgba(0, 0, 0, 0.06); }
+.reserve-maillist-item:not(.is-selected):active { background: var(--c-hover-surface); }
 /* 키보드로 이동했을 때도 행 전체가 선택 대상임이 보여야 한다. */
 .reserve-maillist-item:not(.is-selected):focus-within { background: var(--c-bg-subtle, rgba(0, 0, 0, 0.03)); }
 
@@ -35,6 +35,10 @@
 /* 선택된 행의 hover도 같은 회색 계열을 사용한다. */
 .reserve-maillist-item.is-selected:hover {
     background: var(--c-gray-200, #e5e8eb);
+}
+.reserve-maillist-main:focus-visible {
+    outline: var(--reserve-focus-ring);
+    outline-offset: -2px;
 }
 
 /* 예약 날짜와 시간 선택은 같은 상태를 쓴다. 진입 애니메이션의 transform을 선택 상태로 덮지 않는다. */

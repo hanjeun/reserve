@@ -11,7 +11,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "inquiry")
+@Table(name = "inquiry", uniqueConstraints = @UniqueConstraint(name = "uk_inquiry_resend_email_id", columnNames = "resend_email_id"))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -33,8 +33,14 @@ public class Inquiry {
     @Column(name = "guest_name", length = 50)
     private String guestName;
 
-    @Column(name = "guest_email", length = 100)
+    @Column(name = "guest_email", length = 254)
     private String guestEmail;
+
+    @Column(name = "resend_email_id", length = 36, updatable = false)
+    private String resendEmailId;
+
+    @Column(name = "inbound_message_id", length = 255, updatable = false)
+    private String inboundMessageId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -64,6 +70,9 @@ public class Inquiry {
     @LastModifiedDate
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 
     /** 화면 표시 순서를 맞추고 ETC는 마지막에 둔다. 저장된 문자열과의 호환성을 위해 기존 열거값 이름을 바꾸거나 삭제하지 않는다. */
     public enum InquiryCategory {
@@ -106,5 +115,19 @@ public class Inquiry {
         this.answer = answerContent;
         this.status = InquiryStatus.ANSWERED;
         this.answeredAt = LocalDateTime.now(Clock.systemDefaultZone());
+    }
+
+    public String replySubject() {
+        String subject = title.replaceAll("\\R", " ");
+        if (!isInboundEmail()) return "[RESERVE 문의 답변] " + subject;
+        return subject.regionMatches(true, 0, "Re:", 0, 3) ? subject : "Re: " + subject;
+    }
+
+    public boolean isInboundEmail() {
+        return resendEmailId != null;
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
     }
 }

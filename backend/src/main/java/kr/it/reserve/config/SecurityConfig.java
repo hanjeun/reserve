@@ -90,6 +90,9 @@ public class SecurityConfig {
                         //   경로를 넓히지 말 것 — "/api/payment/**" 로 풀면 결제·환불 API 가 통째로 열린다.
                         .requestMatchers(org.springframework.http.HttpMethod.POST,
                                 ApiPaths.withV1Aliases("/api/payment/webhook/portone")).permitAll()
+                        // 수신 메일은 원본 본문의 서명으로 인증해요.
+                        .requestMatchers(org.springframework.http.HttpMethod.POST,
+                                ApiPaths.withV1Aliases(ApiPaths.RESEND_INBOUND)).permitAll()
                         // 제공자 이벤트는 브라우저 세션 대신 서명된 SET 본문을 검증한다.
                         .requestMatchers(org.springframework.http.HttpMethod.POST,
                                 ApiPaths.withV1Aliases("/api/oauth/events/google", "/api/oauth/events/kakao", "/api/oauth/events/naver")).permitAll()
@@ -192,7 +195,7 @@ public class SecurityConfig {
 
                         // 문의하기 작성 — 정지된 회원도 문의할 수 있어야 해서 비로그인 허용 (나머지 /api/inquiries/**는 인증 필요, 아래 anyRequest에 걸림)
                         .requestMatchers(org.springframework.http.HttpMethod.POST,
-                                ApiPaths.withV1Aliases("/api/inquiries")).permitAll()
+                                ApiPaths.withV1Aliases("/api/inquiries", "/api/inquiries/preview")).permitAll()
 
                         // 관리자 전용
                         .requestMatchers(ApiPaths.withV1Aliases("/admin/**", "/api/business-verification/admin/**", "/api/admin/**"))

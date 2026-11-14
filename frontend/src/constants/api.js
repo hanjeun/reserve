@@ -201,12 +201,15 @@ export const API_ENDPOINTS = {
         EVENTS: '/api/waiting/events',
     },
     MAIL: {
+        PREVIEW:      '/api/admin/mail/preview',
         COMPOSE:      '/api/admin/mail/compose',
         SENT:         '/api/admin/mail/sent',
         // 소프트 삭제(휴지통 이동). 보존 기간이 끝나면 서버 스케줄러가 자동 정리한다.
         TRASH_SENT:   (id) => `/api/admin/mail/sent/${id}`,
+        SENT_PHOTOS:  (id) => `/api/admin/mail/sent/${id}/photos`,
     },
     INQUIRY: {
+        PREVIEW:       '/api/inquiries/preview',
         MY:            '/api/inquiries/my',
         ADMIN_ALL:     '/api/inquiries/admin/all',
         DETAIL:        (id) => `/api/inquiries/${id}`,
@@ -214,6 +217,8 @@ export const API_ENDPOINTS = {
         CREATE:        '/api/inquiries',
         DELETE:        (id) => `/api/inquiries/${id}`,
         ADMIN_ANSWER:  (id) => `/api/inquiries/${id}/answer`,
+        ADMIN_REPLY:   (id) => `/api/inquiries/admin/${id}/reply`,
+        ADMIN_PHOTOS:  (id) => `/api/inquiries/admin/${id}/photos`,
         ADMIN_DELETE:  (id) => `/api/inquiries/admin/${id}`,
         PENDING_COUNT: '/api/inquiries/pending-count',
     },

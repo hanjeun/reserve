@@ -4,10 +4,10 @@ import useReducedMotion from '../../hooks/useReducedMotion';
 import { IllustrationMotionScope } from '../../hooks/illustrationMotionScope';
 
 /** 표시할 결과가 바뀔 때만 전환한다. 같은 목록의 배경 재조회는 다시 흔들지 않는다. */
-export default function AnimatedContent({ motionKey, ready = true, direction = 'up', as: Component = 'div', children, ...rest }) {
+export default function AnimatedContent({ motionKey, ready = true, animateOnMount = false, direction = 'up', as: Component = 'div', children, ...rest }) {
     const node = useRef(null);
     const last = useRef(motionKey);
-    const pending = useRef(false);
+    const pending = useRef(animateOnMount);
     const reduced = useReducedMotion();
     useLayoutEffect(() => {
         if (last.current !== motionKey) {
@@ -23,5 +23,5 @@ export default function AnimatedContent({ motionKey, ready = true, direction = '
     }, [motionKey, ready, reduced, direction]);
     return <Component {...rest} ref={node}><IllustrationMotionScope.Provider value={ready ? motionKey : null}>{children}</IllustrationMotionScope.Provider></Component>;
 }
-AnimatedContent.propTypes = { motionKey: PropTypes.string.isRequired, ready: PropTypes.bool,
+AnimatedContent.propTypes = { motionKey: PropTypes.string.isRequired, ready: PropTypes.bool, animateOnMount: PropTypes.bool,
     as: PropTypes.elementType, direction: PropTypes.oneOf(['up', 'down']), children: PropTypes.node };

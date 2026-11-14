@@ -174,6 +174,31 @@ class EmailServiceEnvelopeTest {
         return received;
     }
 
+    @Test
+    void inquiryDeliveryUsesThePreviewHtmlAndIncludesItsPhoto() throws Exception {
+        byte[] image = new byte[] { 1, 2, 3, 4 };
+        var photo = new kr.it.reserve.file.util.ImageFileValidator.ValidatedImage(image, "image/png", ".png", 1, 1);
+        MimeMessage delivered = deliver(service -> service.sendNewInquiryAlert(
+                MEMBER_NAME, MEMBER_EMAIL, "기타 문의", "첨부 확인", "첫 줄\r\n둘째 줄", List.of(photo)));
+        assertThat(htmlBody(delivered)).isEqualTo(new EmailService(mock(JavaMailSender.class))
+                .buildInquiryAlertContent(MEMBER_NAME, MEMBER_EMAIL, "기타 문의", "첨부 확인", "첫 줄\r\n둘째 줄"));
+        Part attached = findAttachment(delivered);
+        assertThat(attached).isNotNull();
+        assertThat(attached.getContentType()).startsWith("image/png");
+        assertThat(attached.getInputStream().readAllBytes()).isEqualTo(image);
+    }
+
+    private static Part findAttachment(Part part) throws Exception {
+        if (Part.ATTACHMENT.equalsIgnoreCase(part.getDisposition())) return part;
+        if (part.getContent() instanceof Multipart multipart) {
+            for (int i = 0; i < multipart.getCount(); i++) {
+                Part attached = findAttachment(multipart.getBodyPart(i));
+                if (attached != null) return attached;
+            }
+        }
+        return null;
+    }
+
     private static String htmlBody(MimeMessage message) throws Exception {
         Part body = findHtmlPart(message);
         assertThat(body).as("HTML MIME body").isNotNull();

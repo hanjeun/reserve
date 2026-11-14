@@ -931,3 +931,12 @@ input:disabled {
 
 /* 코드와 복사 아이콘은 줄바꿈하지 않고 좁은 표는 가로로 스크롤한다. */
 .ant-table .reserve-table-code { white-space: nowrap; }
+
+.reserve-mail-preview {
+    display: block;
+    width: 100%;
+    height: min(60vh, 600px);
+    min-height: 320px;
+    border: 0;
+    border-radius: 16px;
+}

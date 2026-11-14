@@ -28,6 +28,29 @@ function Probe() {
 }
 
 describe('useQueryParamsState', () => {
+    it('keeps private terms in memory and changes the page with the confirmed search', async () => {
+        function PrivateProbe() {
+            const [values, patch] = useQueryParamsState({ search: '', page: '1' }, { privateKeys: ['search'] });
+            const location = useLocation();
+            return <><output data-testid="private-query">{location.search}</output>
+                <output data-testid="private-values">{JSON.stringify(values)}</output>
+                <button onClick={() => patch({ search: 'synthetic@example.invalid', page: '1' })}>검색 확정</button>
+                <button onClick={() => patch({ page: '2' })}>페이지 이동</button></>;
+        }
+        const user = userEvent.setup();
+        const view = render(<MemoryRouter initialEntries={['/admin?tab=members&search=legacy&page=3']}><PrivateProbe /></MemoryRouter>);
+        await waitFor(() => expect(screen.getByTestId('private-query')).not.toHaveTextContent('search='));
+        expect(screen.getByTestId('private-values')).toHaveTextContent('"search":""');
+        await user.click(screen.getByRole('button', { name: '검색 확정' }));
+        expect(screen.getByTestId('private-values')).toHaveTextContent('"search":"synthetic@example.invalid","page":"1"');
+        expect(screen.getByTestId('private-query')).toHaveTextContent('page=1');
+        expect(screen.getByTestId('private-query')).not.toHaveTextContent('synthetic');
+        await user.click(screen.getByRole('button', { name: '페이지 이동' }));
+        expect(screen.getByTestId('private-values')).toHaveTextContent('synthetic@example.invalid');
+        view.unmount();
+        render(<MemoryRouter initialEntries={['/admin?tab=members&page=1']}><PrivateProbe /></MemoryRouter>);
+        expect(screen.getByTestId('private-values')).toHaveTextContent('"search":""');
+    });
     it('shows active list defaults and preserves the tab, hash and original history entry', async () => {
         const user = userEvent.setup();
         render(<MemoryRouter initialEntries={['/guide/user', {

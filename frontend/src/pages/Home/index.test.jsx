@@ -174,6 +174,16 @@ describe('app discovery home', () => {
         expect(storeService.getStores).toHaveBeenCalledTimes(2);
     });
 
+    it('잘못된 지역 응답에서도 홈의 추천 목록과 빠른 메뉴를 유지해요', async () => {
+        storeService.getRegions.mockResolvedValueOnce({ content: [] });
+        renderHome(['/']);
+        const section = screen.getByRole('region', { name: '지역별 BEST' });
+        act(() => visibilityByElement.get(section)([{ isIntersecting: true }]));
+        expect(await within(section).findByText('아직 보여드릴 지역별 가게가 없어요.')).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: '메시지' })).toBeInTheDocument();
+        expect(screen.getByText('모던 필라테스')).toBeInTheDocument();
+    });
+
     it('keeps cached recommendation rows visible when a background read fails', async () => {
         const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
         const key = storeKeys.list({ page: 0, size: 4, sort: 'rating' });

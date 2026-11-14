@@ -2263,7 +2263,7 @@ a.reserve-store-list-row-link[href]:active, .reserve-reservation-row:has(.reserv
     white-space: nowrap;
 }
 .reserve-discovery-more .anticon { font-size: 11px; }
-.reserve-discovery-recommended {
+.reserve-discovery-recommended, .reserve-discovery-regional {
     --reserve-home-recommendation-gap: 14px;
     --reserve-home-store-column-gap: 12px;
     border-top: var(--reserve-home-divider-size) solid var(--c-bg-subtle, #f8f9fa);
@@ -2298,10 +2298,10 @@ a.reserve-store-list-row-link[href]:active, .reserve-reservation-row:has(.reserv
 .reserve-discovery-regional-results { touch-action: pan-y pinch-zoom; overflow: clip; }
 .reserve-discovery-regional-results .reserve-discovery-store-list { padding: 3px; }
 @media (min-width: 576px) {
-    .reserve-discovery-recommended { --reserve-home-recommendation-gap: 16px; }
+    .reserve-discovery-recommended, .reserve-discovery-regional { --reserve-home-recommendation-gap: 16px; }
 }
 @media (min-width: 900px) {
-    .reserve-discovery-recommended { --reserve-home-recommendation-gap: 20px; }
+    .reserve-discovery-recommended, .reserve-discovery-regional { --reserve-home-recommendation-gap: 20px; }
     .reserve-discovery-store-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .reserve-discovery-partial-failure {

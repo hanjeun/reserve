@@ -403,12 +403,13 @@ function RegionalBest({ region = '' }) {
     const regions = useQuery({
         queryKey: storeKeys.regions(), queryFn: storeService.getRegions, enabled: ready, staleTime: 180_000,
     });
-    const available = new Map(regions.data?.filter(group => group.count > 0).map(group => [group.name, group.count]));
+    const groups = Array.isArray(regions.data) ? regions.data : [];
+    const available = new Map(groups.filter(group => group?.count > 0).map(group => [group.name, group.count]));
     const options = REGIONAL_OPTIONS.filter(value => available.has(value));
     const homeProvince = region.split(' ', 1)[0];
     const province = options.includes(selection.province) ? selection.province : options.includes(homeProvince) ? homeProvince : options[0] ?? '';
     const { data, isLoading, isFetching, error, refetch } = useQuery({ ...ratedStoresQuery(province), enabled: ready && Boolean(province) });
-    const stores = storeContent(data);
+    const stores = province ? storeContent(data) : [];
 
     useEffect(() => {
         if (ready) return undefined;
@@ -476,7 +477,7 @@ function RegionalBest({ region = '' }) {
         </AnimatedContent>
     </div>;
 
-    return <section ref={sectionRef} className="reserve-discovery-recommended reserve-discovery-regional" aria-labelledby="home-regional-title">
+    return <section ref={sectionRef} className="reserve-discovery-regional" aria-labelledby="home-regional-title">
         <SectionHeading title={<span id="home-regional-title">지역별 BEST</span>} />
         {options.length > 0 ? <Tabs className="reserve-discovery-regional-tabs" activeKey={province}
             onChange={selectProvince} animated={{ inkBar: !reducedMotion, tabPane: false }}

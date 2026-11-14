@@ -5,12 +5,14 @@ import FormModal from '../common/FormModal';
 import Button from '../common/Button';
 import UnderlinedTextButton from '../common/UnderlinedTextButton';
 import CopyableText from '../common/CopyableText';
-import DetailInfoRows from '../common/DetailInfoRows';
 import AnimatedContent from '../common/AnimatedContent';
 import Tooltip from '../common/Tooltip';
 import TextLink from '../common/TextLink';
 import PaymentBrandIcon from './PaymentBrandIcon';
-import { CalendarOutlined, ClockCircleOutlined, CreditCardOutlined, FileTextOutlined, TeamOutlined, UserOutlined, CheckCircleOutlined, SafetyCertificateOutlined, DownOutlined, ShopOutlined } from '../common/icons';
+import PaymentCheckoutSummary from './PaymentCheckoutSummary';
+import advertisementPaymentRows from './advertisementPaymentRows';
+import { CalendarOutlined, ClockCircleOutlined, FileTextOutlined, TeamOutlined, UserOutlined, CheckCircleOutlined, SafetyCertificateOutlined, DownOutlined, ShopOutlined } from '../common/icons';
+import { formatCurrency } from '../../utils/common';
 import { CARD_COMPANIES, cardCompanyLabel, cardCompanySupported, paymentMethodAvailability, paymentMethodBrand, readPaymentDevice } from '../../utils/paymentMethods';
 
 const { Paragraph } = Typography;
@@ -77,16 +79,21 @@ export default function PaymentMethodDialog({ open, prepared, summary = {}, meth
     const card = selected?.payMethod === 'CARD';
     const naverPointsOnly = selected?.testOnly && selected.pgProvider === 'kcp_v2' && paymentMethodBrand(selected) === 'NAVERPAY';
     const ready = acknowledged && selected && availability.available && (!card || cardCompanySupported(cardCompany, selected.pgProvider));
-    const amount = Number(prepared.amount).toLocaleString('ko-KR') + '원';
+    const amount = formatCurrency(prepared.amount);
     const reservation = summary.kind === 'RESERVATION';
+    const advertisement = summary.kind === 'ADVERTISEMENT';
+    const refundOnAttendance = reservation && summary.attendanceRefundEnabled;
+    const rows = advertisement ? advertisementPaymentRows({
+        ...summary, productName: prepared.productName, merchantUid: prepared.merchantUid, buyerName: prepared.buyerName,
+    }) : reservationRows(prepared, summary);
     const selectedLabel = card && cardCompanyLabel(cardCompany) ? '카드 · ' + cardCompanyLabel(cardCompany) : selected?.label || '선택해주세요.';
     const confirm = () => { if (ready) onConfirm(card ? { ...selected, cardCompany } : selected); };
-    return <FormModal title={reservation ? '예약 및 결제 확인' : '결제 정보 확인'} open={open}
+    return <FormModal title={reservation ? '예약 및 결제 확인' : advertisement ? '광고 및 결제 확인' : '결제 정보 확인'} open={open}
         rootClassName="reserve-payment-modal" onClose={onClose} afterClose={afterClose}
         onSubmit={confirm} submitText={amount + ' 결제하기'} submitDisabled={!ready} width={820}
         footer={<div className="reserve-payment-footer">
             <Checkbox checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)}>
-                [필수] {reservation ? '예약' : '주문'} 내용과 <TextLink to="/terms#payments" onClick={event => {
+                [필수] {reservation ? '예약' : advertisement ? '광고 신청' : '주문'} 내용과 <TextLink to="/terms#payments" onClick={event => {
                     event.stopPropagation();
                     if (!event.defaultPrevented && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) onViewTerms?.();
                 }}>결제·취소·환불 안내</TextLink>를 확인했어요.
@@ -94,17 +101,12 @@ export default function PaymentMethodDialog({ open, prepared, summary = {}, meth
             <Button variant="primary" size="sm" disabled={!ready} onClick={confirm}>{amount} 결제하기</Button>
         </div>}>
         <div className="reserve-payment-bridge">
-            <section aria-label={reservation ? '예약 정보' : '주문 정보'} className="reserve-payment-section reserve-payment-overview">
-                <DetailInfoRows rows={reservationRows(prepared, summary)} />
-            </section>
-            <aside className="reserve-payment-total" aria-label="결제 금액 확인">
-                <h3>{summary.attendanceRefundEnabled ? '예약 보증금' : '결제 금액'}</h3>
-                <DetailInfoRows rows={[{ Icon: CreditCardOutlined, label: '결제 수단', value: selectedLabel }]} />
-                <div className="reserve-payment-amount"><span>총 결제 금액</span><strong>{amount}</strong></div>
-                {summary.attendanceRefundEnabled && <p className="reserve-payment-policy"><CheckCircleOutlined aria-hidden="true" />
+            <PaymentCheckoutSummary label={reservation ? '예약 정보' : advertisement ? '광고 정보' : '주문 정보'} rows={rows}
+                title={refundOnAttendance ? '예약 보증금' : undefined} amountLabel={amount} methodLabel={selectedLabel}>
+                {refundOnAttendance && <p className="reserve-payment-policy"><CheckCircleOutlined aria-hidden="true" />
                     <span>QR 체크인 후 이용을 마치면 보증금 전액을 환불해요.</span></p>}
                 <p className="reserve-payment-policy"><SafetyCertificateOutlined aria-hidden="true" /><span>결제 인증은 결제사 화면에서 진행해요.</span></p>
-            </aside>
+            </PaymentCheckoutSummary>
             <section aria-label="결제 방법" className="reserve-payment-section reserve-payment-selection">
                 <h3>결제 방법</h3>
                 <div className="reserve-payment-methods" role="group" aria-label="결제 수단 선택">

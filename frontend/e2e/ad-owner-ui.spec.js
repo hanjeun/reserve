@@ -97,8 +97,8 @@ test('past unpaid ads cannot be paid and both ad previews keep the shared modal 
     await expect(placementPreview).toBeVisible();
     await expect(placementPreview.getByRole('heading', { name: '카드 보기' })).toBeVisible();
     await expect(placementPreview.getByRole('heading', { name: '리스트 보기' })).toBeVisible();
-    await expect(placementPreview.locator('.reserve-store-card-shell .reserve-store-identity-text-ad [aria-hidden="true"]')).toHaveText('AD');
-    await expect(placementPreview.locator('.reserve-store-list-row .reserve-store-identity-text-ad [aria-hidden="true"]')).toHaveText('AD');
+    await expect(placementPreview.locator('.reserve-store-card-shell .reserve-ad-mark [aria-hidden="true"]')).toHaveText('AD');
+    await expect(placementPreview.locator('.reserve-store-list-row .reserve-ad-mark [aria-hidden="true"]')).toHaveText('AD');
     const rowImageWidth = await placementPreview.locator('.reserve-store-list-row-image').evaluate(
         element => element.getBoundingClientRect().width,
     );

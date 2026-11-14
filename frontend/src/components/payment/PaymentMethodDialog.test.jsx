@@ -60,6 +60,19 @@ it('예약 정보와 서버 금액을 유지하며 선택한 간편결제로 넘
     expect(confirm).toHaveBeenCalledExactlyOnceWith(methods[1]);
     expect(screen.queryByRole('textbox', { name: /카드/ })).toBeNull();
 });
+it('광고도 같은 결제 요약에 광고 정보와 서버의 결제 금액을 보여줘요', () => {
+    const confirm = vi.fn();
+    render(<PaymentMethodDialog prepared={{ ...prepared, merchantUid: 'AD-SYNTHETIC' }} methods={methods}
+        selectedId="CARD" onChange={vi.fn()} onConfirm={confirm} onClose={vi.fn()} open
+        summary={{ kind: 'ADVERTISEMENT', storeName: '합성 가게', adType: 'BANNER', startDate: '2026-11-17', endDate: '2026-11-19' }} />);
+    const overview = screen.getByRole('region', { name: '광고 정보' });
+    expect(overview).toHaveTextContent('합성 가게');
+    expect(overview).toHaveTextContent(/11월 17일.*11월 19일/);
+    expect(screen.getByRole('button', { name: '주문번호 복사' })).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: '결제 금액 확인' })).toHaveTextContent('10,000원');
+    expect(screen.getByRole('checkbox', { name: /광고 신청 내용/ })).not.toBeChecked();
+    expect(confirm).not.toHaveBeenCalled();
+});
 it('카드와 간편결제의 중복 인증 설명을 생략하고 TEST 안내는 유지해요', () => {
     render(<Checkout confirm={vi.fn()} />);
     expect(screen.queryByText('카드사를 고르면 해당 카드사의 인증 화면으로 이어져요.')).toBeNull();

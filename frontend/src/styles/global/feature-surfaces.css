@@ -1486,9 +1486,7 @@ a.reserve-store-list-row-link[href]:active, .reserve-reservation-row:has(.reserv
 /* 분류 사이의 가운뎃점은 장식 요소로 표시한다. */
 .reserve-store-identity-text > * + *::before { content: '·'; margin-right: 4px; color: var(--c-text-tertiary, #8b95a1); }
 .reserve-store-identity-text > span { white-space: nowrap; }
-/* 광고 표시는 주변 글자와 크기·자간을 맞추고 색으로 구분한다. */
-.reserve-ad-mark { font-weight: 500; }
-.reserve-store-identity-text-ad { color: var(--c-text-tertiary, #8b95a1); }
+.reserve-ad-mark { color: inherit; font-weight: inherit; }
 .reserve-store-list-row-meta .reserve-store-identity-text { flex: 0 1 auto; }
 .reserve-store-list-row-favorite { display: flex; flex: 0 0 44px; width: 44px; min-height: 44px; align-items: center; justify-content: center; }
 .reserve-store-list-row-favorite:empty { display: none; }
@@ -2280,6 +2278,25 @@ a.reserve-store-list-row-link[href]:active, .reserve-reservation-row:has(.reserv
     padding: 0;
 }
 .reserve-discovery-store-list > li { min-width: 0; }
+.reserve-discovery-regional-tabs.ant-tabs {
+    --ant-tabs-ink-bar-color: var(--c-text-primary);
+    --ant-tabs-item-color: var(--c-text-secondary);
+    --ant-tabs-item-hover-color: var(--c-text-primary);
+    --ant-tabs-item-selected-color: var(--c-text-primary);
+    --ant-tabs-item-active-color: var(--c-text-primary);
+}
+.reserve-discovery-regional-tabs .ant-tabs-tab { min-height: 44px; }
+.reserve-discovery-regional-tabs .ant-tabs-tab-active .ant-tabs-tab-btn { font-weight: 650; }
+.reserve-discovery-regional-tabs.ant-tabs .ant-tabs-nav .ant-tabs-tab,
+.reserve-discovery-regional-tabs.ant-tabs .ant-tabs-nav .ant-tabs-tab-btn { transition: color 120ms ease; }
+.reserve-discovery-regional-tabs.ant-tabs .ant-tabs-nav .ant-tabs-ink-bar-animated { transition-duration: 150ms; }
+@media (prefers-reduced-motion: reduce) {
+    .reserve-discovery-regional-tabs.ant-tabs .ant-tabs-nav .ant-tabs-tab,
+    .reserve-discovery-regional-tabs.ant-tabs .ant-tabs-nav .ant-tabs-tab-btn,
+    .reserve-discovery-regional-tabs.ant-tabs .ant-tabs-nav .ant-tabs-ink-bar-animated { transition-duration: 0s; }
+}
+.reserve-discovery-regional-results { touch-action: pan-y pinch-zoom; overflow: clip; }
+.reserve-discovery-regional-results .reserve-discovery-store-list { padding: 3px; }
 @media (min-width: 576px) {
     .reserve-discovery-recommended { --reserve-home-recommendation-gap: 16px; }
 }

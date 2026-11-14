@@ -183,11 +183,13 @@ async function restoreWithCoverageWait(component, key, runtime) {
 }
 
 export async function main(mode, requestedComponent) {
-    if (mode !== 'restore' && mode !== 'record') throw new Error('Expected restore or record');
+    if (!['restore', 'record', 'key'].includes(mode)) throw new Error('Expected restore, record or key');
     const { component, directory } = componentConfig(requestedComponent);
     const runtime = runtimeIdentity(component);
     const key = keyAt(component, 'HEAD', runtime);
-    if (mode === 'restore') {
+    if (mode === 'key') {
+        output({ key });
+    } else if (mode === 'restore') {
         output({ key, reused: false });
         const proof = await restoreWithCoverageWait(component, key, runtime);
         if (proof) {
@@ -195,6 +197,10 @@ export async function main(mode, requestedComponent) {
             summary(`${component}: reused identical-input successful tests from run ${proof.runId} (original ${proof.originRunId}).`);
         } else summary(`${component}: tests required (new inputs, expired evidence, or forced run).`);
     } else if (mode === 'record') {
+        if (process.env.EVIDENCE_EXPECTED_KEY && process.env.EVIDENCE_EXPECTED_KEY !== key) {
+            summary(`${component}: runner identity changed; no reusable evidence recorded.`);
+            return;
+        }
         const originRunId = process.env.EVIDENCE_ORIGIN || process.env.GITHUB_RUN_ID;
         if (!/^\d+$/.test(originRunId || '')) throw new Error('Missing evidence run ID');
         const executedAt = process.env.EVIDENCE_EXECUTED_AT || new Date().toISOString();

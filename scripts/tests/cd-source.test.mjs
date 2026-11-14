@@ -214,11 +214,12 @@ test('CI and CD have independent runs and only verified main CI can reach deploy
     const dispatch = ci.jobs['dispatch-cd'];
     assert.deepEqual(dispatch.needs, jobs.slice(0, 4).map(job => job.name));
     assert.deepEqual(dispatch.permissions, { actions: 'write' });
-    const mayDispatch = new Function('github', 'always', 'cancelled', 'return ' + dispatch.if);
+    const mayDispatch = new Function('github', 'success', 'return ' + dispatch.if);
     const ciContext = { repository: env.GITHUB_REPOSITORY, event_name: 'push', ref: env.GITHUB_REF };
-    assert.equal(mayDispatch(ciContext, () => true, () => false), true);
+    assert.equal(mayDispatch(ciContext, () => true), true);
+    assert.equal(mayDispatch(ciContext, () => false), false);
     for (const change of [{ event_name: 'pull_request' }, { event_name: 'workflow_dispatch' }, { ref: 'refs/heads/dev' }])
-        assert.equal(mayDispatch({ ...ciContext, ...change }, () => true, () => false), false);
+        assert.equal(mayDispatch({ ...ciContext, ...change }, () => true), false);
     assert.match(dispatch.steps[0].run, /gh workflow run CD\.yml --repo "\$GITHUB_REPOSITORY" --ref main/);
     for (const [field, variable] of [['sha', 'SHA'], ['run_id', 'RUN_ID'], ['run_attempt', 'RUN_ATTEMPT']])
         assert.ok(dispatch.steps[0].run.includes('-f source_' + field + '="$GITHUB_' + variable + '"'));

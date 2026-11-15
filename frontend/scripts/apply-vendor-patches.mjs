@@ -4,7 +4,18 @@ import { fileURLToPath } from 'node:url';
 
 const approvedPatches = [
     { packageName: '@rc-component/tabs', version: '1.13.0', files: ['es/TabNavList/OperationNode.js', 'lib/TabNavList/OperationNode.js'] },
-    { packageName: '@rc-component/util', version: '1.13.0', files: ['es/hooks/useDelayState.js', 'lib/hooks/useDelayState.js'] },
+    {
+        packageName: '@rc-component/util',
+        version: '1.13.0',
+        files: ['es/hooks/useDelayState.js', 'lib/hooks/useDelayState.js', 'es/Dom/findDOMNode.js', 'lib/Dom/findDOMNode.js'],
+    },
+    {
+        packageName: '@rc-component/image',
+        version: '1.10.0',
+        files: ['es', 'lib'].flatMap(format => [
+            'util.js', 'getFixScaleEleTransPosition.js', 'hooks/useImageTransform.js', 'hooks/useMouseEvent.js', 'hooks/useTouchEvent.js',
+        ].map(file => `${format}/${file}`)),
+    },
 ];
 const patchName = entry => `${entry.packageName.replace('/', '+')}+${entry.version}.patch`;
 const normalize = text => text.replace(/\r\n/g, '\n');
@@ -76,7 +87,8 @@ export function applyVendorPatches(frontendRoot) {
         }
     }
     for (const plan of plans) fs.writeFileSync(plan.target, plan.content, 'utf8');
-    return { applied: plans.length, alreadyApplied: 4 - plans.length };
+    const targetCount = approvedPatches.reduce((count, entry) => count + entry.files.length, 0);
+    return { applied: plans.length, alreadyApplied: targetCount - plans.length };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

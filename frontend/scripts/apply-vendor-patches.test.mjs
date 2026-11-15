@@ -7,7 +7,7 @@ import test from 'node:test';
 import { applyVendorPatches } from './apply-vendor-patches.mjs';
 
 const frontendRoot = fileURLToPath(new URL('..', import.meta.url));
-const patchFiles = ['@rc-component+tabs+1.13.0.patch', '@rc-component+util+1.13.0.patch'];
+const patchFiles = ['@rc-component+tabs+1.13.0.patch', '@rc-component+util+1.13.0.patch', '@rc-component+image+1.10.0.patch'];
 const tabSource = cjs => [
     cjs ? '  const overlayClassName = (0, _clsx.clsx)(popupClassName, {' : '  const overlayClassName = clsx(popupClassName, {',
     '    [`${dropdownPrefix}-rtl`]: rtl',
@@ -27,16 +27,30 @@ function fixture(run, { externalTabs = false } = {}) {
         return target;
     };
     try {
-        for (const name of patchFiles) write(`patches/${name}`, fs.readFileSync(path.join(frontendRoot, 'patches', name)));
+        const patches = patchFiles.map(name => {
+            const source = fs.readFileSync(path.join(frontendRoot, 'patches', name), 'utf8').replace(/\r\n/g, '\n');
+            write(`patches/${name}`, source);
+            return source;
+        });
         const tabsRoot = externalTabs ? 'external-tabs' : 'node_modules/@rc-component/tabs';
         write(`${tabsRoot}/package.json`, JSON.stringify({ version: '1.13.0' }));
         write('node_modules/@rc-component/util/package.json', JSON.stringify({ version: '1.13.0' }));
+        write('node_modules/@rc-component/image/package.json', JSON.stringify({ version: '1.10.0' }));
         const files = [
             write(`${tabsRoot}/es/TabNavList/OperationNode.js`, tabSource(false)),
             write(`${tabsRoot}/lib/TabNavList/OperationNode.js`, tabSource(true)),
             write('node_modules/@rc-component/util/es/hooks/useDelayState.js', delaySource),
             write('node_modules/@rc-component/util/lib/hooks/useDelayState.js', delaySource),
         ];
+        for (const block of patches.slice(1).flatMap(source => source.split(/(?=^diff --git )/m))) {
+            const lines = block.split('\n');
+            const target = /^diff --git a\/(node_modules\/@rc-component\/(?:util\/(?:es|lib)\/Dom|image\/(?:es|lib)(?:\/hooks)?)\/[A-Za-z]+\.js) /.exec(lines[0])?.[1];
+            if (!target) continue;
+            const start = lines.findIndex(line => line.startsWith('@@ '));
+            assert.ok(start > 0);
+            const original = lines.slice(start + 1).filter(line => /^[ -]/.test(line)).map(line => line.slice(1)).join('\n');
+            files.push(write(target, original));
+        }
         if (externalTabs) fs.symlinkSync(path.join(root, tabsRoot), path.join(root, 'node_modules/@rc-component/tabs'), process.platform === 'win32' ? 'junction' : 'dir');
         return run({ root, files, write, read: () => files.map(file => fs.readFileSync(file, 'utf8')) });
     } finally {
@@ -47,16 +61,16 @@ function fixture(run, { externalTabs = false } = {}) {
     }
 }
 
-test('clean install applies both ES/CJS fixes and repeated installation is idempotent', () => fixture(({ root, write, read }) => {
+test('clean install applies the approved ES/CJS fixes and repeated installation is idempotent', () => fixture(({ root, write, read }) => {
     const unrelated = write('node_modules/unrelated.js', 'keep this file');
-    assert.deepEqual(applyVendorPatches(root), { applied: 4, alreadyApplied: 0 });
+    assert.deepEqual(applyVendorPatches(root), { applied: 16, alreadyApplied: 0 });
     const [tabsEs, tabsCjs, delayEs, delayCjs] = read();
     for (const source of [tabsEs, tabsCjs]) {
         assert.doesNotMatch(source, /moreNode = mobile \? null/);
         assert.match(source, /moreNode = \/\*#__PURE__\*\/React\.createElement/);
     }
     for (const source of [delayEs, delayCjs]) assert.equal(source.match(/React\.useEffect/g)?.length, 1);
-    assert.deepEqual(applyVendorPatches(root), { applied: 0, alreadyApplied: 4 });
+    assert.deepEqual(applyVendorPatches(root), { applied: 0, alreadyApplied: 16 });
     assert.equal(fs.readFileSync(unrelated, 'utf8'), 'keep this file');
 }));
 
@@ -68,7 +82,7 @@ test('changed package version fails before any file is patched', () => fixture((
 }));
 
 test('a source mismatch in the final file leaves earlier files untouched', () => fixture(({ root, files, read }) => {
-    fs.writeFileSync(files[3], 'changed upstream source');
+    fs.writeFileSync(files.at(-1), 'changed upstream source');
     const original = read();
     assert.throws(() => applyVendorPatches(root), /source mismatch/);
     assert.deepEqual(read(), original);

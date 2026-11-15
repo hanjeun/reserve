@@ -476,7 +476,7 @@ test('messenger: every internal view keeps a close X and shared refresh feedback
     await refreshed;
     await expect(refresh).not.toHaveAttribute('aria-busy', 'true');
     await expect(refresh.locator('.anticon-sync')).not.toHaveClass(/anticon-spin/);
-    await surface.getByRole('button', { name: /테스트 가게/ }).click();
+    await surface.getByRole('button', { name: /테스트 가게(?! 대화 메뉴)/ }).click();
     await expect(messenger).toHaveClass(/has-thread/);
     await expect(messenger).not.toHaveClass(/is-opening-thread/);
     await checkClose();
@@ -511,7 +511,7 @@ test('messenger: message actions, private photo preview and motion settle withou
     const surface = page.locator(isMobile ? '.reserve-messages-page' : '.reserve-chat-panel');
     await surface.getByRole('button', { name: '대화', exact: true }).click();
     const conversation = surface.getByRole('complementary', { name: '대화 목록' })
-        .getByRole('button', { name: /^합성 가게(?:\s|$)/ });
+        .getByRole('button', { name: /^합성 가게(?! 대화 메뉴)(?:\s|$)/ });
     const frames = await conversation.evaluate(async row => {
         const element = row.closest('.reserve-messenger');
         if (!element) throw new Error('The conversation row must belong to the messenger.');

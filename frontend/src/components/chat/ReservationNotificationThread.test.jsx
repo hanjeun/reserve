@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
 import ReservationNotificationThread, { ReservationNotificationEntry } from './ReservationNotificationThread';
+import ReservationNotificationShortcut from './ReservationNotificationShortcut';
 import { chatUnreadCounts } from './chatUnread';
 import { chatService } from '../../services';
 import { chatKeys } from '../../hooks/queryKeys';
@@ -52,12 +53,12 @@ it('reads only the open page, keeps the thread read-only and routes recipients t
 });
 
 function MessageBadgeProbe() {
-    const { data } = useQuery({ queryKey: chatKeys.unread(), enabled: false });
+    const { data } = useQuery({ queryKey: chatKeys.unread(), queryFn: chatService.getUnread, enabled: false });
     const { messages, notifications } = chatUnreadCounts(data);
     return <output aria-label="메시지 버튼 배지">{messages + notifications}</output>;
 }
 
-it('removes the same read alert from the row and total before another unread fetch', async () => {
+it('removes the same read alert from the row, shortcut and total before another unread fetch', async () => {
     chatService.getReservationNotifications.mockResolvedValue({ items: [
         { ...base, id: 7, kind: 'APPROVED', read: false },
     ] });
@@ -68,14 +69,17 @@ it('removes the same read alert from the row and total before another unread fet
     client.setQueryData(chatKeys.unread(), { messages: 2, notifications: 1 });
     render(<QueryClientProvider client={client}><MemoryRouter>
         <ReservationNotificationEntry buttonRef={{ current: null }} selected pollUnread={false} onSelect={vi.fn()} />
+        <ReservationNotificationShortcut buttonRef={{ current: null }} active pollUnread={false} onSelect={vi.fn()} />
         <MessageBadgeProbe />
         <ReservationNotificationThread onBack={vi.fn()} onAnimationEnd={vi.fn()} returningToList={false} />
     </MemoryRouter></QueryClientProvider>);
     expect(screen.getByLabelText('읽지 않은 알림 1개')).toHaveTextContent('1');
     expect(screen.getByLabelText('메시지 버튼 배지')).toHaveTextContent('3');
+    expect(screen.getByRole('button', { name: '알림 보기, 읽지 않은 알림 1개' })).toBeInTheDocument();
     await waitFor(() => expect(chatService.readReservationNotifications).toHaveBeenCalledWith([7]));
     read({ changed: 1, unread: 0 });
     await waitFor(() => expect(screen.queryByLabelText('읽지 않은 알림 1개')).not.toBeInTheDocument());
     expect(screen.getByLabelText('메시지 버튼 배지')).toHaveTextContent('2');
+    expect(screen.getByRole('button', { name: '알림 보기', exact: true })).toBeInTheDocument();
     expect(chatService.getUnread).not.toHaveBeenCalled();
 });

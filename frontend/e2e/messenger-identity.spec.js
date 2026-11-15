@@ -57,7 +57,7 @@ const account = { id: 41, name: '테스트 고객', email: 'identity@example.tes
 const pageOf = (rows) => ({ content: rows, page: { number: 0, totalElements: rows.length, totalPages: 1 } });
 const ok = (route, data) => route.fulfill({ json: { success: true, data } });
 const supportConversation = page => page.getByRole('complementary', { name: '대화 목록' })
-    .getByRole('button', { name: /^RESERVE 고객지원(?:\s|$)/ });
+    .getByRole('button', { name: /^RESERVE 고객지원(?! 대화 메뉴)(?:\s|$)/ });
 
 async function mockApi(page, user, memberRows, ownerRows = []) {
     await page.route('**/api/**', async route => {

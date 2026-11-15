@@ -184,6 +184,7 @@ describe.each([['광고', AdminAdsTab], ['사업자 인증', BusinessVerificatio
 });
 
 it('keeps a mail lookup failure separate from the empty mailbox', () => {
+    state.queryParams = { search: '', page: '1', mailFolder: 'sent' };
     Object.assign(state.query, { isError: true, error: new Error('offline') });
     render(<MailboxTab />);
     expect(screen.getByRole('alert')).toHaveTextContent('보낸 메일을 불러오지 못했어요');
@@ -191,6 +192,7 @@ it('keeps a mail lookup failure separate from the empty mailbox', () => {
 });
 
 it('keeps the mailbox trash action in the selected detail only', () => {
+    state.queryParams = { search: '', page: '1', mailFolder: 'sent' };
     state.query.data = {
         mails: [{
             id: 31,

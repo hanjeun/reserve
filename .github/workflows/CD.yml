@@ -1,28 +1,53 @@
 name: CD
 
 on:
-  workflow_call:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Source main CI commit SHA
+        required: true
+        type: string
+      source_run_id:
+        description: Source CI run ID
+        required: true
+        type: string
+      source_run_attempt:
+        description: Source CI attempt
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: cd-production
+  # 승격하지 않는 이벤트가 정상 배포의 대기 실행을 밀어내지 않게 한다.
+  group: >-
+    ${{ github.repository == 'hanjeun/reserve' && github.ref == 'refs/heads/main' &&
+    github.sha == inputs.source_sha &&
+    'cd-production' || format('cd-ignored-{0}', github.run_id) }}
   cancel-in-progress: false
 
 env:
+  SOURCE_SHA: ${{ inputs.source_sha }}
+  SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+  SOURCE_RUN_ATTEMPT: ${{ inputs.source_run_attempt }}
   # appleboy의 ECDSA 호스트 키를 고정해요.
   RESERVE_SSH_FINGERPRINT: SHA256:xHW59RSgd8gAWYCnNhQwX/Q3qB9+45Qp3k0UUSzmRSk
 
 jobs:
   verify-source:
-    if: github.repository == 'hanjeun/reserve' && github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: >-
+      github.repository == 'hanjeun/reserve' && github.ref == 'refs/heads/main' &&
+      github.sha == inputs.source_sha
     permissions:
       contents: read
       actions: read
     runs-on: ubuntu-latest
     timeout-minutes: 25
     outputs:
+      sha: ${{ steps.source.outputs.sha }}
+      run-id: ${{ steps.source.outputs.run-id }}
+      run-attempt: ${{ steps.source.outputs.run-attempt }}
       digest: ${{ steps.image.outputs.digest }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -32,18 +57,15 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: frontend/.nvmrc
-      - name: Require current main before server access
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/verify-cd-source.mjs current
       - name: Verify source run and same-SHA CodeQL
+        id: source
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/verify-cd-source.mjs source
-      - name: Download immutable image manifest from this run
+      - name: Download immutable image manifest from source CI
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "backend-release-$GITHUB_SHA" --dir backend/build/cd-source
+        run: gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "backend-release-$SOURCE_SHA" --dir backend/build/cd-source
       - name: Verify immutable image manifest
         id: image
         env:
@@ -55,26 +77,25 @@ jobs:
       contents: read
       actions: read
     needs: [verify-source]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    env:
+      SOURCE_SHA: ${{ needs.verify-source.outputs.sha }}
+      SOURCE_RUN_ID: ${{ needs.verify-source.outputs.run-id }}
+      SOURCE_RUN_ATTEMPT: ${{ needs.verify-source.outputs.run-attempt }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ needs.verify-source.outputs.sha }}
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: frontend/.nvmrc
-      - name: Require current main before server access
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/verify-cd-source.mjs current
-      - name: Download this run's frontend
+      - name: Download source CI frontend
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "frontend-release-$GITHUB_SHA" --dir frontend/dist
+        run: gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "frontend-release-$SOURCE_SHA" --dir frontend/dist
 
-      # main-push-only staging 잡이므로 PR에서는 서버에 접근하지 않는다.
+      # 성공한 main CI의 산출물만 받은 뒤 서버 접근을 허용한다.
       - name: Prepare split host configuration
         if: vars.RESERVE_DOMAIN_SPLIT == 'true'
         run: node scripts/prepare-domain-split.mjs --output nginx/default.conf
@@ -82,7 +103,11 @@ jobs:
         if: vars.RESERVE_DOMAIN_SPLIT == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "marketing-release-$GITHUB_SHA" --dir marketing/dist
+        run: gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "marketing-release-$SOURCE_SHA" --dir marketing/dist
+      - name: Require current main before server access
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/verify-cd-source.mjs current
       - name: Stage marketing files
         if: vars.RESERVE_DOMAIN_SPLIT == 'true'
         uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345
@@ -92,7 +117,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
           source: "marketing/dist/*"
-          target: "/home/ubuntu/reserve-marketing-${{ github.sha }}"
+          target: "/home/ubuntu/reserve-marketing-${{ needs.verify-source.outputs.sha }}"
           strip_components: 2
       - name: Stage domain release helper
         uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345
@@ -105,7 +130,6 @@ jobs:
           target: "/home/ubuntu"
           strip_components: 1
       - name: Deploy frontend to EC2
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
         with:
           host: ${{ secrets.RESERVE_SERVER_IP }}
@@ -113,11 +137,10 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
           source: "frontend/dist/*"
-          target: "/home/ubuntu/reserve-frontend-${{ github.sha }}"
+          target: "/home/ubuntu/reserve-frontend-${{ needs.verify-source.outputs.sha }}"
           strip_components: 2
 
       - name: Deploy nginx config
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
         with:
           host: ${{ secrets.RESERVE_SERVER_IP }}
@@ -131,10 +154,9 @@ jobs:
       # SHA별 정적 파일과 nginx 템플릿만 staging한다. live 전환은 새 백엔드가
       # 정상 기동한 뒤 deploy-backend 잡에서 한 번의 nginx reload로 수행한다.
       - name: Stage frontend release
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         env:
-          FRONTEND_RELEASE: ${{ github.sha }}
+          FRONTEND_RELEASE: ${{ needs.verify-source.outputs.sha }}
           RESERVE_DOMAIN_SPLIT: ${{ vars.RESERVE_DOMAIN_SPLIT || 'false' }}
         with:
           host: ${{ secrets.RESERVE_SERVER_IP }}
@@ -204,7 +226,10 @@ jobs:
       deployments: write
       actions: read
     needs: [verify-source, stage-release]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    env:
+      SOURCE_SHA: ${{ needs.verify-source.outputs.sha }}
+      SOURCE_RUN_ID: ${{ needs.verify-source.outputs.run-id }}
+      SOURCE_RUN_ATTEMPT: ${{ needs.verify-source.outputs.run-attempt }}
     runs-on: ubuntu-latest
     environment:
       name: production
@@ -212,7 +237,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ needs.verify-source.outputs.sha }}
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -284,10 +309,14 @@ jobs:
           source: "scripts/check-deployment-memory.sh,scripts/check-auth-limits-image.sh,scripts/prepare-ip-protection.py,scripts/redis-app.rules"
           target: "/home/ubuntu/"
 
+      - name: Recheck source CI before target startup
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/verify-cd-source.mjs current
       - name: Docker compose up (target)
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         env:
-          IMAGE_TAG: sha-${{ github.sha }}
+          IMAGE_TAG: sha-${{ needs.verify-source.outputs.sha }}
           RESERVE_IMAGE_REFERENCE: ${{ format('{0}/reserve@{1}', secrets.DOCKERHUB_USERNAME, needs.verify-source.outputs.digest) }}
           RESERVE_SECURITY_AUTH_LIMITS_ENABLED: ${{ vars.RESERVE_SECURITY_AUTH_LIMITS_ENABLED || 'false' }}
           RESERVE_SECURITY_AUTH_LIMITS_FINGERPRINT_KEY: ${{ secrets.RESERVE_SECURITY_AUTH_LIMITS_FINGERPRINT_KEY }}
@@ -546,11 +575,15 @@ jobs:
 
       # 새 프론트의 절대 경로와 새 백엔드 upstream을 함께 설치하고 nginx를 한 번만 reload한다.
       # 중간 명령이 실패하면 ERR trap이 default.conf, service-env.inc, current symlink를 함께 복구한다.
+      - name: Recheck source CI before cutover
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/verify-cd-source.mjs current
       - name: Cut over frontend and backend
         if: success()
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         env:
-          FRONTEND_RELEASE: ${{ github.sha }}
+          FRONTEND_RELEASE: ${{ needs.verify-source.outputs.sha }}
           TARGET_UPSTREAM: ${{ env.TARGET_UPSTREAM }}
           CURRENT_UPSTREAM: ${{ env.CURRENT_UPSTREAM }}
           DEPLOY_ATTEMPT: ${{ github.run_id }}-${{ github.run_attempt }}
@@ -713,7 +746,7 @@ jobs:
         if: success()
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         env:
-          FRONTEND_RELEASE: ${{ github.sha }}
+          FRONTEND_RELEASE: ${{ needs.verify-source.outputs.sha }}
           TARGET_UPSTREAM: ${{ env.TARGET_UPSTREAM }}
           RESERVE_DOMAIN_SPLIT: ${{ vars.RESERVE_DOMAIN_SPLIT || 'false' }}
           RESERVE_IMAGE_REFERENCE: ${{ format('{0}/reserve@{1}', secrets.DOCKERHUB_USERNAME, needs.verify-source.outputs.digest) }}
@@ -778,7 +811,7 @@ jobs:
         if: failure() || cancelled()
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         env:
-          FRONTEND_RELEASE: ${{ github.sha }}
+          FRONTEND_RELEASE: ${{ needs.verify-source.outputs.sha }}
           TARGET_UPSTREAM: ${{ env.TARGET_UPSTREAM }}
           DEPLOY_ATTEMPT: ${{ github.run_id }}-${{ github.run_attempt }}
         with:
@@ -857,7 +890,7 @@ jobs:
         continue-on-error: true
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         env:
-          FRONTEND_RELEASE: ${{ github.sha }}
+          FRONTEND_RELEASE: ${{ needs.verify-source.outputs.sha }}
           DEPLOY_ATTEMPT: ${{ github.run_id }}-${{ github.run_attempt }}
         with:
           username: ubuntu

@@ -12,7 +12,7 @@ on:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
 
-# PR의 오래된 실행은 취소하고, 운영 배포는 중간에 끊기지 않도록 순서대로 실행한다.
+# PR의 오래된 실행은 취소하고 main의 후보 검사는 순서대로 실행한다.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -119,7 +119,24 @@ jobs:
       - name: Test backend (unit, Spring/H2, isolated MySQL and Redis)
         id: backend_tests
         if: steps.evidence.outputs.reused != 'true'
+        env:
+          RESERVE_CI_JAVA_CACHE_DIR: ${{ runner.temp }}/reserve-ci-java-cache
         run: bash scripts/test-backend-isolated.sh
+      - name: Compile backend Java when test evidence is reused
+        if: steps.evidence.outputs.reused == 'true'
+        working-directory: backend
+        env:
+          RESERVE_CI_JAVA_CACHE_DIR: ${{ runner.temp }}/reserve-ci-java-cache
+        run: |
+          chmod +x ./gradlew
+          ./gradlew compileJava --no-daemon --console=plain --build-cache
+      - name: Upload Java compilation cache
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: backend-java-cache-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/reserve-ci-java-cache/
+          if-no-files-found: error
+          retention-days: 1
       - name: Record successful backend test evidence
         id: record
         env:
@@ -276,14 +293,32 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "frontend-release-$GITHUB_SHA" --dir frontend/dist
+      - name: Restore Java compilation cache from this run
+        id: java_cache
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          directory=$(mktemp -d "$RUNNER_TEMP/reserve-ci-java-cache.XXXXXX")
+          artifact="backend-java-cache-$GITHUB_SHA-$GITHUB_RUN_ATTEMPT"
+          if gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$artifact" --dir "$directory"; then
+            printf 'directory=%s\n' "$directory" >> "$GITHUB_OUTPUT"
+          else
+            echo "Java compilation cache is unavailable. Gradle will compile from source."
+          fi
 
       # 성공한 테스트 입력을 포장하며 테스트를 반복하거나 우회하지 않는다.
       - name: Package backend bootJar
         id: backend_package
         working-directory: backend
+        env:
+          RESERVE_CI_JAVA_CACHE_DIR: ${{ steps.java_cache.outputs.directory }}
         run: |
           chmod +x ./gradlew
-          ./gradlew bootJar --console=plain
+          cache_option=--no-build-cache
+          if [[ -n "$RESERVE_CI_JAVA_CACHE_DIR" ]]; then
+            cache_option=--build-cache
+          fi
+          ./gradlew bootJar --console=plain "$cache_option"
 
       # PR에서도 실제 이미지를 검사하고 검사를 통과한 같은 이미지에만 배포 태그를 붙여요.
       - name: Build Docker image
@@ -327,7 +362,8 @@ jobs:
           const image = process.env.IMAGE_REFERENCE;
           if (!/^[a-z0-9][a-z0-9_.\/-]*\/reserve@sha256:[a-f0-9]{64}$/.test(image || '')) throw new Error('Invalid immutable image reference');
           writeFileSync('backend/build/release-image.json', JSON.stringify({
-            version: 1, sha: process.env.COMMIT_SHA, runId: process.env.GITHUB_RUN_ID, image,
+            version: 2, sha: process.env.COMMIT_SHA, runId: process.env.GITHUB_RUN_ID,
+            runAttempt: process.env.GITHUB_RUN_ATTEMPT, image,
           }) + '\n');
           RESERVE_IMAGE
       - name: Upload immutable backend release
@@ -434,12 +470,20 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  cd:
-    needs: [build-backend, build-frontend, test-backend, test-frontend]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  dispatch-cd:
+    needs: [test-backend, test-frontend, build-backend, build-frontend]
+    if: >-
+      always() && !cancelled() && github.repository == 'hanjeun/reserve' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
     permissions:
-      contents: read
-      actions: read
-      deployments: write
-    uses: ./.github/workflows/CD.yml
-    secrets: inherit
+      actions: write
+    steps:
+      - name: Queue CD on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run CD.yml --repo "$GITHUB_REPOSITORY" --ref main \
+            -f source_sha="$GITHUB_SHA" -f source_run_id="$GITHUB_RUN_ID" \
+            -f source_run_attempt="$GITHUB_RUN_ATTEMPT"

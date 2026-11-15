@@ -14,3 +14,23 @@ diff --git a/node_modules/@rc-component/util/lib/hooks/useDelayState.js b/node_m
    });
 +  React.useEffect(() => cancelPending, [cancelPending]);
    return [value, setDelayValue];
+diff --git a/node_modules/@rc-component/util/es/Dom/findDOMNode.js b/node_modules/@rc-component/util/es/Dom/findDOMNode.js
+--- a/node_modules/@rc-component/util/es/Dom/findDOMNode.js
++++ b/node_modules/@rc-component/util/es/Dom/findDOMNode.js
+@@ -3,3 +3,5 @@
+   // Since XULElement is also subclass of Element, we only need HTMLElement and SVGElement
+-  return node instanceof HTMLElement || node instanceof SVGElement;
++  const view = node?.ownerDocument?.defaultView;
++  return node instanceof HTMLElement || node instanceof SVGElement ||
++    Boolean(view && (node instanceof view.HTMLElement || node instanceof view.SVGElement));
+ }
+diff --git a/node_modules/@rc-component/util/lib/Dom/findDOMNode.js b/node_modules/@rc-component/util/lib/Dom/findDOMNode.js
+--- a/node_modules/@rc-component/util/lib/Dom/findDOMNode.js
++++ b/node_modules/@rc-component/util/lib/Dom/findDOMNode.js
+@@ -11,3 +11,5 @@
+   // Since XULElement is also subclass of Element, we only need HTMLElement and SVGElement
+-  return node instanceof HTMLElement || node instanceof SVGElement;
++  const view = node?.ownerDocument?.defaultView;
++  return node instanceof HTMLElement || node instanceof SVGElement ||
++    Boolean(view && (node instanceof view.HTMLElement || node instanceof view.SVGElement));
+ }

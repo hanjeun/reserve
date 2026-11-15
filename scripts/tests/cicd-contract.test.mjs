@@ -455,16 +455,18 @@ test('forks, Dependabot and unrecognized titles do not perform label writes', as
     }
 });
 
-test('required checks remain present and deployment waits for both builds', () => {
+test('required CI checks remain present and independent deployment requires verified main CI', () => {
     assert.ok(backend && frontend && deployment && backendTests && frontendTests);
     assert.equal(backendTests.if, undefined);
     assert.equal(frontendTests.if, undefined);
     assert.deepEqual(backend.needs, ['test-backend', 'build-frontend']);
     assert.equal(frontend.needs, 'test-frontend');
-    assert.deepEqual(workflow.jobs.cd.needs, ['build-backend', 'build-frontend', 'test-backend', 'test-frontend']);
+    assert.equal(workflow.jobs.cd, undefined);
+    assert.deepEqual(Object.keys(cd.on), ['workflow_dispatch']);
     assert.deepEqual(deployment.needs, ['verify-source', 'stage-release']);
     assert.deepEqual(staging.needs, ['verify-source']);
     assert.equal(staging.if, deployment.if);
+    assert.equal(staging.if, undefined);
     assert.equal(staging.environment, undefined);
     assert.deepEqual(deployment.environment, { name: 'production', url: "${{ vars.RESERVE_DOMAIN_SPLIT == 'true' && 'https://app.reserve.it.kr' || 'https://reserve.it.kr' }}" });
     assert.ok(!deployment.steps.some(entry => /Create GitHub deployment|Mark deployment/.test(entry.name ?? '')));
@@ -478,8 +480,9 @@ test('required checks remain present and deployment waits for both builds', () =
     assert.match(shell.run, /GITHUB_RUN_ID/);
     assert.match(shell.run, /frontend-release-\$GITHUB_SHA/);
     assert.ok(backend.steps.indexOf(shell) < backend.steps.indexOf(step(backend, 'backend_package')));
-    assert.match(deployment.if, /github\.ref == 'refs\/heads\/main'/);
-    assert.match(deployment.if, /github\.event_name == 'push'/);
+    assert.match(cd.jobs['verify-source'].if, /github\.ref == 'refs\/heads\/main'/);
+    assert.match(cd.jobs['verify-source'].if, /github\.sha == inputs\.source_sha/);
+    assert.match(workflow.jobs['dispatch-cd'].if, /github\.event_name == 'push'/);
     assert.equal(workflow.concurrency['cancel-in-progress'], "${{ github.event_name == 'pull_request' }}");
 });
 
@@ -500,6 +503,27 @@ test('backend tests are explicit, required, and run before packaging', () => {
     assert.equal(step(backend, 'backend_tests'), undefined);
     assert.equal(tests['continue-on-error'], undefined);
     assert.doesNotMatch(tests.run + packaging.run, /-x\s+test|--exclude-task[=\s]+test/);
+});
+
+test('backend packaging can restore Java compilation from the same CI attempt', () => {
+    const tests = step(backendTests, 'backend_tests');
+    const compile = backendTests.steps.find(entry => entry.name === 'Compile backend Java when test evidence is reused');
+    const upload = backendTests.steps.find(entry => entry.name === 'Upload Java compilation cache');
+    const restore = step(backend, 'java_cache');
+    const packaging = step(backend, 'backend_package');
+    const directory = '${{ runner.temp }}/reserve-ci-java-cache';
+    assert.equal(tests.env.RESERVE_CI_JAVA_CACHE_DIR, directory);
+    assert.equal(compile.env.RESERVE_CI_JAVA_CACHE_DIR, directory);
+    assert.equal(compile.if, "steps.evidence.outputs.reused == 'true'");
+    assert.match(compile.run, /gradlew compileJava .*--build-cache/);
+    assert.equal(upload.with.path, directory + '/');
+    assert.equal(upload.with.name, 'backend-java-cache-${{ github.sha }}-${{ github.run_attempt }}');
+    assert.ok(backendTests.steps.indexOf(upload) > backendTests.steps.indexOf(compile));
+    assert.match(restore.run, /backend-java-cache-\$GITHUB_SHA-\$GITHUB_RUN_ATTEMPT/);
+    assert.match(restore.run, /if gh run download "\$GITHUB_RUN_ID".*; then\n\s+printf 'directory=/);
+    assert.equal(packaging.env.RESERVE_CI_JAVA_CACHE_DIR, '${{ steps.java_cache.outputs.directory }}');
+    assert.match(packaging.run, /cache_option=--no-build-cache/);
+    assert.ok(backend.steps.indexOf(restore) < backend.steps.indexOf(packaging));
 });
 
 test('snapshot verification installs a scoped Git byte guard without changing the baseline', () => {
@@ -539,18 +563,21 @@ test('PC and mobile browser checks use separate projects and failure evidence', 
     assert.ok(frontend.steps.some(entry => entry.run === 'npm run build'));
 });
 
-test('image publication and frontend staging remain main-push-only', () => {
+test('image publication remains main-push-only and staging downloads only verified source CI artifacts', () => {
     const mainPush = "github.ref == 'refs/heads/main' && github.event_name == 'push'";
     assert.ok(!frontend.steps.some(entry => /^appleboy\//.test(entry.uses ?? '')));
-    assert.match(staging.steps.find(entry => entry.name === "Download this run's frontend").run, /GITHUB_RUN_ID/);
-    assert.equal(staging.if, mainPush);
+    const download = staging.steps.find(entry => entry.name === 'Download source CI frontend');
+    assert.match(download.run, /gh run download "\$SOURCE_RUN_ID"/);
+    assert.match(download.run, /frontend-release-\$SOURCE_SHA/);
+    assert.deepEqual(staging.needs, ['verify-source']);
+    assert.equal(staging.env.SOURCE_RUN_ID, '${{ needs.verify-source.outputs.run-id }}');
+    assert.equal(staging.env.SOURCE_SHA, '${{ needs.verify-source.outputs.sha }}');
     assert.equal(staging.steps.find(entry => entry.name === 'Stage marketing files').if, "vars.RESERVE_DOMAIN_SPLIT == 'true'");
-    for (const job of [backend, staging]) {
-        const writes = job.steps.filter(entry => /^docker\/login-action@|^appleboy\/(scp|ssh)-action@/.test(entry.uses ?? '')
+    for (const job of [backend]) {
+        const writes = job.steps.filter(entry => /^docker\/login-action@/.test(entry.uses ?? '')
             || /docker push\b|docker (?:build|buildx build)[^\n]*--push\b/.test(entry.run ?? ''));
         assert.ok(writes.length > 0);
         for (const entry of writes) {
-            // GitHub는 단계 조건과 별개로 작업 조건도 요구한다.
             if (job.if !== mainPush) assert.equal(entry.if, mainPush, entry.name);
         }
     }

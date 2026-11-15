@@ -38,6 +38,10 @@ describe('route chunk loading patterns', () => {
     beforeAll(async () => {
         expect((await preloadRouteSkeletons())?.default).toBe(RouteSkeletonPages);
         expect((await preloadRouteSkeletons('discovery'))?.default).toBe(DiscoveryRouteSkeleton);
+        const feed = await preloadRouteSkeletons('feed');
+        expect(feed?.default).toBeTypeOf('function');
+        expect(feed?.default).not.toBe(RouteSkeletonPages);
+        expect(await preloadRouteSkeletons('feed-detail')).toBe(feed);
     });
     afterEach(() => { setWidth(originalWidth); clients.splice(0).forEach(client => client.clear()); });
 

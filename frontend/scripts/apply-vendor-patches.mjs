@@ -4,7 +4,25 @@ import { fileURLToPath } from 'node:url';
 
 const approvedPatches = [
     { packageName: '@rc-component/tabs', version: '1.13.0', files: ['es/TabNavList/OperationNode.js', 'lib/TabNavList/OperationNode.js'] },
-    { packageName: '@rc-component/util', version: '1.13.0', files: ['es/hooks/useDelayState.js', 'lib/hooks/useDelayState.js'] },
+    { packageName: '@rc-component/tabs', version: '2.0.0', files: ['es/TabNavList/OperationNode.js', 'lib/TabNavList/OperationNode.js'] },
+    {
+        packageName: '@rc-component/util',
+        version: '1.13.0',
+        files: ['es/hooks/useDelayState.js', 'lib/hooks/useDelayState.js', 'es/Dom/findDOMNode.js', 'lib/Dom/findDOMNode.js'],
+    },
+    {
+        packageName: '@rc-component/util',
+        version: '1.14.1',
+        // 지연 상태 정리는 상류에 반영됐고 다른 문서의 DOM 인식만 보완한다.
+        files: ['es/Dom/findDOMNode.js', 'lib/Dom/findDOMNode.js'],
+    },
+    {
+        packageName: '@rc-component/image',
+        version: '1.10.0',
+        files: ['es', 'lib'].flatMap(format => [
+            'util.js', 'getFixScaleEleTransPosition.js', 'hooks/useImageTransform.js', 'hooks/useMouseEvent.js', 'hooks/useTouchEvent.js',
+        ].map(file => `${format}/${file}`)),
+    },
 ];
 const patchName = entry => `${entry.packageName.replace('/', '+')}+${entry.version}.patch`;
 const normalize = text => text.replace(/\r\n/g, '\n');
@@ -61,11 +79,14 @@ export function applyVendorPatches(frontendRoot) {
         throw new Error('Vendor patch set changed; review the approved patch list');
     }
     const plans = [];
-    for (const entry of approvedPatches) {
-        const packageFile = installedFile(modulesRoot, `${entry.packageName}/package.json`);
+    let targetCount = 0;
+    for (const packageName of new Set(approvedPatches.map(entry => entry.packageName))) {
+        const packageFile = installedFile(modulesRoot, `${packageName}/package.json`);
         const version = JSON.parse(fs.readFileSync(packageFile, 'utf8')).version;
-        if (version !== entry.version) throw new Error(`Unsupported ${entry.packageName} version: ${version}`);
+        const entry = approvedPatches.find(candidate => candidate.packageName === packageName && candidate.version === version);
+        if (!entry) throw new Error(`Unsupported ${packageName} version: ${version}`);
         const changes = parsePatch(fs.readFileSync(path.join(patchesRoot, patchName(entry)), 'utf8'), entry);
+        targetCount += changes.length;
         for (const change of changes) {
             const target = installedFile(modulesRoot, change.relativePath);
             const content = normalize(fs.readFileSync(target, 'utf8'));
@@ -76,7 +97,7 @@ export function applyVendorPatches(frontendRoot) {
         }
     }
     for (const plan of plans) fs.writeFileSync(plan.target, plan.content, 'utf8');
-    return { applied: plans.length, alreadyApplied: 4 - plans.length };
+    return { applied: plans.length, alreadyApplied: targetCount - plans.length };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

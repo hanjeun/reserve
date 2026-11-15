@@ -105,6 +105,7 @@ it('explains a missing code after a challenge arrives and does not set the passw
     setup();
     fireEvent.click(screen.getByRole('button', { name: '인증 코드 받기' }));
     await screen.findByRole('button', { name: '인증 코드 다시 받기' });
+    expect(screen.getByLabelText('인증 코드')).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: '이메일 로그인 설정' }));
     await waitFor(() => expect(fixture.message.info).toHaveBeenCalledWith('6자리 인증 코드를 입력해주세요.'));
     expect(screen.getByLabelText('인증 코드')).toHaveFocus();

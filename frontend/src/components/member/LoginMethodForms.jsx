@@ -34,7 +34,7 @@ export function LoginMethodPasswordSetup({ email, busy, onSend, onSubmit, onCanc
     const mounted = useRef(false);
     useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
     const reducedMotion = useReducedMotion();
-    const { shouldRender: renderCode, isClosing: codeClosing } = useExitAnimation(Boolean(challenge), reducedMotion ? 0 : 200);
+    const { shouldRender: renderCode } = useExitAnimation(Boolean(challenge), reducedMotion ? 0 : 200);
     const send = async () => {
         if (busy || sendLock.current) return;
         sendLock.current = true;
@@ -75,9 +75,9 @@ export function LoginMethodPasswordSetup({ email, busy, onSend, onSubmit, onCanc
                 buttonText={challenge ? '재발송' : '코드발송'} buttonAriaLabel={challenge ? '인증 코드 다시 받기' : '인증 코드 받기'}
                 buttonLoading={sending} buttonDisabled={busy} onButtonClick={send} />
         </Form.Item>
-        {renderCode && <div className="reserve-login-security-code" inert={!challenge || codeClosing ? true : undefined}
+        {(challenge || renderCode) && <div className="reserve-login-security-code" inert={!challenge ? true : undefined}
             style={{ display: 'grid', gridTemplateRows: '1fr', animation: reducedMotion ? 'none'
-                : !challenge || codeClosing ? 'reserve-feed-replies-exit 200ms ease-in both' : 'reserve-feed-replies-enter 200ms ease-out both' }}>
+                : !challenge ? 'reserve-feed-replies-exit 200ms ease-in both' : 'reserve-feed-replies-enter 200ms ease-out both' }}>
             <div style={{ minHeight: 0, overflow: 'hidden' }}><Form.Item name="code" label="인증 코드" preserve={false}
                 rules={[{ required: true, pattern: /^[0-9]{6}$/, message: '6자리 인증 코드를 입력해주세요.' }]}>
                 <FormInput inputMode="numeric" autoComplete="one-time-code" maxLength={6} disabled={busy || !challenge} />

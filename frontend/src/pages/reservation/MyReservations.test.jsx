@@ -82,7 +82,8 @@ it('uses the server count and order, preserves pages across view changes, and re
     expect(screen.getByText('41건')).toBeInTheDocument();
     expect([...container.querySelectorAll('[data-list-item-id]')].map(element => element.dataset.listItemId))
         .toEqual(['reservation:9', 'reservation:24']);
-    fireEvent.click(screen.getByTitle('2'));
+    const pagination = within(screen.getByRole('navigation', { name: '내 예약 목록 페이지' }));
+    fireEvent.click(pagination.getByText('2', { selector: 'a' }));
     await waitFor(() => expect(mocks.read.mock.lastCall[0].page).toBe(1));
     fireEvent.click(screen.getByRole('button', { name: '사진형 보기로 전환' }));
     await waitFor(() => expect(params().get('view')).toBe('cards'));
@@ -94,7 +95,8 @@ it('uses the server count and order, preserves pages across view changes, and re
     fireEvent.click(screen.getByRole('button', { name: '예약 상태' }));
     fireEvent.click(await screen.findByRole('menuitemradio', { name: '승인 대기' }));
     await waitFor(() => expect(mocks.read.mock.lastCall[0]).toMatchObject({ page: 0, status: 'PENDING' }));
-    fireEvent.click(screen.getByTitle('2'));
+    fireEvent.click(pagination.getByText('2', { selector: 'a' }));
+    await waitFor(() => expect(mocks.read.mock.lastCall[0].page).toBe(1));
     fireEvent.change(screen.getByPlaceholderText('가게명, 예약번호로 검색'), { target: { value: '예약번호' } });
     await waitFor(() => expect(mocks.read.mock.lastCall[0]).toMatchObject({ page: 0, search: '예약번호' }));
     expect(params().get('waitingPage')).toBe('2');

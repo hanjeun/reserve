@@ -145,13 +145,13 @@ describe('actual photo benefits banners without invented campaign or general sto
         expect(BENEFIT_PAGE_SIZE).toBe(12);
         expect(benefitService.getList).toHaveBeenCalledWith({ page: 1, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal));
 
-        fireEvent.click(within(screen.getByRole('navigation', { name: '가게 소식 페이지' })).getByTitle('3'));
+        fireEvent.click(within(screen.getByRole('navigation', { name: '가게 소식 페이지' })).getByText('3', { selector: 'a' }));
         await waitFor(() => expect(benefitService.getList).toHaveBeenCalledWith({ page: 2, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal)));
         let params = new URLSearchParams(screen.getByTestId('route-search').textContent);
         expect(Object.fromEntries(params)).toEqual({ page: '3', newsType: 'all', period: 'ONGOING', utm_source: 'campaign' });
 
         await waitFor(() => expect(document.querySelector('.reserve-benefit-list')).toHaveAttribute('aria-busy', 'false'));
-        fireEvent.click(within(screen.getByRole('navigation', { name: '가게 소식 페이지' })).getByTitle('1'));
+        fireEvent.click(within(screen.getByRole('navigation', { name: '가게 소식 페이지' })).getByText('1', { selector: 'a' }));
         await waitFor(() => expect(benefitService.getList).toHaveBeenCalledWith({ page: 0, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal)));
         params = new URLSearchParams(screen.getByTestId('route-search').textContent);
         expect(Object.fromEntries(params)).toEqual({ page: '1', newsType: 'all', period: 'ONGOING', utm_source: 'campaign' });

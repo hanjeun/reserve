@@ -54,6 +54,9 @@ jobs:
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@4c0873ef8656cb3c50b3f42fb63bc1ade0cfa827 # v4
+        env:
+          # PR의 JS·TS 분석은 이전 소스의 추출 경고가 남지 않도록 전체 소스를 읽는다.
+          CODEQL_OVERLAY_DATABASE_MODE: ${{ github.event_name == 'pull_request' && matrix.language == 'javascript-typescript' && 'none' || '' }}
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}

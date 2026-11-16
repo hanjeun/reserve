@@ -431,6 +431,8 @@ test('CodeQL skips duplicate dev pushes without removing PR, main or scheduled s
     assert.ok(scan.on.schedule.length > 0);
     assert.deepEqual(scan.jobs.analyze.strategy.matrix.include.map(entry => entry.language), ['java-kotlin', 'javascript-typescript']);
     assert.equal(scan.jobs.analyze['continue-on-error'], undefined);
+    const init = scan.jobs.analyze.steps.find(entry => entry.name === 'Initialize CodeQL');
+    assert.equal(init.env.CODEQL_OVERLAY_DATABASE_MODE, "${{ github.event_name == 'pull_request' && matrix.language == 'javascript-typescript' && 'none' || '' }}");
 });
 
 test('PR labels share existing CI events without metadata-only runs or weaker build checks', () => {

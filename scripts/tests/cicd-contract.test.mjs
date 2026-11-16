@@ -386,6 +386,44 @@ test('provider security remains opt-in and forwards dedicated keys through the p
     assert.match(launch.with.script, /KAKAO_APP_ID:\?Kakao app ID is required/);
 });
 
+test('production keeps Resend receiving off by default and requires all inbound settings to enable it', () => {
+    const launch = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
+    const flag = 'RESEND_INBOUND_ENABLED';
+    const address = 'RESEND_INBOUND_ADDRESS';
+    const secrets = ['RESEND_INBOUND_WEBHOOK_SECRET', 'RESEND_INBOUND_API_KEY'];
+    const names = [flag, address, ...secrets];
+    assert.ok(launch.env[flag].includes("vars.RESEND_INBOUND_ENABLED || 'false'"));
+    assert.ok(launch.env[address].includes('vars.' + address));
+    for (const secret of secrets) {
+        assert.ok(launch.env[secret].includes("vars.RESEND_INBOUND_ENABLED == 'true' && secrets." + secret));
+    }
+    for (const name of names) {
+        assert.ok(launch.with.envs.split(',').includes(name));
+        const fallback = name === flag ? 'false' : '';
+        for (const color of ['blue', 'green']) {
+            assert.ok(read('infra/compose/docker-compose-' + color + '.yml').includes(name + '=${' + name + ':-' + fallback + '}'));
+        }
+    }
+
+    const script = launch.with.script;
+    const start = script.indexOf('case "$RESEND_INBOUND_ENABLED"');
+    const end = script.indexOf('case "$RESERVE_IMAGE_REFERENCE"', start);
+    assert.ok(start >= 0 && end > start && end < script.indexOf('sudo docker pull'));
+    const run = settings => spawnSync(process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash',
+        ['-eu', '-c', script.slice(start, end)], { encoding: 'utf8', timeout: 5000,
+            env: { ...process.env, [flag]: 'false', [address]: '', [secrets[0]]: '', [secrets[1]]: '', ...settings } });
+    assert.equal(run({}).status, 0);
+    const enabled = { [flag]: 'true', [address]: 'support@example.test',
+        [secrets[0]]: 'fixture-signing-secret', [secrets[1]]: 'fixture-api-key' };
+    assert.equal(run(enabled).status, 0);
+    for (const [name, value] of [[flag, 'invalid'], [address, ''], ...secrets.map(secret => [secret, ''])]) {
+        const failure = run({ ...enabled, [name]: value });
+        assert.ifError(failure.error);
+        assert.notEqual(failure.status, 0);
+        assert.doesNotMatch(failure.stderr + failure.stdout, /fixture-(?:signing-secret|api-key)/);
+    }
+});
+
 test('CodeQL skips duplicate dev pushes without removing PR, main or scheduled security scans', () => {
     const scan = require('js-yaml').load(read('.github/workflows/codeql.yml'));
     assert.deepEqual(scan.on.push.branches, ['main']);

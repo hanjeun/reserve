@@ -56,6 +56,8 @@ GitHub Actions가 검사와 빌드를 수행해요. Lightsail의 Blue/Green 컨�
 
 Resend의 이메일 수신을 연결한 뒤 **email.received**를 앱의 **POST /api/inquiries/inbound/resend**로 전달해요. 앱은 원본 본문의 Svix 서명과 수신 주소를 확인하고 Resend API에서 본문을 읽어요. 동일한 수신 식별자는 문의 한 건으로 저장해요. 본문은 텍스트로 표시해요. JPG·PNG·WebP 사진은 한 장당 2MB, 최대 3장까지 실제 형식을 확인해 문의와 함께 저장해요. 관리자 메일함에서 첨부를 확대할 수 있고, 답변과 새 메일의 사진은 MIME 첨부로 발송해요. 원본 Message-ID가 있으면 답변은 같은 메일 스레드로 이어져요. [수신 웹훅](https://resend.com/docs/dashboard/receiving/create-receiving-webhook)
 
-[수신 메일 DDL](../../backend/src/main/resources/db/manual/inquiry-inbound-email.sql)과 [첨부 사진 DDL](../../backend/src/main/resources/db/manual/support-mail-photos.sql)을 적용한 뒤 앱을 시작해요. 문의와 발송 사진은 비공개 테이블에 저장하고 조회마다 관리자 권한과 휴지통 상태를 확인해요. 문의나 발송 기록이 영구 삭제되면 사진도 삭제돼요. 수신 기능은 기본 비활성이며, **RESEND_INBOUND_ENABLED**를 켤 때 **RESEND_INBOUND_ADDRESS**, **RESEND_INBOUND_WEBHOOK_SECRET**, 수신 메일 조회 권한이 있는 **RESEND_INBOUND_API_KEY**를 설정해요. 기존 지원 주소의 MX나 전달 설정은 해당 주소의 다른 메일 흐름과 함께 확인해요.
+[수신 메일 DDL](../../backend/src/main/resources/db/manual/inquiry-inbound-email.sql), [문의 휴지통 DDL](../../backend/src/main/resources/db/manual/inquiry-trash.sql), [첨부 사진 DDL](../../backend/src/main/resources/db/manual/support-mail-photos.sql)을 적용한 뒤 앱을 시작해요. 문의와 발송 사진은 비공개 테이블에 저장하고 조회마다 관리자 권한과 휴지통 상태를 확인해요. 문의나 발송 기록이 영구 삭제되면 사진도 삭제돼요.
+
+운영 수신을 켤 때 GitHub `production`의 변수 `RESEND_INBOUND_ENABLED`를 `true`로 설정하고, `RESEND_INBOUND_ADDRESS`에 실제 지원 주소를 등록해요. 웹훅 서명 키 `RESEND_INBOUND_WEBHOOK_SECRET`과 Resend `Full access` 키 `RESEND_INBOUND_API_KEY`는 저장소 또는 `production` 시크릿에 등록해요. 활성화한 배포에서 두 시크릿을 앱에 전달해요. 발송에는 `RESEND_API_KEY`를 사용해요. 기존 지원 주소의 MX나 전달 설정은 해당 주소의 다른 메일 흐름과 함께 확인해요.
 
 받은 문의와 보낸 메일은 관리자 휴지통에서 30일간 복구할 수 있어요. 받은 문의가 휴지통에 있는 동안 조회·회신 목록에서 숨겨지며 같은 수신 이벤트가 다시 와도 새 문의로 등록하지 않아요.

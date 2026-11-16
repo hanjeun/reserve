@@ -53,4 +53,5 @@ createRoot(document.getElementById('root')).render(
 )
 
 const cancelReplay = scheduleSessionReplay()
-if (import.meta.hot) import.meta.hot.dispose(cancelReplay)
+const hot = import.meta.hot
+hot?.dispose(cancelReplay)

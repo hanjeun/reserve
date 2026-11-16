@@ -164,7 +164,8 @@ if (typeof window !== 'undefined') {
         if (isCurrentSession(event.detail?.epoch)) useAuthStore.getState().expireSession();
     };
     window.addEventListener('reserve:session-expired', onSessionExpired);
-    import.meta.hot?.dispose(() => {
+    const hot = import.meta.hot;
+    hot?.dispose(() => {
         window.removeEventListener('storage', onStorage);
         window.removeEventListener('reserve:session-expired', onSessionExpired);
     });

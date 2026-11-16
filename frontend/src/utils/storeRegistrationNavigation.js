@@ -22,4 +22,5 @@ const unsubscribe = useAuthStore.subscribe((current, previous) => {
     if (current.user?.id !== previous.user?.id || current.user?.role !== previous.user?.role
         || current.sessionRevision !== previous.sessionRevision) snapshots.clear();
 });
-if (import.meta.hot) import.meta.hot.dispose(() => { unsubscribe(); snapshots.clear(); });
+const hot = import.meta.hot;
+hot?.dispose(() => { unsubscribe(); snapshots.clear(); });

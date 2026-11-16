@@ -26,4 +26,5 @@ const unsubscribe = useAuthStore.subscribe((current, previous) => {
     if (current.user?.id !== previous.user?.id || current.user?.role !== previous.user?.role
         || current.sessionRevision !== previous.sessionRevision) draft = null;
 });
-if (import.meta.hot) import.meta.hot.dispose(() => { unsubscribe(); draft = null; });
+const hot = import.meta.hot;
+hot?.dispose(() => { unsubscribe(); draft = null; });

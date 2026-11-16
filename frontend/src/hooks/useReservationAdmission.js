@@ -103,7 +103,8 @@ const unsubscribe = useAuthStore.subscribe((state, previous) => {
         }
     } else if (previous.authRestoring && !state.authRestoring) initialOwnerRestore = false;
 });
-import.meta.hot?.dispose(unsubscribe);
+const hot = import.meta.hot;
+hot?.dispose(unsubscribe);
 
 /* 진행 판단은 하나만 유지하고 늦은 응답도 현재 세션·실행 경계를 통과시킨다. */
 function createAdmissionFlow(onChange) {

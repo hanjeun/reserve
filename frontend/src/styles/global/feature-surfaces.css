@@ -590,7 +590,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 @media (pointer: coarse) {
     .reserve-chat-message-row:has(> .reserve-chat-message-meta > .reserve-chat-message-actions:enabled)
         > .reserve-chat-bubble-group > :is(.reserve-chat-message-bubble, .reserve-chat-photo-group),
-    .reserve-chat-secondary-photo > .reserve-chat-image-message {
+    .reserve-chat-secondary-photo > :is(.reserve-chat-image-message, .reserve-chat-file-download) {
         -webkit-touch-callout: none;
         -webkit-user-select: none;
         user-select: none;
@@ -1115,6 +1115,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     padding: 0 0 14px;
 }
 .reserve-messenger-composer-wrap {
+    flex-shrink: 0;
     padding: 8px 12px;
     border-top: 1px solid var(--c-border-light, #f2f4f6);
     background: var(--c-bg-paper, #fff);
@@ -1132,37 +1133,130 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 }
 .reserve-chat-composer-input-area {
     display: flex;
-    align-items: center;
-    height: 56px;
-    min-height: 56px;
+    flex-direction: column;
     min-width: 0;
-    gap: 8px;
 }
 .reserve-chat-composer-attachments {
-    flex: 0 1 auto;
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 200ms ease;
+}
+.reserve-chat-composer-attachments[data-expanded='true'] { grid-template-rows: 1fr; }
+.reserve-chat-composer-attachments-clip {
     min-width: 0;
-    max-width: 55%;
-    height: 56px;
+    min-height: 0;
+    overflow: hidden;
+}
+.reserve-chat-attachments {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    min-width: 0;
+    padding: 4px 4px 8px;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+}
+.reserve-chat-picker { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.reserve-chat-attachment-error {
+    display: block;
+    padding: 4px 10px;
+    color: var(--c-error);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+.reserve-chat-attachment {
+    flex: 0 0 auto;
+    border: 1px solid var(--c-border-default);
+    border-radius: var(--radius-md, 10px);
+    background: var(--c-bg-paper);
+}
+.reserve-chat-draft-photo {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    min-inline-size: 104px;
+    min-block-size: 64px;
+}
+.reserve-chat-draft-image {
+    display: block;
+    inline-size: auto;
+    block-size: auto;
+    max-inline-size: 156px;
+    max-block-size: 64px;
+    align-self: center;
+    object-fit: contain;
+    border-radius: inherit;
+}
+.reserve-chat-draft-tools { position: relative; display: flex; gap: 12px; align-items: center; justify-content: center; }
+.reserve-chat-draft-photo > .reserve-chat-draft-tools { align-self: end; }
+.reserve-chat-draft-divider {
+    position: absolute;
+    inset-inline-start: 50%;
+    transform: translateX(-50%);
+    inline-size: 1px;
+    block-size: 18px;
+    background: var(--c-gray-400);
+    pointer-events: none;
+}
+@media (hover: hover) and (pointer: fine) {
+    .reserve-chat-draft-photo > .reserve-chat-draft-tools {
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: color-mix(in srgb, var(--c-bg-subtle) 88%, transparent);
+        opacity: 0;
+        transition: opacity 150ms ease;
+    }
+    .reserve-chat-draft-photo:hover > .reserve-chat-draft-tools,
+    .reserve-chat-draft-photo:focus-within > .reserve-chat-draft-tools { opacity: 1; }
+}
+.reserve-chat-draft-file, .reserve-chat-file-download {
     display: flex;
     align-items: center;
-    overflow-x: auto;
-    overflow-y: hidden;
-    overscroll-behavior-x: contain;
-    scrollbar-width: thin;
+    gap: 8px;
+    min-block-size: 64px;
+    max-inline-size: min(100%, 256px);
+    padding-inline-start: 10px;
+    color: var(--c-text-secondary);
 }
-.reserve-chat-composer-attachments:empty { display: none; }
-.reserve-chat-composer-attachments > .reserve-chat-attachments {
-    flex-wrap: nowrap;
-    margin: 0;
-    max-width: none;
+.reserve-chat-draft-file-copy {
+    min-inline-size: 0;
+    display: grid;
+    gap: 2px;
+    color: var(--c-text-primary);
+    font-size: 13px;
+    text-align: start;
 }
-.reserve-chat-composer-attachments .reserve-chat-attachment { flex-shrink: 0; }
-.reserve-chat-composer-attachments [role="alert"] { flex: 0 0 auto !important; max-width: 220px; }
+.reserve-chat-draft-file-copy > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.reserve-chat-draft-file-copy > small { color: var(--c-text-secondary); }
+.reserve-chat-file-download {
+    padding: 8px 12px;
+    min-block-size: 44px;
+    min-inline-size: 0;
+    border: 1px solid var(--c-border-default);
+    border-radius: var(--radius-md, 10px);
+    background: var(--c-bg-subtle);
+    font: inherit;
+    cursor: pointer;
+    transition: border-color 150ms ease, background-color 150ms ease;
+}
+.reserve-chat-file-download > .anticon { flex-shrink: 0; }
+.reserve-chat-file-download > :last-child { margin-inline-start: 4px; }
+.reserve-chat-file-download:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 2px; }
+.reserve-chat-file-download:disabled { cursor: default; }
+@media (hover: hover) and (pointer: fine) {
+    .reserve-chat-file-download:hover:not(:disabled) { background: var(--c-bg-paper); border-color: var(--c-gray-400); }
+}
+.reserve-messenger-thread[data-file-over='true'] .reserve-chat-composer {
+    outline: 1px dashed var(--c-primary);
+    outline-offset: -1px;
+}
 .reserve-messenger-composer textarea {
     box-sizing: border-box;
     min-width: 0;
     width: 100%;
-    flex: 1 1 0;
+    flex: 0 0 56px;
     height: 56px;
     max-height: 100px;
     padding: 8px 10px;
@@ -1190,7 +1284,6 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 .reserve-chat-composer-toolbar, .reserve-chat-composer-tools { display: flex; align-items: center; gap: 4px; }
 .reserve-chat-composer-toolbar { justify-content: space-between; }
 .reserve-chat-composer-tools { flex: 1; min-width: 0; flex-wrap: wrap; }
-.reserve-chat-attachments { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; max-width: 100%; margin-block: 8px; }
 .reserve-chat-tool {
     width: var(--reserve-icon-target-size); height: var(--reserve-icon-target-size); flex-shrink: 0; padding: 0; border: 0; border-radius: var(--reserve-icon-tool-radius);
     background: transparent; color: var(--c-text-secondary, #4e5968); font-size: 20px;
@@ -1207,7 +1300,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 .reserve-chat-emoji-picker { width: min(280px, calc(100vw - 64px)); }
 .reserve-chat-emoji-picker input {
     box-sizing: border-box; width: 100%; padding: 10px 12px; border: 1px solid var(--c-border-default, #e5e8eb);
-    border-radius: 12px; background: var(--c-bg-subtle, #f8f9fa); color: var(--c-text-primary, #1a1f27); font: inherit; font-size: 16px;
+    border-radius: 12px; background: var(--c-bg-paper, #fff); color: var(--c-text-primary, #1a1f27); font: inherit; font-size: 16px;
 }
 .reserve-chat-emoji-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; max-height: 224px; overflow-y: auto; padding: 8px 2px; }
 .reserve-chat-emoji-grid button {
@@ -1442,7 +1535,10 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     .reserve-messenger.is-returning-to-list > .reserve-messenger-thread { animation-duration: 0.01ms; }
     .reserve-messenger-list-refresh.is-refreshing .anticon { animation: none; }
     .reserve-messenger-replies-content { transition: none; }
-    .reserve-chat-photo-image { transition: none; }
+    .reserve-chat-photo-image,
+    .reserve-chat-composer-attachments,
+    .reserve-chat-draft-tools,
+    .reserve-chat-file-download { transition: none; }
     .reserve-messenger-launcher-wrap,
     .reserve-chat-launcher,
     .reserve-chat-launcher .anticon,
@@ -2624,7 +2720,7 @@ button.reserve-store-card-hit:disabled { pointer-events: none; }
     align-items: center;
     border: 1px solid var(--c-border-light, #f2f4f6);
     border-radius: var(--reserve-search-field-radius);
-    background: var(--c-gray-50, #f9fafb);
+    background: var(--c-bg-paper, #fff);
 }
 .reserve-search-field:focus-within { border-color: var(--c-gray-500, #8b95a1); }
 .reserve-search-field input {
@@ -2981,6 +3077,16 @@ button.reserve-store-card-hit:disabled { pointer-events: none; }
 .reserve-review-photo-overview { display: grid; gap: 10px; min-width: 0; }
 .reserve-review-photo-overview > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .reserve-review-photo-overview h4 { margin: 0; font-size: 16px; }
+.reserve-review-load-more { padding-block: 12px; text-align: center; }
+.reserve-photo-preview-image { display: contents; }
+.reserve-photo-preview-progress {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    color: #fff;
+}
 .reserve-review-photo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 8px; }
 .reserve-review-photo-overview.is-desktop .reserve-review-photo-grid {
     --review-photo-min-width: 210px;
@@ -3090,20 +3196,16 @@ button.reserve-store-card-hit:disabled { pointer-events: none; }
     outline-offset: 2px;
 }
 .rsv-time-pill {
-    background: transparent;
-    color: var(--c-text-secondary, #4e5968);
-    transition: background-color 0.2s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s ease;
+    min-width: 0;
+    padding-inline: 0;
+    font-variant-numeric: tabular-nums;
+    scale: 1;
+    transition: background-color 0.2s ease, border-color 0.2s ease, scale 0.15s ease;
 }
-.rsv-time-pill:hover:not(:disabled) {
-    background-color: var(--c-gray-100, #f2f4f6);
-    color: var(--c-text-primary, #1a1f27);
-}
-.rsv-time-pill:active:not(:disabled) { transform: scale(0.96); }
+/* 진입·퇴장의 transform과 누름 효과가 서로 덮어쓰지 않게 한다. */
+.rsv-time-pill:active:not(:disabled) { scale: 0.96; }
 .rsv-time-pill.rsv-selected {
-    background-color: var(--c-gray-200, #e5e8eb);
-    color: var(--c-text-primary, #1a1f27);
     font-weight: 600;
-    transform: scale(1.04);
 }
 .rsv-time-pill:disabled {
     color: var(--c-text-disabled, #b5b8bd);
@@ -3200,4 +3302,5 @@ button.reserve-store-card-hit:disabled { pointer-events: none; }
     .mock-card:hover .mock-card-image,
     .mock-card-m:hover .mock-card-image { transform: none !important; }
     .reserve-qr-scanning-dot { animation: none !important; }
+    .rsv-time-pill:active { scale: none; }
 }

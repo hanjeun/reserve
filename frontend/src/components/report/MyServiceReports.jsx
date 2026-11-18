@@ -18,6 +18,7 @@ export default function MyServiceReports({ open, onClose }) {
         queryFn: ({ signal }) => serviceReportService.mine({ page: page - 1, size: DEFAULT_PAGE_SIZE }, signal),
         enabled: open && memberId != null,
         placeholderData: (data, previous) => previous?.queryKey[2] === memberId && previous?.queryKey[3] === session ? data : undefined });
+    const rows = query.data?.content ?? [];
     const columns = [
         { title: '신고', key: 'targetType', width: 116, render: (_, row) => `${REPORT_TYPE_LABELS[row.targetType]} #${row.id}` },
         { title: '상태', dataIndex: 'status', width: 100, render: reportStateLabel },
@@ -26,11 +27,12 @@ export default function MyServiceReports({ open, onClose }) {
             <Button variant="ghost-sm" onClick={() => { setAppeal(row); setAppealOpen(true); }}>이의 신청</Button> },
     ];
     return <>
-        <FormModal title="내 신고" open={open} onClose={onClose} footer={null} width={720}>
-            {query.error ? <DataState state="error" error={query.error} title="신고 내역을 불러오지 못했어요." onRetry={query.refetch} />
-                : <PagedDataTable columns={columns} dataSource={query.data?.content ?? []} rowKey="id"
+        <FormModal title="내 신고" open={open} onClose={onClose} footer={null} width={720} mobileSize="content">
+            {query.error ? <DataState compact state="error" error={query.error} title="신고 내역을 불러오지 못했어요." onRetry={query.refetch} />
+                : <PagedDataTable columns={rows.length ? columns : columns.map(column => ({ ...column, width: undefined }))}
+                    dataSource={rows} rowKey="id" scroll={rows.length ? { x: 'max-content' } : undefined}
                     placeholder={query.isPending || query.isPlaceholderData ? <AdminTableSkeleton /> : null}
-                    locale={{ emptyText: '신고 내역이 없어요.' }}
+                    locale={{ emptyText: <DataState compact title="신고 내역이 없어요." /> }}
                     pagination={{ current: page, total: query.data?.page?.totalElements ?? query.data?.totalElements ?? 0,
                         pageSize: DEFAULT_PAGE_SIZE, hideOnSinglePage: true, onChange: setPage }} />}
         </FormModal>

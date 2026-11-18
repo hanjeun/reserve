@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { chatAttachmentKind } from '../utils/chatAttachments';
 
 // ChatService의 증분 조회 한도와 맞춘다. 가득 찬 배치는 이어받기를 마칠 때까지 읽음을 보류한다.
 const POLL_BATCH_SIZE = 50;
@@ -42,13 +43,17 @@ const applyChanges = (previous, incoming) => {
         if (!update || message.hidden || (message.retracted && update.retracted
             && message.expired === update.expired && !update.hidden)) return message;
         changed = true;
-        return update.hidden ? withoutHiddenContent({ ...message, ...update }) : { ...message, ...update };
+        const merged = { ...message, ...update };
+        if (update.hidden) return withoutHiddenContent(merged);
+        return update.retracted || update.expired ? { ...merged, ...CLEARED_ATTACHMENTS } : merged;
     });
     return changed ? next : previous;
 };
 
-const withoutHiddenContent = message => ({ ...message, hidden: true, content: null, imageUrl: null,
-    imageOriginalFilename: null, imageWidth: null, imageHeight: null, canRetract: false });
+const CLEARED_ATTACHMENTS = { imageUrl: null,
+    imageThumbnailUrl: null, imageOriginalFilename: null, imageWidth: null, imageHeight: null,
+    fileUrl: null, fileName: null, fileBytes: null };
+const withoutHiddenContent = message => ({ ...message, ...CLEARED_ATTACHMENTS, hidden: true, content: null, canRetract: false });
 
 // 개인 삭제도 읽음·페이지 커서의 ID는 보존한다. 이미 삭제한 내용을 낡은 응답으로 복구하지 않는다.
 const applyHidden = (previous, ids) => {
@@ -265,7 +270,7 @@ export default function useChatThread({
         setSending(true);
         setMessages((prev) => [...prev, {
             id: tempId,
-            content: text || (attachment ? '사진 전송 중' : ''),
+            content: text || (attachment ? (chatAttachmentKind(attachment) === 'document' ? '파일 전송 중' : '사진 전송 중') : ''),
             senderRole: myRole,
             clientMessageId,
             localSendId: clientMessageId,

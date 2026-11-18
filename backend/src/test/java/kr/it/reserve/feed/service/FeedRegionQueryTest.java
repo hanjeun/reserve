@@ -252,8 +252,9 @@ class FeedRegionQueryTest {
         assertThat(first.getNumber()).isZero();
         assertThat(first.getContent()).singleElement().satisfies(review -> {
             assertThat(review.id()).isEqualTo(latest.getId());
-            assertThat(review.photos()).containsExactly(new FeedDto.ProfileReviewPhoto(photo.getId(),
-                    "/api/reviews/" + latest.getId() + "/photos/" + photo.getId(), 180, 320));
+            String url = "/api/reviews/" + latest.getId() + "/photos/" + photo.getId();
+            assertThat(review.photos()).containsExactly(new FeedDto.ProfileReviewPhoto(photo.getId(), url, 180, 320,
+                    url + "?size=thumbnail"));
         });
         var second = feeds.authorReviews(profile.getPublicId(), 1, 1, null);
         assertThat(second.getTotalElements()).isEqualTo(3);

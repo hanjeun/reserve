@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
 import { Image } from 'antd';
 import LoadingAntImage from '../common/LoadingAntImage';
+import PhotoPreviewImage from '../common/PhotoPreviewImage';
 import { photoPreviewClassNames, rememberPhotoPreviewOrigin } from '../../utils/photoPreview';
 import useMediaStripDrag from '../../hooks/useMediaStripDrag';
 
@@ -14,12 +15,14 @@ export default function FeedMediaStrip({ images, label = '게시물' }) {
             drag.onClickCapture(event);
             if (!event.defaultPrevented) rememberPhotoPreviewOrigin(event);
         }}>
-        <Image.PreviewGroup items={images.map(image => image.src)} classNames={photoPreviewClassNames}>
+        <Image.PreviewGroup items={images.map(image => image.previewSrc ?? image.src)} classNames={photoPreviewClassNames}
+            preview={images.some(image => image.previewSrc)
+                ? { imageRender: image => <PhotoPreviewImage key={image.props.src} image={image} /> } : undefined}>
             {images.map((image, index) => <div key={image.id || `${image.src}:${index}`} className="reserve-feed-media-item"
                 style={{ '--feed-media-ratio': image.width > 0 && image.height > 0 ? image.width / image.height : 4 / 3 }}>
                 <LoadingAntImage src={image.src} alt={`${label} 사진 ${index + 1}`} width="100%" height="100%" draggable={false} loading="lazy" decoding="async"
                     referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', aspectRatio: 'auto', objectFit: 'cover', display: 'block' }}
-                    preview={{ mask: false }} />
+                    preview={{ mask: false, src: image.previewSrc }} />
             </div>)}
         </Image.PreviewGroup>
     </div>;

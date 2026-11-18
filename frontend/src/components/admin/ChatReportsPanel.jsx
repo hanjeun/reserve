@@ -20,6 +20,7 @@ import { adminKeys } from '../../hooks/queryKeys';
 import { chatService } from '../../services';
 import { listRows } from '../../utils/listResponse';
 import ChatImage from '../chat/ChatImage';
+import ChatFileDownload from '../chat/ChatFileDownload';
 import ChatRetentionModal from './ChatRetentionModal';
 import ManagementListToolbar from '../common/ManagementListToolbar';
 import SkeletonText from '../common/SkeletonText';
@@ -233,6 +234,9 @@ const ChatReportsPanel = ({ initialContextId = null }) => {
                         {contextQuery.data.reportedMessage.imageUrl && <ChatImage
                             url={`/api/admin/chat/reports/${contextReportId}/images/${contextQuery.data.reportedMessage.id}`}
                             width={contextQuery.data.reportedMessage.imageWidth} height={contextQuery.data.reportedMessage.imageHeight} />}
+                        {contextQuery.data.reportedMessage.fileUrl && <ChatFileDownload
+                            url={`/api/admin/chat/reports/${contextReportId}/files/${contextQuery.data.reportedMessage.id}`}
+                            filename={contextQuery.data.reportedMessage.fileName} />}
                         <div style={{ marginTop: 6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                             {contextQuery.data.reportedMessage.content}
                         </div>
@@ -245,6 +249,8 @@ const ChatReportsPanel = ({ initialContextId = null }) => {
                         <strong>{item.senderRole === 'OWNER' ? '사장님' : '회원'}</strong>
                         {item.imageUrl && <ChatImage url={`/api/admin/chat/reports/${contextReportId}/images/${item.id}`}
                             width={item.imageWidth} height={item.imageHeight} />}
+                        {item.fileUrl && <ChatFileDownload url={`/api/admin/chat/reports/${contextReportId}/files/${item.id}`}
+                            filename={item.fileName} />}
                         <div style={{ marginTop: 4, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                             {item.content}
                         </div>

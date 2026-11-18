@@ -1,5 +1,6 @@
 /* 노출된 선택 칩과 패널 탭은 같은 테두리로 선택 상태를 표시한다. */
 .reserve-segmented-btn,
+.rsv-time-pill,
 .reserve-pill-tabs .ant-tabs-tab,
 .reserve-route-panel-tab,
 .reserve-search-keywords button {
@@ -17,12 +18,14 @@
     transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
 }
 .reserve-segmented-btn--active,
+.rsv-time-pill.rsv-selected,
 .reserve-pill-tabs .ant-tabs-tab-active,
 .reserve-route-panel-tab.is-active {
     border-color: var(--c-text-primary);
 }
 @media (hover: hover) and (pointer: fine) {
     .reserve-segmented-btn:hover:not(:disabled),
+    .rsv-time-pill:hover:not(:disabled),
     .reserve-pill-tabs .ant-tabs-tab:hover:not(.ant-tabs-tab-disabled),
     .reserve-search-keywords button:hover:not(:disabled) {
         background-color: var(--c-hover-surface);
@@ -95,7 +98,8 @@
     font-weight: 600 !important;
 }
 
-.reserve-segmented-btn {
+.reserve-segmented-btn,
+.rsv-time-pill {
     appearance: none;
     cursor: pointer;
     white-space: nowrap;

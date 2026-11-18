@@ -1,11 +1,12 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Rate } from 'antd';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { DataState, ReviewCardSkeleton } from '../common';
 import AnimatedContent from '../common/AnimatedContent';
 import { StarFilled } from '../common/icons';
 import LoadingStatus from '../common/LoadingStatus';
+import UnderlinedTextButton from '../common/UnderlinedTextButton';
 import ReviewEditor from './ReviewEditor';
 import ReviewCard from './ReviewCard';
 import { ReviewPhotoOverview } from './ReviewPhotos';
@@ -36,6 +37,7 @@ const ReviewList = ({
     focusReviewId = null,
     reviewNavigationKey,
     onRatingLoad,
+    ratingSummary,
     isPC = false,
 }) => {
     const user = useAuthStore(state => state.user);
@@ -57,21 +59,37 @@ const ReviewList = ({
     const scrolled = useRef(null);
     const restoreEditFocus = useRef(null);
 
-    const { data: loadedReviews, isLoading: loading, isError, error, isFetching, refetch } = useQuery({
-        queryKey: reviewKeys.byStore(storeId),
-        queryFn: async ({ signal }) => {
-            const data = await reviewService.getReviewsByStore(storeId, signal);
-            return Array.isArray(data) ? data : NO_REVIEWS;
+    const targetReviewId = focusReviewId ?? (autoOpenWrite ? completedReservation?.reviewId : null);
+    const storeQueryKey = reviewKeys.byStore(storeId);
+    const { data: loadedReviews, isLoading: loading, isError, error, isFetching, refetch,
+        hasNextPage, isFetchNextPageError, fetchNextPage } = useInfiniteQuery({
+        queryKey: targetReviewId == null ? storeQueryKey : [...storeQueryKey, 'focused', targetReviewId],
+        queryFn: async ({ signal, pageParam }) => {
+            const data = await reviewService.getReviewsByStore(storeId, signal, {
+                limit: 10, ...(pageParam ?? { focusId: targetReviewId }),
+            });
+            return Array.isArray(data) ? { content: data, next: null } : data ?? { content: NO_REVIEWS, next: null };
         },
+        initialPageParam: null,
+        getNextPageParam: page => page.next ?? undefined,
         enabled: !!storeId,
     });
-    const reviews = loadedReviews ?? NO_REVIEWS;
+    const reviews = useMemo(() => {
+        if (!loadedReviews) return NO_REVIEWS;
+        const distinct = new Map();
+        for (const page of loadedReviews.pages) {
+            for (const review of page.content) if (!distinct.has(review.id)) distinct.set(review.id, review);
+        }
+        return [...distinct.values()];
+    }, [loadedReviews]);
 
-    const averageRating = reviews.length
-        ? (reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length).toFixed(1) : null;
+    const reviewCount = ratingSummary?.reviewCount || reviews.length;
+    const rating = ratingSummary?.reviewCount ? ratingSummary.rating
+        : reviews.length ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length : null;
+    const averageRating = rating?.toFixed(1);
     useEffect(() => {
-        onRatingLoad?.({ avg: averageRating ? Number(averageRating) : null, count: reviews.length });
-    }, [averageRating, reviews.length, onRatingLoad]);
+        onRatingLoad?.({ avg: averageRating ? Number(averageRating) : null, count: reviewCount });
+    }, [averageRating, reviewCount, onRatingLoad]);
     useEffect(() => {
         const timers = exitTimers.current;
         return () => { timers.forEach(clearTimeout); timers.clear(); };
@@ -83,7 +101,6 @@ const ReviewList = ({
     const showEditor = canWrite && dismissed !== draftKey;
     const { data: profile, error: profileError, isLoading: profileLoading } = useFeedProfile(Boolean(user?.id && (showEditor || editingId != null)));
     const reviewProfile = !isReadAccessDenied(profileError) && ['PUBLIC', 'MEMBERS'].includes(profile?.visibility) ? profile : null;
-    const targetReviewId = focusReviewId ?? (autoOpenWrite ? completedReservation?.reviewId : null);
     const unavailableWrite = autoOpenWrite && !completedReservationRetrying && !completedReservationError
         && (!completedReservation || completedReservation.reviewWritten) && targetReviewId == null && writtenReservation !== draftKey;
     const targetKey = [reviewNavigationKey, targetReviewId ?? reservationId, targetReviewId != null ? 'review' : 'write'].join(':');
@@ -111,18 +128,22 @@ const ReviewList = ({
     }, [editingId, profileLoading]);
 
     const updateReviews = async (targetStore, epoch, update) => {
-        const queryKey = reviewKeys.byStore(targetStore);
+        const matches = { queryKey: reviewKeys.byStore(targetStore),
+            predicate: query => Array.isArray(query.state.data?.pages) };
         if (!isCurrentSession(epoch)) return false;
-        await queryClient.cancelQueries({ queryKey, exact: true });
+        await queryClient.cancelQueries(matches);
         if (!isCurrentSession(epoch)) return false;
-        queryClient.setQueryData(queryKey, update);
+        queryClient.setQueriesData(matches, current => current && ({
+            ...current, pages: current.pages.map((page, index) => ({ ...page, content: update(page.content, index) })),
+        }));
         return true;
     };
 
     const createMutation = useMutation({
         mutationFn: ({ payload, files }) => files.length ? reviewService.createReview(payload, files) : reviewService.createReview(payload),
         onSuccess: async (created, { epoch, key, targetStore }) => {
-            if (!await updateReviews(targetStore, epoch, (old = []) => [created, ...old.filter(row => row.id !== created.id)])) return;
+            if (!await updateReviews(targetStore, epoch, (old, index) => index === 0
+                ? [created, ...old.filter(row => row.id !== created.id)] : old)) return;
             setCreatedId(created.id);
             setWrittenReservation(key);
             void invalidateReviewData(queryClient);
@@ -133,7 +154,7 @@ const ReviewList = ({
             if (httpStatusOf(failure) === 409) {
                 setWrittenReservation(key);
                 void invalidateReviewData(queryClient);
-                void queryClient.invalidateQueries({ queryKey: reviewKeys.byStore(targetStore), exact: true });
+                void queryClient.invalidateQueries({ queryKey: reviewKeys.byStore(targetStore) });
             }
             handleApiError(failure, message);
         },
@@ -184,10 +205,7 @@ const ReviewList = ({
     };
     const updateInteractions = async (id, changes) => {
         const { epoch } = currentSession();
-        const queryKey = reviewKeys.byStore(storeId);
-        await queryClient.cancelQueries({ queryKey, exact: true });
-        if (!isCurrentSession(epoch)) return;
-        queryClient.setQueryData(queryKey, current => current?.map(row => row.id === id
+        await updateReviews(storeId, epoch, current => current.map(row => row.id === id
             ? { ...row, interactions: { ...row.interactions, ...changes } } : row));
     };
 
@@ -196,7 +214,7 @@ const ReviewList = ({
         return <DataState state="error" kind="review" subject="리뷰" error={error} onRetry={refetch} retrying={isFetching} />;
     }
 
-    const photos = reviews.flatMap(review => review.photos ?? []);
+    const photos = reviews.flatMap(review => review.photos ?? []).slice(0, 10);
     const rows = reviews.map(review => ({ id: review.id, review }));
     if (!reducedMotion) for (const exit of exits) {
         if (exit.storeId === storeId && !reviews.some(review => review.id === exit.id)) rows.splice(exit.index, 0, exit);
@@ -204,7 +222,7 @@ const ReviewList = ({
     const activeReport = report && isCurrentSession(report.epoch) ? report : null;
     return (
         <div className="reserve-reviews">
-            {isError && <DataState compact state="error" kind="review" title="리뷰를 갱신하지 못했어요."
+            {isError && !isFetchNextPageError && <DataState compact state="error" kind="review" title="리뷰를 갱신하지 못했어요."
                 error={error} onRetry={refetch} retrying={isFetching} />}
             {completedReservationError && <DataState state="error" kind="review" requestType="detail" subject="리뷰 작성 가능 예약"
                 title="리뷰 작성 가능 예약을 확인하지 못했어요." error={completedReservationError} onRetry={onCompletedReservationRetry}
@@ -219,12 +237,12 @@ const ReviewList = ({
                 onSubmit={(payload, files) => createMutation.mutate({
                     payload: { reservationId, ...payload }, files, key: draftKey, epoch: currentSession().epoch, targetStore: storeId,
                 })} />}
-            {reviews.length > 0 && <div className="reserve-review-summary">
+            {reviewCount > 0 && <div className="reserve-review-summary">
                 <span className="reserve-review-score">{averageRating}</span>
                 <div>
                     <Rate aria-label={'평균 ' + averageRating + '점'} character={<StarFilled aria-hidden="true" />}
                         disabled allowHalf value={Number(averageRating)} className="reserve-review-stars" />
-                    <div className="reserve-review-muted">리뷰 {reviews.length}개</div>
+                    <div className="reserve-review-muted">리뷰 {reviewCount}개</div>
                 </div>
             </div>}
             {photos.length > 0 && <ReviewPhotoOverview key={storeId} photos={photos} isPC={isPC} />}
@@ -255,6 +273,12 @@ const ReviewList = ({
                         </AnimatedContent>;
                     })}
                 </div>}
+            {hasNextPage && <div className="reserve-review-load-more">
+                {isFetchNextPageError && <p className="reserve-review-muted" role="status">다음 리뷰를 불러오지 못했어요.</p>}
+                <UnderlinedTextButton disabled={isFetching} onClick={() => fetchNextPage()}>
+                    {isFetching ? '리뷰 불러오는 중…' : '리뷰 더 보기'}
+                </UnderlinedTextButton>
+            </div>}
             {activeReport && <Suspense fallback={null}>
                 <ServiceReportForm target={{ type: 'REVIEW', id: activeReport.id }} open={activeReport.open}
                     onClose={() => setReport(current => ({ ...current, open: false }))} afterClose={() => setReport(null)} />

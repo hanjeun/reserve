@@ -39,6 +39,46 @@ describe('review read states', () => {
         auth.isLoggedIn = false;
     });
 
+    it('requests the next review page only after a click and keeps the store-wide rating', async () => {
+        const cursor = { beforeId: 51, beforeDate: '2026-10-01T12:00:00' };
+        reviewService.getReviewsByStore
+            .mockResolvedValueOnce({ content: [{ id: 51, title: '최근 리뷰', rating: 5 }], next: cursor })
+            .mockResolvedValueOnce({ content: [{ id: 49, title: '이전 리뷰', rating: 1 }], next: null });
+        renderReviews({ ratingSummary: { reviewCount: 31, rating: 4.2 } });
+        const more = await screen.findByRole('button', { name: '리뷰 더 보기' });
+        expect(reviewService.getReviewsByStore).toHaveBeenCalledTimes(1);
+        fireEvent.click(more);
+        expect(await screen.findByText('이전 리뷰')).toBeInTheDocument();
+        expect(screen.getByText('최근 리뷰')).toBeInTheDocument();
+        expect(screen.getByText('리뷰 31개')).toBeInTheDocument();
+        expect(reviewService.getReviewsByStore).toHaveBeenLastCalledWith(12, expect.any(AbortSignal), { limit: 10, ...cursor });
+    });
+
+    it('uses the thumbnail in both lists and requests the original for an opened photo', async () => {
+        const url = '/api/reviews/51/photos/31';
+        const thumbnailUrl = url + '?size=thumbnail';
+        reviewService.getReviewsByStore.mockResolvedValue([{ id: 51, title: '사진 리뷰', rating: 5,
+            photos: [{ id: 31, url, thumbnailUrl, width: 500, height: 300 }] }]);
+        const bounds = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+            .mockReturnValue({ left: 10, right: 110, top: 10, bottom: 70, width: 100, height: 60 });
+        try {
+            const { container } = renderReviews();
+            const overview = await screen.findByRole('region', { name: '리뷰 사진 모아보기' });
+            const tile = within(overview).getByRole('button', { name: '리뷰 사진 1 크게 보기' });
+            await waitFor(() => expect(container.querySelectorAll('img[src="' + thumbnailUrl + '"]')).toHaveLength(2));
+            expect(document.querySelector('img[src="' + url + '"]')).toBeNull();
+            fireEvent.click(tile);
+            const dialog = await screen.findByRole('dialog');
+            const photo = dialog.querySelector('img[src="' + url + '"]');
+            expect(photo).toBeInTheDocument();
+            expect(within(dialog).getByRole('status', { name: '사진을 불러오는 중' })).toBeInTheDocument();
+            fireEvent.load(photo);
+            expect(within(dialog).queryByRole('status', { name: '사진을 불러오는 중' })).toBeNull();
+        } finally {
+            bounds.mockRestore();
+        }
+    });
+
     it('uses the visible profile in the review editor and displays server-projected photos for other readers', async () => {
         auth.user = { id: 7, name: '시험 회원', profileImageUrl: 'https://example.com/account.jpg' };
         auth.isLoggedIn = true;

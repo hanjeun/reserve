@@ -17,6 +17,7 @@ const deployment = cd.jobs['deploy-backend'];
 const backendTests = workflow.jobs['test-backend'];
 const frontendTests = workflow.jobs['test-frontend'];
 const frontendCoreTests = workflow.jobs['test-frontend-core'];
+const prepareFrontendTests = workflow.jobs['prepare-frontend-tests'];
 const frontendBrowserTests = workflow.jobs['test-frontend-browser'];
 const staging = cd.jobs['stage-release'];
 const detectionScript = read('scripts/detect-active-upstream.sh');
@@ -679,20 +680,24 @@ test('both HTML CSP policies allow the exact Kakao and Turnstile origins without
     assert.doesNotMatch(nginx, /add_header\s+Content-Security-Policy\s/);
 });
 
-test('PC and mobile browser checks run independently and both results gate the frontend build', () => {
-    assert.equal(frontendBrowserTests.needs, 'test-frontend-core');
-    assert.equal(frontendBrowserTests.if, "needs.test-frontend-core.outputs.reused == 'false'");
+test('unit and both browser checks run in parallel and gate the frontend build', () => {
+    assert.equal(frontendCoreTests.needs, 'prepare-frontend-tests');
+    assert.equal(frontendBrowserTests.needs, 'prepare-frontend-tests');
+    assert.equal(frontendBrowserTests.if, "needs.prepare-frontend-tests.outputs.reused == 'false'");
     assert.deepEqual(frontendBrowserTests.strategy, { 'fail-fast': false, matrix: { project: ['chromium', 'mobile-chromium'] } });
     const browser = frontendBrowserTests.steps.find(entry => entry.name === 'Test browser');
     assert.equal(browser.env.PLAYWRIGHT_PROJECT, '${{ matrix.project }}');
     assert.equal(browser.run, 'npm run test:e2e -- --project="$PLAYWRIGHT_PROJECT" --output=test-results');
     assert.equal(browser['continue-on-error'], undefined);
     assert.equal(frontendBrowserTests['continue-on-error'], undefined);
-    assert.ok(frontendCoreTests.steps.some(entry => entry.run === 'npm run test:run'));
+    const units = frontendCoreTests.steps.find(entry => entry.run === 'npm run test:run');
+    assert.equal(units.if, "needs.prepare-frontend-tests.outputs.reused != 'true'");
+    assert.equal(units['continue-on-error'], undefined);
     assert.ok(frontend.steps.some(entry => entry.run === 'npm run build'));
-    assert.deepEqual(frontendTests.needs, ['test-frontend-core', 'test-frontend-browser']);
+    assert.deepEqual(frontendTests.needs, ['prepare-frontend-tests', 'test-frontend-core', 'test-frontend-browser']);
     const check = frontendTests.steps[0];
     assert.equal(check.env.BROWSER_RESULT, '${{ needs.test-frontend-browser.result }}');
+    assert.equal(check.env.PREPARE_RESULT, '${{ needs.prepare-frontend-tests.result }}');
     const bash = process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash';
     for (const [core, browserResult, reused, key, succeeds] of [
         ['success', 'success', 'false', 'verified-key', true],
@@ -704,7 +709,7 @@ test('PC and mobile browser checks run independently and both results gate the f
         ['success', 'skipped', 'true', '', false],
     ]) {
         const result = spawnSync(bash, ['-e', '-c', check.run], {
-            env: { ...process.env, CORE_RESULT: core, BROWSER_RESULT: browserResult, EVIDENCE_REUSED: reused, EVIDENCE_KEY: key },
+            env: { ...process.env, PREPARE_RESULT: 'success', CORE_RESULT: core, BROWSER_RESULT: browserResult, EVIDENCE_REUSED: reused, EVIDENCE_KEY: key },
         });
         assert.ifError(result.error);
         assert.equal(result.status === 0, succeeds);
@@ -860,7 +865,7 @@ test('the staging bundle checks SHA and bytes before preparing app and marketing
 });
 
 test('only verified successful evidence can skip tests; records and required checks fail closed', () => {
-    for (const job of [backendTests, frontendCoreTests]) {
+    for (const job of [backendTests, prepareFrontendTests]) {
         const restore = step(job, 'evidence');
         assert.match(restore.run, /ci-evidence\.mjs restore/);
         assert.match(restore.env.CI_FORCE_TESTS, /workflow_dispatch/);
@@ -875,7 +880,8 @@ test('only verified successful evidence can skip tests; records and required che
     const record = step(frontendTests, 'record');
     assert.match(record.run, /ci-evidence\.mjs record frontend/);
     assert.equal(record['continue-on-error'], undefined);
-    assert.equal(record.env.EVIDENCE_EXPECTED_KEY, '${{ needs.test-frontend-core.outputs.key }}');
+    assert.equal(record.env.EVIDENCE_EXPECTED_KEY, '${{ needs.prepare-frontend-tests.outputs.key }}');
+    assert.match(record.if, /test-frontend-core\.outputs\.key == needs\.prepare-frontend-tests\.outputs\.key/);
     assert.match(record.if, /outputs\.pc_key.*outputs\.key/);
     assert.match(record.if, /outputs\.mobile_key.*outputs\.key/);
     assert.equal(frontendTests.steps.find(entry => entry.name === 'Upload successful frontend test evidence').if, "steps.record.outputs.key != ''");

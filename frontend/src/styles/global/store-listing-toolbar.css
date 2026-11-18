@@ -118,6 +118,9 @@
     padding-block: 0;
     padding-inline-start: 4px;
 }
+.reserve-list-search .ant-input-affix-wrapper:not(.ant-input-affix-wrapper-disabled) {
+    background-color: var(--c-bg-paper);
+}
 .reserve-list-search input::-webkit-search-decoration,
 .reserve-list-search input::-webkit-search-cancel-button { display: none; }
 

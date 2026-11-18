@@ -10,10 +10,12 @@ import { rememberPhotoPreviewOrigin } from '../../utils/photoPreview';
 
 export default function ReviewPhotos({ photos, label = '리뷰' }) {
     if (!photos?.length) return null;
-    return <FeedMediaStrip images={photos.map(photo => ({ ...photo, src: photo.url }))} label={label} />;
+    return <FeedMediaStrip images={photos.map(photo => ({ ...photo, src: photo.thumbnailUrl ?? photo.url, previewSrc: photo.url }))} label={label} />;
 }
 
-const photoList = PropTypes.arrayOf(PropTypes.shape({ id: PropTypes.number, url: PropTypes.string, width: PropTypes.number, height: PropTypes.number }));
+const photoList = PropTypes.arrayOf(PropTypes.shape({
+    id: PropTypes.number, url: PropTypes.string, thumbnailUrl: PropTypes.string, width: PropTypes.number, height: PropTypes.number,
+}));
 ReviewPhotos.propTypes = { photos: photoList, label: PropTypes.string };
 
 const previewFile = photo => ({ uid: String(photo.id), url: photo.url });
@@ -23,7 +25,7 @@ export function ReviewPhotoOverview({ photos, isPC }) {
     const [columns, setColumns] = useState(3);
     const grid = useRef(null);
     const extraId = useId();
-    const { handlePreview, previewNode } = useImagePreview();
+    const { handlePreview, previewNode } = useImagePreview({ showImageLoading: true });
     useLayoutEffect(() => {
         const node = grid.current;
         if (!isPC || !node) return undefined;
@@ -66,7 +68,7 @@ export function ReviewPhotoOverview({ photos, isPC }) {
                         rememberPhotoPreviewOrigin(event);
                         handlePreview(previewFile(photo), (expanded ? photos : firstPhotos).map(previewFile));
                     }}>
-                    <LoadingImage src={photo.url} alt="" loading="lazy" decoding="async" draggable={false} />
+                    <LoadingImage src={photo.thumbnailUrl ?? photo.url} alt="" loading="lazy" decoding="async" draggable={false} />
                 </button>;
             })}
         </div>

@@ -30,7 +30,7 @@ public final class FeedDto {
         }
     }
     public record ProfileComment(String postPublicId, String commentPublicId, String content, OffsetDateTime createdAt) {}
-    public record ProfileReviewPhoto(Long id, String url, int width, int height) {}
+    public record ProfileReviewPhoto(Long id, String url, int width, int height, String thumbnailUrl) {}
     public record ProfileReview(Long id, String storePublicId, String storeName, int rating, String title, String content,
                               List<ProfileReviewPhoto> photos, OffsetDateTime createdAt) {}
     public record Image(Long id, String url, int width, int height) implements kr.it.reserve.promotion.dto.NewsImage {}

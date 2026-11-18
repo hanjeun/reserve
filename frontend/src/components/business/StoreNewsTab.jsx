@@ -167,7 +167,8 @@ export default function StoreNewsTab() {
             onChange={value => change({ newsPage: String(value) })} /></nav>}
         {editor.mounted && <StoreNewsEditor open={editor.open} newsId={editor.id} initialStoreId={storeId}
             onClose={() => setEditor(current => ({ ...current, open: false }))} onSaved={() => setEditor(current => ({ ...current, open: false }))} />}
-        <FormModal open={preview.open} title="가게 소식 미리보기" onClose={() => setPreview(current => ({ ...current, open: false }))} footer={null} width={740} rootClassName="reserve-store-news-modal">
+        <FormModal open={preview.open} title="가게 소식 미리보기" onClose={() => setPreview(current => ({ ...current, open: false }))}
+            footer={null} width={740} mobileSize="content" rootClassName="reserve-store-news-modal">
             {previewQuery.isError && <DataState state="error" compact title="소식 상태를 확인하지 못했어요." error={previewQuery.error} onRetry={previewQuery.refetch} retrying={previewQuery.isFetching} />}
             {previewNews && !isReadAccessDenied(previewQuery.error) && <BenefitDetailContent item={previewNews} preview
                 notice={previewNews.benefitReviewNote && <p className="reserve-feed-note">심사 사유: {previewNews.benefitReviewNote}</p>} />}

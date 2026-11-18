@@ -279,7 +279,7 @@ describe('time slot lookup and submission boundaries', () => {
             pending.reject(new Error('offline'));
             await pending.promise.catch(() => {});
         });
-        expect(form.getFieldValue('reservationTime')).toBeUndefined();
+        await waitFor(() => expect(form.getFieldValue('reservationTime')).toBeUndefined());
         await act(async () => {
             form.setFields([{ name: 'reservationTime', value: '10:00', errors: [] }]);
             validation = await form.validateFields(['reservationTime']).catch(error => error);
@@ -315,6 +315,51 @@ describe('time slot lookup and submission boundaries', () => {
         expect(form.getFieldValue('reservationTime')).toBeUndefined();
         expect(await screen.findByText('이 날은 예약이 마감됐어요')).toBeInTheDocument();
         expect(time).not.toBeInTheDocument();
+    });
+
+    it('keeps slot nodes and keyboard focus through selection and a background refresh', async () => {
+        const next = deferred();
+        api.get.mockResolvedValueOnce([slot(), slot('11:00')]).mockReturnValueOnce(next.promise);
+        const form = fakeForm();
+        const onChange = vi.fn();
+        const view = render(picker({ form, value: '10:00', onChange }));
+        const time = await screen.findByRole('button', { name: '11:00' });
+        const entry = time.style.animation;
+        time.focus();
+        fireEvent.click(time);
+        expect(onChange).toHaveBeenCalledExactlyOnceWith('11:00');
+        view.rerender(picker({ form, value: '11:00', onChange }));
+        expect(screen.getByRole('button', { name: '11:00' })).toBe(time);
+        expect(time).toHaveFocus();
+        expect(time).toHaveAttribute('aria-pressed', 'true');
+        let refresh;
+        act(() => { refresh = queryClient.invalidateQueries({ queryKey: ['reservations'] }); });
+        await waitFor(() => expect(api.get).toHaveBeenCalledTimes(2));
+        expect(screen.queryByRole('status', { name: '예약 가능한 시간을 불러오는 중' })).not.toBeInTheDocument();
+        expect(time).toHaveFocus();
+        await act(async () => { next.resolve([slot(), slot('11:00')]); await refresh; });
+        expect(screen.getByRole('button', { name: '11:00' })).toBe(time);
+        expect(time.style.animation).toBe(entry);
+        expect(time).toHaveFocus();
+    });
+
+    it('omits entry and exit motion when reduced motion is enabled', async () => {
+        const media = vi.spyOn(window, 'matchMedia').mockImplementation(query => ({
+            matches: query === '(prefers-reduced-motion: reduce)', media: query,
+            addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(),
+        }));
+        try {
+            api.get.mockResolvedValueOnce([slot()]).mockResolvedValueOnce([slot('10:00', false)]);
+            render(picker({ form: fakeForm() }));
+            const time = await screen.findByRole('button', { name: '10:00' });
+            expect(time.style.animation).toBe('none');
+            await act(async () => { await queryClient.invalidateQueries({ queryKey: ['reservations'] }); });
+            expect(await screen.findByText('이 날은 예약이 마감됐어요')).toBeInTheDocument();
+            expect(api.get).toHaveBeenCalledTimes(2);
+            expect(time).not.toBeInTheDocument();
+        } finally {
+            media.mockRestore();
+        }
     });
 
     it('does not allow an edit prefill for a slot with explicit zero remaining places', async () => {

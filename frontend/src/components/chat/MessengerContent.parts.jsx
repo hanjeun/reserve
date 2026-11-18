@@ -1,4 +1,4 @@
-import React, { useId, useState } from 'react';
+import React, { useId, useLayoutEffect, useState } from 'react';
 import { ArrowLeftOutlined, CloseOutlined, DownOutlined, MessageOutlined } from '../common/icons';
 import { Bone, Button, DataState, Tooltip } from '../common';
 import ConversationListSkeleton from './ConversationListSkeleton';
@@ -17,6 +17,7 @@ import useMessengerStore from '../../store/useMessengerStore';
 import ChatModerationMenu from './ChatModerationMenu';
 import ChatRetentionNotice from './ChatRetentionNotice';
 import { matchesSelection, viewerRoleOf } from './messengerContentModel';
+import { filesFromTransfer, hasFileTransfer } from '../../utils/chatAttachments';
 
 const OWNER_REPLIES = [
     { label: '인사', text: '안녕하세요. 문의해주셔서 감사해요. 확인 후 안내해드릴게요.' },
@@ -350,9 +351,45 @@ export function ThreadPanel({
     onAnimationEnd, onBack, returningToList, avatarProps, title, threadKind, moderationProps,
     threadBodyRef, isSupport, bodyProps, composerAreaProps, retentionNoticeVisible = true, backLabel = '대화 목록으로 돌아가기', searchContext,
 }) {
+    const [fileOver, setFileOver] = useState(false);
+    const { composerProps, closed, sending } = composerAreaProps;
+    const canAttach = !closed && !sending && !composerProps.disabled && composerProps.imageEnabled
+        && !composerProps.imageError && Boolean(composerProps.onStageFiles);
+    const searchResult = Boolean(searchContext);
+    useLayoutEffect(() => {
+        const body = threadBodyRef.current;
+        if (!body || searchResult || typeof ResizeObserver !== 'function') return undefined;
+        let previousHeight = body.clientHeight;
+        const observer = new ResizeObserver(() => {
+            const height = body.clientHeight;
+            if (height < previousHeight && body.scrollHeight - body.scrollTop <= previousHeight + 2) {
+                body.scrollTop = body.scrollHeight;
+            }
+            previousHeight = height;
+        });
+        observer.observe(body);
+        return () => observer.disconnect();
+    }, [threadBodyRef, searchResult]);
+    const dragOver = event => {
+        if (!hasFileTransfer(event.dataTransfer)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = canAttach ? 'copy' : 'none';
+        setFileOver(canAttach);
+    };
+    const dragLeave = event => {
+        if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setFileOver(false);
+    };
+    const drop = event => {
+        const selected = filesFromTransfer(event.dataTransfer);
+        if (!selected.length && !hasFileTransfer(event.dataTransfer)) return;
+        event.preventDefault();
+        setFileOver(false);
+        if (canAttach && selected.length) composerProps.onStageFiles(selected);
+    };
     return (
         <section className="reserve-messenger-thread" aria-labelledby="reserve-messenger-thread-title"
-            onAnimationEnd={onAnimationEnd}>
+            onAnimationEnd={onAnimationEnd} data-file-over={fileOver && canAttach || undefined}
+            onDragOver={dragOver} onDragLeave={dragLeave} onDrop={drop}>
             <header className="reserve-messenger-thread-heading">
                 <button
                     type="button"

@@ -20,12 +20,13 @@ export default function ReviewEditor({ review, profile, reservationDate, submitt
     const alias = review?.authorAlias;
     const visibleProfile = !alias && profile?.nickname ? profile : null;
     const [photos, setPhotos] = useState(() => (review?.photos ?? []).map((photo, index) => ({
-        uid: `saved-${photo.id}`, photoId: photo.id, name: `사진 ${index + 1}`, status: 'done', url: photo.url, thumbUrl: photo.url,
+        uid: `saved-${photo.id}`, photoId: photo.id, name: `사진 ${index + 1}`, status: 'done', url: photo.url,
+        thumbUrl: photo.thumbnailUrl ?? photo.url,
     })));
     const [hover, setHover] = useState(0);
     const [photoError, setPhotoError] = useState('');
     const { errors, validate, clearError } = useFormErrors();
-    const { handlePreview, previewNode, suppressLinkNavigation } = useImagePreview();
+    const { handlePreview, previewNode, suppressLinkNavigation } = useImagePreview({ showImageLoading: true });
     const attachmentDrag = useMediaStripDrag(':scope > *', '.ant-upload-list-picture-card');
     const objectUrls = useRef(new Set());
     useEffect(() => {

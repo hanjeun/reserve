@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import MessengerContent from './MessengerContent';
 import { chatService } from '../../services';
+import attachmentService from '../../services/chatService';
 import storeService from '../../services/storeService';
 import useAuthStore from '../../store/useAuthStore';
 import useMessengerStore, { messengerIdentityOf } from '../../store/useMessengerStore';
@@ -19,6 +20,10 @@ vi.mock('./ChatBubbleList', async importOriginal => {
 });
 
 vi.mock('../../services/storeService', () => ({ default: { getStores: vi.fn() } }));
+vi.mock('../../services/chatService', async importOriginal => {
+    const { default: service } = await importOriginal();
+    return { default: { ...service, getImageConfig: vi.fn(), getFile: vi.fn() } };
+});
 
 vi.mock('../../services', () => ({
     chatService: {
@@ -31,6 +36,8 @@ vi.mock('../../services', () => ({
         listStoreInbox: vi.fn(),
         getSupport: vi.fn(),
         sendSupport: vi.fn(),
+        sendImage: vi.fn(),
+        sendFile: vi.fn(),
         getStore: vi.fn(),
         sendStore: vi.fn(),
         getStoreInboxRoom: vi.fn(),
@@ -85,6 +92,7 @@ const renderMessenger = (props = {}) => {
 describe('MessengerContent', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        attachmentService.getImageConfig.mockResolvedValue({ enabled: false });
         localStorage.removeItem('reserve:notification-conversation-hidden:v1:7');
         storeService.getStores.mockReset().mockResolvedValue(page());
         chatService.search.mockResolvedValue({ conversations: [], messages: [], moreConversations: false, moreMessages: false, page: 0 });
@@ -127,6 +135,76 @@ describe('MessengerContent', () => {
     afterEach(() => {
         vi.unstubAllGlobals();
         vi.restoreAllMocks();
+    });
+
+    it('uses one local queue for picker, clipboard and files dropped on the thread, then restores only the unsent files', async () => {
+        attachmentService.getImageConfig.mockResolvedValue({ enabled: true, documentsEnabled: true });
+        vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:local-photo');
+        vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+        const photo = new File(['photo'], 'photo.png', { type: 'image/png' });
+        const note = new File(['설명'], 'note.txt', { type: 'text/plain' });
+        const pdf = new File(['%PDF-1.7'], 'guide.pdf', { type: 'application/pdf' });
+        const createdAt = new Date().toISOString();
+        chatService.sendImage.mockResolvedValue({ id: 8, senderRole: 'MEMBER', content: '첨부 자료예요.', createdAt });
+        chatService.sendFile.mockRejectedValueOnce({ status: 503 }).mockResolvedValueOnce({
+            id: 9, senderRole: 'MEMBER', content: '', fileUrl: '/api/chat/files/9', fileName: note.name, fileBytes: note.size, createdAt,
+        }).mockResolvedValueOnce({
+            id: 10, senderRole: 'MEMBER', content: '', fileUrl: '/api/chat/files/10', fileName: pdf.name, fileBytes: pdf.size, createdAt,
+        });
+        const { container } = renderMessenger();
+        const attach = await screen.findByRole('button', { name: '파일 첨부' });
+        await waitFor(() => expect(attach).toBeEnabled());
+        const input = screen.getByRole('textbox', { name: '메시지 입력' });
+        const thread = container.querySelector('.reserve-messenger-thread');
+        const body = thread.querySelector('.reserve-messenger-thread-body');
+        fireEvent.change(input, { target: { value: '첨부 자료예요.' } });
+        fireEvent.change(screen.getByLabelText('첨부할 파일 선택'), { target: { files: [photo] } });
+        expect(fireEvent.paste(input, { clipboardData: { items: [{ kind: 'file', getAsFile: () => note }] } })).toBe(false);
+        expect(fireEvent.paste(input, { clipboardData: { types: ['text/plain'], items: [] } })).toBe(true);
+        fireEvent.dragOver(body, { dataTransfer: { types: ['Files'] } });
+        expect(thread).toHaveAttribute('data-file-over', 'true');
+        expect(fireEvent.drop(body, { dataTransfer: { files: [pdf] } })).toBe(false);
+        expect(thread).not.toHaveAttribute('data-file-over');
+        const group = container.querySelector('.reserve-chat-composer-attachments');
+        expect(group).toHaveAttribute('data-expanded', 'true');
+        expect(group.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect([...group.querySelectorAll('button[aria-label*="제거"]')].map(button => button.getAttribute('aria-label')))
+            .toEqual(['첨부 사진 제거: photo.png', '첨부 파일 제거: note.txt', '첨부 파일 제거: guide.pdf']);
+        fireEvent.drop(body, { dataTransfer: { files: [new File(['extra'], 'extra.txt', { type: 'text/plain' })] } });
+        expect(screen.getByText('첨부는 3개까지 할 수 있어요.')).toBeInTheDocument();
+        expect(chatService.sendImage).not.toHaveBeenCalled();
+        expect(chatService.sendFile).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole('button', { name: '보내기', exact: true }));
+        await waitFor(() => expect(chatService.sendFile).toHaveBeenCalledTimes(1));
+        expect(chatService.sendImage).toHaveBeenCalledWith(1, photo, '첨부 자료예요.', expect.stringMatching(/^attachments_/), expect.any(Object));
+        expect(chatService.sendFile.mock.calls[0].slice(0, 3)).toEqual([1, note, '']);
+        const firstFileId = chatService.sendFile.mock.calls[0][3];
+        await waitFor(() => expect(screen.getByRole('button', { name: '첨부 파일 제거: guide.pdf' })).toBeEnabled());
+        await waitFor(() => expect(screen.queryByRole('button', { name: '첨부 사진 제거: photo.png' })).toBeNull());
+        expect(input).toHaveValue('');
+        fireEvent.click(screen.getByRole('button', { name: '보내기', exact: true }));
+        expect(await screen.findByRole('button', { name: '파일 내려받기: guide.pdf' })).toBeInTheDocument();
+        expect(chatService.sendFile.mock.calls[1].slice(0, 4)).toEqual([1, note, '', firstFileId]);
+        expect(chatService.sendFile.mock.calls[2].slice(0, 3)).toEqual([1, pdf, '']);
+        expect(chatService.sendImage).toHaveBeenCalledTimes(1);
+        expect(group).not.toHaveAttribute('data-expanded');
+        expect(attachmentService.getFile).not.toHaveBeenCalled();
+        attachmentService.getFile.mockResolvedValueOnce(new Blob(['%PDF-1.7'], { type: 'application/octet-stream' }));
+        const download = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+        fireEvent.click(screen.getByRole('button', { name: '파일 내려받기: guide.pdf' }));
+        await waitFor(() => expect(download).toHaveBeenCalledOnce());
+        expect(download.mock.instances[0].download).toBe('guide.pdf');
+        expect(attachmentService.getFile).toHaveBeenCalledWith('/api/chat/files/10', expect.any(AbortSignal));
+    });
+
+    it('omits the reservation bell on home and keeps it in the conversations list', async () => {
+        useMessengerStore.getState().showHome();
+        renderMessenger({ surface: 'page', onClose: vi.fn() });
+        expect(screen.queryByRole('button', { name: '알림 보기' })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '메시지 닫기' })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: '대화', exact: true }));
+        expect(await screen.findByRole('button', { name: '알림 대화 숨기기' })).toBeInTheDocument();
     });
 
     it.each(profileLongChats ? [50, 200, 500] : [50])(

@@ -197,7 +197,7 @@ const TimeSlotPickerContent = ({ store, dateValue, value, onChange, form, onAvai
 const TimeSlotLoading = () => (
     <LoadingStatus aria-label="예약 가능한 시간을 불러오는 중" aria-busy="true">
         <div style={timeSlotStyles.grid} aria-hidden="true">
-            {[1, 2, 3, 4].map(key => <Bone key={key} pageLoading={false} height={38} borderRadius={radius.md} />)}
+            {[1, 2, 3, 4].map(key => <Bone key={key} pageLoading={false} height={44} borderRadius={radius.pill} />)}
         </div>
     </LoadingStatus>
 );
@@ -235,7 +235,6 @@ const TimeSlotPill = ({ time, selected, selectable, onClick, reducedMotion, dela
         className={`rsv-tap-btn rsv-time-pill${selected && selectable ? ' rsv-selected' : ''}`}
         disabled={!selectable} aria-hidden={!selectable || undefined} aria-pressed={selectable && selected} onClick={onClick}
         style={{
-            ...timeSlotStyles.pill,
             animation: reducedMotion ? 'none' : selectable ? animation.scaleSpringIn : `reserve-time-slot-exit ${SLOT_EXIT_MS}ms ease-in both`,
             animationDelay: selectable ? `${delay}ms` : undefined,
         }}>
@@ -277,11 +276,7 @@ const timeSlotStyles = {
     },
     placeholderIcon: { fontSize: field.iconSize, color: field.selectionHintColor },
     groupLabel: { fontSize: fontSize.sm, color: colors.text.tertiary, fontWeight: fontWeight.medium, marginBottom: 8 },
-    grid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 },
-    pill: {
-        padding: '9px 0', borderRadius: radius.md, border: 'none',
-        fontSize: fontSize.sm, fontWeight: fontWeight.medium, cursor: 'pointer',
-    },
+    grid: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8 },
 };
 
 export const ReservationPanel = ({

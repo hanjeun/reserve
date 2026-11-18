@@ -52,6 +52,9 @@ describe('chat photo draft scope', () => {
         act(() => hook.result.current.clear());
         act(() => oldRestore([photo]));
         expect(hook.result.current.files).toEqual([]);
+        hook.rerender({ room: 'A' });
+        act(() => oldRestore([photo]));
+        expect(hook.result.current.files).toEqual([]);
         act(() => useAuthStore.setState({ sessionRevision: 101 }));
         act(() => oldRestore([photo]));
         expect(hook.result.current.files).toEqual([]);

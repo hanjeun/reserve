@@ -13,6 +13,7 @@ import CollapsibleContent from '../common/CollapsibleContent';
 import ConversationRowActions from './ConversationRowActions';
 import { afterMessageRead, chatUnreadCounts } from './chatUnread';
 import useChatImageDraft from '../../hooks/useChatImageDraft';
+import { chatAttachmentKind } from '../../utils/chatAttachments';
 import useChatThread, { newClientMessageId } from '../../hooks/useChatThread';
 import useChatNotifications from '../../hooks/useChatNotifications';
 import useChatRetentionNotice from '../../hooks/useChatRetentionNotice';
@@ -200,7 +201,10 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
         [selection.kind, focusedMessageId],
     );
     const sendFn = useCallback((_roomId, content, clientMessageId, file, config) => {
-        if (file) return chatService.sendImage(_roomId, file, content, clientMessageId, config);
+        if (file) {
+            const sendAttachment = chatAttachmentKind(file) === 'document' ? chatService.sendFile : chatService.sendImage;
+            return sendAttachment(_roomId, file, content, clientMessageId, config);
+        }
         if (selection.kind === 'admin') {
             return chatService.sendAdminSupportRoom(selection.roomId, content, clientMessageId, config);
         }
@@ -490,14 +494,13 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
         setDraft(selectionKey, '', identity);
         imageDraft.clear();
         try {
-            // 사진별 멱등 키와 취소 경계를 유지한다.
-            // 첫 사진에만 설명을 싣고 일부 실패 시 미전송 사진부터 복원한다.
+            // 첫 첨부에만 본문을 싣고, 실패하면 미전송분부터 복원한다.
             const queue = files.length ? files : [null];
-            const photoGroup = files.length > 1 ? newClientMessageId() : null;
+            const attachmentGroup = files.length > 1 ? newClientMessageId() : null;
             for (let index = 0; index < queue.length; index++) {
                 if (batchRef.current !== batch || batch.cancelled || useMessengerStore.getState().sessionIdentity !== identity) return;
                 const caption = index === 0 ? text : '';
-                const ok = await (photoGroup ? send(caption, queue[index], `photos_${photoGroup}_${index}`) : send(caption, queue[index]));
+                const ok = await send(caption, queue[index], attachmentGroup ? `attachments_${attachmentGroup}_${index}` : undefined);
                 if (ok !== true) {
                     if (ok === false) {
                         if (files.length) imageDraft.restore(files.slice(index));
@@ -566,10 +569,10 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
         <MessengerFooter view={footerViewOf(isHome, isSettings)} disabled={openingThread || returningToList}
             onChange={handleFooterChange} />
     );
-    const closeAction = (toggleRow = false) => <>
-        <ReservationNotificationShortcut buttonRef={notificationShortcutRef} active={showingNotifications}
+    const closeAction = ({ toggleRow = false, showNotification = true } = {}) => <>
+        {showNotification && <ReservationNotificationShortcut buttonRef={notificationShortcutRef} active={showingNotifications}
             disabled={returningToList || openingThread} onSelect={toggleRow ? toggleNotificationRow : openReservationNotifications}
-            hidden={toggleRow ? notificationHidden : undefined} controls={toggleRow ? notificationEntryId : undefined} pollUnread={surface === 'page'} />
+            hidden={toggleRow ? notificationHidden : undefined} controls={toggleRow ? notificationEntryId : undefined} pollUnread={surface === 'page'} />}
         <MessengerCloseButton surface={surface} onClose={onClose} />
     </>;
     const headingLevel = surface === 'page' ? 1 : 2;
@@ -600,7 +603,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
             <MessengerHomeView surface={surface} isSettings={isSettings} user={user}
                 notificationControl={notificationControl} coverImageSrc={coverImageSrc}
                 admin={canAdminSupport} onChoose={chooseFromHome}
-                closeAction={closeAction()} navigation={navigation} />
+                closeAction={closeAction({ showNotification: !isHome })} navigation={navigation} />
         );
     }
 
@@ -615,7 +618,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
 
     return (
         <div className={layout.className}>
-            {closeAction(layout.showList && !searchBackAvailable)}
+            {closeAction({ toggleRow: layout.showList && !searchBackAvailable })}
             {layout.showList && (
                 searchBackAvailable ? searchPanel(openingThread || returningToList, layout.showListNavigation && navigation)
                     : <ConversationListPanel headingLevel={headingLevel}
@@ -699,8 +702,11 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
                         composerProps: {
                             onSend: handleSend,
                             files: imageDraft.files,
-                            onFilesChange: imageDraft.choose,
+                            onStageFiles: imageDraft.choose,
                             onRemoveFile: imageDraft.remove,
+                            allowDocuments: imageDraft.documentsEnabled,
+                            attachmentError: imageDraft.selectionError,
+                            draftScope: imageDraft.scopeKey,
                             imageEnabled: imageDraft.enabled,
                             imageLoading: imageDraft.loading,
                             imageError: !loadError && !loading ? imageDraft.error : null,

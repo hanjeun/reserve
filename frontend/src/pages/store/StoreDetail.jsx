@@ -337,6 +337,7 @@ const StoreDetail = ({ onReservationSuccess } = {}) => {
     };
     const reviewProps = {
         storeId: Number(id),
+        ratingSummary: normalizeStoreRating(store.rating, store.reviewCount),
         completedReservation,
         completedReservationError: reviewEligibilityError,
         completedReservationRetrying: reviewEligibilityLoading,

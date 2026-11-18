@@ -19,9 +19,12 @@ import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.context.request.WebRequest;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,10 +61,20 @@ public class ReviewApiController {
     /**
      * 가게의 리뷰 목록 조회
      */
-    @GetMapping("/store/{storeId}")
+    @GetMapping(value = "/store/{storeId}", params = "!limit")
     public ResponseEntity<ApiResponse<List<ReviewResponse>>> getStoreReviews(@PathVariable Long storeId) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .body(ApiResponse.success(reviewService.getStoreReviews(storeId, viewer()), "가게 리뷰 목록 조회 성공"));
+    }
+
+    @GetMapping(value = "/store/{storeId}", params = "limit")
+    public ResponseEntity<ApiResponse<ReviewService.StoreReviewPage>> getStoreReviewPage(@PathVariable Long storeId,
+            @RequestParam int limit, @RequestParam(required = false) Long beforeId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime beforeDate,
+            @RequestParam(required = false) Long focusId) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(ApiResponse.success(reviewService.getStoreReviewPage(storeId, limit, beforeId, beforeDate, focusId, viewer()),
+                        "가게 리뷰 목록 조회 성공"));
     }
 
     /**
@@ -105,9 +118,16 @@ public class ReviewApiController {
     }
 
     @GetMapping("/{id}/photos/{photoId}")
-    public ResponseEntity<byte[]> getPhoto(@PathVariable Long id, @PathVariable Long photoId) {
-        var image = reviewService.getPhoto(id, photoId);
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.parseMediaType(image.contentType()))
+    public ResponseEntity<byte[]> getPhoto(@PathVariable Long id, @PathVariable Long photoId,
+            @RequestParam(defaultValue = "original") String size, WebRequest request) {
+        if (!"original".equals(size) && !"thumbnail".equals(size)) {
+            throw new ReviewException("사진 크기를 확인해주세요.", HttpStatus.BAD_REQUEST);
+        }
+        var result = reviewService.getPhoto(id, photoId, "thumbnail".equals(size), request::checkNotModified);
+        var cache = CacheControl.noCache().cachePrivate();
+        var image = result.image();
+        if (image == null) return ResponseEntity.status(HttpStatus.NOT_MODIFIED).cacheControl(cache).eTag(result.etag()).build();
+        return ResponseEntity.ok().cacheControl(cache).eTag(result.etag()).contentType(MediaType.parseMediaType(image.contentType()))
                 .contentLength(image.bytes().length).body(image.bytes());
     }
 

@@ -1,7 +1,8 @@
 package kr.it.reserve.chat.service;
 
 import kr.it.reserve.chat.dto.ChatMessageResponse;
-import kr.it.reserve.chat.dto.ChatImagePayload;
+import kr.it.reserve.chat.dto.ChatAttachmentPayload;
+import kr.it.reserve.file.util.ChatDocumentValidator;
 import kr.it.reserve.chat.dto.ChatHistoryResponse;
 import kr.it.reserve.chat.dto.ChatRoomResponse;
 import kr.it.reserve.chat.dto.ConversationSummaryResponse;
@@ -110,10 +111,10 @@ public class ChatService {
         return roomRepository.sumMemberUnread(member.getId());
     }
 
-    /** 사진도 동일한 방 잠금·소유권·차단·재시도 관문을 거친다. 권한 확인 전에 S3에 쓰지 않는다. */
+    /** 첨부는 방 잠금과 참여 권한·차단·멱등 검사를 통과한 뒤에만 저장한다. */
     @Transactional
-    public ChatMessageResponse sendImage(Member member, Long roomId, String content, String clientMessageId,
-                                         Supplier<ChatImagePayload> upload) {
+    public ChatMessageResponse sendAttachment(Member member, Long roomId, String content, String clientMessageId,
+                                               Supplier<ChatAttachmentPayload> upload) {
         ChatRoom room = findRoomForUpdate(roomId);
         SenderRole sender;
         if (room.getMember().getId().equals(member.getId())) {
@@ -130,18 +131,19 @@ public class ChatService {
         var existing = messageRepository.findByRoomIdAndSenderMemberIdAndClientMessageId(
                 roomId, member.getId(), clientMessageId);
         if (existing.isPresent()) return messageResponses(List.of(existing.get()), member.getId()).getFirst();
-        ChatImagePayload image = upload.get();
+        ChatAttachmentPayload attachment = upload.get();
         String caption = content == null ? "" : content.trim();
         ChatMessage saved = messageRepository.save(ChatMessage.builder().room(room).senderRole(sender)
                 .senderMemberId(member.getId()).clientMessageId(clientMessageId).content(caption)
-                .imageKey(image.key()).imageContentType(image.contentType())
-                .imageOriginalFilename(ChatImageFilename.sanitize(image.originalFilename(), image.contentType())).imageWidth(image.width())
-                .imageHeight(image.height()).imageBytes(image.bytes()).build());
-        room.onMessageSent(sender, LocalDateTime.now(Clock.systemDefaultZone()), caption.isEmpty() ? "사진" : "사진 · " + caption);
+                .imageKey(attachment.key()).imageContentType(attachment.contentType())
+                .imageOriginalFilename(ChatAttachmentFilename.sanitize(attachment.originalFilename(), attachment.contentType()))
+                .imageWidth(attachment.width()).imageHeight(attachment.height()).imageBytes(attachment.bytes()).build());
+        String label = ChatDocumentValidator.supports(attachment.contentType()) ? "파일" : "사진";
+        room.onMessageSent(sender, LocalDateTime.now(Clock.systemDefaultZone()), caption.isEmpty() ? label : label + " · " + caption);
         return messageResponses(List.of(saved), member.getId()).getFirst();
     }
 
-    /** 관리자는 고객지원 사진만 직접 조회한다. 가게 대화는 실제 참가자만 통과한다. */
+    /** 관리자는 고객지원 첨부만 직접 조회한다. 가게 대화는 참가자 권한을 검사한다. */
     public void assertImageReader(Long roomId, Member member) {
         ChatRoom room = findRoom(roomId);
         if (room.getType() == ChatRoom.RoomType.SUPPORT && member.getRole() == Role.ADMIN) return;
@@ -553,7 +555,7 @@ public class ChatService {
         Map<Long, String> previews = new HashMap<>();
         roomIds.forEach(id -> previews.put(id, "메시지를 나에게만 삭제했어요."));
         for (var message : messageRepository.findLatestVisibleByRoomIds(roomIds, viewerId)) {
-            previews.put(message.getRoom().getId(), ChatRoom.previewContent(ChatMessageResponse.from(message, viewerId).getContent()));
+            previews.put(message.getRoom().getId(), ChatMessageResponse.from(message, viewerId).listPreview());
         }
         return previews;
     }
@@ -573,7 +575,7 @@ public class ChatService {
         Map<Long, String> previews = new HashMap<>();
         for (ChatMessage message : messageRepository.findLatestByRoomIds(roomIds)) {
             if (message.getRoom() != null && roomIds.contains(message.getRoom().getId())) {
-                previews.put(message.getRoom().getId(), ChatRoom.previewContent(ChatMessageResponse.from(message).getContent()));
+                previews.put(message.getRoom().getId(), ChatMessageResponse.from(message).listPreview());
             }
         }
         return previews;

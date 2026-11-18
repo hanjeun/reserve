@@ -7,11 +7,13 @@ import kr.it.reserve.review.controller.ReviewApiController;
 import kr.it.reserve.review.dto.ReviewCreateRequest;
 import kr.it.reserve.review.dto.ReviewUpdateRequest;
 import kr.it.reserve.review.service.ReviewService;
+import kr.it.reserve.review.service.ReviewPhotos;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -19,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.function.Predicate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,6 +31,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup;
 
@@ -48,6 +54,25 @@ class ReviewPhotoControllerTest {
     @AfterEach
     void clear() {
         SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void browserCanRevalidateAPhotoWithoutDownloadingItsBytesAgain() throws Exception {
+        String url = "/api/reviews/19/photos/23?size=thumbnail";
+        String etag = "\"synthetic-version-thumbnail\"";
+        when(service.getPhoto(eq(19L), eq(23L), eq(true), any())).thenAnswer(call -> {
+            Predicate<String> conditional = call.getArgument(3);
+            return new ReviewService.PhotoRead(etag, conditional.test(etag) ? null
+                    : new ReviewPhotos.ImageContent(new byte[]{1, 2}, "image/png"));
+        });
+
+        mvc.perform(get(url)).andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.ETAG, etag))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-cache, private"))
+                .andExpect(content().bytes(new byte[]{1, 2}));
+        mvc.perform(get(url).header(HttpHeaders.IF_NONE_MATCH, etag)).andExpect(status().isNotModified())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-cache, private"))
+                .andExpect(content().bytes(new byte[0]));
     }
 
     @Test

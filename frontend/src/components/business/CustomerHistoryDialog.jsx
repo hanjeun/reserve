@@ -113,7 +113,8 @@ export default function CustomerHistoryDialog({ customer, open, onClose, afterCl
         afterClose?.();
     };
     return <>
-        <FormModal title="고객 내역" open={open} onClose={onClose} afterClose={closed} footer={null} width={780} scrollResetKey={section}>
+        <FormModal title="고객 내역" open={open} onClose={onClose} afterClose={closed}
+            footer={null} mobileSize="content" width={780} scrollResetKey={section}>
             {customer && <DetailInfoRows rows={[
                 { Icon: UserOutlined, label: '고객', value: customer.name },
                 { Icon: ShopOutlined, label: '가게', value: customer.storeName },

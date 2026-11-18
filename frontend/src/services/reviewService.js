@@ -12,7 +12,7 @@ const reviewBody = (data, files, removedPhotoIds) => {
 
 const reviewService = {
     createReview:          (data, files)       => api.post(API_ENDPOINTS.REVIEW.CREATE, reviewBody(data, files)),
-    getReviewsByStore:     (storeId, signal)   => api.get(API_ENDPOINTS.REVIEW.BY_STORE(storeId), { signal }),
+    getReviewsByStore:     (storeId, signal, params) => api.get(API_ENDPOINTS.REVIEW.BY_STORE(storeId), { signal, params }),
     updateReview:          (id, data, files, removedPhotoIds) => api.put(API_ENDPOINTS.REVIEW.UPDATE(id), reviewBody(data, files, removedPhotoIds)),
     replyAsOwner:          (id, content)       => api.put(`/api/reviews/${id}/owner-reply`, { content }),
     deleteReview:          (id)                => api.delete(API_ENDPOINTS.REVIEW.DELETE(id)),

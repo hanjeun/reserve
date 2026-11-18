@@ -135,4 +135,11 @@ public class AdminChatController {
         return ChatImageController.imageResponse(imageService.readForReport(
                 SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE), reportId, messageId));
     }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/reports/{reportId}/files/{messageId}")
+    public ResponseEntity<byte[]> reportDocument(@PathVariable Long reportId, @PathVariable Long messageId) {
+        return ChatImageController.documentResponse(imageService.readDocumentForReport(
+                SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE), reportId, messageId));
+    }
 }

@@ -5,6 +5,7 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { colors, fontSize, radius } from '../../styles/tokens';
 import { SupportAvatar, SupportName } from './SupportIdentity';
 import ChatImage from './ChatImage';
+import ChatFileDownload from './ChatFileDownload';
 import useChatPreferences from '../../hooks/useChatPreferences';
 import ChatMessageActions from './ChatMessageActions';
 import useChatMessageHold from './useChatMessageHold';
@@ -28,8 +29,8 @@ const inSameGroup = (a, b) => {
     return Number.isFinite(gap) && gap < GROUP_GAP_MS;
 };
 
-const attachmentBatch = message => message?.imageUrl
-    && /^photos_([a-f0-9-]{32,36})_[0-2]$/i.exec(message.clientMessageId)?.[1];
+const attachmentBatch = message => !message.retracted && !message.expired && (message.imageUrl || message.fileUrl)
+    && /^(?:photos|attachments)_([a-f0-9-]{32,36})_[0-2]$/i.exec(message.clientMessageId)?.[1];
 
 function packAttachments(messages) {
     const rows = [];
@@ -49,7 +50,8 @@ function packAttachments(messages) {
     return rows;
 }
 
-function PhotoSurface({ message, roomId }) {
+function AttachmentSurface({ message, roomId }) {
+    if (message.fileUrl) return <ChatFileDownload key={message.fileUrl} url={message.fileUrl} filename={message.fileName} bytes={message.fileBytes} />;
     return <div className="reserve-chat-image-message" style={message.pending ? styles.bubblePending : undefined}>
         <ChatImage url={message.imageUrl} thumbnailUrl={message.imageThumbnailUrl} roomId={roomId}
             width={message.imageWidth} height={message.imageHeight} compact />
@@ -59,7 +61,8 @@ function PhotoSurface({ message, roomId }) {
 const MessageRow = memo(function MessageRow({
     message, attachments, isMine, first, last, atStart, searchMessageId, palette, roomId, reportRole, onRetracted, onHidden,
 }) {
-    const { id, senderRole, content, createdAt, localSendId, pending, imageUrl, retracted, expired } = message;
+    const { id, senderRole, content, createdAt, localSendId, pending, imageUrl, fileUrl, retracted, expired } = message;
+    const hasAttachment = !retracted && !expired && Boolean(imageUrl || fileUrl);
     const timestamp = last ? formatTime(attachments.at(-1)?.createdAt || createdAt) : '';
     const supportReply = senderRole === 'ADMIN' && !isMine;
     const corner = first && (isMine ? { borderTopRightRadius: 6 } : { borderTopLeftRadius: 6 });
@@ -73,10 +76,10 @@ const MessageRow = memo(function MessageRow({
             {isMine && <ChatMessageActions message={message} roomId={roomId} onRetracted={onRetracted} onHidden={onHidden}
                 timestamp={pending ? '보내는 중' : timestamp} />}
             <div className={'reserve-chat-bubble-group' + (isMine && localSendId ? ' reserve-chat-bubble-group--sent' : '')
-                + (imageUrl ? ' has-photos' : '') + (isMine ? ' is-mine' : '')}
+                + (hasAttachment ? ' has-photos' : '') + (isMine ? ' is-mine' : '')}
                 style={{ maxWidth: supportReply ? '72%' : '78%' }}>
                 {supportReply && first && <span className="reserve-chat-sender-name"><SupportName /></span>}
-                {(!imageUrl || content) && <div className="reserve-chat-message-bubble" style={{
+                {(!hasAttachment || content) && <div className="reserve-chat-message-bubble" style={{
                     ...styles.bubble,
                     ...(isMine ? { background: palette.background, color: palette.foreground } : styles.bubbleTheirs),
                     ...corner,
@@ -84,12 +87,12 @@ const MessageRow = memo(function MessageRow({
                     ...(retracted || expired ? styles.bubbleUnavailable : null),
                     ...(id === searchMessageId ? styles.bubbleHighlighted : null),
                 }}><span>{content}</span></div>}
-                {imageUrl && <div className="reserve-chat-photo-group" style={id === searchMessageId && !content ? styles.bubbleHighlighted : undefined}>
-                    <PhotoSurface message={message} roomId={roomId} />
+                {hasAttachment && <div className="reserve-chat-photo-group" style={id === searchMessageId && !content ? styles.bubbleHighlighted : undefined}>
+                    <AttachmentSurface message={message} roomId={roomId} />
                     {attachments.map(photo => <div key={photo.id} data-message-id={photo.id}
                         className="reserve-chat-message-row reserve-chat-secondary-photo"
                         style={photo.id === searchMessageId ? styles.bubbleHighlighted : undefined}>
-                        <PhotoSurface message={photo} roomId={roomId} />
+                        <AttachmentSurface message={photo} roomId={roomId} />
                         <ChatMessageActions message={photo} roomId={roomId} onRetracted={isMine ? onRetracted : undefined}
                             onHidden={onHidden} reportRole={isMine ? undefined : reportRole} />
                     </div>)}

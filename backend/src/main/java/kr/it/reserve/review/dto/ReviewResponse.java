@@ -35,7 +35,7 @@ public class ReviewResponse {
     private List<Photo> photos;
     private ReviewInteractionResponse.Summary interactions;
 
-    public record Photo(Long id, String url, int width, int height) { }
+    public record Photo(Long id, String url, int width, int height, String thumbnailUrl) { }
 
     public static ReviewResponse fromEntity(Review review) {
         return fromEntity(review, null, false, ReviewInteractionResponse.Summary.EMPTY);
@@ -71,7 +71,9 @@ public class ReviewResponse {
     }
 
     public static List<Photo> photoList(Review review) {
-        return review.isModerationHidden() ? List.of() : review.getPhotos().stream().map(photo -> new Photo(photo.getId(),
-                "/api/reviews/" + review.getId() + "/photos/" + photo.getId(), photo.getWidth(), photo.getHeight())).toList();
+        return review.isModerationHidden() ? List.of() : review.getPhotos().stream().map(photo -> {
+            String url = "/api/reviews/" + review.getId() + "/photos/" + photo.getId();
+            return new Photo(photo.getId(), url, photo.getWidth(), photo.getHeight(), url + "?size=thumbnail");
+        }).toList();
     }
 }

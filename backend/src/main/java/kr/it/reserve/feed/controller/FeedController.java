@@ -117,8 +117,8 @@ public class FeedController {
         Long member = member(); limitWrite(member, http); return response(feeds.edit(member, id, request), "게시물을 저장했어요.");
     }
     @DeleteMapping("/posts/{id:[0-9]+}")
-    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id, HttpServletRequest http) {
-        Long member = member(); limitWrite(member, http); feeds.delete(member, id); return response(null, "게시물을 삭제했어요.");
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id, @RequestParam(required = false) Long draftRevision, HttpServletRequest http) {
+        Long member = member(); limitWrite(member, http); feeds.delete(member, id, draftRevision); return response(null, "게시물을 삭제했어요.");
     }
     @PostMapping(value = "/media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<FeedDto.Image>> upload(@RequestPart("file") MultipartFile file, HttpServletRequest http) {

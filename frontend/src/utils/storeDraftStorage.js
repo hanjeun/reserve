@@ -1,5 +1,5 @@
 import dayjs from 'dayjs';
-import { LOCAL_DRAFT_TTL_MS, runDraftTransaction } from './localDraftDatabase';
+import { deleteDraftRecord, LOCAL_DRAFT_TTL_MS, runDraftTransaction } from './localDraftDatabase';
 import { isLegacyStoreId } from './storePublicAddress';
 
 const OBJECT_STORE = 'store-forms';
@@ -236,7 +236,10 @@ export const listStoreDrafts = async userId => {
 
 export const deleteStoreDraft = async key => {
     if (!key || typeof indexedDB === 'undefined') return;
-    await runTransaction('readwrite', store => store.delete(key));
+    return deleteDraftRecord(OBJECT_STORE, key);
 };
+
+export const deleteSavedStoreDraft = (userId, key, expectedSavedAt) => userId != null && key.startsWith(storeDraftPrefix(userId))
+    ? deleteDraftRecord(OBJECT_STORE, key, expectedSavedAt) : false;
 
 export const STORE_DRAFT_TTL_DAYS = LOCAL_DRAFT_TTL_MS / (24 * 60 * 60 * 1000);

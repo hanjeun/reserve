@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import Pagination from '../../components/common/Pagination';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { DataState, FilterMenu } from '../../components/common';
 import FeedPostCard from '../../components/feed/FeedPostCard';
 import FeedModalLoading from '../../components/feed/FeedModalLoading';
@@ -25,13 +25,21 @@ import useListQueryNormalization from '../../hooks/useListQueryNormalization';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
 import { httpStatusOf } from '../../utils/listErrorMessage';
 import { isBlockingListReadError, refetchFailedReads } from '../../hooks/liveUpdateQueries';
+import { draftPath } from '../drafts/draftWorkspace';
 
 const FeedReportModal = lazy(() => import('../../components/feed/FeedReportModal'));
 
 export default function Feed() {
+    const [params] = useSearchParams();
+    if (params.get('view') === 'drafts') return <Navigate to={draftPath('posts', feedPage(params.get('page')))} replace />;
+    return <FeedDirectory />;
+}
+
+function FeedDirectory() {
     useDocumentTitle('피드', 'RESERVE 회원이 나누는 글과 사진을 만나보세요.');
     const user = useAuthStore(state => state.user);
     const [params, setParams] = useSearchParams();
+    const navigate = useNavigate();
     useListQueryNormalization(params);
     const view = views.some(item => item.value === params.get('view')) ? params.get('view') : 'all';
     const page = feedPage(params.get('page'));
@@ -46,10 +54,10 @@ export default function Feed() {
     const [reportId, setReportId] = useState(null);
     const [regionOpen, setRegionOpen] = useState(false);
     const { onDelete, onShare, requestReport } = useFeedActions();
-    const ownView = view === 'mine' || view === 'drafts';
+    const ownView = view === 'mine';
     const requiresLogin = ownView || view === 'favorites';
     const listParams = { page: page - 1, size: FEED_PAGE_SIZE,
-        ...(ownView ? { drafts: view === 'drafts' } : { region: region || undefined, favoriteOnly: view === 'favorites',
+        ...(ownView ? { drafts: false } : { region: region || undefined, favoriteOnly: view === 'favorites',
             sort: view === 'popular' ? 'popular' : 'latest' }) };
     const list = useQuery({ queryKey: ownView ? feedKeys.mine(listParams) : feedKeys.list(listParams),
         queryFn: ({ signal }) => ownView ? feedService.myPosts(listParams, signal) : feedService.list(listParams, signal),
@@ -93,7 +101,7 @@ export default function Feed() {
         if (requiresLogin && !user) return <DataState state="empty" title="로그인하면 이용할 수 있어요." action={<Link to="/login" state={{ from: loginFrom }} onClick={rememberLogin}>로그인</Link>} />;
         if (list.isPending && !list.data) return <FeedSkeleton />;
         if (blockingError || list.isError && unavailable) return <DataState state="error" title="게시물을 불러오지 못했어요." error={list.error} onRetry={retryReads} retrying={retrying} />;
-        if (!posts.length) return <DataState state="empty" kind="feed" title={view === 'drafts' ? '임시저장한 글이 없어요.' : !ownView && region ? '이 지역에 게시된 글이 없어요.' : '아직 게시물이 없어요.'}
+        if (!posts.length) return <DataState state="empty" kind="feed" title={!ownView && region ? '이 지역에 게시된 글이 없어요.' : '아직 게시물이 없어요.'}
             description={view === 'favorites' ? '찜한 가게가 연결된 게시물을 모아 보여줘요.' : undefined} />;
         return <div className="reserve-feed-list" aria-busy={list.isFetching}>
             {posts.map(post => <FeedPostCard key={post.id} post={post} listItemId={`post:${post.id}`} onEdit={item => { mountModal('compose'); setComposer({ post: item }); }}
@@ -109,7 +117,7 @@ export default function Feed() {
             <div className="reserve-feed-write-tools">
                 {user ? <><IconTool label="새 글 작성" icon={<InterfaceIcon name="compose" />} onClick={write}
                     unavailableReason={profile.isError && (profile.data === undefined || [401, 403].includes(httpStatusOf(profile.error))) ? '프로필을 다시 불러온 뒤 작성해주세요.' : ''} />
-                    <IconTool label={view === 'drafts' ? '최신 피드로 돌아가기' : '임시저장한 글'} icon={<InterfaceIcon name="folder" />} active={view === 'drafts'} onClick={() => setFilter('view', view === 'drafts' ? 'all' : 'drafts')} />
+                    <IconTool label="피드 임시보관함" icon={<InterfaceIcon name="folder" />} to={draftPath('posts')} />
                     {notificationCount.visible && <IconTool label={`피드 알림${notificationCount.pending ? ' 확인 중' : notificationCount.data?.unread ? `, 안 읽은 알림 ${notificationCount.data.unread}개` : ''}`}
                         disabled={!notificationCount.enabled} to="/feed/notifications"
                         icon={<span className="reserve-feed-notification-icon"><BellOutlined />{notificationCount.data?.unread > 0 && <span className="reserve-feed-notification-badge" aria-hidden="true">{Math.min(99, notificationCount.data.unread)}{notificationCount.data.unread > 99 ? '+' : ''}</span>}</span>} />}</>
@@ -134,7 +142,7 @@ export default function Feed() {
             post={composer?.post} config={config.data}
             onClose={() => setComposer(null)} onSaved={(saved, draft) => {
                 setComposer(null);
-                if (draft) setFilter('view', 'drafts'); else if (view === 'drafts') setFilter('view', 'mine');
+                if (draft) navigate(draftPath('posts'));
             }} />}
         <Suspense fallback={<FeedModalLoading kind="report" open={Boolean(reportId)} onClose={() => setReportId(null)} />}>
             {mountedModals.report && <FeedReportModal postId={reportId} onClose={() => setReportId(null)} />}

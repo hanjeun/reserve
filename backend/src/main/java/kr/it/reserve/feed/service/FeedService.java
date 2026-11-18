@@ -392,12 +392,15 @@ public class FeedService implements ReviewAuthorReader {
     }
 
     @Transactional
-    public void delete(Long memberId, Long id) {
+    public void delete(Long memberId, Long id, Long draftRevision) {
         policy.requireEnabled(); activeWriter(memberId);
         if (posts.newsSourceId(id).isPresent()) throw FeedException.missing();
         FeedPost post = posts.findForUpdate(id).orElseThrow(FeedException::missing); requireOwner(post, memberId);
         if (post.getNewsPromotion() != null) throw FeedException.missing();
         if (post.getState() != FeedPost.State.DELETED) {
+            if (draftRevision != null && (post.getState() != FeedPost.State.DRAFT || draftRevision != post.getRevision())) {
+                throw new FeedException("초안이 변경됐어요. 임시보관함을 다시 확인해주세요.", HttpStatus.CONFLICT);
+            }
             boolean wasPublic = isPublic(post);
             post.delete(now());
             changed(post, wasPublic, EntityUpdates.Operation.DELETED);

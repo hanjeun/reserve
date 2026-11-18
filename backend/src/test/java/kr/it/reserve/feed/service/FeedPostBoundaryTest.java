@@ -179,7 +179,7 @@ class FeedPostBoundaryTest {
         when(members.findActiveByIdForUpdate(7L)).thenReturn(Optional.of(author));
         when(posts.newsSourceId(20L)).thenReturn(Optional.of(12L));
 
-        assertThatThrownBy(() -> feeds.delete(7L, 20L)).isInstanceOfSatisfying(FeedException.class,
+        assertThatThrownBy(() -> feeds.delete(7L, 20L, null)).isInstanceOfSatisfying(FeedException.class,
                 exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
 
         var order = inOrder(members, posts, stores, promotions);
@@ -206,7 +206,7 @@ class FeedPostBoundaryTest {
             else news.getStore().softDelete();
         }
 
-        assertThatThrownBy(() -> feeds.delete(7L, 20L)).isInstanceOfSatisfying(FeedException.class,
+        assertThatThrownBy(() -> feeds.delete(7L, 20L, null)).isInstanceOfSatisfying(FeedException.class,
                 exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
 
         assertThat(news.getState()).isEqualTo(Promotion.State.PUBLISHED);
@@ -224,7 +224,7 @@ class FeedPostBoundaryTest {
         when(members.findActiveByIdForUpdate(7L)).thenReturn(Optional.of(writer));
         when(posts.newsSourceId(20L)).thenReturn(Optional.of(12L));
 
-        assertThatThrownBy(() -> feeds.delete(7L, 20L)).isInstanceOfSatisfying(FeedException.class,
+        assertThatThrownBy(() -> feeds.delete(7L, 20L, null)).isInstanceOfSatisfying(FeedException.class,
                 exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
 
         assertThat(news.getState()).isEqualTo(Promotion.State.PUBLISHED);
@@ -239,11 +239,28 @@ class FeedPostBoundaryTest {
         when(members.findActiveByIdForUpdate(7L)).thenReturn(Optional.of(writer));
         when(posts.findForUpdate(20L)).thenReturn(Optional.of(post));
 
-        feeds.delete(7L, 20L);
+        feeds.delete(7L, 20L, null);
 
         assertThat(post.getState()).isEqualTo(FeedPost.State.DELETED);
         assertThat(post.getContent()).isEqualTo("처음 원문");
         verifyNoInteractions(stores, promotions, media);
+    }
+
+    @Test
+    void deletingDraftRequiresTheCurrentDraftRevision() {
+        Member writer = member(7L); FeedPost post = post(profile(writer));
+        when(members.findActiveByIdForUpdate(7L)).thenReturn(Optional.of(writer));
+        when(posts.findForUpdate(20L)).thenReturn(Optional.of(post));
+
+        assertThatThrownBy(() -> feeds.delete(7L, 20L, post.getRevision())).isInstanceOfSatisfying(FeedException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT));
+        assertThat(post.getState()).isEqualTo(FeedPost.State.PUBLISHED);
+
+        post.edit("작성 중", null, null, null, true, NOW);
+        assertThatThrownBy(() -> feeds.delete(7L, 20L, post.getRevision() + 1)).isInstanceOfSatisfying(FeedException.class,
+                exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT));
+        feeds.delete(7L, 20L, post.getRevision());
+        assertThat(post.getState()).isEqualTo(FeedPost.State.DELETED);
     }
 
     @Test

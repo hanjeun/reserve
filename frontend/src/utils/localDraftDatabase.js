@@ -53,3 +53,20 @@ export async function runDraftTransaction(name, mode, operation) {
         result = operation(transaction.objectStore(name));
     });
 }
+
+export async function deleteDraftRecord(name, key, expectedSavedAt) {
+    let matches = true;
+    await runDraftTransaction(name, 'readwrite', store => {
+        if (expectedSavedAt === undefined) {
+            store.delete(key);
+            return;
+        }
+        const request = store.get(key);
+        request.onsuccess = () => {
+            if (!request.result) return;
+            matches = request.result.savedAt === expectedSavedAt;
+            if (matches) store.delete(key);
+        };
+    });
+    return matches;
+}

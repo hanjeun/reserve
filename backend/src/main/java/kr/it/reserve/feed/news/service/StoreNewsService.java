@@ -105,12 +105,13 @@ public class StoreNewsService {
     public Page<StoreNewsDto.News> mine(Long memberId, Long storeId, String state, int page, int size) {
         policy.requireEnabled(); business(reader(memberId));
         if (storeId != null && storeId <= 0) throw FeedException.invalid("가게를 다시 선택해주세요.");
-        if (!Set.of("ALL", "DRAFT", "PUBLISHED", "ENDED", "HIDDEN", "DELETED").contains(state)) throw FeedException.invalid("소식 상태를 다시 선택해주세요.");
+        if (!Set.of("ALL", "MANAGED", "DRAFT", "PUBLISHED", "ENDED", "HIDDEN", "DELETED").contains(state)) throw FeedException.invalid("소식 상태를 다시 선택해주세요.");
         LocalDateTime now = StoreNewsPolicy.now();
         Specification<Promotion> specification = (root, query, cb) -> {
             var result = cb.and(cb.equal(root.get("member").get("id"), memberId), cb.notEqual(root.get("state"), Promotion.State.DELETED));
             if (storeId != null) result = cb.and(result, cb.equal(root.get("store").get("id"), storeId));
             if ("ENDED".equals(state)) result = cb.and(result, cb.equal(root.get("state"), Promotion.State.PUBLISHED), cb.lessThanOrEqualTo(root.get("endsAt"), now));
+            else if ("MANAGED".equals(state)) result = cb.and(result, cb.notEqual(root.get("state"), Promotion.State.DRAFT));
             else if (!"ALL".equals(state)) {
                 result = cb.and(result, cb.equal(root.get("state"), Promotion.State.valueOf(state)));
                 if ("PUBLISHED".equals(state)) result = cb.and(result, cb.or(cb.isNull(root.get("endsAt")), cb.greaterThan(root.get("endsAt"), now)));
@@ -174,9 +175,15 @@ public class StoreNewsService {
     }
 
     @Transactional
-    public void delete(Long memberId, Long id) {
+    public void delete(Long memberId, Long id, Long draftRevision) {
         policy.requireEnabled(); business(feeds.activeWriter(memberId));
         Promotion news = lockedNews(memberId, id);
+        if (draftRevision != null) {
+            if (news.getState() == Promotion.State.DELETED) return;
+            if (news.getState() != Promotion.State.DRAFT || draftRevision != news.getRevision()) {
+                throw new FeedException("초안이 변경됐어요. 임시보관함을 다시 확인해주세요.", HttpStatus.CONFLICT);
+            }
+        }
         boolean wasPublic = StoreNewsPolicy.publiclyVisible(news);
         if (news.getNewsPost() != null) CurrentLockedState.refresh(entityManager, news.getNewsPost());
         news.deleteNews(StoreNewsPolicy.now());

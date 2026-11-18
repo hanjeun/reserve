@@ -164,11 +164,11 @@
 .reserve-liked-title-link > .reserve-store-card-name,
 .reserve-liked-title-link > .reserve-store-list-row-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit; }
 .reserve-liked-title-tools { position: relative; z-index: 2; display: flex; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; align-items: center; max-width: 100%; margin-inline-start: auto; }
-.reserve-liked-card .reserve-liked-title-tools { min-height: 44px; }
+.reserve-liked-card .reserve-liked-title-tools { justify-content: flex-start; min-height: 44px; margin-inline-start: 0; }
 .reserve-liked-card .reserve-liked-title-link > .reserve-store-card-name { white-space: normal; overflow-wrap: anywhere; }
-/* 가게 링크가 없어도 보기·하트·신고의 열을 맞춘다. */
-.reserve-liked-view-tools,
-.reserve-liked-action-tools { display: grid; grid-template-columns: repeat(2, 44px); align-items: center; }
+/* 목록에서 가게 링크가 없어도 도구 열을 맞춘다. */
+.reserve-liked-list-row :is(.reserve-liked-view-tools, .reserve-liked-action-tools) { display: grid; grid-template-columns: repeat(2, 44px); align-items: center; }
+.reserve-liked-card :is(.reserve-liked-view-tools, .reserve-liked-action-tools) { display: flex; align-items: center; }
 .reserve-liked-title-tools .reserve-feed-interaction { display: inline-flex; flex: none; align-items: center; justify-content: center; min-width: 44px; height: 44px; padding-inline: 4px; }
 .reserve-liked-title-tools .reserve-feed-interaction .anticon { flex: none; }
 .reserve-liked-card p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; margin: 4px 0; color: var(--c-text-secondary); font-size: 13px; }

@@ -190,7 +190,7 @@ class StoreNewsMutationBoundaryTest {
         FeedPost carrier = FeedPost.create(profile, REQUEST_ID, NOW);
         carrier.linkNews(news, "서울", NOW);
 
-        service.delete(7L, 11L);
+        service.delete(7L, 11L, null);
 
         var order = inOrder(stores, entityManager);
         order.verify(stores).findByIdForUpdate(3L);
@@ -202,6 +202,17 @@ class StoreNewsMutationBoundaryTest {
         assertThat(carrier.getDeletedAt()).isEqualTo(news.getDeletedAt());
         verify(promotions, never()).delete(any(Promotion.class));
         verifyNoInteractions(media);
+    }
+
+    @Test
+    void draftDeleteKeepsANewsItemPublishedInAnotherSession() {
+        when(feeds.activeWriter(7L)).thenReturn(owner);
+        when(promotions.findById(11L)).thenReturn(Optional.of(news));
+        when(stores.findByIdForUpdate(3L)).thenReturn(Optional.of(store));
+
+        assertStatus(() -> service.delete(7L, 11L, news.getRevision()), HttpStatus.CONFLICT);
+        assertThat(news.getState()).isEqualTo(Promotion.State.PUBLISHED);
+        assertThat(news.getDeletedAt()).isNull();
     }
 
     private void writable() {

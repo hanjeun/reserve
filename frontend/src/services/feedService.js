@@ -33,7 +33,7 @@ export default {
     },
     create: values => api.post('/api/feed/posts', values),
     update: (id, values) => api.put(`/api/feed/posts/${id}`, values),
-    remove: id => api.delete(`/api/feed/posts/${id}`),
+    remove: (id, draftRevision) => api.delete(`/api/feed/posts/${id}`, { params: { draftRevision } }),
     report: (id, values) => api.post(`/api/feed/posts/${id}/reports`, values),
     reports: (params, signal) => api.get('/api/admin/feed/reports', { params, signal }),
     reportDetail: (id, signal) => api.get(`/api/admin/feed/reports/${id}`, { signal }),

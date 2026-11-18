@@ -24,5 +24,10 @@ export function draftWorkspace(tab, canManageStores, canManageMail) {
     return { groups: visibleGroups, items, activeKey: items.some(item => item.key === tab) ? tab : 'all' };
 }
 
-export const draftPath = (tab, page = 1) => tab === 'all' ? '/drafts'
-    : `/drafts?tab=${tab}${page > 1 ? `&page=${page}` : ''}`;
+export function draftPath(tab, page = 1, view = 'list') {
+    const params = new URLSearchParams();
+    if (tab !== 'all') params.set('tab', tab);
+    if (tab !== 'all' && page > 1) params.set('page', String(page));
+    if (view === 'cards') params.set('view', view);
+    return params.size ? `/drafts?${params}` : '/drafts';
+}

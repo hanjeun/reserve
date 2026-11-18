@@ -1,4 +1,4 @@
-import { LOCAL_DRAFT_TTL_MS, runDraftTransaction } from './localDraftDatabase';
+import { deleteDraftRecord, LOCAL_DRAFT_TTL_MS, runDraftTransaction } from './localDraftDatabase';
 
 const OBJECT_STORE = 'mail-forms';
 const mailPrefix = userId => `member:${userId}:mail:`;
@@ -45,7 +45,7 @@ export async function readMailDraft(userId, id) {
     return draft;
 }
 
-export async function deleteMailDraft(userId, id) {
+export async function deleteMailDraft(userId, id, expectedSavedAt) {
     if (userId == null || !id) return;
-    await run('readwrite', store => store.delete(mailKey(userId, id)));
+    return deleteDraftRecord(OBJECT_STORE, mailKey(userId, id), expectedSavedAt);
 }

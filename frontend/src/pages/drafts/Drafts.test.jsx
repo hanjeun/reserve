@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import Header from '../../components/layout/Header';
@@ -12,10 +12,12 @@ import { listMailDrafts } from '../../utils/mailDraftStorage';
 import Drafts from './Drafts';
 
 const viewport = vi.hoisted(() => ({ width: 1280 }));
+const { confirm, message } = vi.hoisted(() => ({ confirm: vi.fn(), message: { success: vi.fn(), warning: vi.fn() } }));
+vi.mock('../../hooks/useMessage', () => ({ default: () => ({ confirm, message }) }));
 vi.mock('../../hooks/useWindowWidth', () => ({ default: () => viewport.width, useWindowWidth: () => viewport.width }));
 vi.mock('../../hooks/useReducedMotion', () => ({ default: () => true }));
 vi.mock('../../components/layout/HeaderAccountMenu', () => ({ default: () => null }));
-vi.mock('../../services/feedService', () => ({ default: { config: vi.fn(), myPosts: vi.fn() } }));
+vi.mock('../../services/feedService', () => ({ default: { config: vi.fn(), myPosts: vi.fn(), remove: vi.fn() } }));
 vi.mock('../../services/storeNewsService', () => ({ default: { config: vi.fn(), mine: vi.fn() } }));
 vi.mock('../../utils/storeDraftStorage', () => ({ listStoreDrafts: vi.fn(), STORE_DRAFT_TTL_DAYS: 30 }));
 vi.mock('../../utils/mailDraftStorage', () => ({ listMailDrafts: vi.fn() }));
@@ -49,7 +51,7 @@ beforeEach(() => {
     vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
     feedService.config.mockResolvedValue({ enabled: true });
     feedService.myPosts.mockResolvedValue({ totalElements: 4, content: [1, 2, 3, 4].map(id => ({
-        id, content: `피드 초안 ${id}`, state: 'DRAFT', updatedAt: savedAt,
+        id, content: `피드 초안 ${id}`, state: 'DRAFT', updatedAt: savedAt, revision: 3,
     })).concat({ id: 5, content: '공개 게시글', state: 'PUBLISHED' }) });
     storeNewsService.config.mockResolvedValue({ enabled: true });
     storeNewsService.mine.mockResolvedValue({ totalElements: 1, content: [{
@@ -125,4 +127,21 @@ it('passes the saved store selection to the existing edit route', async () => {
     show('BUSINESS', '/drafts?tab=stores');
     fireEvent.click(await screen.findByRole('link', { name: '수정 중인 가게 이어서 작성' }));
     expect(JSON.parse(screen.getByTestId('draft-destination').textContent)).toEqual({ pathname: '/store/12/edit', draft: selection });
+});
+
+it('keeps the same actions in cards and deletes only the confirmed draft version', async () => {
+    const { container } = show('USER', '/drafts?tab=posts');
+    expect(await screen.findByRole('button', { name: '피드 초안 1 이어서 작성' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '카드형 보기로 전환' }));
+    expect(container.querySelector('.rsv-mystore-grid .reserve-card')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '피드 초안 1 이어서 작성' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '피드 초안 1 삭제' }));
+    expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ title: '피드 초안을 삭제할까요?' }));
+    expect(feedService.remove).not.toHaveBeenCalled();
+
+    feedService.remove.mockResolvedValueOnce(null);
+    feedService.myPosts.mockResolvedValueOnce({ totalElements: 0, content: [] });
+    await act(async () => confirm.mock.lastCall[0].onOk());
+    expect(feedService.remove).toHaveBeenCalledExactlyOnceWith(1, 3);
+    expect(await screen.findByText('임시저장한 글이 없어요.')).toBeInTheDocument();
 });

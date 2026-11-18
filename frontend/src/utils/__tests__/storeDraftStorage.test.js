@@ -2,6 +2,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import dayjs from 'dayjs';
 import {
     readStoreDraft,
+    deleteSavedStoreDraft,
     saveStoreDraft,
     fingerprintStoreDraftBase,
     hydrateStoreFormValues,
@@ -118,7 +119,12 @@ it('preserves the store forms and keeps local mail bodies and photos scoped by a
     expect(await listMailDrafts(7)).toEqual([{
         id: 'compose', toEmail: form.toEmail, subject: form.subject, bodyPreview: form.body, savedAt: expect.any(Number),
     }]);
-    await deleteMailDraft(7, 'compose');
+    expect(await deleteMailDraft(7, 'compose', savedAt - 1)).toBe(false);
+    expect(await readMailDraft(7, 'compose')).toMatchObject({ form, photos });
+    expect(await deleteSavedStoreDraft(8, key, savedAt)).toBe(false);
+    expect(await deleteSavedStoreDraft(7, key, savedAt - 1)).toBe(false);
+    expect(await readStoreDraft(key)).not.toBeNull();
+    await deleteMailDraft(7, 'compose', (await readMailDraft(7, 'compose')).savedAt);
     expect(await readMailDraft(7, 'compose')).toBeNull();
     expect(await readMailDraft(8, 'compose')).toMatchObject({ form: { subject: '다른 관리자' } });
     vi.useFakeTimers({ toFake: ['Date'] });

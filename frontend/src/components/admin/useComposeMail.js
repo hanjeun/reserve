@@ -48,10 +48,6 @@ export default function useComposeMail({ message, ownerId, draftKey, onSendError
         }
     }, [ownerId, message, resetErrors]);
 
-    const removeDraft = async id => {
-        await deleteMailDraft(ownerId, id);
-        void queryClient.invalidateQueries({ queryKey: draftKey });
-    };
     const saveDraft = async photos => {
         const epoch = currentSession().epoch;
         await saveMailDraft(ownerId, { id: draft?.id, form: composeForm, photos });
@@ -62,16 +58,18 @@ export default function useComposeMail({ message, ownerId, draftKey, onSendError
 
     const sendMutation = useMutation({
         mutationFn: ({ form, photos }) => sendMailDraft(API_ENDPOINTS.MAIL.COMPOSE, form, photos),
-        onSuccess: async (_, { draftId, epoch }) => {
+        onSuccess: async (_, { draftId, draftSavedAt, epoch }) => {
+            if (!isCurrentSession(epoch)) return;
             let removed = true;
             if (draftId) {
-                try { await removeDraft(draftId); }
+                try { removed = await deleteMailDraft(ownerId, draftId, draftSavedAt) !== false; }
                 catch { removed = false; }
             }
             if (!isCurrentSession(epoch)) return;
             if (removed) message.success('메일을 보냈어요.');
-            else message.warning('메일을 보냈어요. 임시저장본은 목록에서 직접 삭제해주세요.');
+            else message.warning('메일을 보냈어요. 남은 초안은 임시보관함에서 확인해주세요.');
             resetCompose();
+            if (draftId) void queryClient.invalidateQueries({ queryKey: draftKey });
             void queryClient.invalidateQueries({ queryKey: adminKeys.sentMails() });
         },
         onError: onSendError,
@@ -89,11 +87,11 @@ export default function useComposeMail({ message, ownerId, draftKey, onSendError
     const handleComposeSend = photos => {
         if (sendMutation.isPending) return;
         sendMutation.mutate({ form: { ...composeForm, toEmail: composeForm.toEmail.trim() }, photos,
-            draftId: draft?.id, epoch: currentSession().epoch });
+            draftId: draft?.id, draftSavedAt: draft?.savedAt, epoch: currentSession().epoch });
     };
     const changed = Object.keys(EMPTY_FORM).some(field => composeForm[field] !== (draft?.form || EMPTY_FORM)[field]);
 
     return { composing, startCompose, composeForm, setComposeForm, composeSending: sendMutation.isPending,
         resetCompose, validateCompose, handleComposeSend, errors, clearError, changed, initialPhotos: draft?.photos,
-        openDraft, saveDraft, removeDraft };
+        openDraft, saveDraft };
 }

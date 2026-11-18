@@ -3,7 +3,7 @@ import { Typography, Divider, Checkbox } from 'antd';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Pagination from '../common/Pagination';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { SendOutlined, InboxOutlined, ArrowLeftOutlined, DeleteOutlined, MailOutlined, ClockCircleOutlined, FileTextOutlined } from '../common/icons';
+import { SendOutlined, InboxOutlined, ArrowLeftOutlined, DeleteOutlined, FolderOutlined, MailOutlined, ClockCircleOutlined, FileTextOutlined } from '../common/icons';
 import { Button, DataState, FormTextArea, FormInput, FormField, FilterToolbar, SegmentedControl } from '../common';
 import MailDraftModal from '../common/MailDraftModal';
 import MailPhotoStrip from '../common/MailPhotoStrip';
@@ -23,6 +23,7 @@ import { API_ENDPOINTS } from '../../constants';
 import { colors, fontSize, fontWeight, radius } from '../../styles/tokens';
 import { WorkspaceActivityContext } from '../layout/workspaceActivity';
 import useComposeMail from './useComposeMail';
+import { draftPath } from '../../pages/drafts/draftWorkspace';
 
 const { Text, Title, Paragraph } = Typography;
 
@@ -166,10 +167,13 @@ const SearchBar = ({ folder, onFolderChange, value, onSubmit, onReload, loading,
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 10, minHeight: 40 }}>
                 <SegmentedControl options={FOLDERS} value={folder} onChange={onFolderChange} block={false} aria-label="메일함 분류" />
-                {initialLoading ? <Bone width={104} height={40} borderRadius={20} /> : <Button variant="primary" size="sm" onClick={onCompose}
+                {initialLoading ? <Bone width={104} height={40} borderRadius={20} /> : <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <IconTool label="메일 임시보관함" to={draftPath('mail')} icon={<FolderOutlined aria-hidden="true" />} />
+                    <Button variant="primary" size="sm" onClick={onCompose}
                     style={{ height: 40, borderRadius: 20, paddingLeft: 20, paddingRight: 20, flexShrink: 0, gap: 6 }}>
-                    <SendOutlined aria-hidden="true" /> 새 메일
-                </Button>}
+                        <SendOutlined aria-hidden="true" /> 새 메일
+                    </Button>
+                </div>}
             </div>
             <FilterToolbar search={{ value, onSubmit, placeholder: folder === 'received' ? '보낸 사람, 제목 검색' : '받는 사람, 제목 검색' }}
                 onReload={onReload} loading={loading} initialLoading={initialLoading} style={{ marginBottom: 0 }} />
@@ -200,8 +204,7 @@ const MailListSkeleton = ({ framed = true }) => (
     </div>
 );
 
-/* 발송한 메일은 상세에서 휴지통으로 옮기며, 초안 삭제는 로컬 저장소에만 적용한다. */
-const MailItem = ({ mail, received, isSelected, onClick, onDeleteDraft }) => (
+const MailItem = ({ mail, received, isSelected, onClick }) => (
     <div className={`reserve-maillist-item${isSelected ? ' is-selected' : ''}`} style={styles.mailItem}>
         <button type="button" aria-current={isSelected ? 'true' : undefined} onClick={event => onClick(mail, event.currentTarget)}
             className="reserve-maillist-main" style={styles.mailItemMain}>
@@ -209,9 +212,8 @@ const MailItem = ({ mail, received, isSelected, onClick, onDeleteDraft }) => (
                 <Text style={{ fontSize: fontSize.sm, fontWeight: fontWeight.medium, color: colors.text.primary, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {received ? mail.memberEmail || mail.memberName : mail.toEmail}
                 </Text>
-                {onDeleteDraft && <Text style={styles.mailMeta}>임시 저장됨</Text>}
                 <Text style={styles.mailMeta}>
-                    {formatDate(onDeleteDraft ? new Date(mail.savedAt).toISOString() : (received ? mail.createdAt : mail.sentAt))}
+                    {formatDate(received ? mail.createdAt : mail.sentAt)}
                 </Text>
             </div>
             <Text style={{ display: 'block', fontSize: fontSize.sm, marginTop: 2, fontWeight: fontWeight.medium, color: colors.text.secondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -221,10 +223,6 @@ const MailItem = ({ mail, received, isSelected, onClick, onDeleteDraft }) => (
                 {received ? `${mail.statusDisplayName || ''} · ${mail.content || ''}` : mail.bodyPreview || ''}
             </Text>
         </button>
-        {onDeleteDraft && <div style={styles.draftAction}>
-            <IconTool label={`${mail.subject || '제목 없는 메일'} 초안 삭제`} icon={<DeleteOutlined aria-hidden="true" />}
-                onClick={() => onDeleteDraft(mail.id)} />
-        </div>}
     </div>
 );
 
@@ -310,7 +308,7 @@ const MailPagination = ({ page, total, onChange, simple = false }) => {
 };
 
 const MailboxTab = () => {
-    const { message, confirm } = useMessage();
+    const { message } = useMessage();
     const active = useContext(WorkspaceActivityContext);
     const location = useLocation();
     const navigate = useNavigate();
@@ -326,8 +324,7 @@ const MailboxTab = () => {
     const backButton = useRef(null);
 
     const mail = useMailData(received, page, search);
-    const includeDrafts = !received && page === 1;
-    const { ownerId, queryKey: draftKey, query: draftQuery } = useMailDrafts(active && includeDrafts);
+    const { ownerId, queryKey: draftKey } = useMailDrafts(false);
     const send = useComposeMail({ message, ownerId, draftKey,
         onSendError: error => message.error(mailErrorStatus(error) === 429 ? MAIL_LIMIT_MESSAGE : '메일 발송에 실패했어요.') });
     const resumeId = location.state?.mailDraftResume;
@@ -368,28 +365,13 @@ const MailboxTab = () => {
     const handlePageChange = p => { setQuery({ page: String(p) }); setSelection(null); };
     const showSavedDraft = () => {
         send.resetCompose();
-        setQuery({ mailFolder: 'sent', page: '1', search: '' });
-        setSelection(null);
-    };
-    const deleteDraft = id => confirm({ title: '임시저장한 메일을 삭제할까요?',
-        content: '이 브라우저에 저장된 메일 초안과 첨부 사진이 삭제돼요.', okText: '삭제', cancelText: '취소',
-        onOk: async () => {
-            try { await send.removeDraft(id); message.success('메일 초안을 삭제했어요.'); }
-            catch { message.error('메일 초안을 삭제하지 못했어요. 다시 시도해주세요.'); }
-        } });
-    const reload = () => {
-        void mail.refetch();
-        if (includeDrafts && ownerId != null) void draftQuery.refetch();
+        navigate(draftPath('mail'));
     };
 
     const term = search.trim().toLowerCase();
-    const drafts = includeDrafts ? (draftQuery.data ?? EMPTY_MAILS).filter(item =>
-        !term || item.subject.toLowerCase().includes(term) || item.toEmail.toLowerCase().includes(term)) : EMPTY_MAILS;
-    const isEmpty = mail.totalElements === 0 && !term && !drafts.length;
-    const mailPageLoading = mail.loading || mail.isPlaceholderData;
-    const showLoading = !drafts.length && (mailPageLoading
-        || includeDrafts && ownerId != null && draftQuery.isPending);
-    const showError = !showLoading && !drafts.length && isBlockingListReadError(mail.error, mail.mails);
+    const isEmpty = mail.totalElements === 0 && !term;
+    const showLoading = mail.loading || mail.isPlaceholderData;
+    const showError = !showLoading && isBlockingListReadError(mail.error, mail.mails);
     const showEmpty = !showLoading && !showError && isEmpty;
     const showInitialSkeleton = showLoading && !mail.totalElements;
     const showPanels = !showInitialSkeleton && !showError && !showEmpty;
@@ -399,13 +381,9 @@ const MailboxTab = () => {
     useLayoutEffect(() => {
         if (showMobDetail) backButton.current?.querySelector('button')?.focus({ preventScroll: true });
     }, [showMobDetail]);
-    const listItems = !drafts.length && !mail.mails.length ? <DataState state="empty" kind="mail" title="검색 결과가 없어요." />
-        : <>
-            {drafts.map(item => <MailItem key={`draft:${item.id}`} mail={item} onDeleteDraft={deleteDraft}
-                onClick={() => void send.openDraft(item.id)} />)}
-            {mailPageLoading ? <MailListSkeleton framed={false} /> : mail.mails.map(item => <MailItem key={item.id} mail={item} received={received}
-                isSelected={item.id === selectedMail?.id} onClick={selectMail} />)}
-        </>;
+    const listItems = !mail.mails.length ? <DataState state="empty" kind="mail" title="검색 결과가 없어요." />
+        : mail.mails.map(item => <MailItem key={item.id} mail={item} received={received}
+            isSelected={item.id === selectedMail?.id} onClick={selectMail} />);
     const detail = selectedMail && (
         <AnimatedContent motionKey={`${folder}:${selectedMail.id}`} animateOnMount>
             <MailDetailContent mail={selectedMail} received={received}
@@ -413,21 +391,18 @@ const MailboxTab = () => {
         </AnimatedContent>
     );
     const listBody = style => <AnimatedContent style={style} motionKey={`${folder}:${page}:${search}`}
-        ready={!showLoading && !mailPageLoading} keepResultsHeight={isMobile && mail.totalElements > PAGE_SIZE}
-        aria-busy={showLoading || mailPageLoading}>
+        ready={!showLoading} keepResultsHeight={isMobile && mail.totalElements > PAGE_SIZE} aria-busy={showLoading}>
         {showLoading ? <MailListSkeleton framed={false} /> : listItems}
     </AnimatedContent>;
 
     return (
         <div ref={mailbox}>
             <SearchBar folder={folder} onFolderChange={handleFolderChange} value={search} onSubmit={handleSearchChange}
-                onReload={reload} loading={mail.loading || mail.isFetching || includeDrafts && draftQuery.isFetching}
+                onReload={mail.refetch} loading={mail.loading || mail.isFetching}
                 initialLoading={showInitialSkeleton} onCompose={send.startCompose} />
 
             {mail.error && !showError && <DataState compact state="error" subject={`${subject} 갱신`}
                 error={mail.error} onRetry={mail.refetch} retrying={mail.isFetching} />}
-            {includeDrafts && draftQuery.error && <DataState compact state="error" subject="메일 초안"
-                error={draftQuery.error} onRetry={draftQuery.refetch} retrying={draftQuery.isFetching} />}
             {showInitialSkeleton && <MailListSkeleton />}
 
             {showError && (
@@ -540,7 +515,6 @@ const MailboxTab = () => {
 const styles = {
     scrollableList: { flex: 1, overflowY: 'auto' },
     mailMeta: { fontSize: fontSize.xs, fontWeight: fontWeight.regular, color: colors.text.tertiary, flexShrink: 0 },
-    draftAction: { alignSelf: 'center', marginRight: 4 },
     singlePanel:  { border: `1px solid ${colors.border.default}`, borderRadius: radius.lg, overflow: 'hidden', background: colors.background.paper },
     emptyPanel:   { border: `1px solid ${colors.border.default}`, borderRadius: radius.lg, background: colors.background.paper },
     splitPane:    { display: 'flex', height: 'clamp(400px, calc(100svh - 280px), 680px)', border: `1px solid ${colors.border.default}`, borderRadius: radius.lg, overflow: 'hidden', background: colors.background.paper },

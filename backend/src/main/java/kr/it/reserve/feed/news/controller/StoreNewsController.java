@@ -62,8 +62,8 @@ public class StoreNewsController {
         Long member = member(); limit(member, http); return response(news.edit(member, id, request), "가게 소식을 저장했어요.");
     }
     @DeleteMapping("/{id:[0-9]+}")
-    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id, HttpServletRequest http) {
-        Long member = member(); limit(member, http); news.delete(member, id); return response(null, "가게 소식을 삭제했어요.");
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id, @RequestParam(required = false) Long draftRevision, HttpServletRequest http) {
+        Long member = member(); limit(member, http); news.delete(member, id, draftRevision); return response(null, "가게 소식을 삭제했어요.");
     }
     private Long member() { return SecurityUtil.getCurrentMember("로그인이 필요해요.").getId(); }
     @PostMapping(value = "/media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

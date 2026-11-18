@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConfigProvider } from 'antd';
-import { MemoryRouter } from 'react-router-dom';
+import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import api from '../../api/axios';
 import useAuthStore from '../../store/useAuthStore';
@@ -79,14 +79,14 @@ it('opens, replies to and trashes a received inquiry independently of sent mail'
     expect(screen.queryByText('합성 문의 내용')).not.toBeInTheDocument();
 });
 
-it('saves a new mail with photos locally, reopens it from Sent, and clears it on confirmed send', async () => {
+it('saves to the draft hub, reopens the associated editor, and clears the draft on confirmed send', async () => {
     useAuthStore.setState({ user: { id: 7, role: 'ADMIN' }, isLoggedIn: true });
     const photo = new File(['draft-image'], 'draft.png', { type: 'image/png' });
+    const savedAt = Date.parse('2026-11-18T11:00:00+09:00');
     let draft;
-    saveMailDraft.mockImplementation(async (_owner, record) => { draft = { ...record, id: 'fixture-draft' }; });
+    saveMailDraft.mockImplementation(async (_owner, record) => { draft = { ...record, id: 'fixture-draft', savedAt }; });
     readMailDraft.mockImplementation(async () => draft);
     deleteMailDraft.mockImplementation(async () => { draft = null; });
-    listMailDrafts.mockImplementation(async () => draft ? [{ id: draft.id, ...draft.form, bodyPreview: draft.form.body, savedAt: Date.now() }] : []);
     api.get.mockResolvedValue({ content: [], page: { totalElements: 0 } });
     let sendAttempts = 0;
     api.post.mockImplementation(async url => {
@@ -98,7 +98,10 @@ it('saves a new mail with photos locally, reopens it from Sent, and clears it on
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const user = userEvent.setup();
     render(<MemoryRouter initialEntries={['/admin?tab=mailbox']}>
-        <QueryClientProvider client={client}><ConfigProvider theme={{ token: { motion: false } }}><MailboxTab /></ConfigProvider></QueryClientProvider>
+        <QueryClientProvider client={client}><ConfigProvider theme={{ token: { motion: false } }}><Routes>
+            <Route path="/admin" element={<MailboxTab />} />
+            <Route path="/drafts" element={<Link to="/admin?tab=mailbox&mailFolder=sent" state={{ mailDraftResume: 'fixture-draft' }}>초안 이어서 작성</Link>} />
+        </Routes></ConfigProvider></QueryClientProvider>
     </MemoryRouter>);
 
     await user.click(await screen.findByRole('button', { name: '새 메일' }));
@@ -110,13 +113,14 @@ it('saves a new mail with photos locally, reopens it from Sent, and clears it on
     expect(modal().getByRole('textbox', { name: '받는 사람' })).toBeEnabled();
     await user.upload(screen.getByRole('dialog').querySelector('input[type=file]'), photo);
     await user.click(modal().getByRole('button', { name: '임시저장' }));
-    expect(await screen.findByText('임시 저장됨')).toBeInTheDocument();
+    const resume = await screen.findByRole('link', { name: '초안 이어서 작성' });
     expect(saveMailDraft).toHaveBeenCalledExactlyOnceWith(7, {
         id: undefined, form: { toEmail: 'guest@example.test', subject: '합성 발송 초안', body: '작성한 본문', marketing: true }, photos: [photo],
     });
     expect(api.post).not.toHaveBeenCalled();
 
-    await user.click(await screen.findByRole('button', { name: /임시 저장됨.*합성 발송 초안/ }));
+    expect(listMailDrafts).not.toHaveBeenCalled();
+    await user.click(resume);
     await waitFor(() => expect(modal().getByRole('textbox', { name: '받는 사람' })).toHaveValue('guest@example.test'));
     expect(modal().getByRole('checkbox', { name: /광고·홍보/ })).toBeChecked();
     expect(modal().getByRole('textbox', { name: '내용' })).toHaveValue('작성한 본문');
@@ -128,8 +132,8 @@ it('saves a new mail with photos locally, reopens it from Sent, and clears it on
     await waitFor(() => expect(message.error).toHaveBeenCalledWith('메일 발송에 실패했어요.'));
     expect(deleteMailDraft).not.toHaveBeenCalled();
     await user.click(modal().getByRole('button', { name: '보내기' }));
-    await waitFor(() => expect(deleteMailDraft).toHaveBeenCalledExactlyOnceWith(7, 'fixture-draft'));
-    await waitFor(() => expect(screen.queryByText('임시 저장됨')).not.toBeInTheDocument());
+    await waitFor(() => expect(deleteMailDraft).toHaveBeenCalledExactlyOnceWith(7, 'fixture-draft', savedAt));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 });
 
 it('keeps the received mail pagination and focus across a delayed page request', async () => {

@@ -1,10 +1,11 @@
 import { useContext, useEffect, useRef, useState } from 'react';
 import Pagination from '../common/Pagination';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button, DataState, FilterMenu, FormModal, RefreshButton } from '../common';
 import IconTool from '../common/IconTool';
 import { DeleteOutlined, EditOutlined, EyeOutlined } from '../common/icons';
+import InterfaceIcon from '../common/InterfaceIcon';
 import StoreListViewToggle from '../store/StoreListViewToggle';
 import ListingCount from '../common/ListingCount';
 import useStoreNewsEvents from '../../hooks/useStoreNewsEvents';
@@ -28,6 +29,7 @@ import { isBlockingListReadError, isReadAccessDenied, refetchFailedReads } from 
 import { assertCurrentSession, isCurrentSession } from '../../api/sessionScope';
 import { handleApiError, isResponseUnconfirmed } from '../../utils/errorHandler';
 import { colors } from '../../styles/tokens';
+import { draftPath } from '../../pages/drafts/draftWorkspace';
 
 const PAGE_SIZE = 12;
 const QUERY_DEFAULTS = { newsStore: 'ALL', newsState: 'ALL', newsPage: '1', view: 'list' };
@@ -37,6 +39,7 @@ export default function StoreNewsTab() {
     const revision = useAuthStore(state => state.sessionRevision);
     const business = canManageStoreNews(user);
     const active = useContext(WorkspaceActivityContext);
+    const navigate = useNavigate();
     const mobile = useWindowWidth() < 576;
     const listRef = useRef(null);
     const client = useQueryClient();
@@ -44,6 +47,7 @@ export default function StoreNewsTab() {
     const [params, setParams] = useQueryParamsState(QUERY_DEFAULTS);
     const page = feedPage(params.newsPage);
     const view = params.view === 'cards' ? 'cards' : 'list';
+    const legacyDraftView = params.newsState === 'DRAFT';
     const selectedState = STORE_NEWS_STATES.some(item => item.value === params.newsState) ? params.newsState : 'ALL';
     const requestedStore = Number(params.newsStore);
     const storeId = Number.isSafeInteger(requestedStore) && requestedStore > 0 ? requestedStore : undefined;
@@ -52,8 +56,9 @@ export default function StoreNewsTab() {
     useStoreNewsEvents(active && enabled && config.data?.benefitEventsEnabled === true, true);
     const stores = useQuery({ queryKey: storeNewsKeys.stores(), queryFn: ({ signal }) => storeNewsService.stores(signal), enabled: active && enabled });
     const owned = Array.isArray(stores.data) ? stores.data : stores.data?.content || [];
-    const queryParams = { page: page - 1, size: PAGE_SIZE, state: selectedState, storeId };
-    const list = useQuery({ queryKey: storeNewsKeys.mine(queryParams), queryFn: ({ signal }) => storeNewsService.mine(queryParams, signal), enabled: active && enabled, placeholderData: keepPreviousData });
+    const queryParams = { page: page - 1, size: PAGE_SIZE, state: selectedState === 'ALL' ? 'MANAGED' : selectedState, storeId };
+    const list = useQuery({ queryKey: storeNewsKeys.mine(queryParams), queryFn: ({ signal }) => storeNewsService.mine(queryParams, signal),
+        enabled: active && enabled && !legacyDraftView, placeholderData: keepPreviousData });
     const total = feedTotal(list.data), lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
     useListRefreshAnchor(listRef, `${storeId}:${selectedState}:${page}`, list.isFetching, list.data);
     const visibleNews = (list.data?.content || []).filter(item => item.state !== 'DELETED');
@@ -70,8 +75,10 @@ export default function StoreNewsTab() {
     const previewNews = previewQuery.data?.id === preview.news?.id ? previewQuery.data : preview.news;
     const change = patch => setParams({ newsPage: '1', ...patch });
     useEffect(() => {
+        if (!active) return;
+        if (legacyDraftView && business) { navigate(draftPath('news', page, view), { replace: true }); return; }
         if (params.newsState !== selectedState) setParams({ newsState: selectedState, newsPage: '1' });
-    }, [params.newsState, selectedState, setParams]);
+    }, [active, business, legacyDraftView, navigate, page, view, params.newsState, selectedState, setParams]);
     useEffect(() => {
         if (!list.isSuccess || list.isFetching || list.isPlaceholderData || page <= lastPage) return;
         setParams({ newsPage: String(lastPage) });
@@ -130,7 +137,7 @@ export default function StoreNewsTab() {
         ]).filter(Boolean);
     };
     if (!business) return <DataState state="empty" title="가게 소식 관리는 사업자·관리자 계정에서 이용할 수 있어요." />;
-    if (config.isPending) return <StoreNewsSkeleton view={view} />;
+    if (legacyDraftView || config.isPending) return <StoreNewsSkeleton view={view} />;
     if (config.isError && (!config.data || isReadAccessDenied(config.error))) return <DataState state="error" title="가게 소식 상태를 불러오지 못했어요." error={config.error} onRetry={retryReads} retrying={retrying} />;
     if (!enabled) return <>
         {config.isError && <DataState state="error" compact title="가게 소식 상태를 갱신하지 못했어요." error={config.error} onRetry={retryReads} retrying={retrying} />}
@@ -142,7 +149,9 @@ export default function StoreNewsTab() {
     return <section ref={listRef} className="reserve-store-news-management" aria-label="내 가게 소식 관리">
         <div className="reserve-explore-filters reserve-store-news-manage-toolbar">
             <StoreListViewToggle view={view} onChange={value => setParams({ view: value })} disabled={list.isPending} />
-            <StoreNewsWriteAction unavailableReason={writeUnavailable} onWrite={() => setEditor({ open: true, mounted: true })} /><ListingCount>{blockingError ? '소식 확인 필요' : `${total.toLocaleString('ko-KR')}개 소식`}</ListingCount>
+            <StoreNewsWriteAction unavailableReason={writeUnavailable} onWrite={() => setEditor({ open: true, mounted: true })} />
+            <IconTool label="가게 소식 임시보관함" icon={<InterfaceIcon name="folder" />} to={draftPath('news', 1, view)} />
+            <ListingCount>{blockingError ? '소식 확인 필요' : `${total.toLocaleString('ko-KR')}개 소식`}</ListingCount>
             <div className="reserve-explore-filter-controls"><FilterMenu appearance="plain" value={storeId || 'ALL'} aria-label="내 소식 가게 필터" options={[{ value: 'ALL', label: '전체 가게' }, ...owned.map(store => ({ value: store.id, label: store.name }))]}
                 loading={stores.isPending} disabled={stores.isPending || stores.isError && !stores.data} onChange={value => change({ newsStore: value })} />
                 <FilterMenu appearance="plain" value={selectedState} options={STORE_NEWS_STATES} aria-label="내 소식 상태 필터" onChange={value => change({ newsState: value })} />
@@ -166,7 +175,10 @@ export default function StoreNewsTab() {
         {list.data && total > PAGE_SIZE && <nav className="reserve-feed-pagination" aria-label="내 가게 소식 페이지"><Pagination current={page} total={total} pageSize={PAGE_SIZE} showSizeChanger={false}
             onChange={value => change({ newsPage: String(value) })} /></nav>}
         {editor.mounted && <StoreNewsEditor open={editor.open} newsId={editor.id} initialStoreId={storeId}
-            onClose={() => setEditor(current => ({ ...current, open: false }))} onSaved={() => setEditor(current => ({ ...current, open: false }))} />}
+            onClose={() => setEditor(current => ({ ...current, open: false }))} onSaved={saved => {
+                setEditor(current => ({ ...current, open: false }));
+                if (saved?.state === 'DRAFT') navigate(draftPath('news', 1, view));
+            }} />}
         <FormModal open={preview.open} title="가게 소식 미리보기" onClose={() => setPreview(current => ({ ...current, open: false }))}
             footer={null} width={740} mobileSize="content" rootClassName="reserve-store-news-modal">
             {previewQuery.isError && <DataState state="error" compact title="소식 상태를 확인하지 못했어요." error={previewQuery.error} onRetry={previewQuery.refetch} retrying={previewQuery.isFetching} />}

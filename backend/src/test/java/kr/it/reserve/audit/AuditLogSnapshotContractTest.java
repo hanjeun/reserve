@@ -12,6 +12,7 @@ import kr.it.reserve.audit.service.AuditCleanupWorker;
 import kr.it.reserve.audit.service.AuditLogService;
 import kr.it.reserve.audit.service.AdminSanctionService;
 import kr.it.reserve.global.error.AuditException;
+import kr.it.reserve.global.trash.ReceivedInquiryTrash;
 import kr.it.reserve.mailbox.entity.AdminSentMail;
 import kr.it.reserve.mailbox.repository.AdminSentMailRepository;
 import kr.it.reserve.member.entity.Member;
@@ -74,6 +75,7 @@ class AuditLogSnapshotContractTest {
     @Mock private MemberRepository memberRepository;
     @Mock private StoreRepository storeRepository;
     @Mock private PaymentService paymentService;
+    @Mock private ReceivedInquiryTrash inquiryTrash;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private AuditLogService service;
@@ -81,7 +83,7 @@ class AuditLogSnapshotContractTest {
     @BeforeEach
     void setUp() {
         service = new AuditLogService(auditLogRepository, adminSentMailRepository, reservationRepository,
-                reviewRepository, advertisementRepository, objectMapper, auditCleanupWorker, paymentService);
+                reviewRepository, advertisementRepository, objectMapper, auditCleanupWorker, paymentService, inquiryTrash);
         Member actor = Member.builder().id(90L).email(ACTOR_EMAIL).build();
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(actor, null, List.of()));

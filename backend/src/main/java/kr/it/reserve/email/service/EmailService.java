@@ -1,6 +1,10 @@
 package kr.it.reserve.email.service;
 
 import kr.it.reserve.global.error.EmailException;
+import kr.it.reserve.file.service.SupportMailPhotos;
+import kr.it.reserve.file.util.ImageFileValidator.ValidatedImage;
+import java.util.List;
+import org.springframework.core.io.ByteArrayResource;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import java.io.UnsupportedEncodingException;
@@ -26,7 +30,7 @@ public class EmailService {
     private static final String HTML_HEAD_OPEN = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">";
 
     // Gmail은 @import CSS를 차단하므로 웹폰트 대신 시스템 폰트 스택 사용
-    private static final String FONT_FAMILY = "-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif";
+    private static final String FONT_FAMILY = "Pretendard, 'Pretendard Variable', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif";
     private static final String FONT_IMPORT = ""; // Gmail은 @import 차단, 사용 안 함
 
     private final JavaMailSender mailSender;
@@ -347,6 +351,12 @@ public class EmailService {
     /** 신규 문의 알림 → 운영자(개인 이메일) */
     @Async("mailExecutor")
     public void sendNewInquiryAlert(String memberName, String memberEmail, String categoryDisplayName, String title, String content) {
+        sendNewInquiryAlert(memberName, memberEmail, categoryDisplayName, title, content, List.of());
+    }
+
+    @Async("mailExecutor")
+    public void sendNewInquiryAlert(String memberName, String memberEmail, String categoryDisplayName, String title,
+            String content, List<ValidatedImage> photos) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, MAIL_CHARSET);
@@ -357,6 +367,11 @@ public class EmailService {
             }
             helper.setSubject("[RESERVE 문의] " + sanitizeSubject(title));
             helper.setText(buildInquiryAlertContent(memberName, memberEmail, categoryDisplayName, title, content), true);
+            for (int i = 0; i < photos.size(); i++) {
+                var photo = photos.get(i);
+                helper.addAttachment(SupportMailPhotos.filename(photo, i + 1),
+                        new ByteArrayResource(photo.bytes()), photo.contentType());
+            }
             mailSender.send(message);
             log.info("New inquiry alert email sent to admin");
         } catch (MessagingException | UnsupportedEncodingException | MailException e) {
@@ -364,7 +379,7 @@ public class EmailService {
         }
     }
 
-    private String buildInquiryAlertContent(String memberName, String memberEmail, String category, String title, String content) {
+    public String buildInquiryAlertContent(String memberName, String memberEmail, String category, String title, String content) {
         String safeMemberName = escapeHtml(memberName);
         String safeMemberEmail = escapeHtml(memberEmail);
         String safeCategory = escapeHtml(category);
@@ -383,7 +398,7 @@ public class EmailService {
             + "    <p style=\"font-size:14px;color:#8b95a1;margin:0 0 4px;\">" + safeMemberName + " · " + safeCategory + "</p>"
             + emailRow
             + "    <div style=\"background:#f2f4f6;border-radius:16px;padding:24px;margin-bottom:20px;\">"
-            + "      <p style=\"font-size:15px;color:#191f28;line-height:1.8;white-space:pre-wrap;margin:0;\">" + safeContent + "</p>"
+            + "      <p style=\"font-family:" + FONT_FAMILY + ";font-size:15px;font-weight:500;color:#191f28;line-height:1.8;white-space:pre-wrap;margin:0;\">" + safeContent + "</p>"
             + "    </div>"
             + "    <div style=\"font-size:13px;color:#b0b8c1;border-top:1px solid #f2f4f6;padding-top:20px;\">관리자 패널에서 답변을 등록해주세요. © 2026 RESERVE.</div>"
             + "  </div>"

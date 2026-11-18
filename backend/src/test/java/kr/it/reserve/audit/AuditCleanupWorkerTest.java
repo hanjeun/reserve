@@ -4,6 +4,7 @@ import kr.it.reserve.advertisement.repository.AdvertisementRepository;
 import kr.it.reserve.audit.entity.AuditLog;
 import kr.it.reserve.audit.repository.AuditLogRepository;
 import kr.it.reserve.audit.service.AuditCleanupWorker;
+import kr.it.reserve.global.trash.ReceivedInquiryTrash;
 import kr.it.reserve.mailbox.repository.AdminSentMailRepository;
 import kr.it.reserve.payment.repository.PaymentRepository;
 import kr.it.reserve.reservation.repository.ReservationRepository;
@@ -35,8 +36,21 @@ class AuditCleanupWorkerTest {
     @Mock private ReviewRepository reviewRepository;
     @Mock private AdvertisementRepository advertisementRepository;
     @Mock private PaymentRepository paymentRepository;
+    @Mock private ReceivedInquiryTrash inquiryTrash;
 
     @InjectMocks private AuditCleanupWorker worker;
+
+    @Test
+    void expiredReceivedInquiryUsesTheTrashResource() {
+        var now = LocalDateTime.of(2026, 11, 12, 12, 0);
+        var record = AuditLog.builder().entityType(ReceivedInquiryTrash.TYPE).entityId(9L)
+                .action("SOFT_DELETE").expiresAt(now.minusMinutes(1)).build();
+        when(auditLogRepository.findByIdForUpdate(3L)).thenReturn(Optional.of(record));
+
+        assertThat(worker.deleteOneItem(3L, now)).isTrue();
+        verify(inquiryTrash).purge(9L);
+        verify(auditLogRepository).deleteSoftDeleteLog(ReceivedInquiryTrash.TYPE, 9L);
+    }
 
     @Test
     @DisplayName("결제와 연결된 예약은 30일이 지나도 물리 삭제하지 않고 보존 홀드로 전환한다")

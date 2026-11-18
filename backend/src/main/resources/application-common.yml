@@ -94,6 +94,11 @@ mail:
   from: ${MAIL_FROM:reserve@reserve.it.kr}
   from-name: ${MAIL_FROM_NAME:RESERVE}
   admin-notify: ${MAIL_ADMIN_NOTIFY:hanjeun111@gmail.com}
+  resend-inbound:
+    enabled: ${RESEND_INBOUND_ENABLED:false}
+    recipient: ${RESEND_INBOUND_ADDRESS:}
+    signing-secret: ${RESEND_INBOUND_WEBHOOK_SECRET:}
+    api-key: ${RESEND_INBOUND_API_KEY:}
   properties:
     mail:
       smtp:

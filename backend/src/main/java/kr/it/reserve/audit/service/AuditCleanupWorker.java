@@ -4,6 +4,7 @@ import kr.it.reserve.advertisement.repository.AdvertisementRepository;
 import kr.it.reserve.audit.entity.AuditLog;
 import kr.it.reserve.audit.repository.AuditLogRepository;
 import kr.it.reserve.global.error.AuditException;
+import kr.it.reserve.global.trash.ReceivedInquiryTrash;
 import kr.it.reserve.mailbox.repository.AdminSentMailRepository;
 import kr.it.reserve.payment.repository.PaymentRepository;
 import kr.it.reserve.reservation.repository.ReservationRepository;
@@ -29,6 +30,7 @@ public class AuditCleanupWorker {
     private final ReviewRepository reviewRepository;
     private final AdvertisementRepository advertisementRepository;
     private final PaymentRepository paymentRepository;
+    private final ReceivedInquiryTrash inquiryTrash;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean deleteOneItem(Long auditLogId, LocalDateTime now) {
@@ -67,6 +69,7 @@ public class AuditCleanupWorker {
     private void hardDeleteEntity(String entityType, Long entityId) {
         switch (entityType.toUpperCase()) {
             case "SENT_MAIL" -> adminSentMailRepository.deleteById(entityId);
+            case ReceivedInquiryTrash.TYPE -> inquiryTrash.purge(entityId);
             case "RESERVATION" -> reservationRepository.deleteById(entityId);
             case "REVIEW" -> reviewRepository.deleteById(entityId);
             case "ADVERTISEMENT" -> advertisementRepository.deleteById(entityId);

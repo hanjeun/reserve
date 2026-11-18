@@ -4,6 +4,7 @@
 
 export const ENTITY_LABELS = {
     SENT_MAIL:   { label: '발송 메일',  color: 'cyan'    },
+    RECEIVED_INQUIRY: { label: '받은 문의', color: 'blue' },
     MEMBER:      { label: '회원',       color: 'purple'  },
     STORE:       { label: '가게',       color: 'green'   },
     RESERVATION: { label: '예약',       color: 'orange'  },
@@ -14,6 +15,7 @@ export const ENTITY_LABELS = {
 export const ENTITY_TYPE_OPTIONS = [
     { value: '',            label: '전체' },
     { value: 'SENT_MAIL',   label: '발송 메일' },
+    { value: 'RECEIVED_INQUIRY', label: '받은 문의' },
     { value: 'RESERVATION', label: '예약' },
     { value: 'REVIEW',      label: '리뷰' },
 ];
@@ -22,6 +24,7 @@ export const ENTITY_TYPE_OPTIONS = [
 export const AUDIT_TYPE_OPTIONS = [
     { value: '',            label: '전체' },
     { value: 'SENT_MAIL',   label: '발송 메일' },
+    { value: 'RECEIVED_INQUIRY', label: '받은 문의' },
     { value: 'MEMBER',      label: '회원' },
     { value: 'STORE',       label: '가게' },
     { value: 'RESERVATION', label: '예약' },

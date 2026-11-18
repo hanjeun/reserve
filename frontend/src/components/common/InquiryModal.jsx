@@ -4,13 +4,14 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { Typography } from 'antd';
-import FormModal, { FormField } from './FormModal';
+import { FormField } from './FormModal';
+import MailDraftModal from './MailDraftModal';
 import FormInput from './FormInput';
 import FormTextArea from './FormTextArea';
 import SegmentedGrid from './SegmentedGrid';
 import useAuthStore from '../../store/useAuthStore';
 import { useMessage } from '../../hooks';
-import api from '../../api/axios';
+import { previewMailDraft, sendMailDraft } from '../../services/mailService';
 import { API_ENDPOINTS } from '../../constants';
 import { EMAIL_REGEX } from '../../utils/validation';
 import { colors, fontSize } from '../../styles/tokens';
@@ -39,7 +40,7 @@ const CATEGORY_OPTIONS = [
 ];
 
 const InquiryModal = ({ open, onClose }) => {
-    const { isLoggedIn } = useAuthStore();
+    const { isLoggedIn, user } = useAuthStore();
     const { message } = useMessage();
 
     const [category, setCategory] = useState('ETC');
@@ -77,16 +78,17 @@ const InquiryModal = ({ open, onClose }) => {
         return Object.keys(next).length === 0;
     };
 
-    const handleSubmit = async () => {
-        if (!validate()) return;
-
+    const handleSubmit = async photos => {
+        if (sending) return;
         setSending(true);
         try {
-            await api.post(API_ENDPOINTS.INQUIRY.CREATE, {
+            await sendMailDraft(API_ENDPOINTS.INQUIRY.CREATE, {
                 category, title: title.trim(), content: content.trim(),
                 ...(!isLoggedIn && { guestName: guestName.trim(), guestEmail: guestEmail.trim() }),
-            });
-            message.success('문의가 접수됐어요. 빠르게 답변드릴게요.');
+            }, photos);
+            message.success(isLoggedIn
+                ? '문의가 접수되었어요. 등록하신 이메일로 회신드릴게요.'
+                : '문의가 접수되었어요. 입력하신 이메일로 회신드릴게요.');
             handleClose();
         } catch {
             message.error('문의 등록에 실패했어요.');
@@ -96,8 +98,17 @@ const InquiryModal = ({ open, onClose }) => {
     };
 
     return (
-        <FormModal title="문의하기" open={open} onClose={handleClose}
-            onSubmit={handleSubmit} submitting={sending}>
+        <MailDraftModal title="문의하기" open={open} onClose={handleClose}
+            validate={validate} onSend={handleSubmit} sending={sending}
+            loadPreview={signal => previewMailDraft(API_ENDPOINTS.INQUIRY.PREVIEW, {
+                category, title: title.trim(), content: content.trim(),
+                ...(!isLoggedIn && { guestName: guestName.trim(), guestEmail: guestEmail.trim() }),
+            }, signal)}
+            previewFields={[
+                { label: '회신 이메일', value: isLoggedIn ? user?.email : guestEmail.trim() },
+                { label: '문의 유형', value: CATEGORY_OPTIONS.find(option => option.value === category)?.label },
+                { label: '제목', value: title.trim() },
+            ]}>
             {!isLoggedIn && (
                 <div style={{ display: 'flex', gap: 10 }}>
                     <div style={{ flex: 1 }}>
@@ -133,7 +144,7 @@ const InquiryModal = ({ open, onClose }) => {
                     비회원 문의는 입력하신 이메일로 답변을 보내드려요.
                 </Text>
             )}
-        </FormModal>
+        </MailDraftModal>
     );
 };
 

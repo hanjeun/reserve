@@ -6,6 +6,9 @@ import kr.it.reserve.advertisement.repository.AdvertisementRepository;
 import kr.it.reserve.audit.entity.AuditLog;
 import kr.it.reserve.audit.repository.AuditLogRepository;
 import kr.it.reserve.global.error.AuditException;
+import kr.it.reserve.global.trash.ReceivedInquiryTrash;
+import org.springframework.context.event.EventListener;
+import org.springframework.transaction.annotation.Propagation;
 import kr.it.reserve.mailbox.entity.AdminSentMail;
 import kr.it.reserve.mailbox.repository.AdminSentMailRepository;
 import kr.it.reserve.member.entity.Member;
@@ -49,6 +52,7 @@ public class AuditLogService {
     private final ObjectMapper objectMapper;
     private final AuditCleanupWorker auditCleanupWorker;
     private final PaymentService paymentService;
+    private final ReceivedInquiryTrash inquiryTrash;
     @Autowired(required = false)
     private ReservationUpdates reservationUpdates;
     @Autowired(required = false)
@@ -134,6 +138,12 @@ public class AuditLogService {
     public void restore(String entityType, Long entityId) {
         switch (entityType.toUpperCase()) {
             case "SENT_MAIL"      -> adminSentMailRepository.restoreById(entityId);
+            case ReceivedInquiryTrash.TYPE -> {
+                auditLogRepository.findSoftDeleteForUpdate(ReceivedInquiryTrash.TYPE, entityId)
+                        .filter(entry -> entry.getExpiresAt().isAfter(LocalDateTime.now(Clock.systemDefaultZone())))
+                        .orElseThrow(() -> AuditException.notFound("복구할 수 있는 문의가 없어요."));
+                inquiryTrash.restore(entityId);
+            }
             case RESERVATION_ENTITY_TYPE    -> {
                 paymentService.lockReservationForStateChange(entityId);
                 Reservation reservation = reservationRepository.findByIdForUpdate(entityId)
@@ -192,6 +202,12 @@ public class AuditLogService {
                 Map.of("이메일", memberEmail, "사유", detail),
                 getCurrentUserEmail());
         log.info("Business verification logged: memberId={}, action={}", memberId, action);
+    }
+
+    @EventListener
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordInquiryTrash(ReceivedInquiryTrash.Moved event) {
+        saveAuditLog(ReceivedInquiryTrash.TYPE, event.id(), SOFT_DELETE_ACTION, Map.of("제목", event.title()));
     }
 
     // 스케줄러 전용 자동 정리

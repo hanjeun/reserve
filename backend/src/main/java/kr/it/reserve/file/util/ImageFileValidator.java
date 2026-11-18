@@ -39,10 +39,17 @@ public final class ImageFileValidator {
     }
 
     public static ValidatedImage inspect(MultipartFile file) {
-        byte[] bytes = readBytes(file);
+        return inspect(readBytes(file), file.getContentType(), file.getOriginalFilename());
+    }
+
+    public static ValidatedImage inspect(byte[] bytes, String contentType, String filename) {
+        if (bytes.length == 0) throw FileException.invalid("비어 있는 파일은 업로드할 수 없어요.");
+        if (bytes.length > MAX_FILE_BYTES) {
+            throw new FileException("파일 크기는 8MB를 초과할 수 없어요.", HttpStatus.PAYLOAD_TOO_LARGE);
+        }
         Format format = detect(bytes);
-        validateDeclaredType(file.getContentType(), format);
-        validateExtension(file.getOriginalFilename(), format);
+        validateDeclaredType(contentType, format);
+        validateExtension(filename, format);
 
         Dimensions dimensions = format == Format.WEBP
                 ? inspectWebp(bytes)

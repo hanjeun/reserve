@@ -105,7 +105,7 @@ test('admin filtered counts stay attached and remain visible on mobile', async (
 });
 
 test('mailbox keeps the trash action in the selected message detail', async ({ page }) => {
-    await page.goto('/admin?tab=mailbox');
+    await page.goto('/admin?tab=mailbox&mailFolder=sent');
 
     await expect(page.getByText('member@example.test')).toBeVisible();
     await expect(page.locator('.reserve-maillist-trash')).toHaveCount(0);

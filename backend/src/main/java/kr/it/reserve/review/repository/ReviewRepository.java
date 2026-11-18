@@ -8,6 +8,7 @@ import kr.it.reserve.review.entity.ReviewPhoto;
 import kr.it.reserve.store.entity.Store;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -51,6 +52,19 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     // 가게의 리뷰 목록 조회 - store, member fetch join으로 N+1 방지 (소프트 삭제된 리뷰 제외)
     @Query("SELECT r FROM Review r JOIN FETCH r.member JOIN FETCH r.store WHERE r.store.id = :storeId AND r.deletedAt IS NULL AND r.moderationHidden = false ORDER BY r.createdAt DESC")
     List<Review> findByStoreIdOrderByCreatedAtDesc(@Param("storeId") Long storeId);
+
+    @Query("""
+            SELECT r FROM Review r JOIN FETCH r.member JOIN FETCH r.store s
+             WHERE s.id = :storeId AND r.deletedAt IS NULL AND r.moderationHidden = false
+               AND s.deletedAt IS NULL AND s.status <> kr.it.reserve.store.entity.StoreStatus.BANNED
+               AND (s.status <> kr.it.reserve.store.entity.StoreStatus.SUSPENDED OR s.suspendedUntil < :now)
+               AND (:beforeId IS NULL
+                   OR (:beforeDate IS NULL AND r.createdAt IS NULL AND r.id < :beforeId)
+                   OR (:beforeDate IS NOT NULL AND (r.createdAt IS NULL OR r.createdAt < :beforeDate
+                       OR (r.createdAt = :beforeDate AND r.id < :beforeId))))
+             ORDER BY r.createdAt DESC, r.id DESC
+            """)
+    Slice<Review> findPublishedStoreReviews(Long storeId, LocalDateTime now, LocalDateTime beforeDate, Long beforeId, Pageable page);
 
     // 회원의 리뷰 목록 조회 - store fetch join으로 N+1 방지 (소프트 삭제된 리뷰 제외)
     @Query("SELECT r FROM Review r JOIN FETCH r.store WHERE r.member = :member AND r.deletedAt IS NULL ORDER BY r.createdAt DESC")

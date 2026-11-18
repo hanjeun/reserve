@@ -6,8 +6,11 @@ import kr.it.reserve.file.service.FileDeletionOutboxService;
 import kr.it.reserve.file.service.FileStorageService;
 import kr.it.reserve.global.error.ReviewException;
 import kr.it.reserve.member.entity.Member;
+import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.review.entity.Review;
 import kr.it.reserve.review.entity.ReviewPhoto;
+import kr.it.reserve.review.repository.ReviewRepository;
+import kr.it.reserve.store.entity.Store;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockMultipartFile;
@@ -21,6 +24,8 @@ import java.io.IOException;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Predicate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -37,25 +42,50 @@ class ReviewPhotosTest {
     @Test
     void photoKeepsItsRatioAndUsesEncryptedReviewStorage() throws IOException {
         var png = new ByteArrayOutputStream();
-        ImageIO.write(new BufferedImage(90, 150, BufferedImage.TYPE_INT_RGB), "png", png);
+        ImageIO.write(new BufferedImage(360, 600, BufferedImage.TYPE_INT_RGB), "png", png);
         var file = new MockMultipartFile("photos", "fixture.png", "image/png", png.toByteArray());
         String prefix = "users/5/reviews/images";
         String key = prefix + "/fixture.bin";
-        when(storage.storeEncryptedReviewImage(any(), eq(prefix))).thenReturn(key);
+        when(storage.storeEncryptedReviewImage(any(), any(), eq(prefix))).thenReturn(key);
 
         photos.update(review, List.of(), List.of(file));
 
         assertThat(review.getPhotos()).singleElement().satisfies(photo -> {
-            assertThat(photo.getWidth()).isEqualTo(90);
-            assertThat(photo.getHeight()).isEqualTo(150);
+            assertThat(photo.getWidth()).isEqualTo(360);
+            assertThat(photo.getHeight()).isEqualTo(600);
         });
         var written = ArgumentCaptor.forClass(byte[].class);
-        verify(storage).storeEncryptedReviewImage(written.capture(), eq(prefix));
+        var thumbnail = ArgumentCaptor.forClass(byte[].class);
+        verify(storage).storeEncryptedReviewImage(written.capture(), thumbnail.capture(), eq(prefix));
+        when(storage.readEncryptedReviewThumbnail(eq(key), eq(prefix), any())).thenReturn(thumbnail.getValue());
+        byte[] small = photos.read(review.getPhotos().getFirst(), true).bytes();
+        verify(storage, never()).readEncryptedReviewImage(any(), any());
+        var smallImage = ImageIO.read(new java.io.ByteArrayInputStream(small));
+        assertThat(smallImage.getHeight()).isEqualTo(320);
+        assertThat(smallImage.getWidth()).isEqualTo(192);
+        assertThat(thumbnail.getValue()).isNotEqualTo(small);
         when(storage.readEncryptedReviewImage(key, prefix)).thenReturn(written.getValue());
-        byte[] decoded = photos.read(review.getPhotos().getFirst()).bytes();
+        byte[] decoded = photos.read(review.getPhotos().getFirst(), false).bytes();
         assertThat(written.getValue()).isNotEqualTo(decoded);
         var image = ImageIO.read(new java.io.ByteArrayInputStream(decoded));
-        assertThat(image.getHeight()).isEqualTo(150);
+        assertThat(image.getHeight()).isEqualTo(600);
+    }
+
+    @Test
+    void conditionalPhotoReadChecksPublicationBeforeReturningNotModified() {
+        var rows = mock(ReviewRepository.class);
+        var service = new ReviewService(rows, mock(ReservationRepository.class), mock(ReviewMutationGuard.class),
+                photos, mock(ReviewAuthorReader.class), mock(ReviewInteractions.class));
+        Review published = Review.builder().store(Store.builder().build()).member(review.getMember()).build();
+        var photo = new ReviewPhoto(published, "users/5/reviews/images/synthetic.bin", "image/png", 180, 300);
+        when(rows.findPublishedPhoto(12L, 5L)).thenReturn(Optional.of(photo), Optional.empty());
+        Predicate<String> conditional = etag -> etag.endsWith("-thumbnail-v1\"");
+
+        assertThat(service.getPhoto(12L, 5L, true, conditional).image()).isNull();
+        assertThatThrownBy(() -> service.getPhoto(12L, 5L, true, conditional))
+                .isInstanceOfSatisfying(ReviewException.class,
+                        failure -> assertThat(failure.getStatus()).isEqualTo(org.springframework.http.HttpStatus.NOT_FOUND));
+        verifyNoInteractions(storage);
     }
 
     @Test

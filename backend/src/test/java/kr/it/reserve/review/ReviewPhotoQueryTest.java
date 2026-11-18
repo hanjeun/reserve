@@ -12,6 +12,9 @@ import kr.it.reserve.store.repository.StoreRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.data.domain.PageRequest;
+
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -36,8 +39,9 @@ class ReviewPhotoQueryTest {
         entityManager.clear();
 
         Review saved = reviews.findByStoreIdOrderByCreatedAtDesc(store.getId()).getFirst();
+        String url = "/api/reviews/" + reviewId + "/photos/" + photoId;
         assertThat(ReviewResponse.fromEntity(saved).getPhotos()).containsExactly(new ReviewResponse.Photo(photoId,
-                "/api/reviews/" + reviewId + "/photos/" + photoId, 180, 320));
+                url, 180, 320, url + "?size=thumbnail"));
         assertThat(reviews.findPublishedPhoto(reviewId, photoId)).isPresent();
         assertThat(reviews.findPublishedPhoto(reviewId + 1, photoId)).isEmpty();
 
@@ -50,5 +54,31 @@ class ReviewPhotoQueryTest {
         saved.getPhotos().clear();
         reviews.flush();
         assertThat(reviews.findPublishedPhoto(reviewId, photoId)).isEmpty();
+    }
+
+    @Test
+    void storeReviewCursorOrdersPublishedRowsAndUsesIdToBreakTies() {
+        Member owner = members.save(Member.builder().name("점주").email("cursor-owner@example.invalid").build());
+        Store store = stores.save(Store.builder().owner(owner).name("리뷰 페이지 검증 가게").build());
+        Review first = storeReview(store, owner, "첫 번째", false);
+        Review second = storeReview(store, owner, "두 번째", false);
+        storeReview(store, owner, "숨겨진 리뷰", true);
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime written = now.minusDays(1).withNano(0);
+        entityManager.createQuery("UPDATE Review r SET r.createdAt = :written WHERE r.store.id = :storeId")
+                .setParameter("written", written).setParameter("storeId", store.getId()).executeUpdate();
+        entityManager.clear();
+        var size = PageRequest.ofSize(1);
+        var newest = reviews.findPublishedStoreReviews(store.getId(), now, null, null, size);
+        assertThat(newest.getContent()).extracting(Review::getId).containsExactly(second.getId());
+        assertThat(newest.hasNext()).isTrue();
+        var older = reviews.findPublishedStoreReviews(store.getId(), now, written, second.getId(), size);
+        assertThat(older.getContent()).extracting(Review::getId).containsExactly(first.getId());
+        assertThat(older.hasNext()).isFalse();
+    }
+
+    private Review storeReview(Store store, Member owner, String title, boolean hidden) {
+        return reviews.saveAndFlush(Review.builder().store(store).member(owner).rating(5)
+                .title(title).content(title).moderationHidden(hidden).build());
     }
 }

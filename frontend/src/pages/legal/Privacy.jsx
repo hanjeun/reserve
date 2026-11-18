@@ -79,7 +79,7 @@ const Privacy = () => {
                     <li style={{ marginBottom: 6 }}><strong>회원가입 시:</strong> 이메일 주소, 이름, 비밀번호(일방향 해시 저장)</li>
                     <li style={{ marginBottom: 6 }}><strong>소셜 로그인 시:</strong> 이메일, 이름, 프로필 사진 (Google/Naver/Kakao 제공 정보)</li>
                     <li style={{ marginBottom: 6 }}><strong>예약 시:</strong> 예약 정보(날짜, 시간, 인원), 요청사항</li>
-                    <li style={{ marginBottom: 6 }}><strong>채팅·신고 시:</strong> 대화 내용, 첨부 사진과 원래 파일명, 신고 내용·처리 기록 및 검토에 필요한 대화 증거</li>
+                    <li style={{ marginBottom: 6 }}><strong>채팅·신고 시:</strong> 대화 내용, 첨부 파일(사진·문서)과 원래 파일명, 신고 내용·처리 기록 및 검토에 필요한 대화 증거</li>
                     <li style={{ marginBottom: 6 }}><strong>가게 소식 작성 시:</strong> 작성자와 가게 연결, 제목·본문·사진·소식 종류·기간·조건, 공개 여부와 작성·수정·삭제 시각</li>
                     <li style={{ marginBottom: 6 }}><strong>웨이팅 접수 시:</strong> 회원 식별자와 이름(고객 접수), 선택한 팀 표시명(직원 접수), 접수 방식, 인원, 접수 번호와 접수·호출·입장·취소 시각. 대기 명단에서 연락처는 수집하지 않습니다.</li>
                     <li style={{ marginBottom: 6 }}><strong>결제 시:</strong> 포트원을 통한 결제 처리 정보입니다. 카드·계좌 정보는 RESERVE 서버에 저장하지 않습니다.</li>
@@ -101,7 +101,7 @@ const Privacy = () => {
                 <ul style={{ paddingLeft: 20 }}>
                     <li style={{ marginBottom: 6 }}>일반 감사 로그(Audit Log): 90일 보관 후 파기. 신고 자료의 열람·처리 기록은 아래의 별도 기간을 적용합니다.</li>
                     <li style={{ marginBottom: 6 }}>계정 식별정보(이메일, 비밀번호, 위치, 소셜 로그인 토큰): 탈퇴 처리 시 제거 또는 비식별 값으로 치환</li>
-                    <li style={{ marginBottom: 6 }}>일반 채팅의 글·사진·원래 파일명: 전송일로부터 90일. 만료되면 원문과 사진 참조를 제거하고 사진 파일을 파기합니다.</li>
+                    <li style={{ marginBottom: 6 }}>일반 채팅의 글·첨부 파일·원래 파일명: 전송일로부터 90일. 만료되면 원문과 첨부 참조를 제거하고 첨부 파일을 파기합니다.</li>
                     <li style={{ marginBottom: 6 }}>처리된 일반 채팅 신고·증거: 처리 완료일로부터 1년</li>
                     <li style={{ marginBottom: 6 }}>소비자 불만·거래 분쟁 처리 기록: 처리 완료일로부터 3년</li>
                     <li style={{ marginBottom: 6 }}>계약·청약철회·대금결제·재화 공급 기록: 해당 거래일을 기준으로 5년. 관련 채팅 증거는 일반 채팅과 구분하여 보관합니다.</li>

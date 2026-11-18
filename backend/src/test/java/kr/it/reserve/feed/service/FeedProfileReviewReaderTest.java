@@ -50,7 +50,8 @@ class FeedProfileReviewReaderTest {
         var mapper = new ObjectMapper();
         String photoJson = mapper.writeValueAsString(item.photos().getFirst());
         assertThat(photoJson).isEqualTo(mapper.writeValueAsString(ReviewResponse.photoList(review).getFirst()));
-        assertThat(photoJson).isEqualTo("{\"id\":40,\"url\":\"/api/reviews/30/photos/40\",\"width\":180,\"height\":320}");
+        assertThat(photoJson).isEqualTo("{\"id\":40,\"url\":\"/api/reviews/30/photos/40\",\"width\":180,\"height\":320,"
+                + "\"thumbnailUrl\":\"/api/reviews/30/photos/40?size=thumbnail\"}");
         verify(repository).findPublishedProfileReviews(7L, false, now, page);
     }
 }

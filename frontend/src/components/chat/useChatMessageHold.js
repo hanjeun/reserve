@@ -30,7 +30,7 @@ export default function useChatMessageHold(roomId) {
         cancel();
         suppressedClick.current = null;
         if (event.touches.length !== 1) return;
-        const surface = event.target.closest?.('.reserve-chat-message-bubble, .reserve-chat-image-message');
+        const surface = event.target.closest?.('.reserve-chat-message-bubble, .reserve-chat-image-message, .reserve-chat-file-download');
         const row = surface?.closest('.reserve-chat-message-row');
         const button = row?.querySelector(MENU_BUTTON);
         if (!button || button.disabled || !event.currentTarget.contains(row)) return;

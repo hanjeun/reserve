@@ -2,6 +2,7 @@ package kr.it.reserve.review.service;
 
 import kr.it.reserve.config.updates.EntityUpdates;
 
+import kr.it.reserve.global.common.PageRequests;
 import kr.it.reserve.global.error.ReviewException;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.reservation.entity.Reservation;
@@ -22,7 +23,12 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
+import java.util.function.Predicate;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -129,12 +135,17 @@ public class ReviewService {
     }
 
     @Transactional(readOnly = true)
-    public ReviewPhotos.ImageContent getPhoto(Long reviewId, Long photoId) {
+    public PhotoRead getPhoto(Long reviewId, Long photoId, boolean thumbnail, Predicate<String> notModified) {
         var photo = reviewRepository.findPublishedPhoto(reviewId, photoId)
                 .filter(row -> !row.getReview().getStore().isDeleted() && !row.getReview().getStore().isSuspended())
                 .orElseThrow(() -> new ReviewException("리뷰 사진을 찾을 수 없어요.", HttpStatus.NOT_FOUND));
-        return photos.read(photo);
+        photos.requireKey();
+        String imageId = UUID.nameUUIDFromBytes(photo.getObjectKey().getBytes(StandardCharsets.UTF_8)).toString();
+        String etag = "\"" + imageId + (thumbnail ? "-thumbnail-v1" : "-original") + "\"";
+        return new PhotoRead(etag, notModified.test(etag) ? null : photos.read(photo, thumbnail));
     }
+
+    public record PhotoRead(String etag, ReviewPhotos.ImageContent image) { }
 
     @Transactional
     public ReviewResponse replyAsOwner(Long id, Member owner, String reply) {
@@ -167,6 +178,28 @@ public class ReviewService {
     public List<ReviewResponse> getStoreReviews(Long storeId, Member viewer) {
         var reviews = reviewRepository.findByStoreIdOrderByCreatedAtDesc(storeId).stream().filter(Review::isPublished).toList();
         return responses(reviews, viewer);
+    }
+
+    public record ReviewCursor(Long beforeId, LocalDateTime beforeDate) { }
+    public record StoreReviewPage(List<ReviewResponse> content, ReviewCursor next) { }
+
+    @Transactional(readOnly = true)
+    public StoreReviewPage getStoreReviewPage(Long storeId, int limit, Long beforeId, LocalDateTime beforeDate,
+                                               Long focusId, Member viewer) {
+        var page = reviewRepository.findPublishedStoreReviews(storeId, LocalDateTime.now(), beforeDate, beforeId,
+                PageRequests.bounded(0, Math.min(limit, 10)));
+        var selected = new ArrayList<>(page.getContent());
+        ReviewCursor next = null;
+        if (page.hasNext()) {
+            Review last = selected.getLast();
+            next = new ReviewCursor(last.getId(), last.getCreatedAt());
+        }
+        if (beforeId == null && focusId != null && selected.stream().noneMatch(review -> focusId.equals(review.getId()))) {
+            reviewRepository.findById(focusId)
+                    .filter(review -> storeId.equals(review.getStore().getId()) && review.isPublished())
+                    .ifPresent(selected::addFirst);
+        }
+        return new StoreReviewPage(responses(selected, viewer), next);
     }
 
     @Transactional(readOnly = true)

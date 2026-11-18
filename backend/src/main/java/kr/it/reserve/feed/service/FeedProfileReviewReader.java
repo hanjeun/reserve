@@ -24,7 +24,7 @@ public class FeedProfileReviewReader implements ProfileReviewReader {
                 .map(review -> new FeedDto.ProfileReview(review.getId(), review.getStore().getPublicId(), review.getStore().getName(),
                         review.getRating(), review.getTitle(), review.getContent(),
                         ReviewResponse.photoList(review).stream().map(photo ->
-                                new FeedDto.ProfileReviewPhoto(photo.id(), photo.url(), photo.width(), photo.height())).toList(),
+                                new FeedDto.ProfileReviewPhoto(photo.id(), photo.url(), photo.width(), photo.height(), photo.thumbnailUrl())).toList(),
                         review.getCreatedAt().atOffset(ZoneOffset.UTC)));
     }
 }

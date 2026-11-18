@@ -3,6 +3,7 @@ package kr.it.reserve.review.service;
 import kr.it.reserve.file.service.FileDeletionOutboxService;
 import kr.it.reserve.file.service.FileStorageService;
 import kr.it.reserve.file.util.FileStoragePaths;
+import kr.it.reserve.file.util.ImageThumbnail;
 import kr.it.reserve.global.error.ReviewException;
 import kr.it.reserve.review.entity.Review;
 import kr.it.reserve.review.entity.ReviewPhoto;
@@ -23,6 +24,7 @@ import java.util.function.Supplier;
 public class ReviewPhotos {
     private static final int MAX_PHOTOS = 5;
     private static final long MAX_UPLOAD_BYTES = 7L * 1024 * 1024;
+    private static final int THUMBNAIL_SIDE = 320;
     private static final Set<String> CONTENT_TYPES = Set.of("image/jpeg", "image/png");
 
     private final ReviewImageCodec codec;
@@ -62,7 +64,8 @@ public class ReviewPhotos {
         for (MultipartFile file : files) {
             ReviewPhoto photo = transfer(() -> {
                 var image = codec.inspect(file);
-                String key = storage.storeEncryptedReviewImage(codec.encrypt(image.bytes(), prefix), prefix);
+                byte[] small = codec.encrypt(makeThumbnail(image.bytes()), thumbnailContext(prefix));
+                String key = storage.storeEncryptedReviewImage(codec.encrypt(image.bytes(), prefix), small, prefix);
                 return new ReviewPhoto(review, key, image.contentType(), image.width(), image.height());
             });
             existing.add(photo);
@@ -73,14 +76,36 @@ public class ReviewPhotos {
         for (ReviewPhoto photo : photos) deletions.enqueue(photo.getObjectKey(), "REVIEW_PHOTO", reviewId);
     }
 
-    ImageContent read(ReviewPhoto photo) {
-        requireKey();
+    ImageContent read(ReviewPhoto photo, boolean thumbnail) {
         String prefix = FileStoragePaths.reviewImage(photo.getReview().getMember().getId());
-        return transfer(() -> new ImageContent(
-                codec.decrypt(storage.readEncryptedReviewImage(photo.getObjectKey(), prefix), prefix), photo.getContentType()));
+        return transfer(() -> thumbnail ? readThumbnail(photo, prefix)
+                : new ImageContent(readOriginal(photo, prefix), photo.getContentType()));
     }
 
-    private void requireKey() {
+    private byte[] readOriginal(ReviewPhoto photo, String prefix) {
+        return codec.decrypt(storage.readEncryptedReviewImage(photo.getObjectKey(), prefix), prefix);
+    }
+
+    private ImageContent readThumbnail(ReviewPhoto photo, String prefix) {
+        String context = thumbnailContext(prefix);
+        byte[] encrypted = storage.readEncryptedReviewThumbnail(photo.getObjectKey(), prefix,
+                () -> codec.encrypt(makeThumbnail(readOriginal(photo, prefix)), context));
+        byte[] bytes = codec.decrypt(encrypted, context);
+        return new ImageContent(bytes, (bytes[0] & 0xff) == 0x89 ? "image/png" : "image/jpeg");
+    }
+
+    private static byte[] makeThumbnail(byte[] bytes) {
+        try { return ImageThumbnail.create(bytes, 1, THUMBNAIL_SIDE); }
+        catch (IllegalArgumentException exception) {
+            throw new ReviewException("작은 사진을 만들 수 없어요.", HttpStatus.UNPROCESSABLE_ENTITY);
+        }
+    }
+
+    private static String thumbnailContext(String prefix) {
+        return prefix + "/thumbnail";
+    }
+
+    void requireKey() {
         if (!codec.isEnabled()) throw new ReviewException("리뷰 사진을 준비하고 있어요.", HttpStatus.SERVICE_UNAVAILABLE);
     }
 

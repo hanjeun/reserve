@@ -21,7 +21,7 @@ const fileToUrl = (file) => {
     return null;
 };
 
-const useImagePreview = () => {
+const useImagePreview = ({ showImageLoading = false } = {}) => {
     const [previewOpen, setPreviewOpen] = useState(false);
     // 프리뷰에 넘길 이미지 URL 배열 + 시작 인덱스
     const [previewItems, setPreviewItems] = useState([]);
@@ -112,6 +112,7 @@ const useImagePreview = () => {
             sessionKey={previewSession}
             onClose={handleCancel}
             onCurrentChange={setPreviewCurrent}
+            showImageLoading={showImageLoading}
         />
     );
 

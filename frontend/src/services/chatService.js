@@ -84,6 +84,14 @@ const chatService = {
         form.append('clientMessageId', clientMessageId);
         return api.post(`/api/chat/rooms/${roomId}/images`, form, config);
     },
+    sendFile: (roomId, file, content, clientMessageId, config) => {
+        const form = new FormData();
+        form.append('file', file);
+        form.append('content', content || '');
+        form.append('clientMessageId', clientMessageId);
+        return api.post(`/api/chat/rooms/${roomId}/files`, form, config);
+    },
+    getFile: (url, signal) => api.get(url, { responseType: 'blob', signal }),
     checkImageAccess: (url, signal) => api.head(url, { signal }),
     getImage: (url, signal) => api.get(url, { responseType: 'blob', signal }),
     getSupportIntro: () => api.get(API_ENDPOINTS.CHAT.INTRO_SUPPORT),

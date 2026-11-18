@@ -59,13 +59,17 @@ export async function downloadChatImage(url, signal, isCurrent, originalFilename
     if (signal.aborted || !isCurrent()) return;
     const blob = await read(url, signal, isCurrent);
     if (signal.aborted || !isCurrent()) return;
+    saveChatBlob(blob, downloadFilename(originalFilename, blob.type, url.split('/').pop()));
+}
+
+export function saveChatBlob(blob, filename) {
     const objectUrl = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = objectUrl;
-    link.download = downloadFilename(originalFilename, blob.type, url.split('/').pop());
+    link.download = filename;
     try {
         document.body.append(link);
-        if (!signal.aborted && isCurrent()) link.click();
+        link.click();
     } finally {
         link.remove();
         // 브라우저가 Blob을 사용한 뒤 임시 URL을 해제한다.

@@ -13,6 +13,7 @@ import useMessengerStore, { messengerIdentityOf } from '../../store/useMessenger
 import { breakpoints } from '../../styles/tokens';
 import MessengerLauncherVisual from './MessengerLauncherVisual';
 import { chatListQueryPolicy, shouldAutoRefreshChatMetadata } from './chatListQueryPolicy';
+import { chatUnreadCounts } from './chatUnread';
 import MessengerPanelSkeleton from './MessengerPanelSkeleton';
 import Tooltip from '../common/Tooltip';
 import { LoadingPresentationContext, createLoadingPresentation } from '../layout/loadingPresentation';
@@ -132,7 +133,8 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
         refetchInterval: query => ((!isMobile && open) || isMessagesPage || !shouldAutoRefreshChatMetadata(query))
             ? false : BADGE_POLL_MS,
     });
-    const unreadCount = Number.isFinite(Number(unread)) ? Math.max(0, Math.trunc(Number(unread))) : 0;
+    const { messages, notifications } = chatUnreadCounts(unread);
+    const unreadCount = messages + notifications;
     const messagesLabel = unreadCount > 0
         ? `메시지, 읽지 않은 메시지 ${unreadCount}개`
         : '메시지';
@@ -242,7 +244,7 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
             )}
             {!isSearchPage && <div className="reserve-messenger-launcher-wrap"
                 style={isMobile && !open && launcherObstructed ? { visibility: 'hidden' } : undefined}>
-                <Badge count={!isMobile && open ? 0 : unreadCount} offset={[-4, 4]}
+                <Badge count={unreadCount} offset={[-4, 4]}
                     styles={{ indicator: { background: 'var(--reserve-messenger-unread-bg)', color: 'var(--c-error-fg)' } }}>
                     <Tooltip title={!isMobile && open ? '메시지 창 닫기' : `${messagesLabel} 열기`}><button
                         ref={launcherRef}

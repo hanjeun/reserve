@@ -86,7 +86,7 @@ function ListRows({ query, coldError, rows, subject, emptyText, children }) {
     }
     if (query.isLoading) return <ConversationListSkeleton />;
     if (rows.length === 0) {
-        return <DataState state="empty" kind="message" title={emptyText} />;
+        return emptyText ? <DataState state="empty" kind="message" title={emptyText} /> : null;
     }
     return children;
 }
@@ -111,19 +111,21 @@ function AdminInboxSection({ query, rows, showThread, selection, onChoose }) {
     );
 }
 
-function CustomerSection({ query, rows, customerRows, showHidden, showThread, selection, onChoose }) {
+function CustomerSection({ query, rows, customerRows, showHidden, hasHiddenNotification, showThread, selection, onChoose, onVisibilityChange }) {
     return (
         <section aria-labelledby="reserve-my-conversations">
             <h2 id="reserve-my-conversations" className={`reserve-messenger-section-label${customerRows.length === 0 ? ' reserve-messenger-sr-only' : ''}`}>내 문의</h2>
             <StaleListError query={query} rows={rows}
                 title="목록을 새로 불러오지 못했어요. 이전 내용을 보여드려요." />
             <ListRows query={query} coldError={query.isError && rows.length === 0} rows={customerRows} subject="대화 목록"
-                emptyText={showHidden ? '숨긴 대화가 없어요.' : '아직 문의한 내역이 없어요.'}>
+                emptyText={showHidden ? hasHiddenNotification ? null : '숨긴 대화가 없어요.' : '아직 문의한 내역이 없어요.'}>
                 {customerRows.map((row) => (
                     <ConversationRow
                         key={row.type === 'SUPPORT' ? 'support' : `store-${row.storeId}`}
                         row={row}
                         owner={false}
+                        hidden={showHidden}
+                        onVisibilityChange={onVisibilityChange}
                         selected={showThread && matchesSelection(row, selection)}
                         onSelect={() => onChoose(row.type === 'SUPPORT'
                             ? { kind: 'support' }
@@ -136,7 +138,7 @@ function CustomerSection({ query, rows, customerRows, showHidden, showThread, se
     );
 }
 
-function OwnerInboxSection({ query, rows, showThread, selection, onChoose }) {
+function OwnerInboxSection({ query, rows, showHidden, showThread, selection, onChoose, onVisibilityChange }) {
     return (
         <section aria-labelledby="reserve-store-inbox">
             <h2 id="reserve-store-inbox" className="reserve-messenger-section-label">손님 문의</h2>
@@ -148,6 +150,8 @@ function OwnerInboxSection({ query, rows, showThread, selection, onChoose }) {
                         key={`owner-${row.roomId}`}
                         row={row}
                         owner
+                        hidden={showHidden}
+                        onVisibilityChange={onVisibilityChange}
                         selected={showThread && matchesSelection(row, selection)}
                         onSelect={() => onChoose({ kind: 'owner', roomId: row.roomId })}
                     />
@@ -158,7 +162,7 @@ function OwnerInboxSection({ query, rows, showThread, selection, onChoose }) {
     );
 }
 
-function ConversationSections({ lists, canAdminSupport, canOwnStores, showHidden, rowProps }) {
+function ConversationSections({ lists, canAdminSupport, canOwnStores, showHidden, hasHiddenNotification, rowProps }) {
     const { memberQuery, ownerQuery, adminQuery, memberRows, ownerRows, adminRows, customerRows } = lists;
     const showOwnerInbox = canOwnStores && (ownerQuery.isLoading || ownerQuery.isError || ownerRows.length > 0);
     return (
@@ -168,17 +172,18 @@ function ConversationSections({ lists, canAdminSupport, canOwnStores, showHidden
             )}
 
             <CustomerSection query={memberQuery} rows={memberRows} customerRows={customerRows}
-                showHidden={showHidden} {...rowProps} />
+                showHidden={showHidden} hasHiddenNotification={hasHiddenNotification} {...rowProps} />
 
             {showOwnerInbox && (
-                <OwnerInboxSection query={ownerQuery} rows={ownerRows} {...rowProps} />
+                <OwnerInboxSection query={ownerQuery} rows={ownerRows} showHidden={showHidden} {...rowProps} />
             )}
         </>
     );
 }
 
 export function ConversationListPanel({
-    headingLevel, inert, lists, showHidden, onToggleHidden, onFindStore, canAdminSupport, canOwnStores, rowProps, navigation,
+    headingLevel, inert, lists, showHidden, onToggleHidden, onFindStore, canAdminSupport, canOwnStores,
+    rowProps, notificationEntry, navigation,
 }) {
     return (
         <aside className="reserve-messenger-list" aria-label="대화 목록"
@@ -189,12 +194,14 @@ export function ConversationListPanel({
                 showHidden={showHidden} onToggleHidden={onToggleHidden} onFindStore={onFindStore} />
 
             <div className="reserve-messenger-list-scroll" aria-busy={lists.conversationListsLoading}>
+                {notificationEntry}
                 {lists.allConversationListsFailed ? (
                     <DataState state="error" kind="message" subject="대화 목록" error={lists.allConversationListsError}
                         onRetry={lists.refreshConversationLists} retrying={lists.conversationListsFetching} />
                 ) : (
                     <ConversationSections lists={lists} canAdminSupport={canAdminSupport}
-                        canOwnStores={canOwnStores} showHidden={showHidden} rowProps={rowProps} />
+                        canOwnStores={canOwnStores} showHidden={showHidden}
+                        hasHiddenNotification={showHidden && Boolean(notificationEntry)} rowProps={rowProps} />
                 )}
             </div>
             {navigation}

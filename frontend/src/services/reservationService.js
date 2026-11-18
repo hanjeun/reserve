@@ -10,7 +10,7 @@ const reservationService = {
     getEditStore:        (id, storeId, config = {}) => api.get(`/api/reservations/${id}/edit-store`, { ...config, params: { storeId } }),
     getEditAvailability: (id, storeId, date, config = {}) => api.get(`/api/reservations/${id}/availability`, { ...config, params: { storeId, date } }),
     getEditCalendar:     (id, storeId, month, config = {}) => api.get(`/api/reservations/${id}/calendar`, { ...config, params: { storeId, month } }),
-    createReservation:   (data)         => api.post(API_ENDPOINTS.RESERVATION.CREATE, data),
+    createReservation:   (data, config) => api.post(API_ENDPOINTS.RESERVATION.CREATE, data, config),
     recoverReservation:  (data, config = {}) => api.post('/api/reservations/requests/result', data, config),
     updateReservation:   (id, data)     => api.patch(API_ENDPOINTS.RESERVATION.UPDATE(id), data),
     cancelReservation:   (id)           => api.patch(API_ENDPOINTS.RESERVATION.CANCEL(id)),

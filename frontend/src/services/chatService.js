@@ -71,7 +71,10 @@ const chatService = {
     getReportContext: (reportId) => api.get(API_ENDPOINTS.CHAT.ADMIN_REPORT_CONTEXT(reportId)),
     reviewReport: (reportId, review) => api.patch(
         API_ENDPOINTS.CHAT.ADMIN_REPORT(reportId), review),
-    getUnread: () => api.get(API_ENDPOINTS.CHAT.UNREAD),
+    getUnread: ({ signal } = {}) => api.get(API_ENDPOINTS.CHAT.UNREAD, { params: { split: true }, signal }),
+    getReservationNotifications: (before, signal) => api.get('/api/chat/notifications', { params: { before }, signal }),
+    readReservationNotifications: (ids) => api.post('/api/chat/notifications/read?split=true', { ids }),
+    getNotificationReservation: (id, signal) => api.get(`/api/chat/notifications/${id}/reservation`, { signal }),
     getImageConfig: () => api.get('/api/chat/images/config'),
     sendImage: (roomId, file, content, clientMessageId, config) => {
         const form = new FormData();

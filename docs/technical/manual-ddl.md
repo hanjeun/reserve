@@ -29,6 +29,7 @@
 | [login-methods.sql](../../backend/src/main/resources/db/manual/login-methods.sql) | 기존 회원을 보존하는 로그인 수단 관리와 검증 요청 |
 | [jwt-session.sql](../../backend/src/main/resources/db/manual/jwt-session.sql) | 원문 토큰을 저장하지 않는 기기별 로그인 세션 |
 | [reservation-admission.sql](../../backend/src/main/resources/db/manual/reservation-admission.sql) | 같은 요청의 예약 결과를 복구하는 멱등성 기록 |
+| [reservation-notifications.sql](../../backend/src/main/resources/db/manual/reservation-notifications.sql) | 예약 알림 발송 대기·전달·회원별 읽음 기록 |
 | [mfa-completion-settlement.sql](../../backend/src/main/resources/db/manual/mfa-completion-settlement.sql) | MFA·예약 종료 기준·방문 보증금·TEST 가상 정산 |
 | [reservation-consent.sql](../../backend/src/main/resources/db/manual/reservation-consent.sql) | 예약 안내·동의의 버전과 거래 증거 |
 | [reservation-retention.sql](../../backend/src/main/resources/db/manual/reservation-retention.sql) | 예약 증거의 사건별 파기 보류와 해제 이력 |

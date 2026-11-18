@@ -50,19 +50,30 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); client.clear(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
-it('waits for authentication restoration and keeps anonymous streams credentialless', () => {
+async function renderProvider(element) {
+    const view = render(element);
+    await act(async () => { await import('./LiveUpdatesConnection'); });
+    return view;
+}
+
+it('waits for authentication restoration and keeps anonymous streams credentialless', async () => {
     state.authRestoring = true;
     const rendered = render(ui('restoring'));
+    const probe = screen.getByRole('status');
     expect(connections).toHaveLength(0);
     state.authRestoring = false;
     state.isLoggedIn = false;
-    rendered.rerender(ui('restoring'));
+    await act(async () => {
+        rendered.rerender(ui('restoring'));
+        await import('./LiveUpdatesConnection');
+    });
+    expect(screen.getByRole('status')).toBe(probe);
     expect(connections).toHaveLength(1);
     expect(connections[0].url).toMatch(/updates\/public\/events$/);
     expect(connections[0].options).toEqual({ withCredentials: false });
 });
 it('uses one credentialed stream and enables only server-advertised supported domains after ready', async () => {
-    render(ui('account'));
+    await renderProvider(ui('account'));
     expect(connections).toHaveLength(1);
     expect(connections[0].url).toMatch(/\/api\/(?:v1\/)?updates\/events$/);
     expect(connections[0].options).toEqual({ withCredentials: true });
@@ -74,15 +85,15 @@ it('uses one credentialed stream and enables only server-advertised supported do
     await tick(250);
     expect(state.refresh).toHaveBeenCalledWith([], true);
 });
-it.each([null, false, [], { epoch: '', domains: [] }])('ignores malformed ready payload %j without breaking the page', data => {
-    render(ui('account'));
+it.each([null, false, [], { epoch: '', domains: [] }])('ignores malformed ready payload %j without breaking the page', async data => {
+    await renderProvider(ui('account'));
     expect(() => act(() => connections[0].emit('ready', data))).not.toThrow();
     expect(status()).toEqual({ present: true, connected: false, domains: [] });
     expect(state.refresh).not.toHaveBeenCalled();
 });
 
 it('coalesces signals and rejects duplicates and stale versions per entity without losing another entity', async () => {
-    render(ui('account'));
+    await renderProvider(ui('account'));
     act(() => ready(connections[0])); await tick(250); state.refresh.mockClear();
     act(() => {
         connections[0].emit('update', update(5));
@@ -98,7 +109,7 @@ it('coalesces signals and rejects duplicates and stale versions per entity witho
 });
 
 it('ignores all events from an old account scope, including session termination', async () => {
-    const view = render(ui('A'));
+    const view = await renderProvider(ui('A'));
     const old = connections[0];
     act(() => ready(old)); await tick(250); state.refresh.mockClear();
     advanceSession(); state.sessionRevision = 1; state.isLoggedIn = false;
@@ -118,7 +129,7 @@ it('ignores all events from an old account scope, including session termination'
 });
 
 it('reconciles after transport failure without logging the member out and ignores the replaced stream', async () => {
-    render(ui('account'));
+    await renderProvider(ui('account'));
     const old = connections[0];
     act(() => ready(old)); await tick(250); state.refresh.mockClear();
     act(() => old.onerror());
@@ -141,7 +152,7 @@ it('reconciles after transport failure without logging the member out and ignore
 it.each([null, { id: 7 }])('rechecks current cookies before ending a replaced session (%j)', async member => {
     let finish;
     state.checkAuth.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
-    render(ui('account'));
+    await renderProvider(ui('account'));
     const old = connections[0];
     act(() => ready(old));
     act(() => old.emit('session-ended', {}));
@@ -157,7 +168,7 @@ it('waits for session renewal and coalesces repeated failures and visibility cha
     let finish;
     state.checkAuth.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
     const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
-    render(ui('account'));
+    await renderProvider(ui('account'));
     act(() => { connections[0].onerror(); connections[0].onerror(); });
     await tick(6_000);
     expect(state.checkAuth).toHaveBeenCalledOnce();
@@ -173,7 +184,7 @@ it('waits for session renewal and coalesces repeated failures and visibility cha
 });
 
 it('ends private reconnects after confirmed expiry and uses only the public stream', async () => {
-    const view = render(ui('account'));
+    const view = await renderProvider(ui('account'));
     state.checkAuth.mockImplementationOnce(async () => {
         state.isLoggedIn = false; state.sessionRevision = advanceSession();
         return null;
@@ -192,7 +203,7 @@ it('ends private reconnects after confirmed expiry and uses only the public stre
 it('backs off a transient session-check failure without logging out or reopening an unchecked stream', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     state.checkAuth.mockRejectedValueOnce(Object.assign(new Error('unavailable'), { status: 503 }));
-    render(ui('account'));
+    await renderProvider(ui('account'));
     act(() => connections[0].onerror());
     await tick(5_000);
     expect(connections).toHaveLength(1);
@@ -207,7 +218,7 @@ it('backs off a transient session-check failure without logging out or reopening
 it.each(['unmount', 'account-switch'])('ignores a late session probe after %s', async action => {
     let finish;
     state.checkAuth.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
-    const view = render(ui('account'));
+    const view = await renderProvider(ui('account'));
     act(() => connections[0].onerror());
     await tick(6_000);
     if (action === 'unmount') view.unmount();
@@ -229,7 +240,7 @@ it('keeps polling when EventSource construction fails and recovers through the s
             super(...args);
         }
     });
-    render(ui('account'));
+    await renderProvider(ui('account'));
     expect(connections).toHaveLength(0);
     expect(status().connected).toBe(false);
     blocked = false;
@@ -240,7 +251,7 @@ it('keeps polling when EventSource construction fails and recovers through the s
 
 it('reconnects anonymously without attempting session renewal', async () => {
     state.isLoggedIn = false;
-    render(ui('anonymous'));
+    await renderProvider(ui('anonymous'));
     act(() => connections[0].onerror());
     await tick(6_000);
     expect(state.checkAuth).not.toHaveBeenCalled();
@@ -251,7 +262,7 @@ it('reconnects anonymously without attempting session renewal', async () => {
 it('checks a previously healthy private session before reconnecting and refreshing a returned tab', async () => {
     let finish;
     const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
-    render(ui('account'));
+    await renderProvider(ui('account'));
     act(() => ready(connections[0])); await tick(250); state.refresh.mockClear();
     state.checkAuth.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
     hidden.mockReturnValue(true);
@@ -269,7 +280,7 @@ it('checks a previously healthy private session before reconnecting and refreshi
 });
 
 it('marks healthy-stream fallback as periodic while retaining signals in the same batch', async () => {
-    render(ui('account'));
+    await renderProvider(ui('account'));
     act(() => ready(connections[0])); await tick(250); state.refresh.mockClear();
     await tick(59_750);
     act(() => connections[0].emit('update', update(1)));
@@ -279,7 +290,7 @@ it('marks healthy-stream fallback as periodic while retaining signals in the sam
 });
 
 it.each([-125, 0, 125])('preserves full reconciliation when ready arrives %sms around a periodic tick', async offset => {
-    render(ui('account'));
+    await renderProvider(ui('account'));
     act(() => ready(connections[0])); await tick(250); state.refresh.mockClear();
     await tick(59_750 + offset);
     act(() => ready(connections[0]));
@@ -290,7 +301,7 @@ it.each([-125, 0, 125])('preserves full reconciliation when ready arrives %sms a
 
 it('pauses hidden pages, reconciles on return, and closes subscriptions on unmount', async () => {
     const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
-    const view = render(ui('account'));
+    const view = await renderProvider(ui('account'));
     const first = connections[0];
     act(() => ready(first)); await tick(250); state.refresh.mockClear();
     hidden.mockReturnValue(true);

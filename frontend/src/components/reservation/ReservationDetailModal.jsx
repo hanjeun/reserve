@@ -15,13 +15,15 @@ const { Text } = Typography;
 /*
  * 손님·사업자가 같은 읽기 전용 예약 상세를 사용하며 실행 도구는 각 화면이 담당한다.
  */
-const ReservationDetailModal = ({ reservation, open, onClose, tools }) => {
+const ReservationDetailModal = ({ reservation, open, onClose, tools, placeholder }) => {
     // 닫힘 중에도 마지막 예약 내용을 유지해 모달이 일찍 사라지지 않게 한다.
 
     const [cached, setCached] = React.useState(reservation);
     if (reservation && reservation !== cached) setCached(reservation);
 
     const displayed = reservation ?? cached;
+    if (placeholder) return <ResponsiveModal title="예약 상세" open={open} onCancel={onClose}
+        footer={null} centered mobileSize="content">{placeholder}</ResponsiveModal>;
     if (!displayed) return null;
 
     const {

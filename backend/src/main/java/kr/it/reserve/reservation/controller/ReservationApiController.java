@@ -14,6 +14,7 @@ import kr.it.reserve.reservation.dto.ReservationUpdateRequest;
 import kr.it.reserve.reservation.dto.CalendarDayResponse;
 import kr.it.reserve.reservation.dto.SlotAvailabilityResponse;
 import kr.it.reserve.reservation.entity.Reservation;
+import kr.it.reserve.reservation.protection.ReservationSubmissionProtection;
 import kr.it.reserve.reservation.service.ReservationService;
 import kr.it.reserve.reservation.service.ReservationRemovalService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -42,18 +43,22 @@ public class ReservationApiController {
     private final ReservationService reservationService;
     private final RateLimiter rateLimiter;
     private final ReservationRemovalService reservationRemovalService;
+    private final ReservationSubmissionProtection submissionProtection;
 
     // --- 일반 사용자 API ---
 
     @PostMapping
-    public ResponseEntity<ApiResponse<ReservationResponse>> createReservation(
+    public ResponseEntity<ApiResponse<?>> createReservation(
             @Valid @RequestBody ReservationCreateRequest request,
+            @RequestHeader(name = ReservationSubmissionProtection.TOKEN_HEADER, required = false) String turnstileToken,
             HttpServletRequest httpRequest) {
-        String ip = IpExtractor.extract(httpRequest);
-        if (!rateLimiter.tryConsume(ip, RateLimiter.Policy.RESERVATION_CREATE)) {
-            throw new ReservationException("예약 요청이 너무 많아요. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+        Member member = SecurityUtil.getCurrentMember();
+        var challenge = submissionProtection.check(member.getId(), IpExtractor.extract(httpRequest), request.getRequestId(), turnstileToken);
+        if (challenge != null) {
+            return ResponseEntity.status(HttpStatus.PRECONDITION_REQUIRED).cacheControl(CacheControl.noStore())
+                    .body(ApiResponse.error("예약을 계속하려면 확인을 완료해주세요.", challenge));
         }
-        ReservationResponse reservation = reservationService.createReservation(request, SecurityUtil.getCurrentMember());
+        ReservationResponse reservation = reservationService.createReservation(request, member);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(reservation, "예약이 신청됐어요."));
     }

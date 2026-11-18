@@ -8,7 +8,30 @@ import java.util.HashSet;
 
 @Component @RequiredArgsConstructor
 public class ReservationUpdates {
+    public enum NotificationKind { APPROVED, CHANGED, CANCELLED }
+
+    public interface NotificationSink {
+        void enqueue(Reservation reservation, NotificationKind kind);
+    }
+
     private final EntityUpdates updates;
+    private final NotificationSink notifications;
+
+    public void created(Reservation reservation) {
+        if (reservation.getStatus() == Reservation.ReservationStatus.CONFIRMED) {
+            notifications.enqueue(reservation, NotificationKind.APPROVED);
+        }
+        changed(reservation, EntityUpdates.Operation.CREATED);
+    }
+
+    public void approved(Reservation reservation) { notifyChange(reservation, NotificationKind.APPROVED); }
+    public void rescheduled(Reservation reservation) { notifyChange(reservation, NotificationKind.CHANGED); }
+    public void cancelled(Reservation reservation) { notifyChange(reservation, NotificationKind.CANCELLED); }
+
+    private void notifyChange(Reservation reservation, NotificationKind kind) {
+        notifications.enqueue(reservation, kind);
+        updated(reservation);
+    }
 
     public void updated(Reservation reservation) { changed(reservation, EntityUpdates.Operation.UPDATED); }
 

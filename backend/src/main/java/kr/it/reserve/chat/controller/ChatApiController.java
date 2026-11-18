@@ -18,7 +18,9 @@ import kr.it.reserve.global.ratelimit.IpExtractor;
 import kr.it.reserve.global.ratelimit.RateLimiter;
 import kr.it.reserve.config.util.SecurityUtil;
 import kr.it.reserve.member.entity.Member;
+import kr.it.reserve.notification.service.ReservationNotificationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -45,6 +47,7 @@ public class ChatApiController {
     private final ChatService chatService;
     private final ChatModerationService moderationService;
     private final RateLimiter rateLimiter;
+    private final ReservationNotificationService reservationNotifications;
 
     /** MessengerShell 목록. 빈 고객지원 방은 만들지 않고 실제 대화만 반환한다. */
     @PreAuthorize("isAuthenticated()")
@@ -221,11 +224,26 @@ public class ChatApiController {
     }
 
     @PreAuthorize("isAuthenticated()")
-    @GetMapping("/unread")
+    @GetMapping(value = "/unread", params = "!split")
     public ResponseEntity<ApiResponse<Long>> totalUnread() {
-        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
-        return ResponseEntity.ok(ApiResponse.success(chatService.totalUnreadCount(me), QUERY_SUCCESS_MESSAGE));
+        UnreadCounts unread = unreadCounts();
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(ApiResponse.success(unread.messages() + unread.notifications(), QUERY_SUCCESS_MESSAGE));
     }
+
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping(value = "/unread", params = "split")
+    public ResponseEntity<ApiResponse<UnreadCounts>> splitUnread() {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(ApiResponse.success(unreadCounts(), QUERY_SUCCESS_MESSAGE));
+    }
+
+    private UnreadCounts unreadCounts() {
+        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
+        return new UnreadCounts(chatService.totalUnreadCount(me), reservationNotifications.unread(me));
+    }
+
+    public record UnreadCounts(long messages, long notifications) {}
 
     /** 내 대화 열기 — 방이 없으면 만들고, 최근 메시지를 주고, 안 읽음을 0으로. */
     @PreAuthorize("isAuthenticated()")

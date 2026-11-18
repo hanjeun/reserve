@@ -27,6 +27,7 @@ import { breakpoints, colors, radius, fontWeight } from '../../styles/tokens';
 
 import { ReservationPanel } from '../../components/reservation/StoreReservationPanel';
 import AdmissionModal from '../../components/reservation/AdmissionModal';
+import ReservationChallengeModal from '../../components/reservation/ReservationChallengeModal';
 const { Title } = Typography;
 export { ReservationPanel, TimeSlotPicker } from '../../components/reservation/StoreReservationPanel';
 
@@ -238,6 +239,7 @@ const StoreDetail = () => {
         reviewSectionRef,
         onFinish,
         admissionModalProps,
+        reservationChallengeProps,
         reservationSubmitting,
         reservationEntry,
         isEditMode,
@@ -288,6 +290,7 @@ const StoreDetail = () => {
     return (
         <PageContainer className="reserve-store-detail" size={containerSize} paddingTop={paddingTop}>
             <AdmissionModal {...admissionModalProps} />
+            {reservationChallengeProps && <ReservationChallengeModal {...reservationChallengeProps} />}
             {paymentDialog}
             {error && <DataState compact state="error" subject="가게 정보" title="가게 정보를 갱신하지 못했어요."
                 error={error} onRetry={refetch} />}

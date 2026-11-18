@@ -6,6 +6,7 @@ import kr.it.reserve.global.ratelimit.RateLimiter;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.reservation.controller.ReservationApiController;
 import kr.it.reserve.reservation.dto.ReservationResponse;
+import kr.it.reserve.reservation.protection.ReservationSubmissionProtection;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.service.ReservationService;
 import org.junit.jupiter.api.AfterEach;
@@ -38,7 +39,7 @@ class ReservationMyPageControllerTest {
 
     @BeforeEach
     void prepare() {
-        mvc = standaloneSetup(new ReservationApiController(service, limiter, removals))
+        mvc = standaloneSetup(new ReservationApiController(service, limiter, removals, mock(ReservationSubmissionProtection.class)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(new ObjectMapper().findAndRegisterModules())).build();
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(member, null, List.of()));

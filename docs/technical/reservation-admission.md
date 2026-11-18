@@ -35,6 +35,18 @@
 - 예약 처리의 제한 시간은 30초예요. Redis는 처리 중 최소 60초를 보호하며, 실패해도 원래 입장 기한을 늘려주지 않아요. 입장권은 결제 자격이나 결제 완료를 의미하지 않아요.
 - 사용자가 창을 닫으면 입장권을 유지하고, 명시적으로 대기를 취소하면 반환해요. 확인이 끊기면 유예 후 만료돼요.
 
+## 반복 요청 방어
+
+예약 생성은 IP와 회원별로 제한해요. 같은 요청의 커밋 결과는 별도 결과 조회에서 복구해요. 결과 조회와 기존 예약의 변경·취소는 추가 확인을 요구하지 않아요.
+
+`RESERVE_RESERVATION_SHARED_LIMITS_ENABLED`를 켜면 구성된 Redis에서 회원별 생성 한도와 추가 확인 기준을 공유해요. Redis 통신이 실패하면 인스턴스별 제한을 적용해요. 공유 한도를 켜려면 RESERVE Redis 구성이 필요해요.
+
+`RESERVE_RESERVATION_TURNSTILE_ENABLED`를 켜고 `RESERVE_RESERVATION_TURNSTILE_SITE_KEY`, `RESERVE_RESERVATION_TURNSTILE_SECRET_KEY`, `RESERVE_RESERVATION_TURNSTILE_HOSTNAME`을 설정해요. 반복 시도가 기준을 넘으면 예약 생성 API가 428과 확인 정보를 돌려줘요. 브라우저는 이때만 위젯을 불러오고 같은 요청 번호로 재시도해요. 서버가 Siteverify의 호스트·동작·요청 번호를 확인한 뒤 예약 트랜잭션을 시작해요. 제공자 장애 때는 503을 반환해요. 이메일 인증은 계정 확인에 사용해요. [Turnstile 서버 검증](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)
+
+운영 CD는 GitHub `production` 환경의 변수와 Turnstile 비밀값을 blue·green 컨테이너에 전달해요. 예약 공유 한도와 Turnstile은 기본값이 꺼짐이에요. 공유 한도를 켜면 제한된 Redis 계정과 준비 상태를 검사하고, Turnstile을 켜면 실제 앱 호스트와 운영 키를 확인한 뒤 컨테이너를 시작해요.
+
+Cloudflare WAF에서 과도한 공개 조회를 제한할 때는 앱 호스트의 가게 목록·지역 조회·검색 GET에만 규칙을 적용하고 검증된 검색엔진을 예외로 둬요. API 제한 응답에는 429를 사용해요. 적용 전 오리진이 신뢰할 프록시와 클라이언트 IP 전달을 확인해요. CDN 캐시는 공개 정적 자산에 적용해요. 공통 비상 입장 정책이 검사하는 API 응답과 예약·입장·개인 데이터는 오리진의 권한·입장 검사를 유지해요. [WAF 요청 제한](https://developers.cloudflare.com/waf/rate-limiting-rules/)
+
 ## 코드
 
 - [입장 대기와 멱등성](../../backend/src/main/java/kr/it/reserve/reservation/admission)

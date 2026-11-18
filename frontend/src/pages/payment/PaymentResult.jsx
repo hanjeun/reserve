@@ -109,7 +109,7 @@ const PaymentResult = () => {
                 interactive={settled || lookupError} />
             <PageTitle level={1} className="reserve-payment-result__title">{copy.title}</PageTitle>
             <PageDescription className="reserve-payment-result__description">{copy.description}</PageDescription>
-            <PaymentSummary detail={detail} merchantUid={validMerchantUid(merchantUid) ? merchantUid : null} />
+            <PaymentSummary detail={detail} merchantUid={validMerchantUid(merchantUid) ? merchantUid : null} isAd={isAd} />
             <div className="reserve-payment-result__actions">
                 <Button variant="primary" size="lg" block onClick={goToRecords}>{isAd ? '광고 관리' : '내 예약'}</Button>
                 {canRefresh ? <Button variant="secondary" size="lg" block loading={result.isFetching}
@@ -150,7 +150,7 @@ const PaymentRecoveryLink = ({ isAd }) => (
 );
 PaymentRecoveryLink.propTypes = { isAd: PropTypes.bool.isRequired };
 
-const PaymentSummary = ({ detail, merchantUid }) => {
+const PaymentSummary = ({ detail, merchantUid, isAd }) => {
     const reservation = detail?.reservation;
     const rows = [
         reservation?.storeName && { Icon: ShopOutlined, label: '가게', value: reservation.storeName },
@@ -165,11 +165,11 @@ const PaymentSummary = ({ detail, merchantUid }) => {
         detail?.payMethod && { Icon: CreditCardOutlined, label: '결제 수단', value: formatPayMethod(detail.payMethod, detail.payProvider) },
     ].filter(Boolean);
     if (!rows.length) return null;
-    return <section className="reserve-payment-result__summary" aria-label="예약 및 결제 내역">
+    return <section className="reserve-payment-result__summary" aria-label={isAd ? '광고 결제 내역' : '예약 및 결제 내역'}>
         <DetailInfoRows rows={rows} />
     </section>;
 };
-PaymentSummary.propTypes = { detail: PropTypes.object, merchantUid: PropTypes.string };
+PaymentSummary.propTypes = { detail: PropTypes.object, merchantUid: PropTypes.string, isAd: PropTypes.bool };
 
 function formatPayMethod(method, provider) {
     const map = {

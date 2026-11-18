@@ -7,7 +7,9 @@ import {
     RightOutlined,
 } from '../../components/common/icons';
 import { useQuery } from '@tanstack/react-query';
+import { Tabs } from 'antd';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import AnimatedContent from '../../components/common/AnimatedContent';
 import DataState from '../../components/common/DataState';
 import LoadingImage from '../../components/common/LoadingImage';
 import ServiceDomainIcon from '../../components/common/ServiceDomainIcon';
@@ -27,9 +29,10 @@ import useReducedMotion from '../../hooks/useReducedMotion';
 import useAuthStore from '../../store/useAuthStore';
 import useLocationStore from '../../store/useLocationStore';
 import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
+import { storeKeys } from '../../hooks/queryKeys';
 import { storeService } from '../../services';
 import { distanceSortParams, hasDistanceCoordinates } from '../../utils/distanceSort';
-import { formatRegionLabel } from '../../constants/regions';
+import { formatRegionLabel, REGION_OPTIONS } from '../../constants/regions';
 
 const withRegion = (path, region) => {
     if (!path.startsWith('/stores')) return path;
@@ -99,8 +102,17 @@ const FEATURED_SLIDES = [
 ];
 const FEATURED_AUTO_ADVANCE_MS = 6000;
 
-const homeKeys = {
-    recommendedStores: region => ['home', 'recommended-stores', region],
+const HOME_STORE_LIMIT = 4;
+const REGIONAL_OPTIONS = ['서울', '경기', ...REGION_OPTIONS.map(({ value }) => value).filter(value => value !== '서울' && value !== '경기')];
+const REGION_SWIPE_MIN = 48;
+const ratedStoresQuery = region => {
+    const params = { page: 0, size: HOME_STORE_LIMIT, sort: 'rating', ...(region ? { region } : {}) };
+    return {
+        queryKey: storeKeys.list(params),
+        queryFn: ({ signal }) => storeService.getStores(params, signal),
+        staleTime: 180_000,
+        refetchOnReconnect: false,
+    };
 };
 const storeContent = page => page?.content ?? [];
 
@@ -331,11 +343,7 @@ function DiscoveryShortcuts({ region = '' }) {
 DiscoveryShortcuts.propTypes = { region: PropTypes.string };
 
 function RecommendedStores({ region = '' }) {
-    const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
-        queryKey: homeKeys.recommendedStores(region),
-        queryFn: () => storeService.getStores({ page: 0, size: 4, sort: 'rating', ...(region ? { region } : {}) }),
-        staleTime: 1000 * 60 * 3,
-    });
+    const { data, isLoading, isError, error, refetch, isFetching } = useQuery(ratedStoresQuery(region));
     const stores = storeContent(data);
     const blockingError = isBlockingListReadError(error, stores);
     const refreshFailure = isError && !blockingError
@@ -347,7 +355,7 @@ function RecommendedStores({ region = '' }) {
         if (isLoading) {
             return (
                 <output className="reserve-discovery-store-list reserve-store-list-rows" aria-label="추천 가게를 불러오는 중" aria-busy="true">
-                    <StoreListRowSkeleton count={4} />
+                    <StoreListRowSkeleton count={HOME_STORE_LIMIT} />
                 </output>
             );
         }
@@ -385,6 +393,99 @@ function RecommendedStores({ region = '' }) {
 }
 
 RecommendedStores.propTypes = { region: PropTypes.string };
+
+function RegionalBest({ region = '' }) {
+    const reducedMotion = useReducedMotion();
+    const sectionRef = useRef(null);
+    const touchStart = useRef(null);
+    const [ready, setReady] = useState(() => typeof IntersectionObserver !== 'function');
+    const [selection, setSelection] = useState({ province: '', direction: 'right' });
+    const regions = useQuery({
+        queryKey: storeKeys.regions(), queryFn: storeService.getRegions, enabled: ready, staleTime: 180_000,
+    });
+    const groups = Array.isArray(regions.data) ? regions.data : [];
+    const available = new Map(groups.filter(group => group?.count > 0).map(group => [group.name, group.count]));
+    const options = REGIONAL_OPTIONS.filter(value => available.has(value));
+    const homeProvince = region.split(' ', 1)[0];
+    const province = options.includes(selection.province) ? selection.province : options.includes(homeProvince) ? homeProvince : options[0] ?? '';
+    const { data, isLoading, isFetching, error, refetch } = useQuery({ ...ratedStoresQuery(province), enabled: ready && Boolean(province) });
+    const stores = province ? storeContent(data) : [];
+
+    useEffect(() => {
+        if (ready) return undefined;
+        const observer = new IntersectionObserver(([entry]) => {
+            if (entry.isIntersecting) setReady(true);
+        }, { rootMargin: '240px 0px' });
+        observer.observe(sectionRef.current);
+        return () => observer.disconnect();
+    }, [ready]);
+
+    const selectProvince = next => {
+        if (next === province) return;
+        setSelection({ province: next, direction: options.indexOf(next) < options.indexOf(province) ? 'left' : 'right' });
+    };
+
+    const startSwipe = event => {
+        const touch = event.touches[0];
+        if (!province || !touch) return;
+        touchStart.current = event.touches.length === 1 && (window.visualViewport?.scale ?? 1) < 1.01
+            ? { id: touch.identifier, x: touch.clientX, y: touch.clientY, scrollY: window.scrollY } : null;
+    };
+
+    const endSwipe = event => {
+        const start = touchStart.current;
+        touchStart.current = null;
+        const touch = event.changedTouches[0];
+        if (!start || event.touches.length || touch?.identifier !== start.id || Math.abs(window.scrollY - start.scrollY) > 3) return;
+        const dx = touch.clientX - start.x;
+        if (Math.abs(dx) < REGION_SWIPE_MIN || Math.abs(dx) <= Math.abs(touch.clientY - start.y) * 1.5) return;
+        const adjacent = options[options.indexOf(province) + (dx < 0 ? 1 : -1)];
+        if (adjacent) {
+            if (event.cancelable) event.preventDefault();
+            selectProvince(adjacent);
+        }
+    };
+
+    const loading = !ready || regions.isLoading || isLoading;
+    const rowCount = Math.min(available.get(province) ?? HOME_STORE_LIMIT, HOME_STORE_LIMIT);
+    let results;
+    if (loading) {
+        results = <output className="reserve-discovery-store-list reserve-store-list-rows" aria-label="지역별 가게를 불러오는 중" aria-busy="true">
+            <StoreListRowSkeleton count={rowCount} pageLoading={false} />
+        </output>;
+    } else if (regions.isError && !regions.data) {
+        results = <DataState state="error" kind="store" subject="지역 정보" error={regions.error}
+            onRetry={regions.refetch} retrying={regions.isFetching} compact />;
+    } else if (isBlockingListReadError(error, stores)) {
+        results = <DataState state="error" kind="store" subject="지역별 가게" error={error} onRetry={refetch} retrying={isFetching} compact />;
+    } else if (stores.length === 0) {
+        results = <DataState state="empty" kind="store" title="아직 보여드릴 지역별 가게가 없어요." compact />;
+    } else {
+        results = <>
+            <ul className="reserve-discovery-store-list reserve-store-list-rows" aria-label={`${province} 가게`}>
+                {stores.map(store => <li key={store.id}><StoreListRow store={store} /></li>)}
+            </ul>
+            {error && <DataState compact state="error" role="status" aria-live="polite"
+                title="최신 정보를 불러오지 못했어요." error={error} onRetry={refetch} retrying={isFetching} />}
+        </>;
+    }
+
+    const panel = <div className="reserve-discovery-regional-results" data-discovery-swipe-ignore="true"
+        onTouchStart={startSwipe} onTouchEnd={endSwipe} onTouchCancel={() => { touchStart.current = null; }}>
+        <AnimatedContent motionKey={province} animateOnMount={Boolean(selection.province)} direction={selection.direction} duration={150}>
+            {results}
+        </AnimatedContent>
+    </div>;
+
+    return <section ref={sectionRef} className="reserve-discovery-regional" aria-labelledby="home-regional-title">
+        <SectionHeading title={<span id="home-regional-title">지역별 BEST</span>} />
+        {options.length > 0 ? <Tabs className="reserve-discovery-regional-tabs" activeKey={province}
+            onChange={selectProvince} animated={{ inkBar: !reducedMotion, tabPane: false }}
+            items={options.map(key => ({ key, label: key, children: key === province ? panel : null }))} /> : panel}
+    </section>;
+}
+
+RegionalBest.propTypes = { region: PropTypes.string };
 
 export default function Home() {
     useDocumentTitle(null);
@@ -456,6 +557,7 @@ export default function Home() {
             <FeaturedCarousel region={region} />
             <DiscoveryShortcuts region={region} />
             <RecommendedStores region={region} />
+            <RegionalBest region={region} />
             <RegionSheet open={regionOpen} value={region} onClose={() => setRegionOpen(false)} onApply={applyRegion} />
         </div>
     );

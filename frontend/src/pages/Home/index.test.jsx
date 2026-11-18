@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import Home from './index';
+import { storeKeys } from '../../hooks/queryKeys';
 import { storeService, tourismService } from '../../services';
 import { saveDiscoveryRegion } from '../../utils/discoveryRegion';
 
@@ -85,7 +86,13 @@ const prepareBannerScroll = () => {
 };
 
 describe('app discovery home', () => {
+    const visibilityByElement = new Map();
     beforeEach(() => {
+        vi.stubGlobal('IntersectionObserver', class {
+            constructor(callback) { this.callback = callback; }
+            observe(element) { visibilityByElement.set(element, this.callback); }
+            disconnect() {}
+        });
         saveDiscoveryRegion('');
         navigate.mockClear();
         locationRequest.mockReset();
@@ -108,9 +115,78 @@ describe('app discovery home', () => {
         ]);
     });
 
+    afterEach(() => {
+        visibilityByElement.clear();
+        vi.unstubAllGlobals();
+    });
+
+    it('지역별 BEST는 가까워질 때 읽고 선택한 지역의 조회 결과를 재사용해요', async () => {
+        const user = userEvent.setup();
+        storeService.getStores.mockImplementation(async ({ region }) => ({
+            content: region === '서울' ? [{ id: 3, name: '서울 가게' }]
+                : [{ id: 4, name: '경기 가게' }],
+        }));
+        renderHome(['/?region=서울']);
+        const section = screen.getByRole('region', { name: '지역별 BEST' });
+        const regional = within(section);
+        expect(storeService.getRegions).not.toHaveBeenCalled();
+        const skeleton = regional.getByRole('status', { name: '지역별 가게를 불러오는 중' });
+        expect(skeleton).toHaveAttribute('aria-busy', 'true');
+        expect(skeleton.querySelector('.reserve-skeleton-block:not(.reserve-skeleton-block--local)')).toBeNull();
+
+        act(() => visibilityByElement.get(section)([{ isIntersecting: true }]));
+        expect(await regional.findByRole('link', { name: '서울 가게 상세 보기' })).toHaveAttribute('href', `/store/3`);
+        expect(regional.getByRole('tab', { name: '서울' })).toHaveAttribute('aria-selected', 'true');
+        expect(storeService.getRegions).toHaveBeenCalledTimes(1);
+        expect(storeService.getStores).toHaveBeenCalledExactlyOnceWith({ page: 0, size: 4, sort: 'rating', region: '서울' }, expect.any(AbortSignal));
+
+        const results = regional.getByRole('list', { name: '서울 가게' }).closest('[data-discovery-swipe-ignore]');
+        const point = { identifier: 1, clientX: 220, clientY: 100 };
+        fireEvent.touchStart(results, { touches: [point] });
+        fireEvent.touchEnd(results, { touches: [], changedTouches: [{ ...point, clientX: 216, clientY: 180 }] });
+        expect(regional.getByRole('tab', { name: '서울' })).toHaveAttribute('aria-selected', 'true');
+        let resolveGyeonggi;
+        storeService.getStores.mockImplementationOnce(() => new Promise(resolve => { resolveGyeonggi = resolve; }));
+        const animate = vi.fn(() => ({ cancel: vi.fn() }));
+        const animationProperty = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'animate');
+        Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value: animate });
+        try {
+            fireEvent.touchStart(results, { touches: [point] });
+            fireEvent.touchEnd(results, { touches: [], changedTouches: [{ ...point, clientX: 100 }] });
+            expect(regional.getByRole('tab', { name: '경기' })).toHaveAttribute('aria-selected', 'true');
+            expect(regional.getByRole('status', { name: '지역별 가게를 불러오는 중' }).querySelectorAll('.reserve-store-list-row')).toHaveLength(1);
+            const horizontalMotions = () => animate.mock.calls.filter(([frames]) => frames[0]?.transform === 'translateX(12px)');
+            expect(horizontalMotions()).toHaveLength(1);
+            expect(horizontalMotions()[0][1]).toMatchObject({ duration: 150 });
+
+            await act(async () => resolveGyeonggi({ content: [{ id: 4, name: '경기 가게' }] }));
+            expect(await regional.findByRole('link', { name: '경기 가게 상세 보기' })).toBeVisible();
+            expect(horizontalMotions()).toHaveLength(1);
+            expect(regional.queryByRole('link', { name: /전체 보기/ })).not.toBeInTheDocument();
+            expect(storeService.getStores).toHaveBeenLastCalledWith({ page: 0, size: 4, sort: 'rating', region: '경기' }, expect.any(AbortSignal));
+        } finally {
+            if (animationProperty) Object.defineProperty(HTMLElement.prototype, 'animate', animationProperty);
+            else delete HTMLElement.prototype.animate;
+        }
+
+        await user.click(regional.getByRole('tab', { name: '서울' }));
+        expect(regional.getByRole('link', { name: '서울 가게 상세 보기' })).toBeVisible();
+        expect(storeService.getStores).toHaveBeenCalledTimes(2);
+    });
+
+    it('잘못된 지역 응답에서도 홈의 추천 목록과 빠른 메뉴를 유지해요', async () => {
+        storeService.getRegions.mockResolvedValueOnce({ content: [] });
+        renderHome(['/']);
+        const section = screen.getByRole('region', { name: '지역별 BEST' });
+        act(() => visibilityByElement.get(section)([{ isIntersecting: true }]));
+        expect(await within(section).findByText('아직 보여드릴 지역별 가게가 없어요.')).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: '메시지' })).toBeInTheDocument();
+        expect(screen.getByText('모던 필라테스')).toBeInTheDocument();
+    });
+
     it('keeps cached recommendation rows visible when a background read fails', async () => {
         const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-        const key = ['home', 'recommended-stores', ''];
+        const key = storeKeys.list({ page: 0, size: 4, sort: 'rating' });
         client.setQueryData(key, { content: [{ id: 3, name: '읽던 가게', rating: 4.9, reviewCount: 10 }] });
         renderHome(['/'], client);
         expect(await screen.findByText('읽던 가게')).toBeInTheDocument();
@@ -124,7 +200,7 @@ describe('app discovery home', () => {
 
     it('replaces a cached empty success with only an error after a failed refresh and restores empty after retry', async () => {
         const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-        const key = ['home', 'recommended-stores', ''];
+        const key = storeKeys.list({ page: 0, size: 4, sort: 'rating' });
         const emptyPage = { content: [] };
         storeService.getStores.mockResolvedValueOnce(emptyPage)
             .mockRejectedValueOnce({ status: 503 })
@@ -171,7 +247,7 @@ describe('app discovery home', () => {
         expect(screen.getByRole('link', { name: '운동 · 웰니스 가게 둘러보기' }))
             .toHaveAttribute('href', '/stores?domain=SPORTS&region=all');
         expect(await screen.findByText('모던 필라테스')).toBeInTheDocument();
-        expect(storeService.getStores).toHaveBeenCalledWith({ page: 0, size: 4, sort: 'rating' });
+        expect(storeService.getStores).toHaveBeenCalledWith({ page: 0, size: 4, sort: 'rating' }, expect.any(AbortSignal));
     });
 
     it('keeps the guide copy inside the hero link rather than a separately loaded notice block', async () => {
@@ -196,35 +272,25 @@ describe('app discovery home', () => {
     it('auto-advances only while the featured banner is visible and pauses for pointer attention', () => {
         vi.useFakeTimers();
         try {
-            let reportVisibility;
-            const originalObserver = globalThis.IntersectionObserver;
-            globalThis.IntersectionObserver = class IntersectionObserver {
-                constructor(callback) { reportVisibility = callback; }
-                observe() {}
-                disconnect() {}
-            };
-            try {
-                renderHome();
-                const { section, track } = prepareBannerScroll();
-                act(() => { vi.advanceTimersByTime(6000); });
-                expect(track.scrollTo).not.toHaveBeenCalled();
-                act(() => { reportVisibility([{ isIntersecting: true, intersectionRatio: 0.01 }]); });
-                act(() => { vi.advanceTimersByTime(6000); });
-                expect(track.scrollTo).not.toHaveBeenCalled();
-                act(() => { reportVisibility([{ isIntersecting: true, intersectionRatio: 0.5 }]); });
-                act(() => { vi.advanceTimersByTime(6000); });
-                expect(track.scrollTo).toHaveBeenLastCalledWith({ left: 410, behavior: 'smooth' });
-                expect(section.querySelector('.reserve-discovery-banner-next')).toHaveTextContent('2 / 4');
+            renderHome();
+            const { section, track } = prepareBannerScroll();
+            const reportVisibility = visibilityByElement.get(section);
+            act(() => { vi.advanceTimersByTime(6000); });
+            expect(track.scrollTo).not.toHaveBeenCalled();
+            act(() => { reportVisibility([{ isIntersecting: true, intersectionRatio: 0.01 }]); });
+            act(() => { vi.advanceTimersByTime(6000); });
+            expect(track.scrollTo).not.toHaveBeenCalled();
+            act(() => { reportVisibility([{ isIntersecting: true, intersectionRatio: 0.5 }]); });
+            act(() => { vi.advanceTimersByTime(6000); });
+            expect(track.scrollTo).toHaveBeenLastCalledWith({ left: 410, behavior: 'smooth' });
+            expect(section.querySelector('.reserve-discovery-banner-next')).toHaveTextContent('2 / 4');
 
-                fireEvent.pointerEnter(section, { pointerType: 'mouse' });
-                act(() => { vi.advanceTimersByTime(6000); });
-                expect(track.scrollTo).toHaveBeenCalledTimes(1);
-                fireEvent.pointerLeave(section, { pointerType: 'mouse' });
-                act(() => { vi.advanceTimersByTime(6000); });
-                expect(track.scrollTo).toHaveBeenLastCalledWith({ left: 820, behavior: 'smooth' });
-            } finally {
-                globalThis.IntersectionObserver = originalObserver;
-            }
+            fireEvent.pointerEnter(section, { pointerType: 'mouse' });
+            act(() => { vi.advanceTimersByTime(6000); });
+            expect(track.scrollTo).toHaveBeenCalledTimes(1);
+            fireEvent.pointerLeave(section, { pointerType: 'mouse' });
+            act(() => { vi.advanceTimersByTime(6000); });
+            expect(track.scrollTo).toHaveBeenLastCalledWith({ left: 820, behavior: 'smooth' });
         } finally {
             vi.useRealTimers();
         }
@@ -400,7 +466,7 @@ describe('app discovery home', () => {
         expect(screen.getByRole('button', { name: '경기도 안산시' })).toBeInTheDocument();
         await waitFor(() => expect(storeService.getStores).toHaveBeenCalledWith({
             page: 0, size: 4, sort: 'rating', region: '경기 안산시',
-        }));
+        }, expect.any(AbortSignal)));
         expect(screen.getByRole('link', { name: '전체 보기' }))
             .toHaveAttribute('href', '/stores?sort=rating&region=%EA%B2%BD%EA%B8%B0+%EC%95%88%EC%82%B0%EC%8B%9C');
     });
@@ -410,12 +476,12 @@ describe('app discovery home', () => {
         const first = renderHome(['/?region=서울 종로구']);
         await waitFor(() => expect(storeService.getStores).toHaveBeenCalledWith({
             page: 0, size: 4, sort: 'rating', region: '서울 종로구',
-        }));
+        }, expect.any(AbortSignal)));
         first.unmount();
         storeService.getStores.mockClear();
         renderHome(['/?region=']);
         expect(screen.getByRole('button', { name: '전체 지역' })).toBeInTheDocument();
-        await waitFor(() => expect(storeService.getStores).toHaveBeenCalledWith({ page: 0, size: 4, sort: 'rating' }));
+        await waitFor(() => expect(storeService.getStores).toHaveBeenCalledWith({ page: 0, size: 4, sort: 'rating' }, expect.any(AbortSignal)));
     });
 
     it('opens the shared region sheet and applies a real district to recommendations and links', async () => {
@@ -432,7 +498,7 @@ describe('app discovery home', () => {
 
         await waitFor(() => expect(storeService.getStores).toHaveBeenCalledWith({
             page: 0, size: 4, sort: 'rating', region: '서울 종로구',
-        }));
+        }, expect.any(AbortSignal)));
         expect(within(document.querySelector('.reserve-discovery-location')).getByRole('button', { name: '서울특별시 종로구' }))
             .toHaveAttribute('aria-expanded', 'false');
         expect(screen.getByRole('link', { name: '전체 보기' })).toHaveAttribute('href', '/stores?sort=rating&region=%EC%84%9C%EC%9A%B8+%EC%A2%85%EB%A1%9C%EA%B5%AC');
@@ -453,7 +519,7 @@ describe('app discovery home', () => {
         expect(within(dialog).getByText(/현재 등록된 가게가 없어요/)).toBeInTheDocument();
         await user.click(within(dialog).getByRole('button', { name: '제주특별자치도 적용' }));
         expect(await screen.findByText('이 지역에 등록된 가게가 없어요.')).toBeInTheDocument();
-        expect(storeService.getStores).toHaveBeenCalledWith({ page: 0, size: 4, sort: 'rating', region: '제주' });
+        expect(storeService.getStores).toHaveBeenCalledWith({ page: 0, size: 4, sort: 'rating', region: '제주' }, expect.any(AbortSignal));
 
         await user.click(screen.getByRole('button', { name: '제주특별자치도' }));
         dialog = await screen.findByRole('dialog');

@@ -440,14 +440,17 @@ const AdManageTab = () => {
             storeId, adType, dateRange, bannerCopyKey, bannerTitle, bannerDescription, bannerMotionKey, imageFiles,
         });
 
-        const result = await pay(formData);
+        const result = await pay(formData, {
+            storeName: selectedStore?.name, adType,
+            startDate: dateRange[0].format('YYYY-MM-DD'), endDate: dateRange[1].format('YYYY-MM-DD'),
+        });
         if (result.success) {
             setModalOpen(false);
             resetForm();
         }
     };
 
-    const handlePay = (ad) => payExisting(ad.id);
+    const handlePay = ({ id, storeName, adType, startDate, endDate }) => payExisting(id, { storeName, adType, startDate, endDate });
 
     // 수정 모달에는 기존 텍스트와 사진 미리보기를 채운다.
 

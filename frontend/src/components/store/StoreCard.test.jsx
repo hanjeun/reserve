@@ -71,7 +71,7 @@ describe('photo store card rating summaries', () => {
         expect(titleLine).toHaveTextContent('가게');
         expect(titleLine.querySelector('.reserve-store-card-favorite')).toBeTruthy();
         expect(identity).toHaveTextContent('한식AD광고우리동네');
-        expect(identity.querySelector('.reserve-store-identity-text-ad')).toHaveTextContent('광고');
+        expect(identity.querySelector('.reserve-ad-mark')).toHaveTextContent('광고');
         expect(identity.querySelector('[style*="background"]')).toBeNull();
         expect(titleLine.nextElementSibling).toBe(identity);
         expect(identity.nextElementSibling).toHaveClass('reserve-store-card-rating');

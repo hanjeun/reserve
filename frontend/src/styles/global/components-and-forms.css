@@ -737,75 +737,6 @@
     font-size: 12px;
 }
 
-/* 결제 금액과 계산 근거를 구분한다. */
-.reserve-ad-checkout {
-    padding: 20px;
-    border-radius: 16px;
-    background: var(--c-bg-subtle);
-}
-
-.reserve-ad-checkout__amount {
-    display: grid;
-    gap: 2px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid var(--c-gray-200, #e5e8eb);
-}
-
-.reserve-ad-checkout__amount h4 {
-    margin: 0;
-    color: var(--c-text-secondary);
-    font-size: 13px;
-    font-weight: 500;
-    line-height: 20px;
-}
-
-.reserve-ad-checkout__amount strong {
-    color: var(--c-text-primary);
-    font-size: 26px;
-    font-weight: 700;
-    line-height: 34px;
-    font-variant-numeric: tabular-nums;
-}
-
-.reserve-ad-checkout__rows {
-    display: grid;
-    gap: 12px;
-    margin: 16px 0 0;
-}
-
-.reserve-ad-checkout__row {
-    display: flex;
-    min-width: 0;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 16px;
-}
-
-.reserve-ad-checkout__row dt {
-    flex: 0 0 auto;
-    color: var(--c-text-secondary);
-    font-size: 14px;
-    line-height: 20px;
-}
-
-.reserve-ad-checkout__row dd {
-    min-width: 0;
-    margin: 0;
-    color: var(--c-text-primary);
-    font-size: 14px;
-    font-weight: 500;
-    line-height: 20px;
-    text-align: right;
-    word-break: keep-all;
-}
-
-.reserve-ad-checkout__note {
-    margin: 16px 0 0;
-    color: var(--c-text-tertiary);
-    font-size: 12px;
-    line-height: 18px;
-}
-
 @keyframes reserve-ad-create-page-enter {
     from { opacity: 0; transform: translateX(10px); }
     to { opacity: 1; transform: translateX(0); }
@@ -826,7 +757,6 @@
     .reserve-ad-final-preview-stage { min-height: 240px; }
     .reserve-ad-final-banner { right: 12px; bottom: 12px; width: calc(100% - 24px); }
     .reserve-ad-preview-screen { padding: 12px; }
-    .reserve-ad-checkout { padding: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

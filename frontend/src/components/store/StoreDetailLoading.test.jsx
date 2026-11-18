@@ -36,7 +36,7 @@ describe('one store detail loading frame', () => {
         const client = new QueryClient(); clients.push(client);
         const url = 'https://cdn.reserve.it.kr/users/3/stores/804/images/current.webp';
         client.setQueryData(['stores', 'detail', '804', 'edit'], { id: 804, mainImageUrl: url, mainImageWidth: 50, mainImageHeight: 50 }, { updatedAt: 30 });
-        client.setQueryData(['home', 'recommended-stores', ''], { content: [{ id: 804, detailImageUrls: [url], detailImageMeta: [{ url, width: 900, height: 500 }] }] }, { updatedAt: 20 });
+        client.setQueryData(['stores', 'list', { page: 0, size: 4, sort: 'rating' }], { content: [{ id: 804, detailImageUrls: [url], detailImageMeta: [{ url, width: 900, height: 500 }] }] }, { updatedAt: 20 });
         client.setQueryData(['stores', 'list', {}], { content: [{ id: 804, mainImageUrl: url, mainImageWidth: 600, mainImageHeight: 800 }] }, { updatedAt: 10 });
         const { container } = render(<QueryClientProvider client={client}><StoreDetailLoading storeId={804} /></QueryClientProvider>);
         expect(cover(container).style.aspectRatio).toBe('900 / 500');

@@ -2,8 +2,8 @@ import React, { lazy, Suspense, useEffect } from 'react';
 import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import Pagination from '../../components/common/Pagination';
-import { ReservationCardSkeleton, ReservationSummaryCardSkeleton, DataState, FilterToolbar } from '../../components/common';
-import ListingContent from '../../components/common/ListingContent';
+import { AdminTableSkeleton, ReservationCardSkeleton, ReservationSummaryCardSkeleton, DataState, FilterToolbar } from '../../components/common';
+import { AnimatedListingContent } from '../../components/common/AnimatedContent';
 import WorkspaceLayout from '../../components/layout/WorkspaceLayout';
 import WorkspacePanels from '../../components/layout/WorkspacePanels';
 import useWorkspaceNavigate from '../../hooks/useWorkspaceNavigate';
@@ -19,11 +19,12 @@ import ChatIntroTab from '../../components/business/ChatIntroTab';
 import StoreNewsSkeleton from '../../components/store-news/StoreNewsSkeleton';
 import useManageReservations from '../../hooks/useManageReservations';
 import { useMyStores, useQueryParamsState } from '../../hooks';
-import useDebounce from '../../hooks/useDebounce';
 import useMessage from '../../hooks/useMessage';
 import { handleApiError } from '../../utils/errorHandler';
 import useViewModeParam from '../../hooks/useViewModeParam';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
+import useListSelectionMotion from '../../hooks/useListSelectionMotion';
+import useInitialLoading from '../../hooks/useInitialLoading';
 import { resolveViewMode } from '../../utils/viewMode';
 import { WaitingTabSkeleton } from '../../components/waiting/WaitingSkeleton';
 import { useWindowWidth } from '../../hooks/useWindowWidth';
@@ -36,6 +37,8 @@ import useTabQueryMemory from '../../hooks/useTabQueryMemory';
 
 const WaitingTab = lazy(() => import('../../components/business/WaitingTab'));
 const StoreNewsTab = lazy(() => import('../../components/business/StoreNewsTab'));
+const NoShowTab = lazy(() => import('../../components/business/NoShowTab'));
+const CustomersTab = lazy(() => import('../../components/business/CustomersTab'));
 
 // 상태 필터 목록은 constants/status.js 하나에서만 온다 —
 // 같은 상태를 화면마다 다르게 부르지 않기 위해서다('확정' vs '승인됨' vs '예약 확정').
@@ -59,17 +62,17 @@ const positivePageOrOne = (value) => {
 };
 
 // useManageReservations 조회 조건 — 'ALL'·빈 검색어는 보내지 않는다
-const buildManageQuery = ({ page, debouncedKeyword, statusFilter, storeFilter, sort }) => ({
+const buildManageQuery = ({ page, keyword, statusFilter, storeFilter, sort }) => ({
     page: page - 1,
     size: DEFAULT_PAGE_SIZE,
-    search: debouncedKeyword.trim() || undefined,
+    search: keyword.trim() || undefined,
     status: statusFilter === 'ALL' ? undefined : statusFilter,
     storeId: storeFilter === 'ALL' ? undefined : Number(storeFilter),
     sort,
 });
 
 // 예약 목록 본문 — 로딩 스켈레톤 / 빈 안내 / 목록 중 하나.
-const ReservationListBody = ({ loading, view, reservations, statusFilter, debouncedKeyword, cardProps, listRef }) => {
+const ReservationListBody = ({ loading, view, reservations, statusFilter, keyword, cardProps, listRef }) => {
     if (loading) {
         return (
             view === 'cards'
@@ -80,7 +83,7 @@ const ReservationListBody = ({ loading, view, reservations, statusFilter, deboun
     if (reservations.length === 0) {
         return (
             <DataState state="empty" kind="reservation"
-                title={statusFilter === 'ALL' && !debouncedKeyword.trim()
+                title={statusFilter === 'ALL' && !keyword.trim()
                     ? '예약 내역이 없어요.'
                     : '조건에 맞는 예약이 없어요.'} />
         );
@@ -102,7 +105,7 @@ const ReservationListBody = ({ loading, view, reservations, statusFilter, deboun
 };
 
 // 가게·예약 조회가 함께 실패하면 하나로 안내하고 개별 오류는 해당 목록에만 표시한다.
-const renderMainContent = ({ error, blockingError, myStoresError, myStoresLoading, busy, retryAll, refetch, retryStores, listBody }) => {
+const renderMainContent = ({ view, resultsLoading, total, error, blockingError, myStoresError, myStoresLoading, busy, retryAll, refetch, retryStores, listBody }) => {
     let content = listBody;
     if (blockingError && myStoresError) {
         content = (
@@ -117,7 +120,7 @@ const renderMainContent = ({ error, blockingError, myStoresError, myStoresLoadin
         );
     }
     return (
-        <ListingContent notice={!blockingError && <>
+        <AnimatedListingContent motionKey={view} ready={!resultsLoading} keepResultsHeight={total > DEFAULT_PAGE_SIZE} notice={!blockingError && <>
             {error && <DataState state="error" kind="reservation" subject="예약 목록" error={error}
                 title="최신 예약을 확인하지 못해 이전 목록을 보여드리고 있어요."
                 onRetry={myStoresError ? retryAll : refetch} retrying={busy || myStoresLoading} compact />}
@@ -125,18 +128,17 @@ const renderMainContent = ({ error, blockingError, myStoresError, myStoresLoadin
                 <DataState state="error" kind="store" subject="가게별 필터용 가게 목록" error={myStoresError}
                     onRetry={retryStores} retrying={myStoresLoading} compact />
             )}
-        </>}>{content}</ListingContent>
+        </>}>{content}</AnimatedListingContent>
     );
 };
 
 const ReservationTab = () => {
     const [urlSearchParams] = useSearchParams();
-    const [reservationParams, setReservationParams] = useQueryParamsState(RESERVATION_QUERY_DEFAULTS);
+    const [reservationParams, setReservationParams] = useQueryParamsState(RESERVATION_QUERY_DEFAULTS, { privateKeys: ['reservationSearch'] });
     const statusFilter = optionValueOr(STATUS_OPTIONS, reservationParams.reservationStatus, 'ALL');
     const sort = optionValueOr(SORT_OPTIONS, reservationParams.reservationSort, 'recent');
     const [view, setView] = useViewModeParam(urlSearchParams, 'list');
     const keyword = reservationParams.reservationSearch;
-    const debouncedKeyword = useDebounce(keyword, 300);
     const storeFilter = reservationParams.reservationStore;
     // 광고·통계 탭과 같은 키를 쓰므로, 같은 사업자 패널 안에서 이미 받은 가게 목록은
     // 다시 기다리지 않는다. 예약 데이터와 별개 요청인 점은 아래의 부분 오류 처리로 유지한다.
@@ -145,13 +147,17 @@ const ReservationTab = () => {
     const page = positivePageOrOne(reservationParams.reservationPage);
     const isMobile = useWindowWidth() < MOBILE_PAGINATION_BREAKPOINT;
     const { reservations, total, totalPages, error, loading, refetching, actionLoading, approve, reject, storeCancel, complete, noShow, refetch,
-        hasData = reservations.length > 0 || !loading && !error } = useManageReservations(
-        buildManageQuery({ page, debouncedKeyword, statusFilter, storeFilter, sort }),
+        hasData = reservations.length > 0 || !loading && !error, sorting, resultPage = page, resultSort = sort } = useManageReservations(
+        buildManageQuery({ page, keyword, statusFilter, storeFilter, sort }),
     );
     const { message, confirm } = useMessage();
+    const initialLoading = useInitialLoading(loading || myStoresLoading);
     const blockingError = isBlockingListReadError(error, reservations);
     const listRef = React.useRef(null);
-    useListRefreshAnchor(listRef, JSON.stringify([view, page, debouncedKeyword, statusFilter, storeFilter, sort]), refetching, hasData ? reservations : null);
+    useListRefreshAnchor(listRef, JSON.stringify([view, page, keyword, statusFilter, storeFilter, sort]), refetching, hasData ? reservations : null);
+    useListSelectionMotion(listRef, {
+        selection: resultSort, view, ids: reservations.map(item => item.id), ready: !loading && !blockingError,
+    });
     const retryStores = () => refetchStores();
     const retryAll = () => {
         void retryStores();
@@ -183,9 +189,9 @@ const ReservationTab = () => {
         });
     };
 
-    const resultsLoading = loading || keyword.trim() !== debouncedKeyword.trim();
+    const resultsLoading = loading;
     const listBody = <ReservationListBody
-        {...{ loading: resultsLoading, view, reservations, statusFilter, debouncedKeyword, listRef }}
+        {...{ loading: resultsLoading, view, reservations, statusFilter, keyword, listRef }}
         cardProps={{
             actionLoading,
             onApprove: approve,
@@ -197,7 +203,7 @@ const ReservationTab = () => {
         }} />;
 
     const mainContent = renderMainContent({
-        error, blockingError, myStoresError, myStoresLoading, busy: loading || refetching,
+        view, resultsLoading, total, error, blockingError, myStoresError, myStoresLoading, busy: loading || refetching,
         retryAll, refetch, retryStores, listBody,
     });
 
@@ -220,17 +226,18 @@ const ReservationTab = () => {
                 sort={sort}
                 onSortChange={value => changeFilter({ reservationSort: value })}
                 sortOptions={SORT_OPTIONS}
+                sortLoading={sorting}
                 count={hasData && !blockingError ? total : undefined}
-                disabled={loading}
-                initialLoading={loading || myStoresLoading}
+                disabled={false}
+                initialLoading={initialLoading}
                 label="사업자 예약 목록 필터"
             />
             <FilterToolbar
                 autoRefreshDomain="RESERVATION"
-                search={{ value: keyword, onChange: e => changeFilter({ reservationSearch: e.target.value }), placeholder: '가게명, 예약자로 검색' }}
+                search={{ value: keyword, onSubmit: value => changeFilter({ reservationSearch: value }), placeholder: '가게명, 예약자로 검색' }}
                 onReload={refetch}
-                loading={loading || refetching}
-                initialLoading={loading}
+                loading={loading || refetching && !sorting}
+                initialLoading={initialLoading && loading}
             />
 
             {/*
@@ -240,7 +247,7 @@ const ReservationTab = () => {
             {hasData && !blockingError && total > 0 && (
                 <nav aria-label="예약 목록 페이지" className="reserve-listing-pagination">
                     <Pagination
-                        current={page}
+                        current={resultPage}
                         pageSize={DEFAULT_PAGE_SIZE}
                         total={total}
                         onChange={nextPage => setReservationParams({ reservationPage: String(nextPage) })}
@@ -248,7 +255,7 @@ const ReservationTab = () => {
                         showLessItems={isMobile}
                         size={isMobile ? 'small' : 'default'}
                         align="end"
-                        disabled={loading || keyword !== debouncedKeyword}
+                        disabled={loading || sorting}
                     />
                 </nav>
             )}
@@ -274,8 +281,10 @@ const BusinessPanel = () => {
 
     const tabItems = [
         { key: 'reservations', label: '예약 관리', children: <ReservationTab /> },
+        { key: 'customers', label: '고객 관리', children: <Suspense fallback={<AdminTableSkeleton />}><CustomersTab /></Suspense> },
+        { key: 'no-show', label: '노쇼 관리', children: <Suspense fallback={<ReservationCardSkeleton count={5} />}><NoShowTab /></Suspense> },
         { key: 'waiting', label: '웨이팅', children: <Suspense fallback={<WaitingTabSkeleton view={resolveViewMode('/business', params, 'list')} />}><WaitingTab /></Suspense> },
-        { key: 'news', label: '가게 소식', children: <Suspense fallback={<StoreNewsSkeleton />}><StoreNewsTab /></Suspense> },
+        { key: 'news', label: '가게 소식', children: <Suspense fallback={<StoreNewsSkeleton view={params.get('view') === 'cards' ? 'cards' : 'list'} />}><StoreNewsTab /></Suspense> },
         { key: 'ads', label: '광고 관리', children: <AdManageTab /> },
         { key: 'analytics', label: '통계 · 분석', children: <StatisticsTab /> },
         { key: 'settlements', label: 'TEST 가상 정산', children: <TestSettlementTab /> },

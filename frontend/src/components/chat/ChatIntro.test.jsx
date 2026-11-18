@@ -16,7 +16,7 @@ vi.mock('../../services', () => ({ chatService: {
     listConversations: vi.fn(), listStoreInbox: vi.fn(), getSupport: vi.fn(), sendSupport: vi.fn(),
     getStore: vi.fn(), sendStore: vi.fn(), getStoreInboxRoom: vi.fn(), sendStoreInbox: vi.fn(),
     pollRoom: vi.fn(), getHistory: vi.fn(), markRead: vi.fn(), setBlocked: vi.fn(), reportConversation: vi.fn(),
-    getSupportIntro: vi.fn(), getStoreIntro: vi.fn(),
+    getSupportIntro: vi.fn(), getStoreIntro: vi.fn(), getUnread: vi.fn(),
 } }));
 
 const DEFAULT_ITEMS = DEFAULT_SUPPORT_QUESTIONS.map(question => ({ question, answer: null }));
@@ -41,6 +41,7 @@ beforeEach(() => {
     chatService.listStoreInbox.mockResolvedValue({ content: [], page: { number: 0, totalPages: 1 } });
     chatService.getSupport.mockResolvedValue(emptyThread);
     chatService.pollRoom.mockResolvedValue([]);
+    chatService.getUnread.mockResolvedValue({ messages: 0, notifications: 0 });
     chatService.markRead.mockResolvedValue({});
     // 설정 조회가 아무것도 돌려주지 않으면 기본 안내(기존 질문 4개, 답변 없음)로 떨어진다.
     chatService.getSupportIntro.mockResolvedValue(null);
@@ -96,6 +97,23 @@ describe('chat intro component', () => {
         render(<ChatIntro disabled items={[{ question: '주차', answer: '가능해요.' }, { question: '기타 문의', answer: null }]} onAsk={vi.fn()} />);
         expect(screen.getByRole('button', { name: '주차' })).toBeEnabled();
         expect(screen.getByRole('button', { name: '기타 문의' })).toBeDisabled();
+    });
+
+    it('animates only the latest question and auto answer', () => {
+        const original = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'animate');
+        const animate = vi.fn(() => ({ cancel: vi.fn() }));
+        Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value: animate });
+        try {
+            render(<ChatIntro items={[{ question: '주차', answer: '가능해요.' }, { question: '반려동물', answer: '동반할 수 있어요.' }]} />);
+            fireEvent.click(screen.getByRole('button', { name: '주차' }));
+            expect(animate.mock.contexts.map(node => node.textContent)).toEqual(['주차', '자동 답변가능해요.']);
+            animate.mockClear();
+            fireEvent.click(screen.getByRole('button', { name: '반려동물' }));
+            expect(animate.mock.contexts.map(node => node.textContent)).toEqual(['반려동물', '자동 답변동반할 수 있어요.']);
+        } finally {
+            if (original) Object.defineProperty(HTMLElement.prototype, 'animate', original);
+            else delete HTMLElement.prototype.animate;
+        }
     });
 
     it('shows the notice in the megaphone line instead of the default hello', () => {

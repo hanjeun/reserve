@@ -2,14 +2,14 @@ import { expect, test } from '@playwright/test';
 
 const account = { id: 41, name: 'UI 검사 회원', email: 'ui-check@example.test', role: 'BUSINESS', termsAgreed: true, profileImageUrl: 'https://reserve-image.test/profile.svg' };
 const store = {
-    id: 81, name: '관심 가게', category: '카페', description: '사진과 예약 안내 확인', ownerId: 41,
+    id: 81, publicId: '00000000-0000-4000-8000-000000000081', name: '관심 가게', category: '카페', description: '사진과 예약 안내 확인', ownerId: 41,
     mainImageUrl: 'https://reserve-image.test/first.svg', mainImageWidth: 800, mainImageHeight: 450,
     detailImageUrls: ['https://reserve-image.test/first.svg', 'https://reserve-image.test/second.svg'],
     bookingType: 'TIME', reservationSlotMinutes: 30, openTime: '09:00', closeTime: '18:00', rating: 4.5, reviewCount: 12,
     noShowDeposit: 10000, fullRefundDays: 3, partialRefundDays: 1, partialRefundRate: 50,
     bookingDeadlineHours: 1, paymentTimeoutMinutes: 10, maxCapacityPerSlot: 2,
 };
-const favorite = { id: 51, storeId: store.id, storeName: store.name, storeCategory: store.category, storeMainImageUrl: store.mainImageUrl, storeRating: store.rating, storeReviewCount: store.reviewCount };
+const favorite = { id: 51, storeId: store.id, storePublicId: store.publicId, storeName: store.name, storeCategory: store.category, storeMainImageUrl: store.mainImageUrl, storeRating: store.rating, storeReviewCount: store.reviewCount };
 const emptyPage = { content: [], page: { number: 0, totalElements: 0, totalPages: 0 } };
 const ok = (route, data) => route.fulfill({ json: { success: true, data } });
 
@@ -40,7 +40,7 @@ async function mockUiApi(page, initialRead = {}) {
             return ok(route, [requests.favorites === 2 ? { ...favorite, storeName: '새 관심 가게' } : favorite]);
         }
         if (path.startsWith('/api/favorites/status/')) return ok(route, { isFavorite: true });
-        if (path === '/api/stores/81') return ok(route, store);
+        if (path === '/api/stores/00000000-0000-4000-8000-000000000081') return ok(route, store);
         if (path === '/api/stores/my') return ok(route, [store]);
         if (path === '/api/chat/unread' || path === '/api/chat/my/unread') return ok(route, 0);
         if (path === '/api/chat/intro/support') return ok(route, { configured: false, displayName: 'RESERVE 고객지원', items: [] });
@@ -93,7 +93,7 @@ for (const [mode, scheme] of [['light', 'dark'], ['dark', 'light'], ['system', '
     test(`photo indicators stay fully white in ${mode}/${scheme}, before and after changing the photo`, async ({ page }) => {
         const { requests } = await mockUiApi(page);
         await theme(page, mode, scheme);
-        await page.goto('/store/81');
+        await page.goto('/store/00000000-0000-4000-8000-000000000081');
         await expect(page.locator('.reserve-store-gallery img').first()).toHaveJSProperty('naturalWidth', 800);
         await expect(page.locator('html')).toHaveAttribute('data-theme', mode === 'system' ? scheme : mode);
         const indicators = page.locator('.reserve-carousel .slick-dots');
@@ -118,7 +118,7 @@ test('favorites switch layouts without refetching and retain cached rows and vie
     await toggle.focus();
     await page.keyboard.press('Enter');
     await expect(page.locator('.reserve-store-list-rows .reserve-store-list-row')).toHaveCount(1);
-    await expect(page.getByRole('link', { name: '관심 가게 상세 보기', exact: true })).toHaveAttribute('href', '/store/81');
+    await expect(page.getByRole('link', { name: '관심 가게 상세 보기', exact: true })).toHaveAttribute('href', '/store/00000000-0000-4000-8000-000000000081');
     await expect.poll(() => Object.fromEntries(new URL(page.url()).searchParams))
         .toEqual({ view: 'list', utm_source: 'yes', kind: 'all' });
     expect(mock.requests.favorites).toBe(1);
@@ -212,7 +212,7 @@ for (const [label, path, menu, destination] of [
         const { requests } = await mockUiApi(page, { path, ready });
         await theme(page, 'light');
         await page.emulateMedia({ reducedMotion: 'no-preference' });
-        await page.goto('/store/81');
+        await page.goto('/store/00000000-0000-4000-8000-000000000081');
         await expect(page.locator('.reserve-store-gallery img').first()).toHaveJSProperty('naturalWidth', 800);
         await page.getByRole('button', { name: '내 계정 메뉴 열기', exact: true }).click();
         await page.evaluate(targetPath => {
@@ -268,7 +268,7 @@ test('normal photo corners and hover covers stay clipped during both directions 
     const { requests } = await mockUiApi(page);
     await theme(page, 'dark');
     await page.emulateMedia({ reducedMotion: 'no-preference' });
-    await page.goto('/store/81');
+    await page.goto('/store/00000000-0000-4000-8000-000000000081');
     const gallery = page.locator('.reserve-store-gallery');
     await expect(gallery.locator('img').first()).toHaveJSProperty('naturalWidth', 800);
     await gallery.hover();

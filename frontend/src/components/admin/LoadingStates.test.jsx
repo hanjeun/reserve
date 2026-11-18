@@ -14,10 +14,12 @@ import MailboxTab from './MailboxTab';
 import AdManageTab from '../advertisement/AdManageTab';
 import StatisticsTab from '../business/StatisticsTab';
 import BusinessPanel from '../../pages/business/BusinessPanel';
+import ListSearchField from '../common/ListSearchField';
 
 const state = vi.hoisted(() => ({
-    query: {}, stores: {}, thread: {}, reload: vi.fn(), apiGet: vi.fn(), renderBusinessRows: false,
-    delayedSearch: null, queryOptions: null, dataTableProps: null, setQueryParams: vi.fn(), queryParams: null, manage: {}, width: 390,
+    query: {}, stores: {}, thread: {}, reload: vi.fn(), apiGet: vi.fn(),
+    renderBusinessRows: false, renderReservationNames: false,
+    queryOptions: null, dataTableProps: null, setQueryParams: vi.fn(), queryParams: null, manage: {}, width: 390,
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -39,8 +41,8 @@ vi.mock('../../hooks', () => ({
     useImagePreview: () => ({ handlePreview: vi.fn(), suppressLinkNavigation: vi.fn(), previewNode: null }),
     useFormErrors: () => ({ errors: {}, validate: vi.fn(), clearError: vi.fn(), resetErrors: vi.fn() }),
 }));
-vi.mock('../../hooks/useDebounce', () => ({ default: value => state.delayedSearch ?? value }));
 vi.mock('../../hooks/useChatThread', () => ({ default: () => state.thread }));
+vi.mock('../../hooks/useMailDrafts', () => ({ default: () => ({ ownerId: null, queryKey: ['local-mail-drafts'], query: {} }) }));
 vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: { error: vi.fn(), success: vi.fn() }, confirm: vi.fn() }) }));
 vi.mock('../../hooks/useWindowWidth', () => ({ useWindowWidth: () => state.width }));
 vi.mock('../../hooks/useDocumentTitle', () => ({ default: vi.fn() }));
@@ -53,22 +55,29 @@ vi.mock('../chat/ChatBubbleList', () => ({ default: () => <div data-testid="chat
 vi.mock('../common/Skeletons', () => ({ Bone: () => <div data-testid="bone" /> }));
 vi.mock('../common', () => {
     const Placeholder = () => null;
+    const DataTable = ({ columns = [], dataSource = [], ...props }) => {
+        state.dataTableProps = { columns, dataSource, ...props };
+        const visibleColumn = state.renderBusinessRows ? columns.find(column => column.key === 'actions')
+            : state.renderReservationNames ? columns.find(column => column.key === 'storeName') : undefined;
+        return <div data-testid="data-table">
+            {visibleColumn && dataSource.map(row => (
+                <div key={row.id}>{visibleColumn.render(row[visibleColumn.dataIndex], row)}</div>
+            ))}
+        </div>;
+    };
     return {
         AdminTableSkeleton: () => <div data-testid="table-skeleton" />,
-        DataTable: ({ columns = [], dataSource = [], ...props }) => {
-            state.dataTableProps = { columns, dataSource, ...props };
-            const actions = columns.find(column => column.key === 'actions');
-            return <div data-testid="data-table">
-                {state.renderBusinessRows && actions && dataSource.map(row => (
-                    <div key={row.id}>{actions.render(null, row)}</div>
-                ))}
-            </div>;
-        },
+        DataTable,
+        PagedDataTable: ({ placeholder, ...table }) => placeholder || <DataTable {...table} />,
         DataState: ({ state: dataState = 'empty', title, subject, onRetry }) => <section role={dataState === 'error' ? 'alert' : undefined}>
             <span>{title ?? `${subject ?? '목록'}을 불러오지 못했어요.`}</span>
             {onRetry && <button onClick={onRetry}>다시 불러오기</button>}
         </section>,
-        FilterToolbar: ({ selects }) => <><button onClick={state.query.refetch}>새로고침</button>{selects?.[0]?.options?.[0]?.label === '전체 가게' && <button disabled={selects[0].disabled}>가게 필터</button>}</>,
+        FilterToolbar: ({ selects, search }) => <>
+            <button onClick={state.query.refetch}>새로고침</button>
+            {selects?.[0]?.options?.[0]?.label === '전체 가게' && <button disabled={selects[0].disabled}>가게 필터</button>}
+            {search && <ListSearchField {...search} />}
+        </>,
         FilterMenu: ({ value, options = [], disabled, loading, ...props }) => <button disabled={disabled} aria-busy={loading || undefined} {...props}>{options.find(option => option.value === value)?.label}</button>,
         PageContainer: ({ children }) => <div>{children}</div>,
         ReservationCardSkeleton: Placeholder,
@@ -107,8 +116,8 @@ beforeEach(() => {
     state.queryOptions = null;
     state.dataTableProps = null;
     state.queryParams = null;
-    state.delayedSearch = null;
     state.renderBusinessRows = false;
+    state.renderReservationNames = false;
     state.manage = {};
     state.width = 390;
     state.query = {
@@ -169,24 +178,80 @@ describe.each(PLACEHOLDER_TABLE_TABS)('%s query transitions', (_label, Component
     });
 });
 
-describe.each([['광고', AdminAdsTab], ['사업자 인증', BusinessVerificationTab], ['회원', MembersTab],
-    ['가게', StoresAdminTab], ['예약', ReservationsAllTab], ['사업자 광고', AdManageTab]])('%s 검색 입력 대기', (_label, Component) => {
-    it('서버 요청 지연 중에는 이전 결과 대신 결과 영역의 골격을 표시해요', () => {
-        void _label;
-        state.delayedSearch = '';
-        state.queryParams = { search: '새 검색', page: '1', status: 'ALL', sort: 'recent', view: 'list',
-            advertisementSearch: '새 검색', advertisementPage: '0' };
+describe.each([
+    ['광고', AdminAdsTab, { search: '새 검색', page: '0' }],
+    ['사업자 인증', BusinessVerificationTab, { search: '새 검색', page: '1' }],
+    ['회원', MembersTab, { search: '새 검색', page: '1' }],
+    ['가게', StoresAdminTab, { search: '새 검색', page: '1' }],
+    ['예약', ReservationsAllTab, { search: '새 검색', page: '1' }],
+    ['사업자 광고', AdManageTab, { advertisementSearch: '새 검색', advertisementPage: '0' }],
+])('%s 확정형 검색', (_label, Component, patch) => {
+    it('입력 중에는 목록을 유지하고 검색을 확정할 때 첫 페이지에서 조회해요', () => {
         state.query.data = { content: [], ads: [], items: [], members: [], stores: [], reservations: [], totalElements: 12 };
-        render(<MemoryRouter><Component /></MemoryRouter>);
+        const renderTab = () => <MemoryRouter><Component /></MemoryRouter>;
+        const { rerender } = render(renderTab());
+        fireEvent.change(screen.getByRole('searchbox'), { target: { value: '새 검색' } });
+        expect(state.setQueryParams).not.toHaveBeenCalled();
+        expect(screen.getByTestId('data-table')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: '검색', exact: true }));
+        expect(state.setQueryParams).toHaveBeenCalledExactlyOnceWith(patch);
+        Object.assign(state.query, { isFetching: true, isPlaceholderData: true });
+        rerender(renderTab());
         expect(screen.getByTestId('table-skeleton')).toBeInTheDocument();
         expect(screen.queryByTestId('data-table')).toBeNull();
     });
 });
 
+it('opens the admin reservation detail from the table and clears it after loss of access', () => {
+    state.renderReservationNames = true;
+    state.query.data = { content: [{
+        id: 71, storeName: '예시 가게', reservationCode: 'DEMO-71', status: 'CANCELLED',
+        reservationDate: '2026-01-02', reservationTime: '12:00', guestCount: 2, depositAmount: 0,
+    }], totalElements: 1 };
+    const view = render(<ReservationsAllTab />);
+    fireEvent.click(screen.getByRole('button', { name: '예시 가게 예약 상세 보기' }));
+    expect(screen.getByRole('dialog', { name: '예약 상세' })).toHaveTextContent('DEMO-71');
+    state.query.error = Object.assign(new Error('Access denied'), { status: 403 });
+    view.rerender(<ReservationsAllTab />);
+    expect(screen.queryByRole('dialog', { name: '예약 상세' })).toBeNull();
+    state.query.error = null;
+    view.rerender(<ReservationsAllTab />);
+    expect(screen.queryByRole('dialog', { name: '예약 상세' })).toBeNull();
+});
+
+it('관리자 예약은 같은 범위의 정렬만 유지하고 다른 상태에서는 골격을 보여요', () => {
+    const data = { content: [{ id: 1 }, { id: 2 }], totalElements: 24 };
+    state.query.data = data;
+    state.queryParams = { search: '', status: 'ALL', sort: 'recent', view: 'list', page: '2' };
+    const view = render(<ReservationsAllTab />);
+    const originalKey = state.queryOptions.queryKey;
+    const sort = screen.getByRole('button', { name: '예약 정렬' });
+    sort.focus();
+    state.queryParams = { ...state.queryParams, sort: 'oldest', page: '1' };
+    view.rerender(<ReservationsAllTab />);
+    const retained = state.queryOptions.placeholderData(data, { queryKey: originalKey, state: {} });
+    expect(state.queryOptions.placeholderData(data, { queryKey: originalKey, state: { error: { status: 403 } } })).toBeUndefined();
+    Object.assign(state.query, { data: retained, isFetching: true, isPlaceholderData: true });
+    view.rerender(<ReservationsAllTab />);
+    expect(state.dataTableProps.dataSource).toEqual(data.content);
+    expect(view.container.querySelector('.ant-pagination-item-active')).toHaveTextContent('2');
+    expect(screen.queryByTestId('table-skeleton')).toBeNull();
+    expect(sort).toHaveFocus();
+
+    state.queryParams = { ...state.queryParams, status: 'CANCELLED' };
+    view.rerender(<ReservationsAllTab />);
+    expect(state.queryOptions.placeholderData(data, { queryKey: originalKey, state: {} })).toBeUndefined();
+    Object.assign(state.query, { data: undefined, isLoading: true, isPlaceholderData: false });
+    view.rerender(<ReservationsAllTab />);
+    expect(screen.getByTestId('table-skeleton')).toBeInTheDocument();
+    expect(sort).toBeEnabled();
+    expect(sort).toHaveFocus();
+});
+
 it('keeps a mail lookup failure separate from the empty mailbox', () => {
     state.queryParams = { search: '', page: '1', mailFolder: 'sent' };
     Object.assign(state.query, { isError: true, error: new Error('offline') });
-    render(<MailboxTab />);
+    render(<MemoryRouter><MailboxTab /></MemoryRouter>);
     expect(screen.getByRole('alert')).toHaveTextContent('보낸 메일을 불러오지 못했어요');
     expect(screen.queryByText('보낸 메일이 없어요')).not.toBeInTheDocument();
 });
@@ -205,7 +270,7 @@ it('keeps the mailbox trash action in the selected detail only', () => {
         totalElements: 1,
     };
 
-    render(<MailboxTab />);
+    render(<MemoryRouter><MailboxTab /></MemoryRouter>);
 
     expect(screen.queryByRole('button', { name: /메일을 휴지통으로/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByText('테스트 메일'));
@@ -251,14 +316,15 @@ it('requests the paged business ad contract and wires Spring Boot page metadata 
     expect(state.queryOptions.queryKey).toEqual(['ads', 'my', {
         page: 0, size: 20, storeFilter: 'ALL', search: '',
     }]);
-    await expect(state.queryOptions.queryFn()).resolves.toEqual({
+    const signal = new AbortController().signal;
+    await expect(state.queryOptions.queryFn({ signal })).resolves.toEqual({
         ads: [{ id: 21, storeName: '광고 가게' }],
         totalElements: 41,
     });
     expect(state.apiGet).toHaveBeenNthCalledWith(1, '/api/advertisements/my', {
-        params: { page: 0, size: 20 },
+        params: { page: 0, size: 20 }, signal,
     });
-    await expect(state.queryOptions.queryFn()).resolves.toEqual({ ads: [], totalElements: 7 });
+    await expect(state.queryOptions.queryFn({ signal })).resolves.toEqual({ ads: [], totalElements: 7 });
 
     state.query.data = { ads: [{ id: 21, storeName: '광고 가게' }], totalElements: 41 };
     rerender(<AdManageTab />);
@@ -279,9 +345,10 @@ it('sends business ad filters to the server page query', async () => {
     expect(state.queryOptions.queryKey).toEqual(['ads', 'my', {
         page: 1, size: 20, storeFilter: '42', search: '스튜디오',
     }]);
-    await state.queryOptions.queryFn();
+    const signal = new AbortController().signal;
+    await state.queryOptions.queryFn({ signal });
     expect(state.apiGet).toHaveBeenCalledWith('/api/advertisements/my', {
-        params: { page: 1, size: 20, storeId: 42, search: '스튜디오' },
+        params: { page: 1, size: 20, storeId: 42, search: '스튜디오' }, signal,
     });
 });
 

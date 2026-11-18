@@ -11,6 +11,15 @@ import { readStoreDraft, saveStoreDraft } from '../../utils/storeDraftStorage';
 import { readRegistrationNavigation } from '../../utils/storeRegistrationNavigation';
 import { storeService } from '../../services';
 
+const confirmDraft = vi.hoisted(() => vi.fn());
+
+vi.mock('../useMessage', async importOriginal => {
+    const { default: useMessage } = await importOriginal();
+    return { default: function useTestMessage() {
+        return { ...useMessage(), confirm: confirmDraft };
+    } };
+});
+
 vi.mock('../../utils/storeDraftStorage', async (importOriginal) => ({
     ...(await importOriginal()),
     deleteStoreDraft: vi.fn().mockResolvedValue(undefined),
@@ -41,12 +50,12 @@ const form = {
     setFieldsValue: vi.fn(),
 };
 
-const wrapper = ({ children }) => {
+const wrapper = ({ children, initialEntries }) => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     return (
         <QueryClientProvider client={client}>
             <AntApp>
-                <MemoryRouter>{children}</MemoryRouter>
+                <MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter>
             </AntApp>
         </QueryClientProvider>
     );
@@ -185,6 +194,59 @@ describe('useStoreForm draft scheduling', () => {
         }));
         expect(readStoreDraft.mock.calls).toHaveLength(diskReads);
         expect(result.current.draftState).toMatchObject({ status: 'saved', savedAt: 123, autoSaveEnabled: false });
+    });
+
+    it('opens the selected saved draft immediately from the draft list', async () => {
+        const key = 'member:7:store:create:new';
+        const draft = { key, savedAt: 123, values: { name: '보관한 가게' }, mainImage: [], detailImages: [] };
+        readStoreDraft.mockResolvedValueOnce(draft);
+        const initialEntries = [{ pathname: '/store/register', state: { storeDraftResume: { key, savedAt: 123 } } }];
+
+        const { result } = renderHook(() => useStoreForm({ form }), {
+            wrapper: ({ children }) => wrapper({ children, initialEntries }),
+        });
+        await act(async () => { await Promise.resolve(); });
+
+        expect(confirmDraft).not.toHaveBeenCalled();
+        expect(form.setFieldsValue).toHaveBeenCalledWith(expect.objectContaining({ name: '보관한 가게' }));
+        expect(result.current.draftState).toMatchObject({ status: 'saved', savedAt: 123 });
+    });
+
+    it.each([
+        ['opened normally', undefined],
+        ['replaced after selecting it', 122],
+    ])('asks before restoring a registration draft when %s', async (_reason, selectedAt) => {
+        const key = 'member:7:store:create:new';
+        readStoreDraft.mockResolvedValueOnce({ key, savedAt: 123, values: { name: '기존 초안' }, mainImage: [], detailImages: [] });
+        const state = selectedAt ? { storeDraftResume: { key, savedAt: selectedAt } } : null;
+
+        renderHook(() => useStoreForm({ form }), {
+            wrapper: ({ children }) => wrapper({ children, initialEntries: [{ pathname: '/store/register', state }] }),
+        });
+        await act(async () => { await Promise.resolve(); });
+
+        expect(form.setFieldsValue).not.toHaveBeenCalled();
+        expect(confirmDraft).toHaveBeenCalledWith(expect.objectContaining({
+            title: '임시저장된 내용이 있어요', okText: '이어서 작성', cancelText: '새로 작성',
+        }));
+    });
+
+    it('asks before applying a selected edit draft against a changed store', async () => {
+        const key = 'member:7:store:edit:12';
+        readStoreDraft.mockResolvedValueOnce({
+            key, savedAt: 123, values: { name: '이전 정보로 저장한 가게' }, mainImage: [], detailImages: [], baseFingerprint: 'old',
+        });
+        const initialData = { id: 12, name: '현재 가게' };
+        const initialEntries = [{ pathname: '/store/12/edit', state: { storeDraftResume: { key, savedAt: 123 } } }];
+
+        renderHook(() => useStoreForm({ form, mode: 'edit', storeId: 12, initialData }), {
+            wrapper: ({ children }) => wrapper({ children, initialEntries }),
+        });
+        await act(async () => { await Promise.resolve(); });
+
+        expect(form.setFieldsValue).toHaveBeenCalledTimes(1);
+        expect(form.setFieldsValue).toHaveBeenCalledWith(expect.objectContaining({ name: '현재 가게' }));
+        expect(confirmDraft).toHaveBeenCalledWith(expect.objectContaining({ title: '가게 정보가 달라졌어요' }));
     });
 
     it('applies only the current StrictMode navigation restore setup', async () => {

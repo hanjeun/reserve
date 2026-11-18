@@ -10,7 +10,7 @@ export default function FeedModalLoading({ open, onClose, kind = 'compose' }) {
     const fields = profile ? ['공개 닉네임', '소개'] : report ? ['신고 이유', '추가 설명'] : ['글', '지역 (선택)'];
     return (
         <FormModal
-            title={profile ? '피드 공개 프로필' : report ? '게시물 신고' : '피드 글쓰기'}
+            title={profile ? '프로필' : report ? '게시물 신고' : '피드 글쓰기'}
             open={open}
             onClose={onClose}
             footer={null}

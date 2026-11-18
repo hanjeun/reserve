@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 const keywordUrl = keyword => '/search?keyword=' + encodeURIComponent(keyword);
 const user = { id: 7, role: 'BUSINESS', name: '검색 검사 계정', email: 'search@example.test', termsAgreed: true };
 const group = (key, items = [], error = null) => ({ key, title: key, items, error, hasMore: false });
-const item = (id, type, title, path) => ({ id, type, title, path, description: '합성 검색 결과' });
+const item = (id, type, title, path, publicId) => ({ id, type, title, path, publicId, description: '합성 검색 결과' });
 const pageOf = content => ({ content, page: { number: 0, totalElements: content.length, totalPages: content.length ? 1 : 0 } });
 
 async function setup(page, signedIn = false) {
@@ -21,9 +21,9 @@ async function setup(page, signedIn = false) {
         if (path === '/api/service-admission') return ok({ campaignId: 'service-entry', mode: 'OFF', state: 'BYPASS',
             position: 0, expiresAt: 0, absoluteExpiresAt: 0, serverTime: Date.now(), pollAfterSeconds: 4, heartbeatTimeoutSeconds: 60, continuityId: null });
         if (path === '/api/search') return ok({ keyword: url.searchParams.get('keyword'), groups: [
-            group('stores', [item(3, 'STORE', '검색 가게', '/store/3')]),
+            group('stores', [item(3, 'STORE', '검색 가게', '/store/00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000003')]),
             group('benefits', [], { status: 503, message: '현재 혜택 검색을 사용할 수 없어요.' }),
-            group('feed', [item(4, 'FEED', '검색 피드', '/feed/posts/4')]),
+            group('feed', [item(4, 'FEED', '검색 피드', '/feed/posts/00000000-0000-4000-8000-000000000004', '00000000-0000-4000-8000-000000000004')]),
         ] });
         if (path === '/api/search/me') return ok({ keyword: url.searchParams.get('keyword'), groups: [
             group('reservations', [item(9, 'RESERVATION', '선택할 내 예약', '/my-reservations?reservationId=9')]),
@@ -42,7 +42,7 @@ async function setup(page, signedIn = false) {
         if (path.includes('/config')) return ok({ enabled: false, imageEnabled: false });
         if (path === '/api/waiting/my' || path.includes('/conversations') || path.includes('/inbox')) return ok(pageOf([]));
         if (path === '/api/stores' || path === '/api/waiting/stores') return ok(pageOf([]));
-        if (path === '/api/stores/3') return ok({ id: 3, name: '검색 가게', ownerId: 8, category: '카페', address: '서울', reservationEnabled: false });
+        if (path === '/api/stores/00000000-0000-4000-8000-000000000003') return ok({ id: 3, publicId: '00000000-0000-4000-8000-000000000003', name: '검색 가게', ownerId: 8, category: '카페', address: '서울', reservationEnabled: false });
         return ok([]);
     });
     return requests;

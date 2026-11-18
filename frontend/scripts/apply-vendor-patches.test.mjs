@@ -7,17 +7,18 @@ import test from 'node:test';
 import { applyVendorPatches } from './apply-vendor-patches.mjs';
 
 const frontendRoot = fileURLToPath(new URL('..', import.meta.url));
-const patchFiles = ['@rc-component+tabs+1.13.0.patch', '@rc-component+util+1.13.0.patch', '@rc-component+image+1.10.0.patch'];
-const tabSource = cjs => [
+const patchFiles = ['@rc-component+tabs+1.13.0.patch', '@rc-component+util+1.13.0.patch', '@rc-component+image+1.10.0.patch',
+    '@rc-component+tabs+2.0.0.patch', '@rc-component+util+1.14.1.patch'];
+const tabSource = (cjs, modern = false) => [
     cjs ? '  const overlayClassName = (0, _clsx.clsx)(popupClassName, {' : '  const overlayClassName = clsx(popupClassName, {',
     '    [`${dropdownPrefix}-rtl`]: rtl',
     '  });',
     `  const moreNode = mobile ? null : /*#__PURE__*/React.createElement(${cjs ? '_dropdown.default' : 'Dropdown'}, _extends({`,
-    '    prefixCls: dropdownPrefix,', '    overlay: overlay,', '    visible: tabs.length ? open : false,',
+    '    prefixCls: dropdownPrefix,', '    overlay: overlay,', `    ${modern ? 'open' : 'visible'}: tabs.length ? open : false,`,
 ].join('\n');
 const delaySource = '    }\n  });\n  return [value, setDelayValue];\n';
 
-function fixture(run, { externalTabs = false } = {}) {
+function fixture(run, { externalTabs = false, modern = false } = {}) {
     const tempBase = fs.realpathSync(os.tmpdir());
     const root = fs.mkdtempSync(path.join(tempBase, 'reserve-vendor-patches-'));
     const write = (relative, source) => {
@@ -33,14 +34,14 @@ function fixture(run, { externalTabs = false } = {}) {
             return source;
         });
         const tabsRoot = externalTabs ? 'external-tabs' : 'node_modules/@rc-component/tabs';
-        write(`${tabsRoot}/package.json`, JSON.stringify({ version: '1.13.0' }));
-        write('node_modules/@rc-component/util/package.json', JSON.stringify({ version: '1.13.0' }));
+        write(`${tabsRoot}/package.json`, JSON.stringify({ version: modern ? '2.0.0' : '1.13.0' }));
+        write('node_modules/@rc-component/util/package.json', JSON.stringify({ version: modern ? '1.14.1' : '1.13.0' }));
         write('node_modules/@rc-component/image/package.json', JSON.stringify({ version: '1.10.0' }));
         const files = [
-            write(`${tabsRoot}/es/TabNavList/OperationNode.js`, tabSource(false)),
-            write(`${tabsRoot}/lib/TabNavList/OperationNode.js`, tabSource(true)),
-            write('node_modules/@rc-component/util/es/hooks/useDelayState.js', delaySource),
-            write('node_modules/@rc-component/util/lib/hooks/useDelayState.js', delaySource),
+            write(`${tabsRoot}/es/TabNavList/OperationNode.js`, tabSource(false, modern)),
+            write(`${tabsRoot}/lib/TabNavList/OperationNode.js`, tabSource(true, modern)),
+            write('node_modules/@rc-component/util/es/hooks/useDelayState.js', (modern ? '  React.useEffect(() => cancelPending, [cancelPending]);\n' : '') + delaySource),
+            write('node_modules/@rc-component/util/lib/hooks/useDelayState.js', (modern ? '  React.useEffect(() => cancelPending, [cancelPending]);\n' : '') + delaySource),
         ];
         for (const block of patches.slice(1).flatMap(source => source.split(/(?=^diff --git )/m))) {
             const lines = block.split('\n');
@@ -80,6 +81,19 @@ test('changed package version fails before any file is patched', () => fixture((
     assert.throws(() => applyVendorPatches(root), /Unsupported.*version/);
     assert.deepEqual(read(), original);
 }));
+
+test('reviewed upgrades preserve the open property and upstream delay cleanup without duplicating it', () => fixture(({ root, read }) => {
+    const delayBefore = read().slice(2, 4);
+    assert.deepEqual(applyVendorPatches(root), { applied: 14, alreadyApplied: 0 });
+    const [tabsEs, tabsCjs, ...rest] = read();
+    for (const source of [tabsEs, tabsCjs]) {
+        assert.doesNotMatch(source, /moreNode = mobile \? null/);
+        assert.match(source, /open: tabs.length \? open : false/);
+    }
+    assert.deepEqual(rest.slice(0, 2), delayBefore);
+    for (const source of rest.slice(0, 2)) assert.equal(source.match(/React\.useEffect/g)?.length, 1);
+    assert.deepEqual(applyVendorPatches(root), { applied: 0, alreadyApplied: 14 });
+}, { modern: true }));
 
 test('a source mismatch in the final file leaves earlier files untouched', () => fixture(({ root, files, read }) => {
     fs.writeFileSync(files.at(-1), 'changed upstream source');

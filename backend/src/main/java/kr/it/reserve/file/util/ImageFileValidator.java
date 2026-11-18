@@ -17,7 +17,9 @@ import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Supplier;
 
 /** 업로드 이미지의 클라이언트 메타데이터가 아니라 실제 바이트를 검사하는 단일 관문. */
 public final class ImageFileValidator {
@@ -33,16 +35,34 @@ public final class ImageFileValidator {
             Format.PNG, Set.of(".png"),
             Format.GIF, Set.of(".gif"),
             Format.WEBP, Set.of(".webp"));
-    private static final Semaphore DECODE_SLOT = new Semaphore(1, true);
+    private static final ReentrantLock PROCESSING_SLOT = new ReentrantLock(true);
 
     private ImageFileValidator() {
     }
 
+    /** 재디코드·정규화도 같은 메모리 슬롯을 유지하고 같은 스레드의 중첩 검사는 허용해요. */
+    public static <T> T withProcessingSlot(Supplier<T> operation) {
+        try {
+            if (!PROCESSING_SLOT.tryLock(5, TimeUnit.SECONDS)) {
+                throw new FileException("잠시 후 사진을 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+            }
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new FileException("사진 요청이 중단됐어요. 다시 시도해주세요.", HttpStatus.SERVICE_UNAVAILABLE);
+        }
+        try { return operation.get(); }
+        finally { PROCESSING_SLOT.unlock(); }
+    }
+
     public static ValidatedImage inspect(MultipartFile file) {
-        return inspect(readBytes(file), file.getContentType(), file.getOriginalFilename());
+        return withProcessingSlot(() -> inspectBytes(readBytes(file), file.getContentType(), file.getOriginalFilename()));
     }
 
     public static ValidatedImage inspect(byte[] bytes, String contentType, String filename) {
+        return withProcessingSlot(() -> inspectBytes(bytes, contentType, filename));
+    }
+
+    private static ValidatedImage inspectBytes(byte[] bytes, String contentType, String filename) {
         if (bytes.length == 0) throw FileException.invalid("비어 있는 파일은 업로드할 수 없어요.");
         if (bytes.length > MAX_FILE_BYTES) {
             throw new FileException("파일 크기는 8MB를 초과할 수 없어요.", HttpStatus.PAYLOAD_TOO_LARGE);
@@ -61,13 +81,15 @@ public final class ImageFileValidator {
 
     /** 이미 {@link #inspect}를 통과한 호출부의 메타데이터 저장용 경량 재조회. */
     public static int[] readDimensions(MultipartFile file) {
-        byte[] bytes = readBytes(file);
-        Format format = detect(bytes);
-        Dimensions dimensions = format == Format.WEBP
-                ? inspectWebp(bytes)
-                : readStandardDimensions(bytes);
-        validateDimensions(dimensions);
-        return new int[]{dimensions.width, dimensions.height};
+        return withProcessingSlot(() -> {
+            byte[] bytes = readBytes(file);
+            Format format = detect(bytes);
+            Dimensions dimensions = format == Format.WEBP
+                    ? inspectWebp(bytes)
+                    : readStandardDimensions(bytes);
+            validateDimensions(dimensions);
+            return new int[]{dimensions.width, dimensions.height};
+        });
     }
 
     private static byte[] readBytes(MultipartFile file) {
@@ -117,27 +139,21 @@ public final class ImageFileValidator {
     }
 
     private static Dimensions decodeStandardImage(byte[] bytes) {
-        boolean acquired = false;
         try {
-            DECODE_SLOT.acquire();
-            acquired = true;
             Dimensions header = readStandardDimensions(bytes);
             validateDimensions(header);
             try (ByteArrayInputStream input = new ByteArrayInputStream(bytes)) {
                 BufferedImage image = ImageIO.read(input);
-                if (image == null || image.getWidth() != header.width || image.getHeight() != header.height) {
-                    throw unsupported(INVALID_IMAGE_MESSAGE);
-                }
-                return header;
+                try {
+                    if (image == null || image.getWidth() != header.width || image.getHeight() != header.height) {
+                        throw unsupported(INVALID_IMAGE_MESSAGE);
+                    }
+                    return header;
+                } finally { if (image != null) image.flush(); }
             }
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw FileException.uploadFailed();
         } catch (IOException | RuntimeException exception) {
             if (exception instanceof FileException fileException) throw fileException;
             throw unsupported(INVALID_IMAGE_MESSAGE);
-        } finally {
-            if (acquired) DECODE_SLOT.release();
         }
     }
 

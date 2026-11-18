@@ -27,10 +27,12 @@ describe('route SEO policy', () => {
         `;
     });
 
-    it('indexes only public landing, legal, list, and numeric store detail paths', () => {
+    it('indexes only public landing, legal, list, and store detail paths', () => {
         expect(isIndexablePath('/')).toBe(true);
         expect(isIndexablePath('/stores/')).toBe(true);
-        expect(isIndexablePath('/store/42')).toBe(true);
+        expect(isIndexablePath('/store/42')).toBe(false);
+        expect(isIndexablePath('/store/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee')).toBe(true);
+        expect(isIndexablePath('/store/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee/edit')).toBe(false);
         expect(isIndexablePath('/terms')).toBe(true);
         expect(isIndexablePath('/privacy')).toBe(true);
         expect(isIndexablePath('/content-sources')).toBe(true);
@@ -46,17 +48,24 @@ describe('route SEO policy', () => {
         expect(isIndexablePath('/store/not-an-id')).toBe(false);
     });
 
+    it('normalizes a shared store UUID to its query-free canonical address', () => {
+        renderAt('/store/AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE/?from=share#booking');
+        expect(document.querySelector('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
+        expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute('href',
+            'https://reserve.it.kr/store/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee');
+    });
+
     it('publishes a query-free canonical for public paths', () => {
-        renderAt('/store/42?from=search#reviews');
+        renderAt('/store/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee?from=search#reviews');
 
         expect(document.querySelector('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
         expect(document.querySelector('meta[property="og:url"]')).toHaveAttribute(
             'content',
-            'https://reserve.it.kr/store/42',
+            'https://reserve.it.kr/store/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
         );
         expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute(
             'href',
-            'https://reserve.it.kr/store/42',
+            'https://reserve.it.kr/store/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
         );
     });
 
@@ -81,7 +90,7 @@ describe('route SEO policy', () => {
     };
 
     it('publishes a breadcrumb trail for indexable sub-pages', () => {
-        renderAt('/store/42');
+        renderAt('/store/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee');
 
         const data = breadcrumb();
         expect(data['@type']).toBe('BreadcrumbList');

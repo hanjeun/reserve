@@ -126,6 +126,7 @@
 /* 일반 조회 실패는 중립 상태와 role=alert로 알린다. 폼 검증·파괴적 작업 실패는 기존 오류 표시를 쓴다. */
 .reserve-data-state {
     width: 100%;
+    min-width: 0;
     min-height: 240px;
     box-sizing: border-box;
     display: flex;
@@ -137,30 +138,49 @@
     color: var(--c-text-secondary, #4e5968);
     text-align: center;
 }
-.reserve-data-state__icon {
+.reserve-data-state__illustration {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: var(--c-text-tertiary, #8b95a1);
-    font-size: var(--data-state-icon-size, 48px);
-    line-height: 1;
 }
-.reserve-data-state__copy { max-width: 560px; }
+.reserve-data-state__body { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; max-width: 560px; min-width: 0; }
+.reserve-data-state__copy { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.reserve-data-state__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 100%; }
 .reserve-data-state__title,
 .reserve-data-state__description { margin: 0; color: var(--c-text-secondary, #4e5968); }
 .reserve-data-state__title { font-size: var(--data-state-title-size, 18px); font-weight: 600; line-height: 1.55; color: var(--c-text-primary, #1a1f27); word-break: keep-all; }
 .reserve-data-state__description { margin-top: 4px; font-size: var(--data-state-description-size, 15px); line-height: 1.5; color: var(--c-text-tertiary, #8b95a1); word-break: keep-all; }
-.reserve-data-state__retry { margin-top: 2px; }
+.reserve-data-state__retry { margin: 0; }
 /* 상태 그림은 각 인스턴스의 크기를 유지한다. */
 .reserve-state-illustration {
     --state-illustration-size: var(--state-illustration-mobile-size);
     position: relative;
+    display: inline-flex;
+    width: var(--state-illustration-size);
+    height: var(--state-illustration-size);
+    max-width: 100%;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
     line-height: 1;
 }
 @media (min-width: 768px) {
     .reserve-state-illustration { --state-illustration-size: var(--state-illustration-desktop-size); }
 }
-.reserve-state-illustration__fallback { color: var(--c-text-tertiary); line-height: 1; }
+.reserve-state-illustration > img {
+    display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none;
+    user-select: none; transform-origin: 50% 55%;
+}
+.reserve-state-illustration__fallback { color: var(--c-text-tertiary); font-size: calc(var(--state-illustration-size) / 2); line-height: 1; }
+/* 연결 오류 그림은 원본 요청이 실패해도 이미 받은 스타일에서 표시해요. */
+.reserve-state-illustration__fallback[data-embedded] { width: 100%; height: 100%; background: center / contain no-repeat; }
+.reserve-state-illustration__fallback[data-embedded="network-offline"] {
+    background-image: url('../../assets/state-illustrations/fallback/network-offline.webp?inline');
+}
+.reserve-state-illustration__fallback[data-embedded="server-unavailable"] {
+    background-image: url('../../assets/state-illustrations/fallback/server-unavailable.webp?inline');
+}
 .reserve-state-illustration[role="button"] { cursor: pointer; border-radius: 12px; }
 .reserve-rolling-form-input { position: relative; }
 /* 원문은 즉시 갱신하고 공통 값 레이어만 애니메이션한다. */
@@ -189,23 +209,18 @@
 }
 .reserve-rolling-form-input[data-rolling="true"] > .reserve-rolling-form-input__text { visibility: visible; }
 .reserve-page-status__illustration { display: flex; justify-content: center; }
-.reserve-payment-result__content > .reserve-state-illustration { margin-inline: auto; }
 .reserve-data-state--compact {
     min-height: 0;
     display: grid;
-    grid-template-columns: 20px minmax(0, 1fr);
+    grid-template-columns: max-content minmax(0, 1fr);
     justify-content: start;
-    align-items: start;
-    gap: 8px 12px;
-    padding: 18px 16px;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 0;
     text-align: left;
 }
-.reserve-data-state--compact .reserve-data-state__icon { flex: 0 0 auto; font-size: 20px; margin-top: 1px; }
-.reserve-data-state--compact .reserve-data-state__copy { min-width: 0; }
-.reserve-data-state--compact .reserve-data-state__title { font-size: 14px; font-weight: 400; color: var(--c-text-secondary, #4e5968); }
-.reserve-data-state--compact .reserve-data-state__description { font-size: 13px; }
-.reserve-data-state--compact .reserve-data-state__retry { grid-column: 2; margin: 0; justify-self: start; }
-.reserve-data-state--compact > :not(.reserve-data-state__icon):not(.reserve-data-state__copy) { grid-column: 2; }
+.reserve-data-state--compact .reserve-data-state__body { align-items: flex-start; gap: 8px; }
+.reserve-data-state--compact .reserve-data-state__actions { justify-content: flex-start; }
 
 /* PageStatus와 골격은 화면의 유일한 상태 안내로 같은 배치를 쓴다. */
 .reserve-page-status {
@@ -264,6 +279,32 @@
 }
 .reserve-page-status__actions > .reserve-btn { min-width: 112px; padding: 0 20px; }
 
+.reserve-payment-operations-notice {
+    margin: 0 0 16px;
+    padding: 12px 16px;
+    border: 1px solid var(--c-border-light);
+    border-radius: 10px;
+    background: var(--c-gray-50);
+    color: var(--c-text-secondary);
+    font-size: 13px;
+    line-height: 1.6;
+}
+.reserve-payment-receipt-lookup { max-width: 560px; }
+.reserve-payment-receipt-lookup__result {
+    --reserve-info-label-width: 84px;
+    margin-top: 24px;
+    padding: 16px;
+    border: 1px solid var(--c-border-light);
+    border-radius: 16px;
+    background: var(--c-bg-paper);
+}
+.reserve-payment-receipt-lookup__result h2 {
+    margin: 0 0 8px;
+    color: var(--c-text-primary);
+    font-size: 16px;
+    font-weight: 600;
+}
+
 /* 결제 결과는 일반 목록 오류가 아니라 거래의 확정 여부를 보여 주는 화면이다.
    URL 파라미터가 아니라 서버 상태를 읽은 결과만 이 면에 넣는다. */
 .reserve-payment-result {
@@ -284,25 +325,27 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    font-size: 27px;
+    flex-shrink: 0;
+    font-size: .78em;
 }
 .reserve-payment-result__icon--success {
     color: var(--c-success, #00c73c);
-    background: var(--c-success-light, #e8f9ee);
 }
 .reserve-payment-result__icon--progress {
     color: var(--c-primary, #3182f6);
-    background: var(--c-primary-light, #e8f3ff);
 }
 .reserve-payment-result__icon--neutral {
     color: var(--c-text-secondary, #4e5968);
-    background: var(--c-gray-100, #f2f4f6);
+}
+.reserve-payment-result__icon--warning {
+    color: var(--c-warning, #f59e0b);
 }
 .reserve-payment-result__title {
     --reserve-page-title-margin: 8px 0 -4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .35em;
 }
 .reserve-payment-result__description {
     max-width: 368px;
@@ -445,6 +488,8 @@
     user-select: none;
 }
 .reserve-skeleton-text > * { visibility: hidden; }
+
+.reserve-login-choice-wait .reserve-skeleton-block { animation-play-state: paused; }
 /* 사진의 원래 비율·투명도·로딩 우선순위를 유지한다. */
 .reserve-loading-image {
     color: transparent;
@@ -825,6 +870,88 @@ input:disabled {
     box-shadow: inset 0 0 0 1px var(--c-gray-500, #8b95a1);
 }
 
+.reserve-picture-upload.ant-upload-wrapper { display: block; min-width: 0; max-width: 100%; }
+.reserve-picture-upload.ant-upload-wrapper .ant-upload-list.ant-upload-list-picture-card {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 2px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: inline proximity;
+    scroll-padding-inline-start: calc(var(--upload-picture-card-size, 102px) + 10px);
+    scrollbar-width: none;
+    reading-flow: flex-visual;
+}
+.reserve-picture-upload .ant-upload-list-picture-card::-webkit-scrollbar { display: none; }
+.reserve-picture-upload.ant-upload-wrapper .ant-upload-list.ant-upload-list-picture-card > * {
+    flex-shrink: 0;
+    margin: 0;
+    scroll-snap-align: start;
+}
+.reserve-picture-upload.ant-upload-wrapper .ant-upload-list-picture-card > .ant-upload-select {
+    order: -1;
+    position: sticky;
+    inset-inline-start: 0;
+    z-index: 20;
+    background: var(--c-bg-subtle);
+}
+.reserve-picture-upload .ant-upload-select:has(> :focus-visible) { outline: var(--reserve-focus-ring); outline-offset: -2px; }
+.reserve-picture-upload.ant-upload-wrapper .ant-upload-list-picture-card .ant-upload-list-item-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    top: 50%;
+    margin: 0;
+    transform: translateY(-50%);
+}
+.reserve-picture-upload.ant-upload-wrapper .ant-upload-list-picture-card .ant-upload-list-item-actions > :is(a, button) {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 var(--reserve-icon-target-size, 44px);
+    width: var(--reserve-icon-target-size, 44px);
+    min-width: var(--reserve-icon-target-size, 44px);
+    height: var(--reserve-icon-target-size, 44px);
+    padding: 0;
+    margin: 0;
+    border: 0;
+    color: var(--c-white, #fff);
+    background: transparent;
+}
+.reserve-picture-upload.ant-upload-wrapper .ant-upload-list-picture-card .ant-upload-list-item-actions .anticon {
+    width: var(--reserve-icon-glyph-size, 20px);
+    margin: 0;
+    font-size: var(--reserve-icon-glyph-size, 20px);
+}
+.reserve-picture-upload .ant-upload-list-item-actions > :is(a, button)::after {
+    content: '';
+    position: absolute;
+    width: var(--reserve-icon-surface-size, 32px);
+    height: var(--reserve-icon-surface-size, 32px);
+    border-radius: var(--reserve-icon-tool-radius, 8px);
+    pointer-events: none;
+}
+.reserve-picture-upload .ant-upload-list-item-actions > :is(a, button):is(:hover, :focus-visible)::after { background: rgb(255 255 255 / 16%); }
+.reserve-picture-upload .ant-upload-list-item-actions > :is(a, button):focus-visible { outline: var(--reserve-focus-ring); outline-offset: -2px; }
+.reserve-picture-upload .ant-upload-list-item-actions:has(> :nth-child(2):last-child)::before {
+    content: '';
+    position: absolute;
+    inset-inline-start: 50%;
+    height: 20px;
+    border-inline-start: 1px solid rgb(255 255 255 / 45%);
+    pointer-events: none;
+}
+.reserve-picture-upload .ant-upload-list-picture-card .ant-upload-list-item:focus-within::before,
+.reserve-picture-upload .ant-upload-list-picture-card .ant-upload-list-item:focus-within .ant-upload-list-item-actions { opacity: 1; }
+
 /* 이동은 바깥 칸, 확대·그림자는 안쪽 칸에 적용해 dnd-kit 변환을 덮지 않는다. */
 .reserve-sortable-upload-item {
     height: 100%;
@@ -850,7 +977,7 @@ input:disabled {
     }
 }
 
-/* 선택 칩은 회색 면을 사용한다. AntD 주입 순서와 무관하도록 선택자 명시도를 확보한다. */
+/* 다중 선택 입력의 값 칩은 AntD 주입 순서와 무관하게 회색 면을 유지한다. */
 .ant-picker.ant-picker-filled.ant-picker-multiple .ant-picker-selection-item,
 .ant-select.ant-select-filled.ant-select-multiple .ant-select-selection-item {
     background: var(--c-gray-100, #f2f4f6);
@@ -861,7 +988,6 @@ input:disabled {
 
 /* 코드와 복사 아이콘은 줄바꿈하지 않고 좁은 표는 가로로 스크롤한다. */
 .ant-table .reserve-table-code { white-space: nowrap; }
-
 .reserve-mail-preview {
     display: block;
     width: 100%;

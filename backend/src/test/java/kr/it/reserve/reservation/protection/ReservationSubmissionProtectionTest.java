@@ -58,7 +58,7 @@ class ReservationSubmissionProtectionTest {
                 .isInstanceOfSatisfying(ReservationException.class, error -> assertThat(error.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
 
         when(shared.tryConsume(eq("member:7"), eq(policy), anyInt(), any())).thenReturn(null);
-        for (int i = 0; i < policy.capacity() / 2; i++) {
+        for (int i = policy.capacity() / 2; i < policy.capacity(); i++) {
             assertThat(secondInstance.check(7L, "192.0.2.2" + i, REQUEST_ID, null)).isNull();
         }
         assertThatThrownBy(() -> secondInstance.check(7L, "192.0.2.29", REQUEST_ID, null))

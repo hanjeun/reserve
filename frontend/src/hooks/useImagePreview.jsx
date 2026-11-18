@@ -32,7 +32,7 @@ const useImagePreview = () => {
     const [previewSession, setPreviewSession] = useState(0);
     const exitTimerRef = useRef(null);
     // 현재 화면에 띄우고 있는 blob URL들 — 언마운트/닫힘 cleanup에서 해제해야 하므로 ref로 보관
-    // (클로저가 캡쳐한 시점의 state가 아니라 최신 값을 봐야 한다).
+    // 클로저에 남은 이전 상태 대신 최신 URL 목록을 해제해야 한다.
     const activeBlobsRef = useRef([]);
 
     // blob URL 일괄 해제 — activeBlobsRef(ref)만 참조하므로 안정적(useCallback deps 비움).
@@ -57,7 +57,7 @@ const useImagePreview = () => {
             clearTimeout(exitTimerRef.current);
             exitTimerRef.current = null;
         }
-        // 이전에 열어둔 blob들을 먼저 정리(닫자마자 바로 다시 여는 경우 누수 방지).
+        // 재개방 전에 이전 Blob URL을 해제해 누적을 막는다.
         revokeAllBlobs();
 
         const list = Array.isArray(fileList) && fileList.length > 0 ? fileList : [file];

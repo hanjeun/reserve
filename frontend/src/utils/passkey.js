@@ -24,6 +24,9 @@ export async function performPasskey(json, registration, signal) {
             ? await navigator.credentials.create({ publicKey, signal })
             : await navigator.credentials.get({ publicKey, signal });
     } catch (failure) {
+        if (failure?.name === 'SecurityError') {
+            throw new DOMException('현재 주소에서 패스키를 사용할 수 없어요. 앱 주소를 확인한 뒤 다시 시도해주세요.', 'SecurityError');
+        }
         if (registration && failure?.name === 'InvalidStateError') {
             throw new DOMException('이미 등록된 패스키예요. 기존 키를 사용하거나 다른 저장 위치를 선택해주세요.', 'InvalidStateError');
         }

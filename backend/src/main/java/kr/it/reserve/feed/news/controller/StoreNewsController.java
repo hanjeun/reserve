@@ -1,13 +1,13 @@
 package kr.it.reserve.feed.news.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import kr.it.reserve.config.util.SecurityUtil;
 import kr.it.reserve.feed.FeedException;
 import kr.it.reserve.feed.dto.FeedDto;
 import kr.it.reserve.feed.service.FeedMediaService;
 import kr.it.reserve.global.common.ApiResponse;
+import kr.it.reserve.global.common.SseResponses;
 import kr.it.reserve.global.ratelimit.IpExtractor;
 import kr.it.reserve.global.ratelimit.RateLimiter;
 import kr.it.reserve.feed.news.dto.StoreNewsDto;
@@ -28,13 +28,14 @@ public class StoreNewsController {
     private final RateLimiter limiter;
     private final StoreNewsEvents events;
     @GetMapping(value = "/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter events(HttpServletRequest http, HttpServletResponse response) {
-        response.setHeader("Cache-Control", "no-store"); response.setHeader("X-Accel-Buffering", "no");
-        Long id = member();
-        if (!limiter.tryConsume("news-events-member:" + id, RateLimiter.Policy.AD_METRIC)) {
-            throw new FeedException("잠시 후 다시 연결해주세요.", HttpStatus.TOO_MANY_REQUESTS);
-        }
-        return events.subscribe(SecurityUtil.getCurrentMember("로그인이 필요해요."));
+    public ResponseEntity<SseEmitter> events() {
+        return SseResponses.open(() -> {
+            var current = SecurityUtil.getCurrentMember("로그인이 필요해요.");
+            if (!limiter.tryConsume("news-events-member:" + current.getId(), RateLimiter.Policy.AD_METRIC)) {
+                throw new FeedException("잠시 후 다시 연결해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+            }
+            return events.subscribe(current);
+        });
     }
     @GetMapping("/config")
     public ResponseEntity<ApiResponse<StoreNewsDto.Configuration>> config() {

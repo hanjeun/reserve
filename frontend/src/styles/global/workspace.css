@@ -7,7 +7,10 @@
 .reserve-workspace-layout.ant-layout.is-menu-collapsed { gap: 0; }
 .reserve-workspace-sider.ant-layout-sider { background: transparent; position: sticky; top: var(--workspace-sticky-top); }
 .reserve-workspace-sider.ant-layout-sider-collapsed { overflow: hidden; }
-.reserve-workspace-sider .ant-layout-sider-children { max-height: calc(100svh - var(--workspace-sticky-top) - 24px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-right: 8px; }
+.reserve-workspace-sider-viewport { max-height: calc(100svh - var(--workspace-sticky-top) - 24px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-right: 8px; }
+@media (prefers-reduced-motion: no-preference) {
+    .reserve-workspace-sider-viewport { translate: var(--workspace-sider-translate, none); }
+}
 /* AntD의 has-sider 직계 본문 width: 0 규칙보다 우선한다. 모바일에서는 숨긴 Sider가 남아 있다. */
 .reserve-workspace-layout.ant-layout > .reserve-workspace-main.ant-layout-content { min-width: 0; width: 100%; }
 .reserve-workspace-navigation { display: flex; flex-direction: column; gap: 24px; }
@@ -41,6 +44,12 @@
 .reserve-management-toolbar-trailing .reserve-filter-menu { margin-left: 0; }
 .reserve-management-count { color: var(--c-text-secondary); font-size: 14px; line-height: 24px; }
 
+/* 열린 메뉴 옆에서는 작업 공간의 실제 폭으로 카드 열을 정한다. */
+@media (min-width: 900px) {
+    .reserve-workspace-layout:not(.is-menu-collapsed) :is(.rsv-mystore-grid, .reserve-reservation-card-grid) {
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+    }
+}
 @media (max-width: 899px) {
     .reserve-workspace-sider.ant-layout-sider { display: none; }
     .reserve-workspace-layout.ant-layout { display: block; }

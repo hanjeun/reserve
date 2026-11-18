@@ -10,13 +10,17 @@ import java.util.Set;
 @Component
 @RequiredArgsConstructor
 public class EntityUpdates {
-    public enum Domain { NEWS, WAITING, FEED, COMMENT, LIKE, NOTIFICATION, SYSTEM_NOTIFICATION, STORE, REVIEW, FAVORITE, RESERVATION }
+    public enum Domain { NEWS, WAITING, FEED, COMMENT, LIKE, NOTIFICATION, SYSTEM_NOTIFICATION, STORE, REVIEW, FAVORITE, RESERVATION, SESSION }
     public enum Operation { CREATED, UPDATED, DELETED, INVALIDATED }
     public enum TargetType { POST, NEWS, COMMENT }
     private static final Set<Domain> PRIVATE_DOMAINS = Set.of(Domain.WAITING, Domain.LIKE,
-            Domain.NOTIFICATION, Domain.SYSTEM_NOTIFICATION, Domain.FAVORITE, Domain.RESERVATION);
+            Domain.NOTIFICATION, Domain.SYSTEM_NOTIFICATION, Domain.FAVORITE, Domain.RESERVATION, Domain.SESSION);
 
     private final ApplicationEventPublisher events;
+
+    public void recheckSessions(Long memberId) {
+        publish(Domain.SESSION, 0L, null, null, Operation.INVALIDATED, false, Set.of(memberId), false);
+    }
 
     public void publish(Domain domain, Long entityId, Long parentId, Long storeId, Operation operation,
                         boolean publiclyVisible, Set<Long> members, boolean administrators) {

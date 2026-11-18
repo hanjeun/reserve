@@ -30,17 +30,18 @@ public class RateLimiter {
          * 공격자의 의도적 실패로 계정이 일시 제한될 수 있으므로 영구 잠금으로 사용하지 않는다.
          */
         LOGIN_ACCOUNT(5, Duration.ofMinutes(10)),
-        EMAIL_SEND(5, Duration.ofMinutes(10)),
+        EMAIL_SEND(4, Duration.ofMinutes(10)),
         LOGIN_METHOD_CHANGE(5, Duration.ofMinutes(10)),
-        LOGIN_METHOD_EMAIL(5, Duration.ofMinutes(10)),
-        LOGIN_METHOD_VERIFY(20, Duration.ofMinutes(10)),
-        MEMBER_UPDATE(20, Duration.ofMinutes(1)),
-        MEMBER_UPDATE_IP(60, Duration.ofMinutes(1)),
+        LOGIN_METHOD_EMAIL(3, Duration.ofMinutes(10)),
+        LOGIN_METHOD_VERIFY(16, Duration.ofMinutes(10)),
+        MEMBER_UPDATE(12, Duration.ofMinutes(1)),
+        MEMBER_UPDATE_IP(45, Duration.ofMinutes(1)),
         RESERVATION_CREATE(5, Duration.ofMinutes(1)),   // 1분에 5회 예약
-        RESERVATION_MEMBER_CREATE(6, Duration.ofMinutes(1)),
+        RESERVATION_MEMBER_CREATE(5, Duration.ofMinutes(1)),
         RESERVATION_CHALLENGE_THRESHOLD(3, Duration.ofMinutes(1)),
         RESERVATION_REMOVE(30, Duration.ofMinutes(1)),
         PAYMENT_VERIFY(30, Duration.ofMinutes(1)),
+        PAYMENT_RECEIPT(12, Duration.ofMinutes(1)),
         WAITING_JOIN(5, Duration.ofMinutes(1)),         // 회원·IP별 고객 웨이팅 접수 제한
         SIGNUP(5, Duration.ofMinutes(10)),              // 10분에 5회 회원가입
         /**
@@ -54,15 +55,22 @@ public class RateLimiter {
         MFA_LIFECYCLE(120, Duration.ofMinutes(1)),
         MFA_LIFECYCLE_ACCOUNT(30, Duration.ofMinutes(1)),
         MFA_CANCEL(60, Duration.ofMinutes(1)),
-        OAUTH_START(30, Duration.ofMinutes(1)),
+        OAUTH_START(15, Duration.ofMinutes(1)),
         // 주소 검색은 서버가 보관한 Kakao REST 키로 카카오 로컬 API를 프록시하는 엔드포인트다.
         // 인증은 걸려 있지만(SecurityConfig) 계정 하나만 있으면 카카오 API 쿼터를 무제한 소진시킬 수
         // 있었기 때문에 IP 기준 상한을 둔다. 주소 검색은 타이핑 중 디바운스(300ms)로 호출되는 UI라
         // 정상 사용자도 짧은 시간에 여러 번 호출한다 — 실사용을 막지 않을 만큼 넉넉하게 잡음.
-        ADDRESS_SEARCH(60, Duration.ofMinutes(1)),       // 공개 지표 요청은 공유 IP의 정상 사용을 감안해 호출량을 제한한다.
+        ADDRESS_SEARCH(60, Duration.ofMinutes(1)),
+        ADDRESS_SEARCH_MEMBER(30, Duration.ofMinutes(1)),
         AD_METRIC(120, Duration.ofMinutes(1)),
         // 공개 프로필과 작성글 조회는 같은 방문자 한도를 쓰되 다른 읽기·쓰기 정책과 분리한다.
         PROFILE_READ(120, Duration.ofMinutes(1)),
+        SEARCH_PUBLIC_IP(45, Duration.ofMinutes(1)),
+        SEARCH_PERSONAL_MEMBER(24, Duration.ofMinutes(1)),
+        SEARCH_PERSONAL_IP(90, Duration.ofMinutes(1)),
+        PUBLIC_DIRECTORY_READ(90, Duration.ofMinutes(1)),
+        PUBLIC_AVAILABILITY_READ(90, Duration.ofMinutes(1)),
+        PUBLIC_REVIEW_READ(60, Duration.ofMinutes(1)),
         SERVICE_ENTRY_IP_READ(600, Duration.ofMinutes(1)),
         SERVICE_ENTRY_READ(60, Duration.ofMinutes(1)),
         SERVICE_ENTRY_JOIN(120, Duration.ofMinutes(1)),
@@ -77,6 +85,7 @@ public class RateLimiter {
         QR_CHECKIN(60, Duration.ofMinutes(1)),
         /** 메시지 저장량을 제한하기 위해 채팅 전송에 IP별 상한을 적용한다. */
         CHAT_SEND(30, Duration.ofMinutes(1)),
+        CHAT_MEMBER_SEND(20, Duration.ofMinutes(1)),
         /**
          * 채팅 신고 — 로그인 회원 ID 축. 같은 대상은 DB 멱등 키로 한 번만 저장하지만, 서로 다른 메시지를
          * 자동 제출해 관리자 큐를 부풀리는 경로는 별도로 제한한다. 정상 신고가 10분에 5건을 넘는 경우는

@@ -13,6 +13,7 @@ import kr.it.reserve.promotion.StoreNewsPolicy;
 import kr.it.reserve.promotion.entity.Promotion;
 import kr.it.reserve.promotion.repository.PromotionRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -22,6 +23,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static kr.it.reserve.global.persistence.CurrentLockedStateTestSupport.managedEntities;
 
 @ExtendWith(MockitoExtension.class)
 class FeedInteractionBoundaryTest {
@@ -42,6 +44,7 @@ class FeedInteractionBoundaryTest {
     @Mock FeedNotificationService notifications;
     @Mock FeedProfileRepository profiles;
     @Mock FeedCommentService publicComments;
+    @BeforeEach void persistenceContext() { managedEntities(entityManager); }
     private FeedInteractionPolicy policy() {
         var policy = new FeedInteractionPolicy(new FeedPolicy(true), new StoreNewsAvailability(true)); ReflectionTestUtils.setField(policy, "enabled", true); return policy;
     }

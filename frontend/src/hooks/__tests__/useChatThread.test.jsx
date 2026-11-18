@@ -107,7 +107,9 @@ describe('chat response ownership', () => {
         await act(async () => { expect(await hook.result.current.send('', file)).toBe(true); });
         expect(send.mock.calls[0]).toEqual([1, '', expect.any(String), file]);
         expect(send.mock.calls[1][2]).toBe(send.mock.calls[0][2]);
-        expect(hook.result.current.messages).toEqual([{ id: 33, content: '', imageUrl: '/api/chat/images/33' }]);
+        expect(hook.result.current.messages).toEqual([{
+            id: 33, content: '', imageUrl: '/api/chat/images/33', localSendId: send.mock.calls[0][2],
+        }]);
     });
     for (const outcome of ['success', 'failure']) {
         it(`ignores old room ${outcome} after A to B to A without restoring a draft`, async () => {

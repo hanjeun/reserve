@@ -1,6 +1,8 @@
 package kr.it.reserve.feed.dto;
 
 import jakarta.validation.constraints.*;
+import kr.it.reserve.feed.entity.FeedProfile.Visibility;
+import kr.it.reserve.review.dto.PublicReviewAuthor;
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -8,21 +10,33 @@ public final class FeedDto {
     private FeedDto() {}
     public record Configuration(boolean enabled, boolean imageEnabled, int maxImages, long maxImageBytes, int deleteGraceDays) {}
     public enum AvatarSource { ACCOUNT, CUSTOM, NONE }
-    public record Profile(String publicId, String nickname, String bio, String avatarUrl, boolean useAccountAvatar, AvatarSource avatarSource) {
+    public record Profile(String publicId, String nickname, String bio, String avatarUrl, boolean useAccountAvatar, AvatarSource avatarSource,
+                          Visibility visibility, Boolean activityAvailable, Boolean mine) implements PublicReviewAuthor {
+        public Profile(String publicId, String nickname, String bio, String avatarUrl, boolean useAccountAvatar, AvatarSource source) {
+            this(publicId, nickname, bio, avatarUrl, useAccountAvatar, source, null, null, null);
+        }
         public Profile(String publicId, String nickname, String bio, String avatarUrl, boolean useAccountAvatar) {
             this(publicId, nickname, bio, avatarUrl, useAccountAvatar, useAccountAvatar ? AvatarSource.ACCOUNT : AvatarSource.NONE);
         }
     }
     public record ProfileRequest(@NotBlank @Size(max = 30) String nickname, @Size(max = 160) String bio,
-                                 Boolean useAccountAvatar, AvatarSource avatarSource) {
+                                 Boolean useAccountAvatar, AvatarSource avatarSource,
+                                 Visibility visibility, Boolean resetPhoto) {
+        public ProfileRequest(String nickname, String bio, Boolean useAccountAvatar, AvatarSource source) {
+            this(nickname, bio, useAccountAvatar, source, null, false);
+        }
         public ProfileRequest(String nickname, String bio, boolean useAccountAvatar) {
             this(nickname, bio, useAccountAvatar, null);
         }
     }
+    public record ProfileComment(String postPublicId, String commentPublicId, String content, OffsetDateTime createdAt) {}
+    public record ProfileReviewPhoto(Long id, String url, int width, int height) {}
+    public record ProfileReview(Long id, String storePublicId, String storeName, int rating, String title, String content,
+                              List<ProfileReviewPhoto> photos, OffsetDateTime createdAt) {}
     public record Image(Long id, String url, int width, int height) implements kr.it.reserve.promotion.dto.NewsImage {}
     public record RegionGroup(String name, long count, List<RegionArea> areas) {}
     public record RegionArea(String name, long count) {}
-    public record StoreLink(Long id, String name, boolean reservationEnabled, boolean waitingEnabled) {}
+    public record StoreLink(Long id, String name, boolean reservationEnabled, boolean waitingEnabled, String publicId) {}
     public record PromotionLink(Long id, String title, String periodStatus) {
         public PromotionLink(Long id, String title) { this(id, title, null); }
     }
@@ -30,7 +44,13 @@ public final class FeedDto {
                        String conditions, String periodStatus, boolean feedEnabled, long revision) {}
     public record Post(Long id, String content, String region, OffsetDateTime createdAt, OffsetDateTime updatedAt,
                        long revision, String state, boolean mine, Profile author, List<Image> images,
-                       StoreLink store, PromotionLink promotion, News news) {
+                       StoreLink store, PromotionLink promotion, News news, String publicId) {
+        public Post(Long id, String content, String region, OffsetDateTime createdAt, OffsetDateTime updatedAt,
+                    long revision, String state, boolean mine, Profile author, List<Image> images,
+                    StoreLink store, PromotionLink promotion, News news) {
+            this(id, content, region, createdAt, updatedAt, revision, state, mine, author, images, store, promotion, news, null);
+        }
+
         public Post(Long id, String content, String region, OffsetDateTime createdAt, OffsetDateTime updatedAt,
                     long revision, String state, boolean mine, Profile author, List<Image> images, StoreLink store, PromotionLink promotion) {
             this(id, content, region, createdAt, updatedAt, revision, state, mine, author, images, store, promotion, null);

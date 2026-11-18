@@ -27,6 +27,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
@@ -52,7 +53,7 @@ class ReservationAvailabilityTest {
     @Mock
     private AuditLogService auditLogService;
 
-    /** 빨간날 색칠용. 이 테스트는 시간 슬롯만 보므로 기본 mock(빈 Set) 그대로 둔다. */
+    /** 공휴일은 표시용이므로 예약 가능 시간 검사에서는 빈 집합으로 둔다. */
     @Mock
     private HolidayService holidayService;
 
@@ -75,7 +76,7 @@ class ReservationAvailabilityTest {
 
     private List<String> availableTimes(Store store) {
         when(storeRepository.findById(anyLong())).thenReturn(Optional.of(store));
-        lenient().when(reservationRepository.sumActiveGuestsGroupedByTime(anyLong(), any(LocalDate.class)))
+        lenient().when(reservationRepository.sumActiveGuestsGroupedByTime(anyLong(), any(LocalDate.class), isNull()))
                 .thenReturn(List.of()); // 예약 없음
         return reservationService.getAvailability(1L, TARGET_DATE)
                 .stream().map(SlotAvailabilityResponse::getTime).toList();

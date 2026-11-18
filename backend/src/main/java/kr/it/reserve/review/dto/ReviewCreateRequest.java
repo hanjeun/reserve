@@ -25,4 +25,8 @@ public class ReviewCreateRequest {
     @NotBlank(message = "내용은 필수예요.")
     @Size(max = 1000, message = "내용은 1000자 이내여야 해요.")
     private String content;
+
+    @Size(max = 30, message = "리뷰 닉네임은 30자 이내여야 해요.")
+    @Pattern(regexp = "[\\p{L}\\p{N} ]*", message = "리뷰 닉네임을 다시 선택해주세요.")
+    private String authorAlias;
 }

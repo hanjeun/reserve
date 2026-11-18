@@ -11,7 +11,7 @@ const user = { id: 41, name: '검사 사용자', email: 'ui@example.test', role:
 const profile = { publicId: 'design-review', nickname: '검사 작성자' };
 const pageOf = content => ({ content, page: { number: 0, totalElements: content.length, totalPages: 1 } });
 const photos = [1, 2, 3].map(id => ({ id, url: `/api/feed/media/${id}`, width: 800, height: 450 }));
-const store = { id: 81, name: '디자인 검사 가게', category: '카페', ownerId: 8, phone: '02-1234-5678',
+const store = { id: 81, publicId: '00000000-0000-4000-8000-000000000081', name: '디자인 검사 가게', category: '카페', ownerId: 8, phone: '02-1234-5678',
     mainImageUrl: '/api/feed/media/1', detailImageUrls: ['/api/feed/media/2'], reservationEnabled: true,
     description: '예약 폼과 아이콘을 확인하는 가게예요.', bookingType: 'SESSION',
     openTime: '09:00', closeTime: '18:00', sessionTimes: ['10:00'], maxCapacityPerSlot: 3 };
@@ -35,7 +35,7 @@ async function setup(page) {
             return route.fulfill({ body: photo, contentType: 'image/webp' });
         if (pathname === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: user, refreshPossible: false } } }); }
         if (pathname === '/api/member/me') return ok(user);
-        if (pathname === '/api/stores/81') return ok(store);
+        if (pathname === '/api/stores/00000000-0000-4000-8000-000000000081') return ok(store);
         if (pathname.includes('favorite')) return ok({ isFavorite: false });
         if (pathname.includes('unread')) return ok(0);
         if (pathname === '/api/chat/images/config') return ok({ enabled: true });
@@ -58,10 +58,10 @@ async function setup(page) {
         }
         if (pathname === '/api/feed/config' || pathname === '/api/store-news/config' || pathname === '/api/feed/interactions/config') return ok(config);
         if (pathname === '/api/feed/me/profile') return ok(profile);
-        if (pathname === '/api/feed/posts/8') return ok({ id: 8, revision: 0, state: 'PUBLISHED', author: profile,
+        if (pathname === '/api/feed/posts/00000000-0000-4000-8000-000000000008') return ok({ id: 8, publicId: '00000000-0000-4000-8000-000000000008', revision: 0, state: 'PUBLISHED', author: profile,
             content: '사진 배지와 댓글 입력을 확인해요.', images: photos, createdAt: new Date().toISOString() });
-        if (pathname === '/api/promotions/public/7') return ok({ id: 7, title: '사진 배지 확인', content: '같은 사진 수 표기를 사용해요.',
-            images: photos, state: 'PUBLISHED', storeId: 81, storeName: store.name, createdAt: new Date().toISOString() });
+        if (pathname === '/api/promotions/public/00000000-0000-4000-8000-000000000007') return ok({ id: 7, publicId: '00000000-0000-4000-8000-000000000007', title: '사진 배지 확인', content: '같은 사진 수 표기를 사용해요.',
+            images: photos, state: 'PUBLISHED', storeId: 81, storePublicId: store.publicId, storeName: store.name, createdAt: new Date().toISOString() });
         if (pathname === '/api/stores') return ok(pageOf([store]));
         if (pathname.endsWith('/comments') || pathname.includes('conversations') || pathname.includes('inbox')) return ok(pageOf([]));
         if (pathname.endsWith('/retractions')) return ok({ messages: [], nextRevision: 0 });
@@ -126,7 +126,7 @@ test('three chat photos keep tools clear, animate after load and retry only the 
 
 test('comment attachments remain inside the original input footprint', async ({ page }, testInfo) => {
     await setup(page);
-    await page.goto('/feed/posts/8');
+    await page.goto('/feed/posts/00000000-0000-4000-8000-000000000008');
     const composer = page.locator('.reserve-feed-comment-composer .reserve-chat-composer');
     await expect(composer).toBeVisible();
     await composer.scrollIntoViewIfNeeded();
@@ -146,7 +146,7 @@ test('comment attachments remain inside the original input footprint', async ({ 
 
 test('reservation placeholders and all three store actions use matching type and icon measurements', async ({ page }, testInfo) => {
     await setup(page);
-    await page.goto('/store/81');
+    await page.goto('/store/00000000-0000-4000-8000-000000000081');
     const date = page.getByText('날짜 선택', { exact: true });
     const time = page.getByText('날짜를 먼저 선택해주세요', { exact: true });
     const typography = element => {
@@ -202,7 +202,7 @@ test('home keeps its counter, benefits use gallery dots, and fullscreen keeps it
     const mainSkin = await main.evaluate(skin);
     expect(mainSkin).toMatchObject({ backgroundColor: 'rgba(0, 0, 0, 0.58)', color: 'rgb(255, 255, 255)', borderRadius: '30px' });
     await capture(page, 'home-counter', testInfo);
-    await page.goto('/benefits/7');
+    await page.goto('/benefits/00000000-0000-4000-8000-000000000007');
     const gallery = page.locator('.reserve-benefit-photos .reserve-carousel');
     const dots = gallery.locator('.slick-dots li');
     await expect(page.locator('.reserve-benefit-photo-count')).toHaveCount(0);
@@ -213,7 +213,7 @@ test('home keeps its counter, benefits use gallery dots, and fullscreen keeps it
     await expect(dots.nth(1)).toHaveClass(/slick-active/);
     await expect(gallery.locator('.slick-slide.slick-active').getByAltText('혜택 사진 2', { exact: true })).toBeVisible();
     await capture(page, 'benefit-gallery-dots', testInfo);
-    await page.goto('/feed/posts/8');
+    await page.goto('/feed/posts/00000000-0000-4000-8000-000000000008');
     await page.getByAltText('게시물 사진 1', { exact: true }).click();
     const progress = page.locator('.reserve-image-preview .ant-image-preview-progress');
     await expect(progress).toHaveText('1 / 3');

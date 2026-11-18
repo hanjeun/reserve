@@ -64,6 +64,7 @@ const chatService = {
         API_ENDPOINTS.CHAT.ROOM_BLOCK(roomId), undefined, { params: { viewerRole, blocked } }),
     setHidden: (roomId, viewerRole, hidden) => api.put(`/api/chat/rooms/${roomId}/visibility`, undefined,
         { params: { viewerRole, hidden } }),
+    leave: (roomId, viewerRole) => api.put(`/api/chat/rooms/${roomId}/leave`, undefined, { params: { viewerRole } }),
     reportConversation: (roomId, viewerRole, report) => api.post(
         API_ENDPOINTS.CHAT.ROOM_REPORTS(roomId), report, { params: { viewerRole } }),
     listReports: (page, status) => api.get(

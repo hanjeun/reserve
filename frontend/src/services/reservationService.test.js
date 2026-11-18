@@ -7,8 +7,9 @@ beforeEach(() => { api.post.mockReset(); api.get.mockReset(); });
 
 it('binds edit-context reads to both the owned reservation and the current store without calling public browsing routes', async () => {
     const signal = new AbortController().signal;
-    await reservationService.getEditStore(31, 10, { signal });
-    expect(api.get).toHaveBeenLastCalledWith('/api/reservations/31/edit-store', { params: { storeId: 10 }, signal });
+    const storePublicId = '11111111-1111-4111-8111-111111111111';
+    await reservationService.getEditStore(31, storePublicId, { signal });
+    expect(api.get).toHaveBeenLastCalledWith('/api/reservations/31/edit-store', { params: { storePublicId }, signal });
     await reservationService.getEditAvailability(31, 10, '2030-01-02', { signal });
     expect(api.get).toHaveBeenLastCalledWith('/api/reservations/31/availability', { params: { storeId: 10, date: '2030-01-02' }, signal });
     await reservationService.getEditCalendar(31, 10, '2030-01', { signal });

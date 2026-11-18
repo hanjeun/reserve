@@ -33,6 +33,7 @@ beforeEach(() => { fixture.memberId = 7; fixture.info.mockReset(); advanceSessio
 it('안내는 한 번 표시하고 확인 후 닫힘이 끝나면 내 예약으로 이어줘요', () => {
     show();
     expect(fixture.info).toHaveBeenCalledOnce();
+    expect(notice().okText).toBe('내 예약 보기');
     expect(location().state.paymentIncomplete).toBeUndefined();
     act(() => notice().onOk());
     expect(location().pathname).toBe('/store/12');
@@ -46,6 +47,7 @@ it('안내는 한 번 표시하고 확인 후 닫힘이 끝나면 내 예약으�
 
 it('내 예약에서 확인하면 검색 조건과 방문 기록을 유지해요', () => {
     show('/my-reservations', '?page=2&status=PENDING&view=list');
+    expect(notice().okText).toBe('확인');
     const before = location();
     act(() => { notice().onOk(); notice().afterClose(); });
     expect(location()).toEqual(before);

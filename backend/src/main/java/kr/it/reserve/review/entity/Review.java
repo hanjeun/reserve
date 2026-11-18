@@ -11,9 +11,12 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "review")
+@org.hibernate.annotations.DynamicUpdate
 @Getter
 @Setter
 @NoArgsConstructor
@@ -40,6 +43,12 @@ public class Review {
     @JoinColumn(name = "reservation_id", unique = true)
     private Reservation reservation;
 
+    @OneToMany(mappedBy = "review", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("id ASC")
+    @org.hibernate.annotations.BatchSize(size = 40)
+    @Builder.Default
+    private List<ReviewPhoto> photos = new ArrayList<>();
+
     // 별점 (1~5)
     @Column(name = "rating", nullable = false)
     private Integer rating;
@@ -49,6 +58,18 @@ public class Review {
 
     @Column(name = "content", nullable = false, length = 1000)
     private String content;
+
+    @Column(name = "author_alias", length = 30)
+    private String authorAlias;
+
+    @Column(name = "moderation_hidden", nullable = false)
+    private boolean moderationHidden;
+
+    @Column(name = "owner_reply", length = 500)
+    private String ownerReply;
+
+    @Column(name = "owner_replied_at")
+    private LocalDateTime ownerRepliedAt;
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)
@@ -73,5 +94,9 @@ public class Review {
 
     public boolean isDeleted() {
         return this.deletedAt != null;
+    }
+
+    public boolean isPublished() {
+        return !isDeleted() && !moderationHidden && !store.isDeleted() && !store.isSuspended();
     }
 }

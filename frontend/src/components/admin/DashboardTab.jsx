@@ -215,8 +215,7 @@ const DashboardTab = () => {
                 </ChartCard>
             </div>
 
-            {/* 감사 로그 요약 — 로딩 중엔 낙관적으로 스켈레톤을 보여주고(대부분 로그가 있는 게
-                일반적이므로), 데이터 도착 후 실제로 로그가 하나도 없으면 기존처럼 카드 자체를 숨김 */}
+            {/* 조회 전 상태를 빈 결과로 오인하지 않도록 감사 로그 골격을 먼저 표시한다. */}
             {(loading || sourceFailed('audit') || (stats?.actionCount && Object.keys(stats.actionCount).length > 0)) && (
                 <ChartCard title="최근 감사 로그 요약" loading={loading} height="auto">
                     <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>

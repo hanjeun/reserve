@@ -1,6 +1,7 @@
 package kr.it.reserve.payment;
 
 import jakarta.persistence.EntityManager;
+import kr.it.reserve.global.persistence.CurrentLockedStateTestSupport;
 import kr.it.reserve.global.error.PaymentException;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.repository.MemberRepository;
@@ -12,6 +13,7 @@ import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.store.entity.Store;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -34,6 +36,8 @@ class PaymentPreparedAmountTest {
     @Mock PaymentReconciliationIssueService issues;
     @InjectMocks PaymentService service;
 
+    @BeforeEach void financialPersistence() { CurrentLockedStateTestSupport.managedEntities(entityManager); }
+
     @Test
     void aFreeReservationDoesNotBecomePayableAfterTheStoreRaisesItsDeposit() {
         stubReservation(0);
@@ -55,11 +59,15 @@ class PaymentPreparedAmountTest {
     @Test
     void anExistingReadyOrderKeepsItsIdentityForLookupAndRefund() {
         var reservation = stubReservation(3000);
+        var createdAt = java.time.LocalDateTime.now().minusMinutes(14);
+        reservation.setCreatedAt(createdAt);
+        reservation.getStore().setPaymentTimeoutMinutes(15);
         var existing = kr.it.reserve.payment.entity.Payment.builder().id(51L).reservation(reservation)
                 .member(reservation.getMember()).merchantUid("ORD-legacy-identity").amount(3000)
                 .status(kr.it.reserve.payment.entity.Payment.PaymentStatus.READY).build();
         when(payments.findAllByReservationIdForUpdate(31L)).thenReturn(List.of(existing));
         assertThat(service.preparePayment(request(), 7L).getMerchantUid()).isEqualTo("ORD-legacy-identity");
+        assertThat(reservation.getCreatedAt()).isEqualTo(createdAt);
         verify(payments, never()).save(any());
         verify(portone, never()).getPaymentInfo(anyString());
     }
@@ -76,11 +84,16 @@ class PaymentPreparedAmountTest {
         var reservation = stubReservation(3000);
         reservation.setCreatedAt(java.time.LocalDateTime.now().minusHours(1));
         reservation.getStore().setPaymentTimeoutMinutes(10);
+        var existing = kr.it.reserve.payment.entity.Payment.builder().id(51L).reservation(reservation)
+                .member(reservation.getMember()).merchantUid("ORD-legacy-identity").amount(3000)
+                .status(kr.it.reserve.payment.entity.Payment.PaymentStatus.READY).build();
+        when(payments.findAllByReservationIdForUpdate(31L)).thenReturn(List.of(existing));
         assertThatThrownBy(() -> service.preparePayment(request(), 7L))
                 .isInstanceOf(PaymentException.class).hasMessageContaining("결제 기한");
         verify(payments, never()).save(any());
         verifyNoInteractions(portone);
         assertThat(reservation.getStatus()).isEqualTo(Reservation.ReservationStatus.PENDING);
+        assertThat(existing.getStatus()).isEqualTo(kr.it.reserve.payment.entity.Payment.PaymentStatus.READY);
     }
 
     private Reservation stubReservation(Integer amount) {

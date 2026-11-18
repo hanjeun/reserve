@@ -7,12 +7,14 @@ import WorkspaceNavigationProvider from './WorkspaceNavigationProvider';
 import useWorkspaceDraftGuard from '../../hooks/useWorkspaceDraftGuard';
 import useWorkspaceNavigate from '../../hooks/useWorkspaceNavigate';
 
-const messages = vi.hoisted(() => ({ confirm: vi.fn(), info: vi.fn() }));
-vi.mock('../../hooks/useMessage', () => ({ default: () => ({ confirm: messages.confirm, message: { info: messages.info } }) }));
+const messages = vi.hoisted(() => ({ confirm: vi.fn(), info: vi.fn(), error: vi.fn() }));
+vi.mock('../../hooks/useMessage', () => ({ default: () => ({ confirm: messages.confirm,
+    message: { info: messages.info, error: messages.error } }) }));
 
-function Draft({ busy = false, allowUnload = false }) {
+function Draft({ busy = false, allowUnload = false, onSave }) {
     const [text, setText] = useState('');
-    useWorkspaceDraftGuard({ dirty: Boolean(text), busy, allowUnload, onDiscard: () => setText('') });
+    useWorkspaceDraftGuard({ dirty: Boolean(text), busy, allowUnload, onDiscard: () => setText(''),
+        onSave: onSave ? () => onSave(text) : undefined });
     const navigate = useWorkspaceNavigate();
     const location = useLocation();
     return <><input aria-label="작업 초안" value={text} onChange={event => setText(event.target.value)} />
@@ -22,8 +24,10 @@ function Draft({ busy = false, allowUnload = false }) {
         <output data-testid="location">{location.pathname}{location.search}{location.hash}</output>
         <output data-testid="state">{location.state?.source}</output></>;
 }
-function setup(busy = false, allowUnload = false) {
-    return render(<BrowserRouter><WorkspaceNavigationProvider><Draft busy={busy} allowUnload={allowUnload} /></WorkspaceNavigationProvider></BrowserRouter>);
+function setup(busy = false, allowUnload = false, onSave) {
+    return render(<BrowserRouter><WorkspaceNavigationProvider>
+        <Draft busy={busy} allowUnload={allowUnload} onSave={onSave} />
+    </WorkspaceNavigationProvider></BrowserRouter>);
 }
 const lastConfirmation = () => messages.confirm.mock.calls.at(-1)[0];
 
@@ -31,6 +35,7 @@ beforeEach(() => {
     window.history.replaceState({ idx: 0, key: 'workspace-start', usr: null }, '', '/business?tab=chat-intro');
     messages.confirm.mockReset().mockImplementation(() => ({ destroy: vi.fn() }));
     messages.info.mockReset();
+    messages.error.mockReset();
 });
 
 describe('workspace user navigation and draft boundary', () => {
@@ -56,6 +61,27 @@ describe('workspace user navigation and draft boundary', () => {
         expect(screen.getByTestId('location')).toHaveTextContent('/admin?tab=feed-reports&reportMode=comments#review');
         expect(screen.getByTestId('state')).toHaveTextContent('saved-work');
         expect(messages.confirm).toHaveBeenCalledTimes(1);
+    });
+
+    it('waits for the saved draft before replaying navigation and keeps the draft on a write failure', async () => {
+        let finish;
+        const save = vi.fn().mockRejectedValueOnce(new Error('quota'))
+            .mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+        setup(false, false, save);
+        fireEvent.change(screen.getByRole('textbox'), { target: { value: '임시저장할 내용' } });
+        fireEvent.click(screen.getByRole('link', { name: '신고로' }));
+        expect(lastConfirmation().okText).toBe('임시저장하고 이동');
+        await act(async () => lastConfirmation().onOk());
+        expect(messages.error).toHaveBeenCalledOnce();
+        expect(screen.getByRole('textbox')).toHaveValue('임시저장할 내용');
+        expect(window.location.pathname).toBe('/business');
+        fireEvent.click(screen.getByRole('link', { name: '신고로' }));
+        await act(async () => lastConfirmation().onOk());
+        expect(window.location.pathname).toBe('/business');
+        await act(async () => finish());
+        expect(save).toHaveBeenLastCalledWith('임시저장할 내용');
+        expect(window.location.pathname).toBe('/admin');
+        expect(screen.getByTestId('state')).toHaveTextContent('saved-work');
     });
 
     it('blocks menu-like navigation and reload while a save is pending', async () => {

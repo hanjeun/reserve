@@ -1,6 +1,131 @@
 import { expect, test } from '@playwright/test';
+import { Buffer } from 'node:buffer';
 import { readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 
+test('chat uses compact thumbnails and opens the original after loading', async ({ page }, testInfo) => {
+    await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'no-preference' });
+    const stock = await readFile(new URL('../public/images/discovery-v3/dining-cover.webp', import.meta.url), 'base64');
+    const samples = await page.evaluate(async data => {
+        const image = new Image();
+        image.src = 'data:image/webp;base64,' + data;
+        await image.decode();
+        return [[900, 600], [600, 900]].map(([width, height]) => {
+            const original = Object.assign(document.createElement('canvas'), { width, height });
+            const scale = Math.max(width / image.width, height / image.height);
+            const dw = image.width * scale;
+            const dh = image.height * scale;
+            original.getContext('2d').drawImage(image, (width - dw) / 2, (height - dh) / 2, dw, dh);
+            const factor = 320 / Math.max(width, height);
+            const thumbnail = Object.assign(document.createElement('canvas'), {
+                width: Math.round(width * factor), height: Math.round(height * factor),
+            });
+            thumbnail.getContext('2d').drawImage(original, 0, 0, thumbnail.width, thumbnail.height);
+            return {
+                width, height,
+                original: original.toDataURL('image/jpeg', 0.92).split(',')[1],
+                thumbnail: thumbnail.toDataURL('image/jpeg', 0.82).split(',')[1],
+            };
+        });
+    }, stock);
+    const captionText = '사진을 같이 보냈어요.';
+    await mockApi(page, account, [{ roomId: 1, type: 'SUPPORT', viewerRole: 'MEMBER' }]);
+    await page.route('**/api/chat/images/config', route => ok(route, { enabled: true, maxBytes: 8388608 }));
+    await page.route('**/api/chat/support/open', route => ok(route, {
+        roomId: 1, type: 'SUPPORT', viewerRole: 'MEMBER', canSend: true, messages: [],
+    }));
+    const uploads = [];
+    await page.route('**/api/chat/rooms/1/images', async route => {
+        const request = route.request();
+        const form = await new Response(request.postDataBuffer(), { headers: request.headers() }).formData();
+        const index = uploads.length;
+        const { width, height } = samples[index];
+        const clientMessageId = form.get('clientMessageId');
+        const content = form.get('content');
+        uploads.push({ clientMessageId, content });
+        return ok(route, {
+            id: 81 + index, senderRole: 'MEMBER', canRetract: true,
+            content, clientMessageId,
+            imageUrl: '/api/chat/images/' + (81 + index),
+            imageThumbnailUrl: '/api/chat/images/' + (81 + index) + '/thumbnail',
+            imageWidth: width, imageHeight: height, createdAt: '2026-11-17T10:00:00',
+        });
+    });
+    let release;
+    const responseGate = new Promise(resolve => { release = resolve; });
+    const originals = [];
+    const thumbnails = [];
+    const checks = [];
+    await page.route(/\/api\/chat\/images\/8[12](?:\/thumbnail)?$/, async route => {
+        const path = new URL(route.request().url()).pathname;
+        const preview = path.endsWith('/thumbnail');
+        const index = path.includes('/82') ? 1 : 0;
+        if (route.request().method() === 'HEAD') {
+            checks.push(path);
+            return route.fulfill({ status: 204 });
+        }
+        (preview ? thumbnails : originals).push(path);
+        if (!preview) await responseGate;
+        return route.fulfill({ contentType: 'image/jpeg', body: Buffer.from(samples[index][preview ? 'thumbnail' : 'original'], 'base64') });
+    });
+    const mobile = testInfo.project.name === 'mobile-chromium';
+    if (mobile) await page.goto('/messages');
+    else {
+        await page.goto('/');
+        await page.getByRole('button', { name: '메시지 열기' }).click();
+    }
+    await page.getByRole('navigation', { name: '메신저 화면' }).getByRole('button', { name: '대화', exact: true }).click();
+    await supportConversation(page).click();
+    await expect(page.getByRole('button', { name: '사진 첨부' })).toBeEnabled();
+    await page.getByRole('textbox', { name: '메시지 입력' }).fill(captionText);
+    await page.getByLabel('첨부할 사진 선택').setInputFiles(samples.map(({ original }, index) => ({
+        name: 'photo-' + index + '.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(original, 'base64'),
+    })));
+    await expect(page.getByAltText('첨부 사진')).toHaveCount(2);
+    await page.getByRole('button', { name: '보내기', exact: true }).click();
+    const group = page.locator('.reserve-chat-photo-group');
+    const messenger = page.locator('.reserve-messenger');
+    const tiles = group.getByRole('button', { name: '사진 크게 보기' });
+    await expect(tiles).toHaveCount(2);
+    expect(uploads.map(upload => upload.content)).toEqual([captionText, '']);
+    expect(uploads[0].clientMessageId).toMatch(/^photos_[a-f0-9-]{32,36}_0$/);
+    expect(uploads[1].clientMessageId).toBe(uploads[0].clientMessageId.slice(0, -1) + '1');
+    expect(thumbnails).toHaveLength(2);
+    expect(originals).toEqual([]);
+    const [wide, tall] = await Promise.all([tiles.nth(0).boundingBox(), tiles.nth(1).boundingBox()]);
+    expect(wide.width / wide.height).toBeCloseTo(1.5, 1);
+    expect(tall.width / tall.height).toBeCloseTo(2 / 3, 1);
+    expect(Math.max(wide.width, tall.height)).toBeLessThanOrEqual(77);
+    expect(Math.abs(wide.y + wide.height - tall.y - tall.height)).toBeLessThan(2);
+    const caption = messenger.locator('.reserve-chat-message-bubble').getByText(captionText, { exact: true });
+    expect((await caption.boundingBox()).y).toBeLessThan(Math.min(wide.y, tall.y));
+    if (!mobile) {
+        await tiles.first().hover();
+        await expect(tiles.first().locator('img')).toHaveCSS('filter', 'brightness(0.9)');
+    }
+    await messenger.screenshot({ path: testInfo.outputPath('chat-thumbnails.png'), scale: 'css' });
+
+    try {
+        await tiles.first().click();
+        const spinner = group.getByRole('status', { name: '원본 사진을 불러오는 중' });
+        await expect(spinner).toBeVisible();
+        await expect(page.locator('.reserve-image-preview img')).toHaveCount(0);
+        await expect.poll(() => spinner.locator('circle').last().evaluate(node =>
+            Number.parseFloat(getComputedStyle(node).strokeDasharray))).toBeGreaterThan(20);
+        await messenger.screenshot({ path: testInfo.outputPath('chat-thumbnail-loading.png'), scale: 'css' });
+    } finally { release(); }
+    const enlarged = page.locator('.reserve-image-preview img');
+    await expect(enlarged).toBeVisible();
+    await expect.poll(() => enlarged.evaluate(element => element.naturalWidth)).toBe(900);
+    await expect.poll(async () => (await enlarged.boundingBox())?.width ?? 0).toBeGreaterThan(wide.width * 3);
+    await page.screenshot({ path: testInfo.outputPath('chat-full-size.png'), scale: 'css', animations: 'disabled' });
+    await page.keyboard.press('Escape');
+    await expect(enlarged).not.toBeVisible();
+    await tiles.first().click();
+    await expect(enlarged).toBeVisible();
+    expect(originals).toEqual(['/api/chat/images/81']);
+    expect(checks).toContain('/api/chat/images/81');
+});
 test('message actions center grouped short bubbles and keep tall bubbles bottom aligned', async ({ page }, testInfo) => {
     await mockApi(page, account, [{ roomId: 1, type: 'SUPPORT', viewerRole: 'MEMBER', lastMessagePreview: '감사합니다' }]);
     await page.route('**/api/chat/support/open', route => ok(route, {
@@ -424,7 +549,7 @@ test('owner inbox uses the customer name while the member side uses the store na
     await expect(owner).not.toContainText('스케줄 청담');
 });
 
-test('photo captions stay below the image in narrow chat bubbles', async ({ page }, testInfo) => {
+test('photo captions stay above the image in narrow chat bubbles', async ({ page }, testInfo) => {
     await mockApi(page, account, [{ roomId: 1, type: 'SUPPORT', viewerRole: 'MEMBER', lastMessagePreview: '릴리스 검증용' }]);
     const png = readFileSync(new URL('../public/icons/RESERVE_logo.png', import.meta.url));
     await page.route('**/api/chat/support/open', route => ok(route, {
@@ -446,8 +571,7 @@ test('photo captions stay below the image in narrow chat bubbles', async ({ page
     const captionSurface = page.locator('.reserve-chat-message-bubble')
         .filter({ has: page.getByText('릴리스 검증용', { exact: true }) });
     const captionBox = await captionSurface.boundingBox();
-    expect(captionBox.y).toBeGreaterThanOrEqual(imageBox.y + imageBox.height + 7);
-    expect(captionBox.width).toBeGreaterThanOrEqual(imageBox.width);
+    expect(captionBox.y + captionBox.height).toBeLessThan(imageBox.y);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
@@ -472,7 +596,7 @@ test('photo-only messages use multipart upload and an authenticated preview', as
     const photo = page.getByAltText('대화에 첨부한 사진');
     await expect(photo).toBeVisible();
     await expect(photo).toHaveJSProperty('naturalWidth', 1600);
-    expect((await photo.boundingBox()).width).toBeGreaterThan(150);
+    expect((await photo.boundingBox()).width).toBeLessThanOrEqual(77);
     expect(await photo.getAttribute('src')).toMatch(/^blob:/);
     expect(upload.method()).toBe('POST');
     expect(upload.headers()['content-type']).toContain('multipart/form-data; boundary=');

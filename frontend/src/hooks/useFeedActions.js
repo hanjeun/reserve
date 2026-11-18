@@ -23,7 +23,7 @@ export default function useFeedActions({ onDeleted } = {}) {
     });
     const requestReport = (post, open) => {
         if (!user) {
-            const pathname = postPath(post.id);
+            const pathname = postPath(post.publicId) ?? '/feed';
             saveRedirect(pathname);
             navigate('/login', { state: { from: { pathname } } });
             return;
@@ -31,7 +31,9 @@ export default function useFeedActions({ onDeleted } = {}) {
         open(post.id);
     };
     const onShare = async post => {
-        const url = appUrl(postPath(post.id));
+        const path = postPath(post.publicId);
+        if (!path) return message.error('게시물 주소를 확인하지 못했어요.');
+        const url = appUrl(path);
         try {
             if (typeof navigator.share === 'function') {
                 await navigator.share({ title: `${post.author?.nickname || '회원'}의 RESERVE 게시물`, url });

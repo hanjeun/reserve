@@ -7,7 +7,6 @@ import { HeartFilled } from '../common/icons';
 import StoreListRowSkeleton from '../store/StoreListRowSkeleton';
 import LikedContentItem from './LikedContentItem';
 import { interactionKeys, invalidateInteractions } from '../../hooks/feedInteractionQueries';
-import useFeedActions from '../../hooks/useFeedActions';
 import useMessage from '../../hooks/useMessage';
 import service from '../../services/feedInteractionService';
 import { feedTotal } from '../../utils/feed';
@@ -22,7 +21,6 @@ export default function LikedContentList({ type = 'ALL', view = 'cards' }) {
     const params = { type, size: 20 };
     const client = useQueryClient();
     const { message } = useMessage();
-    const { onShare } = useFeedActions();
     const [reportTarget, setReportTarget] = useState(null);
     const [reportMounted, setReportMounted] = useState(false);
     const report = item => { setReportMounted(true); setReportTarget({ type: item.type, id: item.targetId }); };
@@ -54,7 +52,7 @@ export default function LikedContentList({ type = 'ALL', view = 'cards' }) {
         {items.map(item => !item.available || !(item.post || item.comment || item.news) ? <div key={item.id} data-list-item-id={`liked:${item.id}`} className="reserve-liked-unavailable">
             <p className="reserve-feed-note">현재 공개되지 않는 {item.type === 'NEWS' ? '가게 소식' : item.type === 'COMMENT' ? '댓글' : '게시물'}이에요.</p>
             <IconTool label="좋아요 취소" icon={<HeartFilled aria-hidden="true" style={{ color: 'var(--c-error)' }} />} loading={remove.isPending} onClick={() => remove.mutate({ item, session: currentSession().epoch })} />
-        </div> : <LikedContentItem key={item.id} item={item} view={view} onShare={onShare} onReport={report} />)}
+        </div> : <LikedContentItem key={item.id} item={item} view={view} onReport={report} />)}
     </div>{list.hasNextPage && <Button variant="ghost-sm" size="sm" loading={list.isFetchingNextPage} onClick={() => list.fetchNextPage({ cancelRefetch: false })}>좋아요 더 보기</Button>}
     {reportDialog}</>;
 }

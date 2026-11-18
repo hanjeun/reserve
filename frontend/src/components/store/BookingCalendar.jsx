@@ -23,6 +23,7 @@ const SWIPE_MIN_PX = 45;
 const BLOCKED_LABEL = {
     CLOSED: '휴무',
     FULL: '마감',
+    NOT_OPEN_YET: '오픈 예정',
 };
 
 const BookingCalendarField = ({ id, storeId, reservationId, value, onChange, style, disabled = false, onFocus, onBlur, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid }) => {
@@ -181,14 +182,14 @@ const BookingCalendarField = ({ id, storeId, reservationId, value, onChange, sty
                 onClick={openCalendar}
                 style={{ ...styles.trigger, ...(isError ? styles.triggerError : null), ...style }}
             >
-                <span style={{ ...styles.triggerText, ...(value ? null : styles.placeholder) }}>
-                    <RollingFieldValue value={value?.startOf('day').valueOf()} modalOpen={open}>
-                        {value ? `${value.format('YYYY. M. D.')} (${WEEKDAYS[value.day()]})` : '날짜 선택'}
-                    </RollingFieldValue>
+                <span style={{ ...styles.triggerText, ...(value ? styles.selected : styles.placeholder) }}>
+                    {value ? <RollingFieldValue value={value.startOf('day').valueOf()} modalOpen={open}>
+                        {`${value.format('YYYY. M. D.')} (${WEEKDAYS[value.day()]})`}
+                    </RollingFieldValue> : '날짜 선택'}
                 </span>
                 <CalendarOutlined aria-hidden="true" style={{
                     fontSize: field.iconSize,
-                    color: isError && !value ? colors.error.main : colors.text.placeholder,
+                    color: isError && !value ? colors.error.main : field.selectionHintColor,
                 }} />
             </button>
 
@@ -255,7 +256,7 @@ const styles = {
      */
     trigger: {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        width: '100%', height: field.height, padding: '0 11px',
+        width: '100%', height: field.height, paddingInline: field.paddingInline,
         boxSizing: 'border-box',
         border: 'none', borderRadius: field.radius, background: field.bg,
         cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
@@ -268,8 +269,8 @@ const styles = {
         ...field.textStyle,
         color: colors.text.primary,
     },
-    // AntD placeholder 와 같은 색 — 바로 아래 "예약 시간"의 자리표시자와 톤이 정확히 맞는다.
-    placeholder: { color: field.placeholderColor },
+    selected: { fontWeight: fontWeight.medium },
+    placeholder: { color: field.selectionHintColor },
     header: {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         marginBottom: 10,

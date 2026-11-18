@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface FeedCommentRepository extends JpaRepository<FeedComment, Long> {
+    Optional<FeedComment> findByPublicId(String publicId);
     String PUBLIC_AUTHOR = "author.hidden = false AND member.deletedAt IS NULL AND member.termsAgreed = true "
         + "AND (member.status = kr.it.reserve.member.entity.MemberStatus.ACTIVE OR "
         + "(member.status = kr.it.reserve.member.entity.MemberStatus.SUSPENDED AND member.suspendedUntil < :now))";
@@ -22,6 +23,14 @@ public interface FeedCommentRepository extends JpaRepository<FeedComment, Long> 
     Page<FeedComment> roots(@Param("post") Long post, @Param("now") LocalDateTime now, Pageable page);
     @Query("SELECT c FROM FeedComment c LEFT JOIN c.profile author LEFT JOIN author.member member WHERE c.parent.id = :parent AND c.parent.state <> kr.it.reserve.feed.entity.FeedComment.State.HIDDEN AND " + PUBLIC_COMMENT + " ORDER BY c.createdAt, c.id")
     Page<FeedComment> replies(@Param("parent") Long parent, @Param("now") LocalDateTime now, Pageable page);
+    @EntityGraph(attributePaths = "post")
+    @Query("SELECT c FROM FeedComment c JOIN c.post p JOIN p.profile author JOIN author.member member "
+        + "WHERE c.profile.id = :profile AND c.state = kr.it.reserve.feed.entity.FeedComment.State.PUBLISHED "
+        + "AND p.newsPromotion IS NULL AND p.state = kr.it.reserve.feed.entity.FeedPost.State.PUBLISHED AND author.nickname <> '' "
+        + "AND NOT EXISTS (SELECT parent.id FROM FeedComment parent WHERE parent.id = c.parent.id "
+        + "AND parent.state = kr.it.reserve.feed.entity.FeedComment.State.HIDDEN) AND " + PUBLIC_AUTHOR
+        + " ORDER BY c.createdAt DESC, c.id DESC")
+    Page<FeedComment> publishedByProfile(Long profile, LocalDateTime now, Pageable page);
     @Query("SELECT COUNT(c) FROM FeedComment c LEFT JOIN c.profile author LEFT JOIN author.member member WHERE c.post.id = :post AND NOT EXISTS "
         + "(SELECT parent.id FROM FeedComment parent WHERE parent.id = c.parent.id AND parent.state = kr.it.reserve.feed.entity.FeedComment.State.HIDDEN) AND " + PUBLIC_COMMENT)
     long countVisible(@Param("post") Long post, @Param("now") LocalDateTime now);

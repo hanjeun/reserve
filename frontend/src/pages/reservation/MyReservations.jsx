@@ -6,25 +6,30 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { Typography } from 'antd';
 import {
-    CreditCardOutlined, DeleteOutlined, QrcodeOutlined,
-    CloseOutlined, StarOutlined, EditOutlined,
+    CreditCardOutlined, QrcodeOutlined,
+    CloseOutlined, StarOutlined, EditOutlined, FlagOutlined,
 } from '../../components/common/icons';
 import { PageContainer, Button, DataState, FilterToolbar, MyReservationCardSkeleton, ReservationSummaryCardSkeleton, SpinIndicator, SegmentedControl } from '../../components/common';
-import ListingContent from '../../components/common/ListingContent';
+import AnimatedContent, { AnimatedListingContent } from '../../components/common/AnimatedContent';
 import MyWaiting from '../../components/waiting/MyWaiting';
 import ReservationRow from '../../components/reservation/ReservationRow';
 import ReservationListingToolbar from '../../components/reservation/ReservationListingToolbar';
 import ReservationSummaryCard from '../../components/reservation/ReservationSummaryCard';
+import ReservationCompletionNotice from '../../components/reservation/ReservationCompletionNotice';
+import ReservationHistoryDeleteButton from '../../components/reservation/ReservationHistoryDeleteButton';
 import ReservationDetailModal from '../../components/reservation/ReservationDetailModal';
 import NotificationReservationDetail from '../../components/reservation/NotificationReservationDetail';
 import QrCodeModal from '../../components/reservation/QrCodeModal';
 import { useReservations, useMessage, usePayment } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
+import { storeDetailPath } from '../../utils/storePublicAddress';
 import useViewModeParam from '../../hooks/useViewModeParam';
+import useQueryParamsState from '../../hooks/useQueryParamState';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
+import useListSelectionMotion from '../../hooks/useListSelectionMotion';
+import useInitialLoading from '../../hooks/useInitialLoading';
 import { useWindowWidth } from '../../hooks/useWindowWidth';
 import { isBlockingListReadError, queryErrorStatus } from '../../hooks/liveUpdateQueries';
-import useDebounce from '../../hooks/useDebounce';
 import useAuthStore from '../../store/useAuthStore';
 import usePaymentIncompleteNotice from '../../hooks/usePaymentIncompleteNotice.jsx';
 import paymentService from '../../services/paymentService';
@@ -37,6 +42,8 @@ import Pagination from '../../components/common/Pagination';
 import { DEFAULT_PAGE_SIZE, MOBILE_PAGINATION_BREAKPOINT } from '../../constants/pagination';
 
 const { Text } = Typography;
+const ServiceReportForm = React.lazy(() => import('../../components/report/ServiceReportForm'));
+const MyServiceReports = React.lazy(() => import('../../components/report/MyServiceReports'));
 
 // 상태 필터 목록은 constants/status.js 하나에서만 온다 —
 // 같은 상태를 화면마다 다르게 부르지 않기 위해서다('확정' vs '승인됨' vs '예약 확정').
@@ -93,37 +100,25 @@ const createReservationActions = ({ res, paying, onPay, onEdit, onQr, onCancel, 
             </Button>,
         );
     }
-    if (res.status === 'COMPLETED') {
+    if (res.status === 'COMPLETED' && (res.reviewId || !res.reviewWritten)) {
         actions.push(res.reviewId
             ? <Button key="review" variant="ghost-sm-success"
                 onClick={(e) => { e.stopPropagation(); onReview(res, true); }}>
-                <StarOutlined /> 리뷰 보기
+                <StarOutlined aria-hidden="true" /> 리뷰 보기
               </Button>
             : <Button key="review" variant="ghost-sm-primary"
                 onClick={(e) => { e.stopPropagation(); onReview(res, false); }}>
-                <StarOutlined /> 리뷰 쓰기
+                <StarOutlined aria-hidden="true" /> 리뷰 작성
               </Button>,
-            <Button key="remove" variant="ghost-sm" size="sm"
-                onClick={(e) => { e.stopPropagation(); onRemove(res); }}
-                style={{ color: colors.text.tertiary }}>
-                <DeleteOutlined /> 삭제
-            </Button>,
         );
     }
-    if (['CANCELLED', 'REJECTED', 'NO_SHOW'].includes(res.status)) {
-        actions.push(
-            <Button key="remove" variant="ghost-sm" size="sm"
-                onClick={(e) => { e.stopPropagation(); onRemove(res); }}
-                style={{ color: colors.text.tertiary }}>
-                <DeleteOutlined /> 삭제
-            </Button>,
-        );
+    if (['COMPLETED', 'CANCELLED', 'REJECTED', 'NO_SHOW'].includes(res.status)) {
+        actions.push(<ReservationHistoryDeleteButton key="remove" onClick={() => onRemove(res)} />);
     }
     return actions;
 };
 
-const resolveOptionParam = (params, key, options, fallback) => (options.some(option => option.value === params.get(key))
-    ? params.get(key) : fallback);
+const resolveOptionValue = (value, options, fallback) => (options.some(option => option.value === value) ? value : fallback);
 
 // 상태·정렬의 모든 선택을 같은 방식으로 URL에 표시한다.
 const withToolbarParam = (current, key, value) => {
@@ -135,7 +130,7 @@ const withToolbarParam = (current, key, value) => {
 };
 
 // 목록 결과 — 빈 안내 또는 카드/목록형 항목들.
-const ReservationResults = ({ filtered, view, filtersActive, renderItem, onResetFilters }) => {
+const ReservationResults = ({ filtered, view, filtersActive, renderItem, onResetFilters, resultRef }) => {
     if (filtered.length === 0) {
         return (
             <DataState state="empty" kind="reservation"
@@ -148,11 +143,11 @@ const ReservationResults = ({ filtered, view, filtersActive, renderItem, onReset
         );
     }
     return (
-        <div className={view === 'cards' ? 'reserve-reservation-card-grid' : 'reserve-myreservation-rows'}>
+        <div ref={resultRef} className={view === 'cards' ? 'reserve-reservation-card-grid' : 'reserve-myreservation-rows'}>
             {filtered.map((res, i) => (
                 <div key={res.id} className={view === 'cards' ? 'reserve-myreservation-card-item' : 'reserve-myreservation-row'}>
                     {renderItem(res)}
-                    {view === 'list' && i < filtered.length - 1 && <div style={styles.divider} />}
+                    {view === 'list' && i < filtered.length - 1 && <div className="reserve-myreservation-divider" aria-hidden="true" />}
                 </div>
             ))}
         </div>
@@ -169,33 +164,42 @@ const ReservationHistory = () => {
     usePaymentIncompleteNotice();
     useDocumentTitle('내 예약');
 
-    const statusFilter = resolveOptionParam(urlSearchParams, 'status', STATUS_OPTIONS, 'ALL');
-    const sort = resolveOptionParam(urlSearchParams, 'sort', SORT_OPTIONS, 'recent');
+    const [applied, setApplied] = useQueryParamsState({ reservationKeyword: '', page: '1', status: 'ALL', sort: 'recent' },
+        { privateKeys: ['reservationKeyword'] });
+    const keyword = applied.reservationKeyword;
+    const statusFilter = resolveOptionValue(applied.status, STATUS_OPTIONS, 'ALL');
+    const sort = resolveOptionValue(applied.sort, SORT_OPTIONS, 'recent');
     const [view, setView] = useViewModeParam(urlSearchParams, 'list');
-    const setToolbarParam = (key, value) => setUrlSearchParams(current => withToolbarParam(current, key, value));
-    const [keyword, setKeyword] = useState('');
-    const debouncedKeyword = useDebounce(keyword, 300);
-    const requestedPage = Number(urlSearchParams.get('page') ?? 1);
+    const setToolbarParam = (key, value) => setApplied({ [key]: value, ...(key !== 'page' ? { page: '1' } : {}) });
+    const requestedPage = Number(applied.page);
     const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
     const isMobile = useWindowWidth() < MOBILE_PAGINATION_BREAKPOINT;
-    const { reservations, total, totalPages, loading, refetching, error, cancelReservation, refetch,
+    const { reservations, total, totalPages, loading, refetching, error, cancelReservation, refetch, sorting, resultPage = page, resultSort = sort,
         hasData = reservations.length > 0 || !loading && !error } = useReservations({
         page: page - 1, size: DEFAULT_PAGE_SIZE,
-        search: debouncedKeyword.trim() || undefined,
+        search: keyword.trim() || undefined,
         status: statusFilter === 'ALL' ? undefined : statusFilter,
         sort,
     });
     const [qrReservationId, setQrReservationId] = useState(null);
     const [detailReservation, setDetailReservation] = useState(null);
+    const [reportTarget, setReportTarget] = useState(null);
+    const [reportOpen, setReportOpen] = useState(false);
     const currentDetailReservation = detailReservation ? reservations.find(item => item.id === detailReservation.id) ?? null : null;
     const listRef = React.useRef(null);
+    const resultRef = React.useRef(null);
     const accessDenied = [401, 403].includes(queryErrorStatus(error));
     const blockingError = isBlockingListReadError(error, reservations);
-    useListRefreshAnchor(listRef, JSON.stringify([view, page, statusFilter, sort, debouncedKeyword]), refetching, hasData ? reservations : null);
+    const initialLoading = useInitialLoading(loading);
+    useListRefreshAnchor(listRef, JSON.stringify([view, page, statusFilter, sort, keyword]), refetching, hasData ? reservations : null);
+    useListSelectionMotion(resultRef, {
+        selection: JSON.stringify([keyword, statusFilter, resultSort]), view,
+        ids: reservations.map(item => item.id), ready: !loading && !blockingError,
+    });
     useEffect(() => {
-        if (!hasData || loading || refetching || error || page <= Math.max(totalPages, 1)) return;
+        if (!hasData || loading || sorting || refetching || error || page <= Math.max(totalPages, 1)) return;
         setUrlSearchParams(current => withToolbarParam(current, 'page', Math.max(totalPages, 1)), { replace: true });
-    }, [hasData, loading, refetching, error, page, totalPages, setUrlSearchParams]);
+    }, [hasData, loading, sorting, refetching, error, page, totalPages, setUrlSearchParams]);
     if (accessDenied) {
         if (qrReservationId !== null) setQrReservationId(null);
         if (detailReservation !== null) setDetailReservation(null);
@@ -286,12 +290,17 @@ const ReservationHistory = () => {
     };
 
     // 액션 핸들러 묶음 — ReservationActions에 넘겨 PC/모바일 양쪽에서 재사용
-    const handleEdit   = (res) => navigate(`/store/${res.storeId}?edit=${res.id}`);
+    const handleEdit = (res) => {
+        const path = storeDetailPath({ publicId: res.storePublicId });
+        if (!path) return message.error('가게 주소를 확인할 수 없어요. 예약 목록을 다시 불러와주세요.');
+        navigate(path + '?edit=' + res.id);
+    };
     const handleQr     = (res) => setQrReservationId(res.id);
-    const handleReview = (res, hasReview) => navigate(
-        `/store/${res.storeId}`,
-        { state: hasReview ? { openReviewId: res.reviewId } : { openWrite: true } }
-    );
+    const handleReview = (res, hasReview) => {
+        const path = storeDetailPath({ publicId: res.storePublicId });
+        if (!path) return message.error('가게 주소를 확인할 수 없어요. 예약 목록을 다시 불러와주세요.');
+        navigate(path, { state: hasReview ? { openReviewId: res.reviewId } : { openWrite: true, reviewReservationId: res.id } });
+    };
 
     const actionHandlers = {
         paying,
@@ -312,7 +321,7 @@ const ReservationHistory = () => {
         return <ReservationRow {...itemProps} renderActions={() => actions} />;
     };
 
-    const resultsLoading = loading || keyword.trim() !== debouncedKeyword.trim();
+    const resultsLoading = loading;
     let listBody;
     if (resultsLoading) {
         listBody = (
@@ -330,11 +339,10 @@ const ReservationHistory = () => {
         );
     } else {
         listBody = (
-            <ReservationResults filtered={reservations} view={view}
-                filtersActive={statusFilter !== 'ALL' || Boolean(debouncedKeyword.trim())}
+            <ReservationResults filtered={reservations} view={view} resultRef={resultRef}
+                filtersActive={statusFilter !== 'ALL' || Boolean(keyword.trim())}
                 onResetFilters={() => {
-                    setKeyword('');
-                    setUrlSearchParams(current => withToolbarParam(current, 'status', 'ALL'));
+                    setApplied({ reservationKeyword: '', status: 'ALL', page: '1' });
                 }}
                 renderItem={renderReservationItem} />
         );
@@ -344,34 +352,33 @@ const ReservationHistory = () => {
         <section ref={listRef} aria-label="내 예약 목록" aria-busy={resultsLoading || refetching}>
             {paymentDialog}
             <ReservationListingToolbar view={view}
-                initialLoading={loading}
+                initialLoading={initialLoading}
                 onViewChange={setView}
                 status={statusFilter} onStatusChange={nextStatus => setToolbarParam('status', nextStatus)}
                 statusOptions={STATUS_OPTIONS} sort={sort}
-                onSortChange={nextSort => setToolbarParam('sort', nextSort)} sortOptions={SORT_OPTIONS}
-                count={loading || !hasData || blockingError ? undefined : total} disabled={loading} />
+                onSortChange={nextSort => setToolbarParam('sort', nextSort)} sortOptions={SORT_OPTIONS} sortLoading={sorting}
+                count={loading || !hasData || blockingError ? undefined : total} disabled={initialLoading} />
             <FilterToolbar
                 autoRefreshDomain="RESERVATION"
-                search={{ value: keyword, onChange: e => { setKeyword(e.target.value); setToolbarParam('page', 1); }, placeholder: '가게명, 예약번호로 검색' }}
+                search={{ value: keyword, onSubmit: value => setApplied({ reservationKeyword: value, page: '1' }), placeholder: '가게명, 예약번호로 검색' }}
                 onReload={refetch}
-                loading={loading || refetching}
-                initialLoading={loading}
+                loading={loading || refetching && !sorting}
+                initialLoading={initialLoading}
             />
 
-            {/* 첫 조회에만 스켈레톤을 표시한다. 폴링·창 포커스·수동 새로고침은 현재 예약과
-                읽던 위치를 유지하고 툴바에서만 진행 상태를 알린다. */}
-            <ListingContent notice={!loading && error && !blockingError && (
+            <AnimatedListingContent motionKey={view} ready={!resultsLoading} keepResultsHeight={total > DEFAULT_PAGE_SIZE}
+                notice={!loading && error && !blockingError && (
                 <DataState state="error" kind="reservation" subject="예약 목록" error={error}
                     title="최신 예약을 확인하지 못해 이전 목록을 보여드리고 있어요."
                     onRetry={refetch} retrying={loading || refetching} compact />
-            )}>{listBody}</ListingContent>
+            )}>{listBody}</AnimatedListingContent>
             {hasData && !blockingError && total > 0 && (
                 <nav aria-label="내 예약 목록 페이지" className="reserve-listing-pagination">
-                    <Pagination current={page} pageSize={DEFAULT_PAGE_SIZE} total={total}
+                    <Pagination current={resultPage} pageSize={DEFAULT_PAGE_SIZE} total={total}
                         onChange={nextPage => setToolbarParam('page', nextPage)}
                         showSizeChanger={false} showLessItems={isMobile}
                         size={isMobile ? 'small' : 'default'} align="end"
-                        disabled={loading || keyword !== debouncedKeyword} />
+                        disabled={loading || sorting} />
                 </nav>
             )}
             {!accessDenied && <><QrCodeModal
@@ -383,38 +390,61 @@ const ReservationHistory = () => {
                 reservation={currentDetailReservation}
                 open={currentDetailReservation != null}
                 onClose={() => setDetailReservation(null)}
-            /></>}
+                showPaymentHistory
+                tools={(reservation, open) => open && <Button variant="ghost-sm" onClick={() => {
+                    setReportTarget({ id: reservation.id, type: 'RESERVATION' });
+                    setReportOpen(true);
+                }}><FlagOutlined aria-hidden="true" /> 예약 신고</Button>}
+            />
+            {reportTarget && <React.Suspense fallback={null}><ServiceReportForm target={reportTarget} open={reportOpen}
+                onClose={() => setReportOpen(false)} afterClose={() => setReportTarget(null)} /></React.Suspense>}</>}
         </section>
     );
 };
 
 const MyReservations = () => {
     const [params, setParams] = useSearchParams();
-    const revision = useAuthStore(state => state.sessionRevision);
+    const [reports, setReports] = useState(null);
+    const { state } = useLocation();
+    const revision = useAuthStore(auth => auth.sessionRevision);
+    const memberId = useAuthStore(auth => auth.isLoggedIn ? auth.user?.id : null);
     const waiting = params.get('tab') === 'waiting';
+    // 목록이 초기 라우터 상태를 비워도 이번 진입의 완료 안내는 유지한다.
+    const [completion] = useState(() => state?.reservationCompletion);
+    const completionText = memberId != null && completion?.memberId === memberId && completion.sessionRevision === revision
+        && typeof completion.text === 'string' ? completion.text : null;
     useDocumentTitle('내 예약');
     return <PageContainer size="xl" paddingTop="40px" className="reserve-myreservation-page">
         <div className="reserve-listing-heading">
             <PageTitle style={styles.title}>내 예약 확인</PageTitle>
             <PageDescription>예약과 웨이팅 현황을 확인해요</PageDescription>
         </div>
-        <div style={{ marginBottom: 20 }}><SegmentedControl block={false} value={waiting ? 'waiting' : 'reservation'}
+        {!waiting && completionText && <ReservationCompletionNotice text={completionText} />}
+        <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <SegmentedControl block={false} value={waiting ? 'waiting' : 'reservation'}
             options={[{ value: 'reservation', label: '예약' }, { value: 'waiting', label: '웨이팅' }]}
             onChange={value => setParams(current => {
                 const next = new URLSearchParams(current);
                 next.set('tab', value);
                 next.delete('notification');
                 return next;
-            })} /></div>
+            })} />
+            {memberId != null && <Button variant="ghost-sm" onClick={() => setReports({ revision, open: true })}>
+                <FlagOutlined aria-hidden="true" /> 내 신고</Button>}
+        </div>
+        {reports && reports.revision === revision && <React.Suspense fallback={null}>
+            <MyServiceReports open={reports.open} onClose={() => setReports({ revision, open: false })} />
+        </React.Suspense>}
         <PersonalSearchHandoff key={`search:${revision}`} />
-        {waiting ? <MyWaiting key={`waiting:${revision}`} /> : <ReservationHistory key={`history:${revision}`} />}
+        <AnimatedContent motionKey={waiting ? 'waiting' : 'reservation'}>
+            {waiting ? <MyWaiting key={`waiting:${revision}`} /> : <ReservationHistory key={`history:${revision}`} />}
+        </AnimatedContent>
         {!waiting && <NotificationReservationDetail />}
     </PageContainer>;
 };
 
 const styles = {
     title:    { margin: '0 0 8px', },
-    divider:  { height: 1, background: colors.border?.light || '#f0f0f0' },
     rejection: { fontSize: fontSize.xs, textAlign: 'right', width: '100%' },
 };
 

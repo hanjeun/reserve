@@ -3,30 +3,33 @@
  */
 import React from 'react';
 import PropTypes from 'prop-types';
+import useRadioGroupNavigation from '../../hooks/useRadioGroupNavigation';
 
-const SegmentedControl = ({ options, value, onChange, block = true, disabled = false, id, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy }) => (
+const SegmentedControl = ({ options, value, onChange, block = true, disabled = false, id, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy }) => {
+    const radioProps = useRadioGroupNavigation({ options, value, onChange, disabled });
+    return (
     <div
         id={id}
         className="reserve-segmented"
-        // nowrap 이다 — 줄바꿈이 필요하면 SegmentedGrid 를 쓴다.
-        // flex-wrap 은 왼쪽부터 채우기 때문에 줄당 개수를 제어할 수 없고, 그게 5+3 사태의 원인이었다.
-        style={{ display: 'flex', flexWrap: 'nowrap', gap: 4, width: block ? '100%' : undefined }}
+        // 여러 줄 선택지는 열 수를 고정하는 SegmentedGrid를 사용한다.
+        style={{ display: 'flex', flexWrap: 'nowrap', gap: 8, width: block ? '100%' : undefined }}
         role="radiogroup"
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledBy}
+        aria-disabled={disabled || undefined}
     >
-        {options.map((opt) => {
+        {options.map((opt, index) => {
             const active = opt.value === value;
             return (
                 <button
                     key={opt.value}
+                    {...radioProps(index)}
                     type="button"
                     role="radio"
                     aria-checked={active}
                     disabled={disabled || opt.disabled}
                     onClick={() => onChange(opt.value)}
                     className={`reserve-segmented-btn${active ? ' reserve-segmented-btn--active' : ''}`}
-                    // block 이면 버튼들이 트랙을 균등하게 나눠 갖는다. 아니면 내용 폭만 차지한다.
                     style={block ? { flex: 1 } : undefined}
                 >
                     {opt.label}
@@ -34,7 +37,8 @@ const SegmentedControl = ({ options, value, onChange, block = true, disabled = f
             );
         })}
     </div>
-);
+    );
+};
 
 SegmentedControl.propTypes = {
     options: PropTypes.arrayOf(PropTypes.shape({

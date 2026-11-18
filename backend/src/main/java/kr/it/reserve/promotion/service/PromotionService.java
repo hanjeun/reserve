@@ -142,7 +142,6 @@ public class PromotionService {
                 .map(PromotionDto.PromotionResponse::fromEntity);
     }
 
-    // 공통 도우미 메서드
     private Member findActiveMemberForUpdateOrThrow(Long memberId) {
         Member member = memberRepository.findActiveByIdForUpdate(memberId)
                 .orElseThrow(() -> new PromotionException("회원을 찾을 수 없어요.", HttpStatus.NOT_FOUND));

@@ -108,7 +108,7 @@ export default function Feed() {
         {enabled && <div className="reserve-feed-directory-tools" data-discovery-swipe-ignore="true">
             <div className="reserve-feed-write-tools">
                 {user ? <><IconTool label="새 글 작성" icon={<InterfaceIcon name="compose" />} onClick={write}
-                    unavailableReason={profile.isError && (profile.data === undefined || [401, 403].includes(httpStatusOf(profile.error))) ? '공개 프로필을 다시 불러온 뒤 작성해주세요.' : ''} />
+                    unavailableReason={profile.isError && (profile.data === undefined || [401, 403].includes(httpStatusOf(profile.error))) ? '프로필을 다시 불러온 뒤 작성해주세요.' : ''} />
                     <IconTool label={view === 'drafts' ? '최신 피드로 돌아가기' : '임시저장한 글'} icon={<InterfaceIcon name="folder" />} active={view === 'drafts'} onClick={() => setFilter('view', view === 'drafts' ? 'all' : 'drafts')} />
                     {notificationCount.visible && <IconTool label={`피드 알림${notificationCount.pending ? ' 확인 중' : notificationCount.data?.unread ? `, 안 읽은 알림 ${notificationCount.data.unread}개` : ''}`}
                         disabled={!notificationCount.enabled} to="/feed/notifications"
@@ -121,7 +121,7 @@ export default function Feed() {
             <FilterMenu appearance="plain" options={views} value={view} aria-label="피드 보기" onChange={value => setFilter('view', value)} />
             </div>
         </div>}
-        {profileFailure && <DataState compact state="error" title={profile.data === undefined ? '공개 프로필을 불러오지 못했어요.' : '공개 프로필을 갱신하지 못했어요.'} error={profile.error} onRetry={retryReads} retrying={retrying} />}
+        {profileFailure && <DataState compact state="error" title={profile.data === undefined ? '프로필을 불러오지 못했어요.' : '프로필을 갱신하지 못했어요.'} error={profile.error} onRetry={retryReads} retrying={retrying} />}
         {!unavailable && backgroundFailure && <DataState compact state="error" title="피드를 갱신하지 못했어요." error={backgroundFailure.error} onRetry={retryReads} retrying={retrying} />}
         <AnimatedContent className="reserve-feed-content" motionKey={`${view}:${region || ''}:${page}`} ready={!list.isPlaceholderData && !list.isPending}>{renderList()}</AnimatedContent>
         {enabled && !unavailable && !blockingError && list.data && (!requiresLogin || user) && feedTotal(list.data) > FEED_PAGE_SIZE && <nav className="reserve-feed-pagination" aria-label="피드 페이지">

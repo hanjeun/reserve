@@ -53,23 +53,29 @@ describe('discovery banner motion policy', () => {
         expect(transforms.every(value => value === 'none')).toBe(true);
     });
 
-    it('lifts shortcut images on fine hover without resizing the pressed link or carousel', () => {
+    it('lifts shortcut images on hover and presses only the artwork when motion is enabled', () => {
         const hoverTransforms = [];
         const pressTransforms = [];
+        const artworkPress = [];
         stylesheet.walkRules(rule => {
-            if (rule.selectors.includes('.reserve-discovery-shortcut:hover img')) {
+            if (rule.selectors.includes('.reserve-discovery-shortcut:hover:not(:active) img')) {
                 rule.walkDecls('transform', declaration => {
                     expect(rule.parent.type).toBe('atrule');
                     expect(rule.parent.params).toBe('(hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)');
                     hoverTransforms.push(declaration.value);
                 });
             }
-            if (rule.selectors.some(selector => /^\.reserve-discovery-shortcut:active(?=[:\s]|$)/.test(selector))) {
+            if (rule.selectors.includes('.reserve-discovery-shortcut:active')) {
                 rule.walkDecls('transform', declaration => pressTransforms.push(declaration.value));
+            }
+            if (rule.selectors.includes('.reserve-discovery-shortcut:active img')) {
+                expect(rule.parent.params).toBe('(prefers-reduced-motion: no-preference)');
+                rule.walkDecls('transform', declaration => artworkPress.push(declaration.value));
             }
         });
         expect(hoverTransforms).toEqual(['translateY(-2px)']);
         expect(pressTransforms).toEqual(['none']);
+        expect(artworkPress).toEqual(['scale(var(--reserve-icon-active-scale))']);
         expect(styleAtWidth('.reserve-discovery-shortcut:active', 390).color).toBe('var(--c-text-primary, #191f28)');
     });
 });

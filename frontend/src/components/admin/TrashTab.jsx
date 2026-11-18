@@ -2,7 +2,7 @@ import React from 'react';
 import { Typography, Tag } from 'antd';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { UndoOutlined } from '../common/icons';
-import { Button, FilterToolbar, AdminTableSkeleton, DataState, DataTable } from '../common';
+import { Button, FilterToolbar, AdminTableSkeleton, DataState, PagedDataTable } from '../common';
 import { useMessage, useQueryParamsState } from '../../hooks';
 import { adminKeys } from '../../hooks/queryKeys';
 import { invalidateAdminData, invalidateReservationData, invalidateStoreData } from '../../hooks/invalidateAfterWrite';
@@ -141,19 +141,12 @@ const TrashTab = () => {
             <DataState state="error" subject="휴지통 목록" error={itemsError}
                 onRetry={refetch} retrying={isFetching} />
         );
-    } else if (loading || isPlaceholderData) {
-        trashContent = (
-            <AdminTableSkeleton
-                rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
-                cols={SKELETON_COLS}
-                headers={SKELETON_HEADERS}
-                actionBtns={1}
-                pagination={totalElements ? { current: page, pageSize: PAGE_SIZE, total: totalElements } : null}
-            />
-        );
     } else {
         trashContent = (
-            <DataTable
+            <PagedDataTable
+                placeholder={(loading || isPlaceholderData) && <AdminTableSkeleton
+                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
+                    cols={SKELETON_COLS} headers={SKELETON_HEADERS} actionBtns={1} />}
                 columns={columns}
                 dataSource={items}
                 rowKey="id"

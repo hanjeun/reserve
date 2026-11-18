@@ -1,5 +1,7 @@
 **
 !Dockerfile
+!tools/
+!tools/VerifyReleaseCompatibility.java
 !build/
 build/**
 !build/libs/

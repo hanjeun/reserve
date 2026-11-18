@@ -25,7 +25,7 @@ vi.mock('../../hooks/useDebounce', () => ({ default: value => value }));
 vi.mock('../common', async () => ({
     Button: ({ children, onClick, disabled }) => <button type="button" onClick={onClick} disabled={disabled}>{children}</button>,
     AdminTableSkeleton: () => <span>조회 중</span>,
-    DataTable: ({ columns, dataSource }) => <>{dataSource.map(row => <div key={row.id}>{columns.find(c => c.key === 'actions').render(null, row)}</div>)}</>,
+    PagedDataTable: ({ columns, dataSource, placeholder }) => placeholder || <>{dataSource.map(row => <div key={row.id}>{columns.find(c => c.key === 'actions').render(null, row)}</div>)}</>,
     DataState: ({ onRetry }) => <button onClick={onRetry}>다시 불러오기</button>,
     FilterToolbar: () => null,
     SegmentedControl: (await import('../common/SegmentedControl')).default,

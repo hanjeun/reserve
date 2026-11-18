@@ -12,16 +12,29 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
-    @Query("SELECT p FROM Payment p JOIN FETCH p.reservation r WHERE r.store.id = :storeId "
-            + "AND (p.verifiedChannelType = 'TEST' OR EXISTS (SELECT s.requestKey FROM TestSettlementPayout s WHERE s.paymentId = p.id)) "
-            + "ORDER BY p.id DESC")
-    org.springframework.data.domain.Slice<Payment> findTestSettlementPage(@Param("storeId") Long storeId, Pageable pageable);
+    String TEST_SETTLEMENT_SCOPE = "r.store.id = :storeId "
+            + "AND (p.verifiedChannelType = 'TEST' OR EXISTS (SELECT s.requestKey FROM TestSettlementPayout s WHERE s.paymentId = p.id)) ";
+    String TEST_SETTLEMENT_RANGE = "AND r.reservationDate BETWEEN :start AND :end ";
+    @Query(value = "SELECT p FROM Payment p JOIN FETCH p.reservation r WHERE " + TEST_SETTLEMENT_SCOPE + "ORDER BY p.id DESC",
+            countQuery = "SELECT COUNT(p) FROM Payment p JOIN p.reservation r WHERE " + TEST_SETTLEMENT_SCOPE)
+    org.springframework.data.domain.Page<Payment> findTestSettlementPage(@Param("storeId") Long storeId, Pageable pageable);
+
+    @Query(value = "SELECT p FROM Payment p JOIN FETCH p.reservation r WHERE " + TEST_SETTLEMENT_SCOPE + TEST_SETTLEMENT_RANGE + "ORDER BY p.id DESC",
+            countQuery = "SELECT COUNT(p) FROM Payment p JOIN p.reservation r WHERE " + TEST_SETTLEMENT_SCOPE + TEST_SETTLEMENT_RANGE)
+    Page<Payment> findTestSettlementMonthPage(@Param("storeId") Long storeId, @Param("start") LocalDate start,
+            @Param("end") LocalDate end, Pageable pageable);
+
+    @Query("SELECT p FROM Payment p JOIN FETCH p.reservation r WHERE " + TEST_SETTLEMENT_SCOPE + TEST_SETTLEMENT_RANGE
+            + "AND (:beforeId IS NULL OR p.id < :beforeId) ORDER BY p.id DESC")
+    List<Payment> findTestSettlementMonthBatch(@Param("storeId") Long storeId, @Param("start") LocalDate start,
+            @Param("end") LocalDate end, @Param("beforeId") Long beforeId, Pageable pageable);
 
 
     String CONFIRMED_DEPOSIT_PAYMENT = """
@@ -44,6 +57,12 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     // 가맹점 주문번호로 조회
     Optional<Payment> findByMerchantUid(String merchantUid);
 
+    @Query("""
+            SELECT p FROM Payment p JOIN p.member m
+            WHERE p.merchantUid = :merchantUid AND m.id = :memberId AND m.deletedAt IS NULL AND
+            """ + CONFIRMED_DEPOSIT_PAYMENT)
+    Optional<Payment> findReceiptOrder(@Param("merchantUid") String merchantUid, @Param("memberId") long memberId);
+
     @Query("SELECT p.reservation.id FROM Payment p WHERE p.id = :id")
     Optional<Long> findReservationIdByPaymentId(@Param("id") Long id);
 
@@ -60,6 +79,10 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     
     // 예약 ID로 조회 (단일 - 주의: 레코드 여러 개면 예외 발생)
     Optional<Payment> findByReservationId(Long reservationId);
+
+    List<Payment> findByReservation_IdOrderByIdDesc(Long reservationId, org.springframework.data.domain.Pageable pageable);
+
+    Optional<Payment> findFirstByReservation_IdAndMember_IdOrderByPaidAtDescIdDesc(Long reservationId, Long memberId);
     boolean existsByReservationId(Long reservationId);
 
     /** 동일 예약에 결제 행이 여럿일 수 있으므로 최근 한 건 조회에는 LIMIT 1이 필요하다. */
@@ -83,10 +106,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     @Query("SELECT p FROM Payment p WHERE p.reservation.id = :reservationId ORDER BY p.createdAt DESC")
     List<Payment> findAllByReservationIdForUpdate(@Param("reservationId") Long reservationId);
 
-    /**
-     * 위와 같은 잠금 조회를 예약 ID 로. 조건·정렬·LIMIT 은 {@link #findPaidByReservationId} 와 같다
-     * — 두 메서드가 <b>다른 행을 고르면</b> 잠금이 의미를 잃으므로 바꿀 때 반드시 같이 바꿀 것.
-     */
+    /** 잠금·일반 조회가 같은 결제를 고르도록 {@link #findPaidByReservationId}와 조건·정렬·LIMIT을 맞춘다. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Payment p WHERE p.reservation.id = :reservationId AND p.status = 'PAID' ORDER BY p.createdAt DESC LIMIT 1")
     Optional<Payment> findPaidByReservationIdForUpdate(@Param("reservationId") Long reservationId);

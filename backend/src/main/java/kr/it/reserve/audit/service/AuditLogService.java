@@ -7,21 +7,24 @@ import kr.it.reserve.audit.entity.AuditLog;
 import kr.it.reserve.audit.repository.AuditLogRepository;
 import kr.it.reserve.global.error.AuditException;
 import kr.it.reserve.global.trash.ReceivedInquiryTrash;
-import org.springframework.context.event.EventListener;
-import org.springframework.transaction.annotation.Propagation;
 import kr.it.reserve.mailbox.entity.AdminSentMail;
 import kr.it.reserve.mailbox.repository.AdminSentMailRepository;
 import kr.it.reserve.member.entity.Member;
+import kr.it.reserve.member.mfa.AccountProtectionAudit;
+import kr.it.reserve.payment.service.PaymentReceiptService;
 import kr.it.reserve.payment.service.PaymentService;
 import kr.it.reserve.reservation.entity.Reservation;
+import kr.it.reserve.reservation.entity.StoreBookingRestriction;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.reservation.service.ReservationUpdates;
 import kr.it.reserve.review.entity.Review;
 import kr.it.reserve.review.repository.ReviewRepository;
 import kr.it.reserve.review.service.ReviewUpdates;
+import kr.it.reserve.review.service.ReviewMutationGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
@@ -29,6 +32,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -39,7 +43,7 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class AuditLogService {
+public class AuditLogService implements AccountProtectionAudit {
 
     private static final String SOFT_DELETE_ACTION = "SOFT_DELETE";
     private static final String RESERVATION_ENTITY_TYPE = "RESERVATION";
@@ -53,6 +57,7 @@ public class AuditLogService {
     private final AuditCleanupWorker auditCleanupWorker;
     private final PaymentService paymentService;
     private final ReceivedInquiryTrash inquiryTrash;
+    private final ReviewMutationGuard reviewMutations;
     @Autowired(required = false)
     private ReservationUpdates reservationUpdates;
     @Autowired(required = false)
@@ -68,6 +73,19 @@ public class AuditLogService {
         saveAuditLog("SENT_MAIL", mailId, SOFT_DELETE_ACTION,
                 Map.of("toEmail", mail.getToEmail(), "subject", nullSafe(mail.getSubject())));
         log.info("SentMail soft-deleted: id={}", mailId);
+    }
+
+    @EventListener
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordInquiryTrash(ReceivedInquiryTrash.Moved event) {
+        saveAuditLog(ReceivedInquiryTrash.TYPE, event.id(), SOFT_DELETE_ACTION, Map.of("제목", event.title()));
+    }
+
+    @EventListener
+    @Transactional
+    public void recordPaymentReceiptLookup(PaymentReceiptService.AdminLookup event) {
+        saveAuditLogWithActor("PAYMENT", event.paymentId(), "RECEIPT_LOOKUP",
+                Map.of("문의 번호", Long.toString(event.inquiryId()), "결제 유형", event.type()), "admin:" + event.adminId());
     }
 
     /**
@@ -104,9 +122,10 @@ public class AuditLogService {
 
     @Transactional
     public void softDeleteReview(Long reviewId) {
-        Review review = reviewRepository.findById(reviewId)
+        Review review = reviewMutations.lockReview(reviewId, false)
                 .orElseThrow(() -> AuditException.notFound("Review not found: " + reviewId));
         review.softDelete();
+        reviewMutations.updateRating(review.getStore());
         if (reviewUpdates != null) reviewUpdates.deleted(review);
         saveAuditLog("REVIEW", reviewId, SOFT_DELETE_ACTION, Map.of(
                 "가게",   review.getStore().getName(),
@@ -151,7 +170,12 @@ public class AuditLogService {
                 kr.it.reserve.reservation.service.ReservationRemovalPolicy.requireFinished(reservation);
                 reservation.setDeletedAt(null);
             }
-            case "REVIEW"         -> reviewRepository.restoreById(entityId);
+            case "REVIEW" -> {
+                Review review = reviewMutations.lockReview(entityId, true)
+                        .orElseThrow(() -> AuditException.notFound("Review not found: " + entityId));
+                review.setDeletedAt(null);
+                reviewMutations.updateRating(review.getStore());
+            }
             case "ADVERTISEMENT"  -> advertisementRepository.restoreById(entityId);
             default -> throw new AuditException("휴지통 복구가 지원되지 않는 항목이에요: " + entityType);
         }
@@ -204,10 +228,11 @@ public class AuditLogService {
         log.info("Business verification logged: memberId={}, action={}", memberId, action);
     }
 
-    @EventListener
-    @Transactional(propagation = Propagation.MANDATORY)
-    public void recordInquiryTrash(ReceivedInquiryTrash.Moved event) {
-        saveAuditLog(ReceivedInquiryTrash.TYPE, event.id(), SOFT_DELETE_ACTION, Map.of("제목", event.title()));
+    @Override
+    @Transactional
+    public void logAccountProtection(Long memberId, String action, Long adminId, String reason) {
+        String actor = adminId == null ? "member:" + memberId : "admin:" + adminId;
+        saveAuditLogWithActor("MEMBER", memberId, action, reason == null ? Map.of() : Map.of("사유", reason), actor);
     }
 
     // 스케줄러 전용 자동 정리
@@ -247,6 +272,25 @@ public class AuditLogService {
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
     public void recordReservationRetention(Long id, String action, String purpose) {
         saveAuditLog(RESERVATION_ENTITY_TYPE, id, action, Map.of("목적", purpose));
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void recordNoShowRestrictionCorrection(Long id) {
+        saveAuditLog(RESERVATION_ENTITY_TYPE, id, "NO_SHOW_CORRECTION", Map.of());
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void recordNoShowUndo(Long id) {
+        saveAuditLog(RESERVATION_ENTITY_TYPE, id, "NO_SHOW_UNDONE", Map.of());
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void recordStoreReservationRestriction(Long memberId, Long storeId, LocalDateTime until) {
+        String action = until == null ? "BOOKING_RELEASED" : "BOOKING_RESTRICTED";
+        String endLabel = StoreBookingRestriction.PERMANENT_UNTIL.equals(until) ? "영구 제한" : String.valueOf(until);
+        var snapshot = until == null ? Map.of("가게 번호", storeId.toString())
+                : Map.of("가게 번호", storeId.toString(), "제한 종료 (KST)", endLabel);
+        saveAuditLog("MEMBER", memberId, action, snapshot);
     }
 
     @Transactional(readOnly = true)

@@ -133,6 +133,31 @@ class PaymentStatusServiceTest {
     }
 
     @Test
+    void readsPastRefundedPaymentByOwnedReservationId() {
+        var owner = Member.builder().id(1L).build();
+        var reservation = Reservation.builder().id(12L).member(owner).status(Reservation.ReservationStatus.COMPLETED)
+                .reservationDate(LocalDate.of(2026, 10, 1)).build();
+        var payment = Payment.builder().member(owner).reservation(reservation).merchantUid("PAST-TEST")
+                .status(Payment.PaymentStatus.REFUNDED).amount(5000).refundAmount(5000).build();
+        when(paymentRepository.findFirstByReservation_IdAndMember_IdOrderByPaidAtDescIdDesc(12L, 1L)).thenReturn(Optional.of(payment));
+
+        var response = service.getReservationStatus(12L, 1L);
+
+        assertEquals(12L, response.reservation().id());
+        assertEquals("REFUNDED", response.status());
+        assertEquals(5000, response.refundedAmount());
+        verifyNoInteractions(advertisementRepository, adPaymentAttempts);
+    }
+
+    @Test
+    void onlyLooksUpPaymentInTheCurrentMembersReservationScope() {
+        assertEquals(HttpStatus.NOT_FOUND,
+                assertThrows(PaymentException.class, () -> service.getReservationStatus(12L, 99L)).getStatus());
+        verify(paymentRepository).findFirstByReservation_IdAndMember_IdOrderByPaidAtDescIdDesc(12L, 99L);
+        verifyNoMoreInteractions(paymentRepository);
+    }
+
+    @Test
     void missingRecordsAndInvalidInputAreExplicitErrors() {
         when(paymentRepository.findByMerchantUid("MISSING")).thenReturn(Optional.empty());
         assertEquals(HttpStatus.NOT_FOUND,

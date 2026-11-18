@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
     ArrowRightOutlined,
@@ -33,6 +33,11 @@ import { storeKeys } from '../../hooks/queryKeys';
 import { storeService } from '../../services';
 import { distanceSortParams, hasDistanceCoordinates } from '../../utils/distanceSort';
 import { formatRegionLabel, REGION_OPTIONS } from '../../constants/regions';
+import { getSeasonEffect } from '../../components/common/seasonal-preview/seasonEffect';
+import useSeasonEffectPreference from '../../components/common/seasonal-preview/useSeasonEffectPreference';
+
+const SeasonalPreview = lazy(() => import('../../components/common/seasonal-preview/SeasonalPreview')
+    .catch(() => ({ default: () => null })));
 
 const withRegion = (path, region) => {
     if (!path.startsWith('/stores')) return path;
@@ -498,6 +503,7 @@ export default function Home() {
     const [region, rememberRegion] = useDiscoveryRegion(homeParams);
     useListQueryNormalization(homeParams, { region });
     const [regionOpen, setRegionOpen] = useState(false);
+    const [seasonEffectEnabled] = useSeasonEffectPreference();
 
     const openRegion = () => {
         setRegionOpen(true);
@@ -536,6 +542,9 @@ export default function Home() {
 
     return (
         <div className="reserve-discovery-home" data-home-content="true">
+            {seasonEffectEnabled && getSeasonEffect() && <Suspense fallback={null}>
+                <SeasonalPreview />
+            </Suspense>}
             <h1 className="reserve-discovery-visually-hidden">RESERVE — 가게를 찾고 예약하세요</h1>
             <div className="reserve-discovery-location">
                 <button type="button" className="reserve-discovery-location-link"

@@ -9,6 +9,7 @@ import kr.it.reserve.mailbox.repository.AdminSentMailRepository;
 import kr.it.reserve.payment.repository.PaymentRepository;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.review.repository.ReviewRepository;
+import kr.it.reserve.review.service.ReviewPhotos;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -28,6 +29,7 @@ public class AuditCleanupWorker {
     private final AdminSentMailRepository adminSentMailRepository;
     private final ReservationRepository reservationRepository;
     private final ReviewRepository reviewRepository;
+    private final ReviewPhotos reviewPhotos;
     private final AdvertisementRepository advertisementRepository;
     private final PaymentRepository paymentRepository;
     private final ReceivedInquiryTrash inquiryTrash;
@@ -71,7 +73,10 @@ public class AuditCleanupWorker {
             case "SENT_MAIL" -> adminSentMailRepository.deleteById(entityId);
             case ReceivedInquiryTrash.TYPE -> inquiryTrash.purge(entityId);
             case "RESERVATION" -> reservationRepository.deleteById(entityId);
-            case "REVIEW" -> reviewRepository.deleteById(entityId);
+            case "REVIEW" -> {
+                reviewRepository.findById(entityId).ifPresent(review -> reviewPhotos.enqueueDeletion(review.getPhotos(), entityId));
+                reviewRepository.deleteById(entityId);
+            }
             case "ADVERTISEMENT" -> advertisementRepository.deleteById(entityId);
             default -> throw new AuditException("휴지통 영구삭제가 지원되지 않는 항목이에요: " + entityType);
         }

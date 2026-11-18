@@ -50,17 +50,20 @@ const FormModal = ({
     submitDisabled = false,
     width = 520,
     footer,
+    extraAction,
     rootClassName,
     mobileSize = 'form',
     mobileSheet = true,
     scrollResetKey,
     navigationDirty = false,
     navigationAllowUnload = false,
+    onSaveDraft,
+    draftSaving = false,
     children,
 }) => {
     const contentRef = useRef(null);
-    const requestClose = useWorkspaceDraftGuard({ dirty: open && navigationDirty, busy: open && submitting,
-        allowUnload: navigationAllowUnload, onDiscard: onClose });
+    const requestClose = useWorkspaceDraftGuard({ dirty: open && navigationDirty, busy: open && (submitting || draftSaving),
+        allowUnload: navigationAllowUnload, onDiscard: onClose, onSave: onSaveDraft });
     const close = () => requestClose(() => onClose?.(), { discard: false });
 
     /*
@@ -90,14 +93,15 @@ const FormModal = ({
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
                         <ModalActions onCancel={onCancelAction && onCancelAction !== onClose ? onCancelAction : close} onConfirm={onSubmit}
                             cancelText={cancelText} confirmText={submitText}
-                            loading={submitting} disabled={submitDisabled} cancelDisabled={submitting} />
+                            loading={submitting} disabled={submitDisabled || draftSaving}
+                            cancelDisabled={submitting || draftSaving} extraAction={extraAction} />
                     </div>
                 )
             }
             width={width}
             centered
         >
-            <div ref={contentRef} style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 8 }}>
+            <div ref={contentRef} inert={draftSaving || undefined} style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 8 }}>
                 {children}
             </div>
         </ResponsiveModal>
@@ -127,6 +131,9 @@ FormModal.propTypes = {
     children: PropTypes.node,
     navigationDirty: PropTypes.bool,
     navigationAllowUnload: PropTypes.bool,
+    onSaveDraft: PropTypes.func,
+    draftSaving: PropTypes.bool,
+    extraAction: PropTypes.node,
 };
 
 export default FormModal;

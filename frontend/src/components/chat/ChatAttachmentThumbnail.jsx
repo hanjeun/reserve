@@ -15,7 +15,7 @@ export default function ChatAttachmentThumbnail({ file, uid, url, gallery, onRea
                 if (event.key === 'Escape' && previewOpen) { event.stopPropagation(); handleCancel(); }
             }}
             onClick={() => handlePreview({ uid, url, originFileObj: file }, gallery)}>
-            <LoadingImage ref={imageRef} src={url} alt="첨부 사진" onLoad={onReady} onError={onReady} style={{ width: 44, height: 44, objectFit: 'cover',
+            <LoadingImage ref={imageRef} src={url} alt="첨부 사진" onLoad={onReady} onError={onReady} style={{ width: 44, height: 44, objectFit: 'contain',
                 borderRadius: radius.md, border: `1px solid ${colors.border.light}` }} />
         </button>
         {previewNode}

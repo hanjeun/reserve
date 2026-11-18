@@ -4,7 +4,7 @@
 
 import React from 'react';
 import PropTypes from 'prop-types';
-import { colors, radius } from '../../styles/tokens';
+import { colors } from '../../styles/tokens';
 import Bone from './Bone';
 import StoreDetailSkeleton, { ReviewCardSkeleton } from './StoreDetailSkeleton';
 import StoreCardSkeleton from './StoreCardSkeleton';
@@ -30,7 +30,7 @@ const useIsWideRow = (breakpoint = 576) => {
   return isWide;
 };
 
-const ReservationRowSkeletonItem = ({ isWide, actionCount = 2 }) => {
+const ReservationRowSkeletonItem = ({ isWide, actionCount, showPrice }) => {
   // 액션 골격의 크기와 개수는 실제 텍스트 버튼을 기준으로 둔다.
 
   const actionBones = (
@@ -49,10 +49,9 @@ const ReservationRowSkeletonItem = ({ isWide, actionCount = 2 }) => {
   const line3 = { ...line, height: 16 };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '18px 0' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'nowrap' }}>
-        {/* 썸네일 — 실제 imgWrap(56x56)/imgWrapWide(72x72)와 동일하게 반응형 */}
-        <Bone width={isWide ? 72 : 56} height={isWide ? 72 : 56} borderRadius={radius.lg ?? 8} />
+    <div className="reserve-reservation-row-skeleton" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--reserve-store-list-column-gap)', flexWrap: 'nowrap' }}>
+        <span className="reserve-store-list-row-image"><Bone width="100%" height="100%" /></span>
 
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
           {/* 줄1 — 가게명 | 상태 라벨 */}
@@ -66,9 +65,7 @@ const ReservationRowSkeletonItem = ({ isWide, actionCount = 2 }) => {
           {/* 줄2 — 예약번호(손님·사업자 모두 표시) | 금액 */}
           <div style={line2}>
             <Bone width={isWide ? 120 : '50%'} height={13} />
-            <div style={{ marginLeft: 'auto', flexShrink: 0 }}>
-              <Bone width={64} height={15} />
-            </div>
+            {showPrice && <div style={{ marginLeft: 'auto', flexShrink: 0 }}><Bone width={64} height={15} /></div>}
           </div>
 
           {/*
@@ -87,13 +84,13 @@ const ReservationRowSkeletonItem = ({ isWide, actionCount = 2 }) => {
   );
 };
 
-const ReservationRowSkeletonList = ({ count, actionCount = 2 }) => {
+const ReservationRowSkeletonList = ({ count, actionCount = 2, showPrice = true }) => {
   const isWide = useIsWideRow();
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {skeletonKeys(count, 'row').map((key, i) => (
         <React.Fragment key={key}>
-          <ReservationRowSkeletonItem isWide={isWide} actionCount={actionCount} />
+          <ReservationRowSkeletonItem isWide={isWide} actionCount={actionCount} showPrice={showPrice} />
           {i < count - 1 && (
             <div style={{ height: 1, background: colors.border.light }} />
           )}
@@ -109,10 +106,12 @@ const ReservationRowSkeletonList = ({ count, actionCount = 2 }) => {
 const ReservationCardSkeleton = ({ count = 5 }) => <ReservationRowSkeletonList count={count} actionCount={2} />;
 
 /** MyReservations.jsx(고객 내 예약) 로딩용 — 액션 버튼은 변경/QR/취소 3개. */
-const MyReservationCardSkeleton = ({ count = 4 }) => <ReservationRowSkeletonList count={count} actionCount={3} />;
+const MyReservationCardSkeleton = ({ count = 4, actionCount = 3, showPrice = true }) => (
+  <ReservationRowSkeletonList count={count} actionCount={actionCount} showPrice={showPrice} />
+);
 
 /** 카드형 예약 목록 로딩용 — 실제 카드의 커버·본문 높이를 먼저 확보한다. */
-const ReservationSummaryCardSkeleton = ({ count = 4 }) => (
+const ReservationSummaryCardSkeleton = ({ count = 4, showPrice = true }) => (
   <div className="reserve-reservation-card-grid">
     {skeletonKeys(count, 'reservation-card').map((key) => (
       <div key={key} className="reserve-reservation-card-skeleton" aria-hidden="true">
@@ -125,10 +124,10 @@ const ReservationSummaryCardSkeleton = ({ count = 4 }) => (
           <Bone width="55%" height={13} />
           <Bone width="72%" height={13} />
           <Bone width="32%" height={13} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+          {showPrice && <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
             <Bone width={64} height={13} />
             <Bone width={72} height={16} />
-          </div>
+          </div>}
         </div>
       </div>
     ))}
@@ -141,10 +140,13 @@ ReservationCardSkeleton.propTypes = {
 
 MyReservationCardSkeleton.propTypes = {
   count: PropTypes.number,
+  actionCount: PropTypes.number,
+  showPrice: PropTypes.bool,
 };
 
 ReservationSummaryCardSkeleton.propTypes = {
   count: PropTypes.number,
+  showPrice: PropTypes.bool,
 };
 
 export {

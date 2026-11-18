@@ -1,5 +1,15 @@
 html[data-reserve-modal-open="true"] { overscroll-behavior: none; }
 .ant-modal-wrap, .ant-modal-body { overscroll-behavior: contain; }
+
+/* 제목의 첫 줄에 닫기를 맞추고 긴 제목은 클릭 영역 앞에서 줄바꿈한다. */
+.ant-modal-root .ant-modal-close:has(+ .ant-modal-header) {
+    inset-block-start: calc(var(--reserve-modal-title-top, 20px) + (24px - var(--reserve-icon-target-size)) / 2);
+    inset-inline-end: var(--reserve-modal-close-end, 12px);
+}
+.ant-modal-root .ant-modal-container > .ant-modal-close + .ant-modal-header {
+    padding-inline-end: calc(var(--reserve-modal-close-end, 12px) + var(--reserve-icon-target-size) + 8px - var(--reserve-modal-content-inset, 24px));
+}
+.ant-modal-root .ant-modal-close + .ant-modal-header .ant-modal-title { line-height: 24px; }
 .reserve-modal-actions {
     display: inline-flex;
     flex-wrap: wrap;

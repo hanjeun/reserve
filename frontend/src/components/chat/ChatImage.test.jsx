@@ -11,12 +11,9 @@ vi.mock('../../store/useAuthStore', () => ({ default: Object.assign(
     selector => selector({ sessionRevision: state.revision }),
     { getState: () => ({ sessionRevision: state.revision }) },
 ) }));
-vi.mock('../../services/chatService', () => ({ default: { getImage: vi.fn() } }));
-vi.mock('antd', () => ({ Image: props => <button aria-label={props['aria-label']}
-    className={props.classNames?.root} data-preview-cover={props.preview.cover}
-    aria-hidden={props['aria-hidden']} aria-expanded={props.preview.open} onKeyDown={props.onKeyDown}
-    onClick={() => props.preview.onOpenChange(true)}><img src={props.src} alt={props.alt} style={props.style}
-        onLoad={props.onLoad} onError={props.onError} /></button> }));
+vi.mock('../../services/chatService', () => ({ default: { getImage: vi.fn(), checkImageAccess: vi.fn() } }));
+vi.mock('../common/ImagePreviewPortal', () => ({ default: ({ open, items }) => open
+    ? <div role="dialog"><img src={items[0].src} alt="확대 사진" /></div> : null }));
 const NativeURL = URL;
 let observers;
 let autoIntersect;
@@ -38,20 +35,23 @@ beforeEach(() => {
     urls.revokeObjectURL = vi.fn();
     vi.stubGlobal('URL', urls);
     chatService.getImage.mockReset().mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+    chatService.checkImageAccess.mockReset().mockResolvedValue(null);
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
 it('revokes the old account photo, closes its preview and aborts its request on account change', async () => {
     const { rerender, unmount } = render(<ChatImage url="/api/chat/images/1" />);
     fireEvent.load(await screen.findByAltText('대화에 첨부한 사진'));
-    fireEvent.keyDown(await screen.findByRole('button', { name: '사진 크게 보기' }), { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('button', { name: '사진 크게 보기' }));
     expect(screen.getByRole('button')).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByAltText('확대 사진')).toHaveAttribute('src', 'blob:first');
     const signal = chatService.getImage.mock.calls[0][1];
     state.revision = advanceSession();
     await act(async () => { rerender(<ChatImage url="/api/chat/images/1" />); });
     await waitFor(() => expect(screen.getByAltText('대화에 첨부한 사진')).toHaveAttribute('src', 'blob:second'));
     fireEvent.load(screen.getByAltText('대화에 첨부한 사진'));
     expect(screen.getByRole('button')).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('dialog')).toBeNull();
     expect(signal.aborted).toBe(true);
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:first');
     unmount();
@@ -72,10 +72,9 @@ it('keeps the supplied photo ratio while fetching and decoding without showing a
     fireEvent.load(screen.getByAltText('대화에 첨부한 사진'));
     expect(screen.queryByLabelText('사진을 불러오는 중')).toBeNull();
     expect(screen.getByRole('button', { name: '사진 크게 보기' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '사진 크게 보기' })).toHaveAttribute('data-preview-cover', 'false');
     expect(screen.getByRole('button', { name: '사진 크게 보기' })).toHaveClass('reserve-chat-photo', 'reserve-photo-preview-trigger');
     expect(frame).toHaveStyle({ aspectRatio: '600 / 200' });
-    expect(screen.getByRole('img')).toHaveStyle({ objectFit: 'contain', opacity: '1' });
+    expect(screen.getByRole('img')).toHaveClass('reserve-chat-photo-image');
 });
 
 it('shows a failure explanation when the image cannot be decoded', async () => {
@@ -83,6 +82,34 @@ it('shows a failure explanation when the image cannot be decoded', async () => {
     fireEvent.error(await screen.findByAltText('대화에 첨부한 사진'));
     expect(screen.getByText('사진을 불러오지 못했어요.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '사진 크게 보기' })).toBeNull();
+});
+
+it('only fetches the original on click and reuses it after an access check', async () => {
+    const original = '/api/chat/images/62';
+    const thumbnail = original + '/thumbnail';
+    let complete;
+    chatService.getImage.mockImplementationOnce(async () => new Blob(['small'], { type: 'image/jpeg' }))
+        .mockImplementationOnce(() => new Promise(resolve => { complete = resolve; }));
+    URL.createObjectURL.mockReturnValue('blob:again');
+    render(<ChatImage roomId={3} url={original} thumbnailUrl={thumbnail} width={1000} height={2000} compact />);
+    fireEvent.load(await screen.findByAltText('대화에 첨부한 사진'));
+    expect(chatService.getImage.mock.calls.map(([url]) => url)).toEqual([thumbnail]);
+    const button = screen.getByRole('button', { name: '사진 크게 보기' });
+    expect(button.closest('.reserve-chat-photo-frame')).toHaveStyle({ width: '38px' });
+
+    fireEvent.click(button);
+    expect(screen.getByLabelText('원본 사진을 불러오는 중')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await flush();
+    await act(async () => complete(new Blob(['original'], { type: 'image/png' })));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.queryByLabelText('원본 사진을 불러오는 중')).toBeNull();
+
+    fireEvent.keyDown(button, { key: 'Escape' });
+    fireEvent.click(button);
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+    expect(chatService.checkImageAccess).toHaveBeenCalledWith(original, expect.any(AbortSignal));
+    expect(chatService.getImage.mock.calls.map(([url]) => url)).toEqual([thumbnail, original]);
 });
 
 it('reads only near the chat scrollport and keeps the mounted Blob when scrolling away and back', async () => {

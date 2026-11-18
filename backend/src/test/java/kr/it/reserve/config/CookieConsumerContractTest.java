@@ -116,6 +116,7 @@ class CookieConsumerContractTest {
                 value.startsWith("access_token=synthetic-access;") || value.startsWith("refresh_token=synthetic-refresh;")).toList();
         assertThat(credentials).hasSize(3).allSatisfy(value ->
                 assertThat(value).doesNotContain("Max-Age=", "Expires=").contains("HttpOnly", "Secure", "SameSite=Lax"));
+        assertThat(response.getRedirectedUrl()).isEqualTo("https://reserve.it.kr/oauth2/callback?remember=1");
         verify(sessionIssuer).issue(principal, false);
         assertThat(request.getSession(false)).isNull();
     }
@@ -134,8 +135,9 @@ class CookieConsumerContractTest {
         handler.onAuthenticationSuccess(request, response,
                 new UsernamePasswordAuthenticationToken(principal, null, List.of()));
 
-        assertThat(request.getSession(false)).isNull();
-        assertThat(response.getRedirectedUrl()).contains("/login?error=oauth2&message=");
+        assertThat(request.getSession(false)).isNotNull();
+        assertThat(request.getSession(false).getAttribute("oauth-state")).isNull();
+        assertThat(response.getRedirectedUrl()).contains("/login?error=oauth2&result=").doesNotContain("message=");
         assertThat(response.getHeaders(HttpHeaders.SET_COOKIE)).singleElement().asString().startsWith("JSESSIONID=;");
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
     }

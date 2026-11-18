@@ -1,18 +1,19 @@
 package kr.it.reserve.promotion.entity;
 
-import jakarta.persistence.*;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.promotion.StoreNewsPolicy;
 import kr.it.reserve.store.entity.Store;
+import jakarta.persistence.*;
 import lombok.*;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
 import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-import java.time.LocalDateTime;
-
 @Entity
-@Table(name = "promotion", indexes = {
+@Table(name = "promotion", uniqueConstraints = @UniqueConstraint(name = "uk_promotion_public_id", columnNames = "public_id"), indexes = {
     @Index(name = "ix_promotion_news_public", columnList = "state,news_type,ends_at,created_at,promotion_id"),
     @Index(name = "ix_promotion_news_author", columnList = "member_id,state,created_at,promotion_id"),
     @Index(name = "ix_promotion_news_deleted", columnList = "state,deleted_at,promotion_id"),
@@ -30,6 +31,10 @@ public class Promotion {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "promotion_id")
     private Long id;
+
+    @Setter(AccessLevel.NONE)
+    @Column(name = "public_id", length = 36, updatable = false)
+    private String publicId;
 
     // 홍보를 작성한 회원 (사업자 또는 관리자)
     @ManyToOne(fetch = FetchType.LAZY)
@@ -65,7 +70,7 @@ public class Promotion {
     @Column(length = 500)
     private String tags;
 
-    // 업종 category와 소식 종류는 별개다. 기존 소식과 주소는 NEWS/PUBLISHED로 유지한다.
+    // 업종과 소식 종류는 별개이며 기존 소식은 NEWS/PUBLISHED로 유지한다.
     public enum NewsType { NEWS, NOTICE, EVENT, BENEFIT }
     public enum BenefitDesign { STANDARD, PHOTO, COMPACT }
     @Enumerated(EnumType.STRING) @JdbcTypeCode(SqlTypes.VARCHAR)
@@ -113,7 +118,8 @@ public class Promotion {
 
     // 행사 기간·30일 파기·새 응답은 UTC를 사용한다. 기존 저장 시각은 일괄 변환하지 않는다.
     @PrePersist
-    private void createTimestamps() {
+    private void prepareInsert() {
+        publicId = UUID.randomUUID().toString();
         LocalDateTime now = StoreNewsPolicy.now();
         if (createdAt == null) createdAt = now;
         updatedAt = now;

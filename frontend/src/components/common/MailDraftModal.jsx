@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Spin, Typography, Upload } from 'antd';
 import FormModal, { FormField } from './FormModal';
+import Button from './Button';
 import ImageUploadButton from './ImageUploadButton';
+import LoadingUpload from './LoadingUpload';
 import MailPhotoStrip from './MailPhotoStrip';
 import MailHtmlPreview from './MailHtmlPreview';
 import useImagePreview from '../../hooks/useImagePreview';
@@ -10,11 +12,12 @@ import useImagePreview from '../../hooks/useImagePreview';
 const MAX_PHOTOS = 3;
 const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
 const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const EMPTY_PHOTOS = [];
 const { Paragraph } = Typography;
 
 export default function MailDraftModal({
     title, open, onClose, validate, onSend, sending, sendText = '보내기', navigationDirty,
-    previewFields, loadPreview, children,
+    previewFields, loadPreview, children, initialPhotos = EMPTY_PHOTOS, onSaveDraft, onDraftSaved,
 }) {
     const [reviewing, setReviewing] = useState(false);
     const [photos, setPhotos] = useState([]);
@@ -22,6 +25,9 @@ export default function MailDraftModal({
     const [html, setHtml] = useState('');
     const [previewError, setPreviewError] = useState('');
     const [preparing, setPreparing] = useState(false);
+    const [draftSaving, setDraftSaving] = useState(false);
+    const [draftError, setDraftError] = useState('');
+    const savingDraft = useRef(false);
     const previewRequest = useRef(null);
     const urls = useRef(new Set());
     const { handlePreview, previewNode, suppressLinkNavigation } = useImagePreview();
@@ -33,6 +39,20 @@ export default function MailDraftModal({
         if (!open) previewRequest.current?.abort();
         return () => previewRequest.current?.abort();
     }, [open]);
+    useEffect(() => {
+        if (!open || !initialPhotos.length) return;
+        const restored = initialPhotos.map((file, index) => {
+            const url = URL.createObjectURL(file);
+            urls.current.add(url);
+            return { uid: `draft-${index}`, name: file.name, status: 'done', url, thumbUrl: url, originFileObj: file };
+        });
+        // IndexedDB에서 읽은 파일을 현재 작성기의 미리보기 URL로 복원한다.
+        setPhotos(restored);
+    }, [open, initialPhotos]);
+
+    const changedPhotos = photos.length !== initialPhotos.length
+        || photos.some((photo, index) => photo.originFileObj !== initialPhotos[index]);
+    const dirty = navigationDirty || changedPhotos;
 
     const afterClose = () => {
         for (const url of urls.current) URL.revokeObjectURL(url);
@@ -43,6 +63,7 @@ export default function MailDraftModal({
         setHtml('');
         setPreviewError('');
         setPreparing(false);
+        setDraftError('');
     };
 
     const edit = () => {
@@ -79,7 +100,7 @@ export default function MailDraftModal({
     };
 
     const submit = async () => {
-        if (sending || preparing) return;
+        if (sending || preparing || savingDraft.current) return;
         if (reviewing && html) {
             onSend(photos.map(photo => photo.originFileObj));
             return;
@@ -101,11 +122,27 @@ export default function MailDraftModal({
         }
     };
 
+    const persistDraft = async () => {
+        if (savingDraft.current) throw new Error('메일을 임시저장 중이에요.');
+        savingDraft.current = true;
+        setDraftSaving(true);
+        setDraftError('');
+        try { await onSaveDraft(photos.map(photo => photo.originFileObj)); }
+        finally { savingDraft.current = false; setDraftSaving(false); }
+    };
+    const saveAndClose = async () => {
+        try { await persistDraft(); }
+        catch { setDraftError('임시저장하지 못했어요. 다시 시도해주세요.'); return; }
+        onDraftSaved?.();
+    };
+
     return <FormModal title={reviewing ? title + ' 미리보기' : title} open={open} onClose={onClose}
         afterClose={afterClose} onSubmit={submit} submitting={sending} submitDisabled={preparing}
         submitText={reviewing ? (previewError ? '다시 불러오기' : sendText) : '미리보기'} cancelText={reviewing ? '수정하기' : '취소'}
         onCancelAction={reviewing ? edit : undefined} scrollResetKey={reviewing ? 1 : 0}
-        navigationDirty={navigationDirty || photos.length > 0}>
+        navigationDirty={dirty} onSaveDraft={onSaveDraft && persistDraft} draftSaving={draftSaving}
+        extraAction={onSaveDraft && !reviewing && <Button variant="outline" size="sm" onClick={saveAndClose}
+            disabled={!dirty || sending || draftSaving} loading={draftSaving}>임시저장</Button>}>
         {reviewing ? <>
             {previewFields.map(({ label, value }) => <FormField key={label} label={label}>
                 <Paragraph style={{ margin: 0, overflowWrap: 'anywhere' }}>{value}</Paragraph>
@@ -117,15 +154,16 @@ export default function MailDraftModal({
         </> : <>
             {children}
             <FormField label="사진 · 최대 3장, 한 장당 2MB" error={photoError}>
-                <Upload listType="picture-card" fileList={photos} maxCount={MAX_PHOTOS} multiple
+                <LoadingUpload listType="picture-card" fileList={photos} maxCount={MAX_PHOTOS} multiple
                     accept={PHOTO_TYPES.join(',')} beforeUpload={selectPhotos} disabled={sending}
                     aria-label="첨부 사진 선택" onClickCapture={suppressLinkNavigation}
                     onPreview={file => handlePreview(file, photos)} onRemove={removePhoto}
                     showUploadList={{ showPreviewIcon: true, showRemoveIcon: true, showDownloadIcon: false }}>
                     {photos.length < MAX_PHOTOS && <ImageUploadButton />}
-                </Upload>
+                </LoadingUpload>
             </FormField>
             {previewNode}
+            {draftError && <Paragraph type="danger" role="alert">{draftError}</Paragraph>}
         </>}
     </FormModal>;
 }
@@ -139,6 +177,9 @@ MailDraftModal.propTypes = {
     sending: PropTypes.bool,
     sendText: PropTypes.string,
     navigationDirty: PropTypes.bool,
+    initialPhotos: PropTypes.array,
+    onSaveDraft: PropTypes.func,
+    onDraftSaved: PropTypes.func,
     previewFields: PropTypes.arrayOf(PropTypes.shape({ label: PropTypes.string.isRequired, value: PropTypes.node })).isRequired,
     loadPreview: PropTypes.func.isRequired,
     children: PropTypes.node,

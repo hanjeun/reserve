@@ -14,7 +14,7 @@ const formatWhen = (iso) => {
     return `${date.getMonth() + 1}.${date.getDate()}`;
 };
 
-export default function MessengerConversationRow({ row, selected = false, owner = false, onSelect, hidden = false, onVisibilityChange }) {
+export default function MessengerConversationRow({ row, selected = false, owner = false, onSelect, hidden = false, onVisibilityChange, onLeave }) {
     const supportIdentity = useSupportIdentity();
     const title = conversationTitle(row, supportIdentity.name);
     const preview = row.lastMessagePreview || '아직 메시지가 없어요.';
@@ -44,7 +44,9 @@ export default function MessengerConversationRow({ row, selected = false, owner 
         </button>
     );
     return onVisibilityChange ? <ConversationRowActions title={title} hidden={hidden}
-        onVisibilityChange={value => onVisibilityChange(row, value)}>{content}</ConversationRowActions> : content;
+        onVisibilityChange={value => onVisibilityChange(row, value)} onLeave={onLeave && (() => onLeave(row))}>
+        {content}
+    </ConversationRowActions> : content;
 }
 
 MessengerConversationRow.propTypes = {
@@ -54,4 +56,5 @@ MessengerConversationRow.propTypes = {
     onSelect: PropTypes.func.isRequired,
     hidden: PropTypes.bool,
     onVisibilityChange: PropTypes.func,
+    onLeave: PropTypes.func,
 };

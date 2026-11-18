@@ -9,8 +9,16 @@ export default {
     detail: (id, signal) => publicRead(`/api/feed/posts/${id}`, undefined, signal),
     author: (id, signal) => publicRead(`/api/feed/authors/${encodeURIComponent(id)}`, undefined, signal),
     authorPosts: (id, params, signal) => publicRead(`/api/feed/authors/${encodeURIComponent(id)}/posts`, params, signal),
+    authorComments: (id, params, signal) => publicRead(`/api/feed/authors/${encodeURIComponent(id)}/comments`, params, signal),
+    authorReviews: (id, params, signal) => publicRead(`/api/feed/authors/${encodeURIComponent(id)}/reviews`, params, signal),
     myProfile: signal => api.get('/api/feed/me/profile', { signal }),
-    saveProfile: values => api.put('/api/feed/me/profile', values),
+    saveProfile: (values, image) => {
+        if (!image) return api.put('/api/feed/me/profile', values);
+        const body = new FormData();
+        body.append('profile', new Blob([JSON.stringify(values)], { type: 'application/json' }));
+        body.append('image', image);
+        return api.put('/api/feed/me/profile', body);
+    },
     uploadProfileAvatar: file => {
         const form = new FormData();
         form.append('image', file);

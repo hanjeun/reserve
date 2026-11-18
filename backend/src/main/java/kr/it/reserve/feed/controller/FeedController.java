@@ -7,8 +7,10 @@ import kr.it.reserve.feed.FeedException;
 import kr.it.reserve.feed.dto.FeedDto;
 import kr.it.reserve.feed.service.*;
 import kr.it.reserve.global.common.ApiResponse;
+import kr.it.reserve.global.common.PublicId;
 import kr.it.reserve.global.ratelimit.IpExtractor;
 import kr.it.reserve.global.ratelimit.RateLimiter;
+import kr.it.reserve.member.MemberUpdateLimit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.*;
@@ -40,10 +42,16 @@ public class FeedController {
     @GetMapping("/posts/{id:[0-9]+}")
     public ResponseEntity<ApiResponse<FeedDto.Post>> post(@PathVariable Long id) { return response(feeds.readPost(id, viewer()), "게시물 조회 성공"); }
 
+    @GetMapping("/posts" + PublicId.SEGMENT)
+    public ResponseEntity<ApiResponse<FeedDto.Post>> postByPublicId(@PathVariable java.util.UUID publicId) {
+        return response(feeds.readPostByPublicId(publicId, viewer()), "게시물 조회 성공");
+    }
+
     @GetMapping("/authors/{publicId}")
     public ResponseEntity<ApiResponse<FeedDto.Profile>> author(@PathVariable String publicId, HttpServletRequest http) {
-        limitProfileRead(viewer(), http);
-        return response(feeds.publicProfile(publicId), "공개 프로필 조회 성공");
+        Long viewer = viewer();
+        limitProfileRead(viewer, http);
+        return response(viewer == null ? feeds.publicProfile(publicId) : feeds.publicProfile(publicId, viewer), "프로필 조회 성공");
     }
     @GetMapping("/authors/{publicId}/posts")
     public ResponseEntity<ApiResponse<Page<FeedDto.Post>>> authorPosts(@PathVariable String publicId,
@@ -52,22 +60,47 @@ public class FeedController {
         limitProfileRead(viewer, http);
         return response(feeds.authorPosts(publicId, page, size, viewer), "작성자 피드 조회 성공");
     }
+    @GetMapping("/authors/{publicId}/comments")
+    public ResponseEntity<ApiResponse<Page<FeedDto.ProfileComment>>> authorComments(@PathVariable String publicId,
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "12") int size, HttpServletRequest http) {
+        Long viewer = viewer();
+        limitProfileRead(viewer, http);
+        return response(feeds.authorComments(publicId, page, size, viewer), "작성한 댓글 조회 성공");
+    }
+    @GetMapping("/authors/{publicId}/reviews")
+    public ResponseEntity<ApiResponse<Page<FeedDto.ProfileReview>>> authorReviews(@PathVariable String publicId,
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "12") int size, HttpServletRequest http) {
+        Long viewer = viewer();
+        limitProfileRead(viewer, http);
+        return response(feeds.authorReviews(publicId, page, size, viewer), "작성한 리뷰 조회 성공");
+    }
 
     @GetMapping("/me/profile")
-    public ResponseEntity<ApiResponse<FeedDto.Profile>> myProfile() { return response(feeds.myProfile(member()), "내 공개 프로필 조회 성공"); }
-    @PutMapping("/me/profile")
+    public ResponseEntity<ApiResponse<FeedDto.Profile>> myProfile() { return response(feeds.myProfile(member()), "내 프로필 조회 성공"); }
+    @PutMapping(value = "/me/profile", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ApiResponse<FeedDto.Profile>> profile(@Valid @RequestBody FeedDto.ProfileRequest request, HttpServletRequest http) {
-        Long member = member(); limitWrite(member, http); return response(feeds.updateProfile(member, request), "공개 프로필을 저장했어요.");
+        Long member = member();
+        MemberUpdateLimit.require(limiter, member, IpExtractor.extract(http));
+        return response(feeds.updateProfile(member, request), "프로필을 저장했어요.");
+    }
+    @PutMapping(value = "/me/profile", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<FeedDto.Profile>> profileWithImage(@Valid @RequestPart("profile") FeedDto.ProfileRequest request,
+            @RequestPart("image") MultipartFile image, HttpServletRequest http) {
+        Long member = member();
+        MemberUpdateLimit.require(limiter, member, IpExtractor.extract(http));
+        return response(feeds.updateProfile(member, request, image), "프로필을 저장했어요.");
     }
     @PutMapping(value = "/me/profile/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<FeedDto.Profile>> profileAvatar(@RequestPart("image") MultipartFile image, HttpServletRequest http) {
-        Long member = member(); limitWrite(member, http);
-        return response(feeds.uploadProfileAvatar(member, image), "공개 프로필 사진을 저장했어요.");
+        Long member = member();
+        MemberUpdateLimit.require(limiter, member, IpExtractor.extract(http));
+        return response(feeds.uploadProfileAvatar(member, image), "피드 프로필 사진을 저장했어요.");
     }
     @DeleteMapping("/me/profile/avatar")
     public ResponseEntity<ApiResponse<FeedDto.Profile>> deleteProfileAvatar(HttpServletRequest http) {
-        Long member = member(); limitWrite(member, http);
-        return response(feeds.deleteProfileAvatar(member), "공개 프로필 사진을 지웠어요.");
+        Long member = member();
+        MemberUpdateLimit.require(limiter, member, IpExtractor.extract(http));
+        return response(feeds.deleteProfileAvatar(member), "피드 프로필 사진을 지웠어요.");
     }
     @GetMapping("/me/posts")
     public ResponseEntity<ApiResponse<Page<FeedDto.Post>>> myPosts(@RequestParam(defaultValue = "false") boolean drafts,
@@ -110,7 +143,7 @@ public class FeedController {
     private void limitProfileRead(Long viewer, HttpServletRequest request) {
         if (!limiter.tryConsume("feed-profile-read-ip:" + IpExtractor.extract(request), RateLimiter.Policy.PROFILE_READ)
                 || viewer != null && !limiter.tryConsume("feed-profile-read-member:" + viewer, RateLimiter.Policy.PROFILE_READ)) {
-            throw new FeedException("공개 프로필을 너무 자주 조회했어요. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+            throw new FeedException("프로필을 너무 자주 조회했어요. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
         }
     }
     private void limitWrite(Long member, HttpServletRequest request) {

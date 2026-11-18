@@ -48,35 +48,27 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
         log.info("OAuth2 login success: memberId={}", member.getId());
 
-        // 정지 상태 체크
-        // URL에 한국어 메시지를 인코딩하면 이상한 URL이 되므로
-        // 상태 코드 + 정지 해제일만 전달 → 프론트에서 디코딩하여 UI 표시
         if (member.isSuspended()) {
-            boolean isBanned = "BANNED".equals(member.getStatus().name());
-            String status = isBanned ? "BANNED" : "SUSPENDED";
-            String until = (!isBanned && member.getSuspendedUntil() != null)
-                ? member.getSuspendedUntil().toLocalDate().toString()
-                : "";
-
-            String baseErrorUrl = destination + "/login";
-
-            String redirectUrl = baseErrorUrl
-                + "?suspended=true"
-                + "&status=" + status
-                + (until.isEmpty() ? "" : "&until=" + until);
-
-            log.warn("OAuth2 login blocked: memberId={}, status={}, until={}", member.getId(), status, until);
-            getRedirectStrategy().sendRedirect(request, response, redirectUrl);
+            boolean banned = member.getStatus() == kr.it.reserve.member.entity.MemberStatus.BANNED;
+            String status = banned ? "BANNED" : "SUSPENDED";
+            String until = !banned && member.getSuspendedUntil() != null
+                    ? member.getSuspendedUntil().toLocalDate().toString() : null;
+            log.warn("OAuth2 login blocked: memberId={}, status={}", member.getId(), status);
+            getRedirectStrategy().sendRedirect(request, response, OAuthLoginOutcome.redirect(request, destination,
+                    new OAuthLoginOutcome.View("account_restricted", status, until)));
             return;
         }
 
         // 1. 토큰 생성
         OAuthSessionIssuer.SessionTokens pair;
+        boolean login;
         try {
             if (mfa != null) mfa.cancel(CookieUtil.getCookie(request, "mfa_ticket"));
             var linked = kr.it.reserve.member.service.LoginMethodService.consumeLinkedSession(request);
+            boolean reauth = linked == null && kr.it.reserve.member.service.LoginMethodService.consumeReauthentication(request);
+            login = linked == null && !reauth && !oAuth2User.isLoginMethodAction();
             pair = linked != null ? linked
-                    : kr.it.reserve.member.service.LoginMethodService.consumeReauthentication(request)
+                    : reauth
                     ? sessionIssuer.issueReauthenticated(oAuth2User, CookieUtil.getCookie(request, "access_token"))
                     : sessionIssuer.issue(oAuth2User, LoginAuthorizationRequestRepository.persistent(request));
         } catch (org.springframework.security.oauth2.core.OAuth2AuthenticationException exception) {
@@ -85,12 +77,14 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
             failureHandler.onAuthenticationFailure(request, response, exception);
             return;
         }
+        boolean offerRemember = login && !pair.persistent();
         if (pair.mfaTicket() != null) {
             cookieUtil.deleteCookie(response, "access_token");
             cookieUtil.deleteCookie(response, "refresh_token");
             cookieUtil.addCookie(response, "mfa_ticket", pair.mfaTicket(), pair.persistent() ? 300 : -1);
             clearSessionAndCookies(request, response);
-            getRedirectStrategy().sendRedirect(request, response, destination + "/login?mfa=1" + (oAuth2User.isLoginMethodAction() ? "&security=1" : ""));
+            getRedirectStrategy().sendRedirect(request, response, destination + "/login?mfa=1"
+                    + (oAuth2User.isLoginMethodAction() ? "&security=1" : "") + (offerRemember ? "&remember=1" : ""));
             return;
         }
         cookieUtil.deleteCookie(response, "mfa_ticket");
@@ -112,6 +106,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         String baseUrl = destination + "/oauth2/callback";
         String redirectUrl = oAuth2User.isLoginMethodAction() ? destination + "/my-page?security=verified"
                 : oAuth2User.isNewUser() ? baseUrl + "?newUser=true" : baseUrl;
+        if (offerRemember) redirectUrl += oAuth2User.isNewUser() ? "&remember=1" : "?remember=1";
         log.info("OAuth2 redirect: url={}, env={}, newUser={}", redirectUrl, serverEnv, oAuth2User.isNewUser());
         getRedirectStrategy().sendRedirect(request, response, redirectUrl);
     }

@@ -30,9 +30,10 @@ public class ChatSearchService {
             AND EXISTS (SELECT viewer.id FROM Member viewer WHERE viewer.id = :memberId AND
             """ + MemberSearchAccess.VISIBLE + """
                 AND viewer.role = :role)
-            AND ((room.member.id = :memberId AND room.memberHiddenAt IS NULL)
+            AND ((room.member.id = :memberId AND room.memberHiddenAt IS NULL AND room.memberLeftAt IS NULL)
               OR (:business = true AND room.type = kr.it.reserve.chat.entity.ChatRoom.RoomType.STORE
                 AND (room.ownerHiddenAt IS NULL OR room.ownerHiddenByMemberId <> :memberId)
+                AND (room.ownerLeftByMemberId IS NULL OR room.ownerLeftByMemberId <> :memberId)
                 AND EXISTS (SELECT store.id FROM Store store WHERE store.id = room.storeId AND store.owner.id = :memberId))
               OR (:admin = true AND room.type = kr.it.reserve.chat.entity.ChatRoom.RoomType.SUPPORT))
             """;

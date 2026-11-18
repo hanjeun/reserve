@@ -6,6 +6,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PrivateRoute from '../../components/PrivateRoute';
 import Login from './Login';
+import { saveSecurityReturn, takeSecurityReturn } from '../../utils/securityReturn';
 
 const fixture = vi.hoisted(() => ({ state: {}, post: vi.fn(), login: vi.fn(),
     message: { warning: vi.fn(), error: vi.fn(), success: vi.fn() } }));
@@ -48,39 +49,47 @@ describe('workspace login return', () => {
         });
 
     it.each([
-        '소셜 로그인을 취소했어요.',
-        '현재 RESERVE 계정과 같은 이메일의 인증된 소셜 계정을 사용해주세요.',
-        '처음 연결한 소셜 계정으로 본인 확인해주세요.',
-        '본인 확인을 100% 완료하지 못했어요.',
-    ])('shows a signed-in OAuth failure once and returns to security settings: %s', async text => {
+        ['access_denied', '소셜 로그인을 취소했어요.'],
+        ['login_method_email_mismatch', '현재 RESERVE 계정과 같은 이메일의 인증된 소셜 계정을 사용해주세요.'],
+        ['login_method_identity_mismatch', '처음 연결한 소셜 계정으로 본인 확인해주세요.'],
+        ['ip_verification_unavailable', '접속 환경을 확인할 수 없어요. 잠시 후 다시 로그인해주세요.'],
+    ])('shows the verified OAuth outcome once and returns to security settings: %s', async (code, text) => {
         const user = { id: 7, name: '기존 계정', role: 'USER', termsAgreed: true };
+        const reference = '00000000-0000-4000-a000-000000000001';
         fixture.state = { ...fixture.state, user, isLoggedIn: true };
-        sessionStorage.setItem('reserve:redirectAfterLogin', '/admin?tab=feed-reports');
-        show(`/login?${new URLSearchParams({ error: 'oauth2', message: text })}`, true);
-        await waitFor(() => expect(screen.getByTestId('destination')).toHaveTextContent('/my-page'));
-        expect(fixture.message.error).toHaveBeenCalledTimes(1);
-        expect(fixture.message.error).toHaveBeenCalledWith(text);
+        fixture.post.mockResolvedValueOnce({ code });
+        show('/login?error=oauth2&result=' + reference + '&message=synthetic', true);
+        await waitFor(() => expect(screen.getByTestId('destination')).toHaveTextContent('/my-page?security=retry'));
+        expect(fixture.message.error).toHaveBeenCalledExactlyOnceWith(text);
         expect(fixture.state.user).toBe(user);
-        expect(fixture.state.isLoggedIn).toBe(true);
         expect(fixture.login).not.toHaveBeenCalled();
+        expect(fixture.post).toHaveBeenCalledExactlyOnceWith('/api/auth/oauth-outcome', { reference }, { skipAuthRefresh: true, timeout: 5000 });
+    });
+
+    it('returns to device choices if the matching OAuth outcome could not be loaded', async () => {
+        fixture.state = { ...fixture.state, user: { id: 7, role: 'USER' }, isLoggedIn: true };
+        saveSecurityReturn(7, 'devices');
+        fixture.post.mockRejectedValueOnce(new Error('outcome unavailable'));
+        show('/login?error=oauth2&result=00000000-0000-4000-a000-000000000001', true);
+        expect(await screen.findByTestId('destination')).toHaveTextContent('/my-page?security=retry');
+        expect(fixture.message.error).toHaveBeenCalledExactlyOnceWith('소셜 로그인 결과를 확인하지 못했어요. 다시 시도해주세요.');
+        expect(takeSecurityReturn(7)).toMatchObject({ target: 'devices' });
+        expect(fixture.login).not.toHaveBeenCalled();
+    });
+
+    it('does not open security settings for an unverified address', async () => {
+        fixture.state = { ...fixture.state, user: { id: 7, role: 'USER' }, isLoggedIn: true };
+        show('/login?error=oauth2&code=access_denied');
+        expect(await screen.findByText('홈')).toBeInTheDocument();
+        expect(fixture.message.error).toHaveBeenCalledExactlyOnceWith('소셜 로그인 결과를 확인하지 못했어요. 다시 시도해주세요.');
         expect(fixture.post).not.toHaveBeenCalled();
     });
 
-    it('returns a signed-in OAuth failure with no message to settings with a fallback notice', async () => {
-        fixture.state = { ...fixture.state, user: { id: 7, role: 'USER' }, isLoggedIn: true };
-        show('/login?error=oauth2');
-        await waitFor(() => expect(screen.getByTestId('destination')).toHaveTextContent('/my-page'));
-        expect(fixture.message.error).toHaveBeenCalledWith('소셜 로그인하지 못했어요. 다시 시도해주세요.');
-    });
-
-    it('keeps an anonymous OAuth failure on login and decodes its message only once', async () => {
-        const text = '소셜 로그인을 취소했어요. 진행률 100%';
-        show(`/login?${new URLSearchParams({ error: 'oauth2', message: text })}`, true);
-        await waitFor(() => expect(fixture.message.error).toHaveBeenCalledTimes(1));
-        expect(fixture.message.error).toHaveBeenCalledWith(text);
+    it('keeps anonymous users on login and ignores address-supplied copy', async () => {
+        show('/login?error=oauth2&message=100%25&code=email_conflict', true);
+        await waitFor(() => expect(fixture.message.error).toHaveBeenCalledExactlyOnceWith(
+            '소셜 로그인 결과를 확인하지 못했어요. 다시 시도해주세요.'));
         expect(screen.getByRole('button', { name: '로그인', exact: true })).toBeInTheDocument();
-        expect(screen.queryByTestId('destination')).toBeNull();
-        expect(fixture.state.isLoggedIn).toBe(false);
         expect(fixture.login).not.toHaveBeenCalled();
         expect(fixture.post).not.toHaveBeenCalled();
     });

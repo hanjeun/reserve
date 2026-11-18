@@ -11,6 +11,7 @@ import kr.it.reserve.payment.service.PaymentService;
 import kr.it.reserve.reservation.dto.QrCheckinResponse;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
+import kr.it.reserve.reservation.service.ReservationNoShowRestriction;
 import kr.it.reserve.reservation.service.ReservationService;
 import kr.it.reserve.reservation.util.QrCheckinTokenProvider;
 import kr.it.reserve.store.entity.Store;
@@ -52,7 +53,7 @@ class QrCheckinAttendanceTest {
                 mock(EmailService.class),
                 mock(MemberRepository.class),
                 mock(AuditLogService.class),
-                tokenProvider, mock(kr.it.reserve.reservation.admission.ReservationCreationGuard.class), org.mockito.Mockito.mock(kr.it.reserve.reservation.service.ReservationConsentService.class));
+                tokenProvider, mock(kr.it.reserve.reservation.admission.ReservationCreationGuard.class), org.mockito.Mockito.mock(kr.it.reserve.reservation.service.ReservationConsentService.class), mock(ReservationNoShowRestriction.class));
     }
 
     @Test
@@ -156,8 +157,77 @@ class QrCheckinAttendanceTest {
 
         assertThatThrownBy(() -> reservationService.markNoShow(20L, owner))
                 .isInstanceOf(ReservationException.class)
-                .hasMessageContaining("체크인된 예약");
+                .hasMessageContaining("방문이 확인된 예약");
         assertThat(reservation.getStatus()).isEqualTo(Reservation.ReservationStatus.CONFIRMED);
+    }
+
+    @Test void futureReservationCannotBecomeNoShowAndDoesNotStartARefund() {
+        Member owner = member(1L);
+        Reservation reservation = reservation(owner, Reservation.ReservationStatus.CONFIRMED);
+        reservation.setReservationDate(ServiceTime.today().plusDays(1));
+        when(reservationRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(reservation));
+        assertThatThrownBy(() -> reservationService.markNoShow(20L, owner)).isInstanceOf(ReservationException.class).hasMessageContaining("이용 종료 시각");
+        assertThat(reservation.getStatus()).isEqualTo(Reservation.ReservationStatus.CONFIRMED);
+        verify(payments).lockReservationForStateChange(20L);
+        org.mockito.Mockito.verifyNoMoreInteractions(payments);
+    }
+
+    @Test void repeatedNoShowKeepsTheDecisionWithoutStartingARefund() {
+        Member owner = member(1L);
+        Reservation reservation = reservation(owner, Reservation.ReservationStatus.CONFIRMED);
+        reservation.setReservationDate(ServiceTime.today().minusDays(1));
+        when(reservationRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(reservation));
+        reservationService.markNoShow(20L, owner);
+        reservationService.markNoShow(20L, owner);
+        assertThat(reservation.getStatus()).isEqualTo(Reservation.ReservationStatus.NO_SHOW);
+        verify(payments, org.mockito.Mockito.times(2)).lockReservationForStateChange(20L);
+        org.mockito.Mockito.verifyNoMoreInteractions(payments);
+    }
+
+    @Test void manualCompletionRecordsAttendanceAndPreparesRefundWithoutFabricatingQrCheckIn() {
+        Member owner = member(1L);
+        Reservation reservation = reservation(owner, Reservation.ReservationStatus.UNCONFIRMED);
+        reservation.setAttendanceRefundEnabled(true);
+        reservation.setDepositAmount(10_000);
+        reservation.setDepositPaid(true);
+        when(reservationRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(reservation));
+        when(payments.prepareFullRefundAfterAttendance(20L)).thenReturn(51L);
+        org.springframework.test.util.ReflectionTestUtils.setField(reservationService, "refundDispatch",
+                mock(kr.it.reserve.payment.service.RefundDispatchService.class));
+
+        var result = reservationService.completeReservation(20L, owner);
+
+        assertThat(reservation.getStatus()).isEqualTo(Reservation.ReservationStatus.COMPLETED);
+        assertThat(reservation.getCheckedInAt()).isNull();
+        assertThat(reservation.getManualVisitConfirmedAt()).isNotNull();
+        assertThat(result.refundRequested()).isTrue();
+        assertThat(result.canUndo()).isFalse();
+        verify(payments).prepareFullRefundAfterAttendance(20L);
+    }
+
+    @Test void manualCompletionAllowsUndoWhenNoAttendanceDepositWasCollected() {
+        Member owner = member(1L);
+        Reservation reservation = reservation(owner, Reservation.ReservationStatus.CONFIRMED);
+        when(reservationRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(reservation));
+        when(payments.prepareFullRefundAfterAttendance(20L)).thenReturn(null);
+        org.springframework.test.util.ReflectionTestUtils.setField(reservationService, "refundDispatch",
+                mock(kr.it.reserve.payment.service.RefundDispatchService.class));
+
+        var result = reservationService.completeReservation(20L, owner);
+
+        assertThat(result.canUndo()).isTrue();
+        assertThat(result.refundRequested()).isFalse();
+    }
+
+    @Test void futureReservationCannotBeCompletedManually() {
+        Member owner = member(1L);
+        Reservation reservation = reservation(owner, Reservation.ReservationStatus.CONFIRMED);
+        reservation.setReservationDate(ServiceTime.today().plusDays(1));
+        when(reservationRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(reservation));
+
+        assertThatThrownBy(() -> reservationService.completeReservation(20L, owner)).isInstanceOf(ReservationException.class);
+        assertThat(reservation.getManualVisitConfirmedAt()).isNull();
+        verify(payments, never()).prepareFullRefundAfterAttendance(20L);
     }
 
     private Reservation reservation(Member owner, Reservation.ReservationStatus status) {

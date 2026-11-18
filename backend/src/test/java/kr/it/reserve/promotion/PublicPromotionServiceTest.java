@@ -49,6 +49,8 @@ class PublicPromotionServiceTest {
                 .isEqualTo(PromotionDto.PUBLIC_EXCERPT_LENGTH);
         assertThat(response.getMainImageUrl()).isEqualTo("https://cdn.example.test/store-original.png");
         assertThat(response.getCreatedAt()).isNull();
+        assertThat(response.getLikeCount()).isNull();
+        assertThat(response.isLiked()).isFalse();
         assertPublicFields(response, "excerpt", "content");
         verifyNoMoreInteractions(repository);
         verifyNoInteractions(memberRepository, storeRepository);
@@ -65,6 +67,9 @@ class PublicPromotionServiceTest {
         assertThat(response.getContent()).isEqualTo(raw);
         assertThat(response.getMainImageUrl()).isEqualTo(promotion.getStore().getMainImageUrl());
         assertPublicFields(response, "content", "excerpt");
+        var json = new ObjectMapper().findAndRegisterModules().valueToTree(response);
+        assertThat(json.has("likeCount")).isFalse();
+        assertThat(json.has("liked")).isFalse();
         assertThat(promotion.getViewCount()).isEqualTo(12);
         verify(repository).findPublicById(7L);
         verifyNoMoreInteractions(repository);
@@ -94,7 +99,7 @@ class PublicPromotionServiceTest {
     private void assertPublicFields(Object response, String presentBodyField, String absentBodyField) throws Exception {
         var json = new ObjectMapper().findAndRegisterModules().valueToTree(response);
         assertThat(json.has(presentBodyField)).isTrue();
-        for (String excluded : List.of(absentBodyField, "memberId", "memberName", "imageUrl", "likeCount", "viewCount",
+        for (String excluded : List.of(absentBodyField, "memberId", "memberName", "imageUrl", "viewCount",
                 "specialMenu", "storyHistory", "tags")) {
             assertThat(json.has(excluded)).as(excluded).isFalse();
         }

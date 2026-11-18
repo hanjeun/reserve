@@ -8,6 +8,9 @@ import { storeKeys } from '../../hooks/queryKeys';
 import { storeService, tourismService } from '../../services';
 import { saveDiscoveryRegion } from '../../utils/discoveryRegion';
 
+const FIRST_STORE_PUBLIC_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const SECOND_STORE_PUBLIC_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
 const { navigate, locationRequest, setLiveLocation, messageInfo, locationState } = vi.hoisted(() => ({
     navigate: vi.fn(),
     locationRequest: vi.fn(),
@@ -107,7 +110,7 @@ describe('app discovery home', () => {
         tourismService.getRegionPhotos.mockReset();
         tourismService.getRegionPhotos.mockResolvedValue([]);
         storeService.getStores.mockResolvedValue({
-            content: [{ id: 3, name: '모던 필라테스', rating: 4.9, reviewCount: 10 }],
+            content: [{ id: 3, publicId: FIRST_STORE_PUBLIC_ID, name: '모던 필라테스', rating: 4.9, reviewCount: 10 }],
         });
         storeService.getRegions.mockResolvedValue([
             { name: '서울', count: 2, areas: [{ name: '종로구', count: 2 }] },
@@ -123,8 +126,8 @@ describe('app discovery home', () => {
     it('지역별 BEST는 가까워질 때 읽고 선택한 지역의 조회 결과를 재사용해요', async () => {
         const user = userEvent.setup();
         storeService.getStores.mockImplementation(async ({ region }) => ({
-            content: region === '서울' ? [{ id: 3, name: '서울 가게' }]
-                : [{ id: 4, name: '경기 가게' }],
+            content: region === '서울' ? [{ id: 3, publicId: FIRST_STORE_PUBLIC_ID, name: '서울 가게' }]
+                : [{ id: 4, publicId: SECOND_STORE_PUBLIC_ID, name: '경기 가게' }],
         }));
         renderHome(['/?region=서울']);
         const section = screen.getByRole('region', { name: '지역별 BEST' });
@@ -135,7 +138,7 @@ describe('app discovery home', () => {
         expect(skeleton.querySelector('.reserve-skeleton-block:not(.reserve-skeleton-block--local)')).toBeNull();
 
         act(() => visibilityByElement.get(section)([{ isIntersecting: true }]));
-        expect(await regional.findByRole('link', { name: '서울 가게 상세 보기' })).toHaveAttribute('href', `/store/3`);
+        expect(await regional.findByRole('link', { name: '서울 가게 상세 보기' })).toHaveAttribute('href', `/store/${FIRST_STORE_PUBLIC_ID}`);
         expect(regional.getByRole('tab', { name: '서울' })).toHaveAttribute('aria-selected', 'true');
         expect(storeService.getRegions).toHaveBeenCalledTimes(1);
         expect(storeService.getStores).toHaveBeenCalledExactlyOnceWith({ page: 0, size: 4, sort: 'rating', region: '서울' }, expect.any(AbortSignal));
@@ -159,7 +162,7 @@ describe('app discovery home', () => {
             expect(horizontalMotions()).toHaveLength(1);
             expect(horizontalMotions()[0][1]).toMatchObject({ duration: 150 });
 
-            await act(async () => resolveGyeonggi({ content: [{ id: 4, name: '경기 가게' }] }));
+            await act(async () => resolveGyeonggi({ content: [{ id: 4, publicId: SECOND_STORE_PUBLIC_ID, name: '경기 가게' }] }));
             expect(await regional.findByRole('link', { name: '경기 가게 상세 보기' })).toBeVisible();
             expect(horizontalMotions()).toHaveLength(1);
             expect(regional.queryByRole('link', { name: /전체 보기/ })).not.toBeInTheDocument();
@@ -187,7 +190,7 @@ describe('app discovery home', () => {
     it('keeps cached recommendation rows visible when a background read fails', async () => {
         const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
         const key = storeKeys.list({ page: 0, size: 4, sort: 'rating' });
-        client.setQueryData(key, { content: [{ id: 3, name: '읽던 가게', rating: 4.9, reviewCount: 10 }] });
+        client.setQueryData(key, { content: [{ id: 3, publicId: FIRST_STORE_PUBLIC_ID, name: '읽던 가게', rating: 4.9, reviewCount: 10 }] });
         renderHome(['/'], client);
         expect(await screen.findByText('읽던 가게')).toBeInTheDocument();
         storeService.getStores.mockRejectedValue({ status: 503 });
@@ -333,14 +336,14 @@ describe('app discovery home', () => {
 
     it('reuses the store list row for recommendations: photo, name, description, rating and category without address', async () => {
         storeService.getStores.mockResolvedValue({ content: [
-            { id: 3, name: '모던 필라테스', description: '소규모 레슨 안내', category: '운동', address: '서울시 중구', rating: 4.9, reviewCount: 10, mainImageUrl: 'https://cdn.reserve.it.kr/users/1/stores/3/thumbnails/cover.png', mainImageWidth: 960, mainImageHeight: 640 },
-            { id: 4, name: '작은 공방', mainImageUrl: '/uploads/square.png', mainImageWidth: 512, mainImageHeight: 512, reviewCount: 0 },
+            { id: 3, publicId: FIRST_STORE_PUBLIC_ID, name: '모던 필라테스', description: '소규모 레슨 안내', category: '운동', address: '서울시 중구', rating: 4.9, reviewCount: 10, mainImageUrl: 'https://cdn.reserve.it.kr/users/1/stores/3/thumbnails/cover.png', mainImageWidth: 960, mainImageHeight: 640 },
+            { id: 4, publicId: SECOND_STORE_PUBLIC_ID, name: '작은 공방', mainImageUrl: '/uploads/square.png', mainImageWidth: 512, mainImageHeight: 512, reviewCount: 0 },
         ] });
         renderHome();
         const first = await screen.findByRole('link', { name: '모던 필라테스 상세 보기' });
         expect(first).toHaveClass('reserve-store-list-row-link');
         expect(first.closest('ul')).toHaveClass('reserve-discovery-store-list', 'reserve-store-list-rows');
-        expect(first).toHaveAttribute('href', '/store/3');
+        expect(first).toHaveAttribute('href', `/store/${FIRST_STORE_PUBLIC_ID}`);
         const photo = within(first).getByRole('img', { name: '모던 필라테스 대표 이미지' });
         expect(photo).toHaveAttribute('src', 'https://cdn.reserve.it.kr/users/1/stores/3/thumbnails/cover.png');
         expect(photo).toHaveAttribute('width', '160');
@@ -375,7 +378,7 @@ describe('app discovery home', () => {
         { rating: '4.7', reviewCount: '1234', score: '4.7', count: '(1,234)' },
         { rating: 'invalid', reviewCount: 3, score: '0.0', count: '(3)' },
     ])('uses the shared safe rating/count summary in recommendations: %j', async (values) => {
-        storeService.getStores.mockResolvedValue({ content: [{ id: 3, name: '추천 가게', ...values }] });
+        storeService.getStores.mockResolvedValue({ content: [{ id: 3, publicId: FIRST_STORE_PUBLIC_ID, name: '추천 가게', ...values }] });
         renderHome();
         const card = await screen.findByRole('link', { name: '추천 가게 상세 보기' });
         expect(within(card).getByText(values.score)).toBeInTheDocument();
@@ -410,7 +413,7 @@ describe('app discovery home', () => {
             expect(card.querySelector('a, button')).toBeNull();
         });
         await act(async () => {
-            resolve({ content: [{ id: 3, name: '모던 필라테스' }] });
+            resolve({ content: [{ id: 3, publicId: FIRST_STORE_PUBLIC_ID, name: '모던 필라테스' }] });
             await promise;
         });
         expect(await screen.findByRole('link', { name: '모던 필라테스 상세 보기' })).toBeInTheDocument();
@@ -429,7 +432,7 @@ describe('app discovery home', () => {
     it('preserves the error retry without turning a failed request into empty cards', async () => {
         const user = userEvent.setup();
         storeService.getStores.mockRejectedValueOnce(new Error('offline'))
-            .mockResolvedValue({ content: [{ id: 3, name: '모던 필라테스', rating: 4.9, reviewCount: 10 }] });
+            .mockResolvedValue({ content: [{ id: 3, publicId: FIRST_STORE_PUBLIC_ID, name: '모던 필라테스', rating: 4.9, reviewCount: 10 }] });
         renderHome();
         expect(await screen.findByText('추천 가게를 불러오지 못했어요.')).toBeInTheDocument();
         expect(screen.queryByText('아직 추천할 가게가 없어요.')).toBeNull();
@@ -441,7 +444,7 @@ describe('app discovery home', () => {
     it('retains long HTML-like names and descriptions as literal, nonexecutable card text', async () => {
         const name = '<script>window.hacked=true</script>' + '긴 가게 이름'.repeat(30);
         const description = '<img src=x onerror="window.hacked=true">' + '원문 안내'.repeat(50);
-        storeService.getStores.mockResolvedValue({ content: [{ id: 3, name, description, rating: 4.76, reviewCount: 1234 }] });
+        storeService.getStores.mockResolvedValue({ content: [{ id: 3, publicId: FIRST_STORE_PUBLIC_ID, name, description, rating: 4.76, reviewCount: 1234 }] });
         renderHome();
         const card = await screen.findByRole('link', { name: `${name} 상세 보기` });
         expect(card.querySelector('strong').textContent).toBe(name);
@@ -509,7 +512,7 @@ describe('app discovery home', () => {
     it('allows a zero-store province, shows its empty state, and resets back to nationwide', async () => {
         const user = userEvent.setup();
         storeService.getStores.mockImplementation(async params => ({
-            content: params.region ? [] : [{ id: 3, name: '모던 필라테스' }],
+            content: params.region ? [] : [{ id: 3, publicId: FIRST_STORE_PUBLIC_ID, name: '모던 필라테스' }],
         }));
         renderHome();
 

@@ -7,6 +7,7 @@ import kr.it.reserve.feed.*;
 import kr.it.reserve.feed.dto.*;
 import kr.it.reserve.feed.service.*;
 import kr.it.reserve.global.common.ApiResponse;
+import kr.it.reserve.global.common.PublicId;
 import kr.it.reserve.global.ratelimit.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -50,6 +51,10 @@ public class FeedInteractionController {
     }
     @GetMapping("/comments/{id:[0-9]+}")
     public ResponseEntity<ApiResponse<FeedInteractionDto.Comment>> comment(@PathVariable Long id) { return FeedController.response(comments.readPublic(id, viewer()), "댓글 조회 성공"); }
+    @GetMapping("/comments" + PublicId.SEGMENT)
+    public ResponseEntity<ApiResponse<FeedInteractionDto.Comment>> commentByPublicId(@PathVariable java.util.UUID publicId) {
+        return FeedController.response(comments.readPublicById(publicId, viewer()), "댓글 조회 성공");
+    }
     @GetMapping("/notifications")
     public ResponseEntity<ApiResponse<Page<FeedInteractionDto.Notification>>> notifications(@RequestParam(defaultValue = "false") boolean unread, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
         return FeedController.response(notifications.list(member(), unread, page, size), "피드 알림 조회 성공");

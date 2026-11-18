@@ -6,6 +6,9 @@
  *   2. 문자열 (서버 에러 메시지)
  */
 
+export const isResponseUnconfirmed = error => !error?.isServiceAdmissionRequired && !error?.isOverloadRateLimited
+    && (error?.isResponseUnconfirmed === true || [408, 500, 502, 503, 504].includes(error?.status));
+
 /**
  * @param {any}    error          - axios interceptor가 reject한 값
  * @param {Object} messageApi     - Ant Design message 인스턴스

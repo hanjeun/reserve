@@ -3,14 +3,14 @@ package kr.it.reserve.email.service;
 import kr.it.reserve.global.error.EmailException;
 import kr.it.reserve.file.service.SupportMailPhotos;
 import kr.it.reserve.file.util.ImageFileValidator.ValidatedImage;
-import java.util.List;
-import org.springframework.core.io.ByteArrayResource;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import java.io.UnsupportedEncodingException;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -98,6 +98,27 @@ public class EmailService {
         }
     }
 
+    @Async("mailExecutor")
+    public java.util.concurrent.CompletableFuture<Void> sendAccountProtectionEmail(String toEmail, String recoveryUrl) {
+        boolean recovered = recoveryUrl == null;
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, MAIL_CHARSET);
+            helper.setFrom(fromEmail, fromName);
+            helper.setTo(toEmail);
+            helper.setSubject(recovered ? "[RESERVE] 계정 복구를 완료했어요" : "[RESERVE] 계정을 보호하고 있어요");
+            helper.setText(recovered
+                    ? "계정 복구를 완료했어요. 이후 로그인에는 기존 추가 인증 수단이 필요해요. 본인이 복구하지 않았다면 RESERVE에 문의해주세요."
+                    : "계정 보호를 시작해 모든 기기의 로그인과 등록을 해제했어요. 아래 링크를 열고 기존 인증 수단으로 본인 확인을 진행해주세요. 링크는 1시간 동안 사용할 수 있어요.\n\n" + recoveryUrl);
+            mailSender.send(message);
+            log.info("Account protection notification submitted: recovered={}", recovered);
+            return java.util.concurrent.CompletableFuture.completedFuture(null);
+        } catch (MessagingException | UnsupportedEncodingException | MailException exception) {
+            log.error("Email send failed: errorType={}", exception.getClass().getSimpleName());
+            throw new EmailException("보안 알림 메일 발송에 실패했어요.", HttpStatus.SERVICE_UNAVAILABLE);
+        }
+    }
+
     private String buildLoginMethodChangedContent() {
         return HTML_HEAD_OPEN + FONT_IMPORT + "</head>"
             + "<body style=\"margin:0;padding:0;font-family:" + FONT_FAMILY + ";background:#f9fafb;\">"
@@ -126,13 +147,7 @@ public class EmailService {
                         reservationTime, guestCount), "승인", "#1db954", "예약이 확정됐어요! 방문 당일 즐거운 시간 되세요.", null, null));
     }
 
-    /**
-     * 가게 사정에 의한 예약 취소 알림 → 유저.
-     *
-     * <p>거절 메일과 따로 둔다 — 거절은 "아직 승인 안 된 요청을 안 받는 것"이고,
-     * 취소는 "이미 확정된 약속을 가게가 깬 것"이다. 사용자가 받는 충격이 다르므로
-     * 문구도 다르고, 환불 안내가 반드시 들어가야 한다.
-     */
+    /** 승인 전 거절과 확정 후 가게 취소를 구분하고, 가게 취소에는 환불 안내를 포함한다. */
     @Async("mailExecutor")
     public void sendReservationCancelledByStoreEmail(String toEmail, String memberName,
                                                      String storeName, String reservationDate,
@@ -456,28 +471,39 @@ public class EmailService {
 
     @Async("mailExecutor")
     public void sendPasswordResetEmail(String toEmail, String code) {
+        sendAccountCodeEmail(toEmail, code, "비밀번호 재설정 코드", "비밀번호를<br/>재설정해주세요.",
+                "아래 인증 코드를 입력해 비밀번호를 재설정하세요.");
+    }
+
+    @Async("mailExecutor")
+    public void sendAccountRecoveryCodeEmail(String toEmail, String code) {
+        sendAccountCodeEmail(toEmail, code, "계정 복구 코드", "계정 복구를<br/>진행해주세요.",
+                "계정 복구 화면에 인증 코드를 입력한 뒤 등록한 인증 수단으로 본인인지 확인해주세요.");
+    }
+
+    private void sendAccountCodeEmail(String toEmail, String code, String subject, String title, String prompt) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, MAIL_CHARSET);
             helper.setFrom(fromEmail, fromName);
             helper.setTo(toEmail);
-            helper.setSubject("[RESERVE] 비밀번호 재설정 코드");
-            helper.setText(buildPasswordResetEmailContent(code), true);
+            helper.setSubject("[RESERVE] " + subject);
+            helper.setText(buildAccountCodeEmailContent(code, title, prompt), true);
             mailSender.send(message);
-            log.info("Password reset email sent");
+            log.info("Account verification email sent");
         } catch (MessagingException | UnsupportedEncodingException | MailException e) {
-            log.error("Password reset email failed: errorType={}", e.getClass().getSimpleName());
+            log.error("Account verification email failed: errorType={}", e.getClass().getSimpleName());
         }
     }
 
-    private String buildPasswordResetEmailContent(String code) {
+    private String buildAccountCodeEmailContent(String code, String title, String prompt) {
         return HTML_HEAD_OPEN + FONT_IMPORT + "</head>"
             + "<body style=\"margin:0;padding:0;font-family:" + FONT_FAMILY + ";background-color:#f9fafb;\">"
             + "  <div style=\"width:100%;background-color:#f9fafb;padding:40px 0;\">"
             + "    <div style=\"max-width:500px;margin:0 auto;background-color:#ffffff;border-radius:24px;padding:48px 32px;box-shadow:0 4px 12px rgba(0,0,0,0.05);\">"
             + "      <div style=\"margin-bottom:32px;\"><span style=\"font-size:20px;font-weight:800;color:#3182f6;letter-spacing:-0.5px;font-family:" + FONT_FAMILY + ";\">RESERVE</span></div>"
-            + "      <h1 style=\"font-size:24px;font-weight:700;color:#191f28;line-height:1.4;margin:0 0 12px 0;font-family:" + FONT_FAMILY + ";\">비밀번호를<br/>재설정해주세요.</h1>"
-            + "      <p style=\"font-size:16px;color:#4e5968;line-height:1.6;margin:0 0 32px 0;\">아래 인증 코드를 입력해 비밀번호를 재설정하세요.<br/>코드는 5분간 유효해요.</p>"
+            + "      <h1 style=\"font-size:24px;font-weight:700;color:#191f28;line-height:1.4;margin:0 0 12px 0;font-family:" + FONT_FAMILY + ";\">" + title + "</h1>"
+            + "      <p style=\"font-size:16px;color:#4e5968;line-height:1.6;margin:0 0 32px 0;\">" + prompt + "<br/>코드는 5분간 유효해요.</p>"
             + "      <div style=\"background-color:#f2f4f6;border-radius:16px;padding:32px;text-align:center;margin-bottom:32px;\">"
             + "        <span style=\"display:block;font-size:14px;color:#8b95a1;margin-bottom:8px;\">인증번호</span>"
             + "        <span style=\"font-size:36px;font-weight:800;color:#3182f6;letter-spacing:8px;font-family:" + FONT_FAMILY + ";\">" + code + "</span>"

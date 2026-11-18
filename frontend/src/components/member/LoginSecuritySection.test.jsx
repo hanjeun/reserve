@@ -1,18 +1,21 @@
+import { StrictMode } from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { App as AntApp } from 'antd';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import LoginSecuritySection from './LoginSecuritySection';
 import useAuthStore from '../../store/useAuthStore';
-import { saveSecurityReturn } from '../../utils/securityReturn';
+import { saveSecurityReturn, takeSecurityReturn } from '../../utils/securityReturn';
 
 const fixture = vi.hoisted(() => ({
     api: { getLoginMethods: vi.fn(), beginLoginMethodOAuth: vi.fn(), sendLoginMethodCode: vi.fn(),
-        setLoginMethodPassword: vi.fn(), removeLoginMethodPassword: vi.fn(), unlinkSocialLogin: vi.fn(), changePassword: vi.fn() },
-    message: { success: vi.fn(), error: vi.fn(), info: vi.fn() }, confirm: vi.fn(), navigate: vi.fn(), logout: vi.fn(), mfaGet: vi.fn(), mfaPost: vi.fn(),
+        setLoginMethodPassword: vi.fn(), removeLoginMethodPassword: vi.fn(), unlinkSocialLogin: vi.fn(), changePassword: vi.fn(),
+        getRegisteredDevices: vi.fn(), registerCurrentDevice: vi.fn(), forgetRegisteredDevice: vi.fn(), signOutRegisteredDevice: vi.fn() },
+    message: { success: vi.fn(), error: vi.fn(), info: vi.fn() }, confirm: vi.fn(), navigate: vi.fn(), logout: vi.fn(), mfaGet: vi.fn(), mfaPost: vi.fn(), passkey: vi.fn(),
 }));
 vi.mock('../../services', () => ({ memberService: fixture.api }));
 vi.mock('../../api/axios', () => ({ default: { get: fixture.mfaGet, post: fixture.mfaPost } }));
+vi.mock('../../utils/passkey', async original => ({ ...await original(), performPasskey: fixture.passkey }));
 vi.mock('../../hooks', () => ({ useMessage: () => ({ message: fixture.message, confirm: fixture.confirm }) }));
 vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: fixture.message, confirm: fixture.confirm }) }));
 vi.mock('react-router-dom', async original => ({ ...await original(), useNavigate: () => fixture.navigate }));
@@ -30,6 +33,354 @@ beforeEach(() => {
     fixture.mfaGet.mockResolvedValue({ available: true, enabled: false, required: false, credentials: [] });
 });
 
+it('기기 조회를 지원하지 않는 기존 서버에서는 접속 환경 보호 안내를 표시해요', async () => {
+    fixture.api.getLoginMethods.mockResolvedValue(methods({ browserTrust: 'DISABLED' }));
+    render(view(owner));
+    const devices = await screen.findByRole('button', { name: '로그인 기기 관리' });
+    expect(devices).toHaveAttribute('aria-disabled', 'true');
+    expect(devices).toHaveAccessibleDescription('접속 환경 보호를 켜면 자주 사용하는 기기를 등록할 수 있어요.');
+    fireEvent.click(devices);
+    expect(devices).toHaveAttribute('aria-expanded', 'false');
+    expect(fixture.api.getRegisteredDevices).not.toHaveBeenCalled();
+    expect(fixture.mfaPost).not.toHaveBeenCalled();
+});
+
+it('기기 목록은 전용 본인 확인 뒤 열고 원격 로그아웃과 등록 해제를 구분해요', async () => {
+    fixture.api.getLoginMethods.mockResolvedValue(methods({ browserTrust: 'REMEMBERED' }));
+    const current = { id: 'a'.repeat(64), os: 'windows', browser: 'chrome', current: true, sessionState: 'ACTIVE' };
+    const remote = { id: 'b'.repeat(64), os: 'ios', browser: 'safari', current: false, sessionState: 'ACTIVE' };
+    fixture.api.getRegisteredDevices.mockResolvedValueOnce([current, remote])
+        .mockResolvedValueOnce([current, { ...remote, sessionState: 'SIGNED_OUT' }])
+        .mockResolvedValueOnce([current]);
+    render(view(owner));
+    fireEvent.click(await screen.findByRole('button', { name: '로그인 기기 관리' }));
+    expect(fixture.api.getRegisteredDevices).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('현재 비밀번호'), { target: { value: 'fixture-password' } });
+    fireEvent.click(screen.getByRole('button', { name: '기기 관리 본인 확인' }));
+    const logout = await screen.findByRole('button', { name: '모바일 · Safari 로그아웃' });
+    expect(fixture.mfaPost).toHaveBeenCalledWith('/api/member/login-methods/confirm', { action: 'DEVICES', password: 'fixture-password' }, expect.anything());
+    expect(screen.getByText('이 기기 · 로그인 중 · 등록됨')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'PC · Chrome 로그아웃' })).not.toBeInTheDocument();
+    fireEvent.click(logout);
+    await act(async () => fixture.confirm.mock.calls.at(-1)[0].onOk());
+    expect(fixture.api.signOutRegisteredDevice).toHaveBeenCalledWith(owner.id, remote.id);
+    expect(fixture.api.forgetRegisteredDevice).not.toHaveBeenCalled();
+    expect(screen.getByText('로그아웃 · 등록됨')).toBeVisible();
+    const forget = screen.getByRole('button', { name: '모바일 · Safari 등록 해제' });
+    expect(forget.querySelector('.anticon-minus')).toBeInTheDocument();
+    fireEvent.click(forget);
+    await act(async () => fixture.confirm.mock.calls.at(-1)[0].onOk());
+    expect(fixture.api.forgetRegisteredDevice).toHaveBeenCalledWith(owner.id, remote.id);
+    expect(screen.queryByText('모바일 · Safari')).not.toBeInTheDocument();
+});
+
+it('현재 기기 등록 해제는 확인된 결과를 안내하고 목록을 닫아요', async () => {
+    fixture.api.getLoginMethods.mockResolvedValue(methods({ browserTrust: 'REMEMBERED' }));
+    const current = { id: 'a'.repeat(64), os: 'windows', browser: 'chrome', current: true, sessionState: 'ACTIVE' };
+    fixture.api.getRegisteredDevices.mockResolvedValue([current]);
+    render(view(owner));
+    fireEvent.click(await screen.findByRole('button', { name: '로그인 기기 관리' }));
+    fireEvent.change(screen.getByLabelText('현재 비밀번호'), { target: { value: 'fixture-password' } });
+    fireEvent.click(screen.getByRole('button', { name: '기기 관리 본인 확인' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'PC · Chrome 등록 해제' }));
+    await act(async () => fixture.confirm.mock.calls.at(-1)[0].onOk());
+    expect(fixture.api.forgetRegisteredDevice).toHaveBeenCalledWith(owner.id, current.id);
+    expect(fixture.api.getRegisteredDevices).toHaveBeenCalledOnce();
+    expect(fixture.message.success).toHaveBeenCalledWith('기기 등록을 해제했어요.');
+    expect(fixture.message.error).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '로그인 기기 관리' })).toHaveAttribute('aria-expanded', 'false');
+});
+
+it('네이버·패스키·인증 앱을 한 줄에 표시하고 패스키를 취소하면 같은 선택으로 돌아가요', async () => {
+    const prompt = defer();
+    const cleanup = defer();
+    fixture.api.getLoginMethods.mockResolvedValue(methods({
+        passwordEnabled: false, socialProvider: 'NAVER', browserTrust: 'REMEMBERED', deviceFactorAvailable: true,
+    }));
+    fixture.mfaGet.mockResolvedValue({ available: true, enabled: true, credentials: [{ kind: 'PASSKEY' }, { kind: 'TOTP' }] });
+    fixture.mfaPost.mockResolvedValueOnce({ purpose: 'MANAGE', passkeyAvailable: true, totpAvailable: true, verified: false })
+        .mockResolvedValueOnce('synthetic-options').mockReturnValueOnce(cleanup.promise);
+    fixture.passkey.mockReturnValueOnce(prompt.promise);
+    render(<StrictMode>{view(owner)}</StrictMode>);
+    const trigger = await screen.findByRole('button', { name: '로그인 기기 관리' });
+    const glyph = trigger.querySelector('.reserve-login-setup-icon');
+    const svg = glyph.querySelector('svg');
+    fireEvent.click(trigger);
+    const naver = screen.getByRole('button', { name: '네이버로 본인 확인' });
+    const passkey = await screen.findByRole('button', { name: '패스키로 확인' });
+    const options = screen.getByRole('group', { name: '인증 수단' });
+    expect(options).toContainElement(naver);
+    expect(options).toContainElement(passkey);
+    expect(within(options).getByRole('button', { name: '인증 앱 코드로 확인' })).toBeEnabled();
+    expect(passkey.querySelector('.anticon-lock')).toBeInTheDocument();
+    expect(glyph).toHaveClass('is-open');
+    expect(glyph.querySelector('svg')).toBe(svg);
+    expect(fixture.mfaPost).not.toHaveBeenCalled();
+
+    fireEvent.click(passkey);
+    await waitFor(() => expect(fixture.passkey).toHaveBeenCalledExactlyOnceWith('synthetic-options', false, expect.any(AbortSignal)));
+    expect(fixture.mfaPost.mock.calls[0].slice(0, 2)).toEqual(['/api/member/login-methods/confirm', { action: 'DEVICES', password: undefined }]);
+    const heading = await screen.findByRole('heading', { name: '기기 관리 본인 확인' });
+    const panel = heading.closest('.reserve-login-security-panel');
+    expect(panel).toHaveAttribute('id', trigger.getAttribute('aria-controls'));
+
+    await act(async () => prompt.reject(new DOMException('cancelled', 'NotAllowedError')));
+    const restored = await screen.findByRole('group', { name: '인증 수단' });
+    expect(restored.closest('.reserve-login-security-panel')).toBe(panel);
+    expect(within(restored).getByRole('button', { name: '인증 앱 코드로 확인' })).toBeDisabled();
+    expect(screen.queryByLabelText('인증 앱 코드')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '기기 관리 본인 확인' })).not.toBeInTheDocument();
+    expect(fixture.mfaPost).toHaveBeenCalledWith('/api/auth/mfa/cancel', undefined, expect.objectContaining({ timeout: 2500 }));
+    await act(async () => cleanup.reject(new Error('discard response unavailable')));
+    await waitFor(() => expect(within(restored).getByRole('button', { name: '네이버로 본인 확인' })).toBeEnabled());
+    expect(within(restored).getByRole('button', { name: '패스키로 확인' })).toBeEnabled();
+    expect(within(restored).getByRole('button', { name: '인증 앱 코드로 확인' })).toBeEnabled();
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(fixture.message.info).toHaveBeenCalledWith('패스키 인증을 취소했어요.');
+    expect(fixture.api.getRegisteredDevices).not.toHaveBeenCalled();
+
+    fireEvent.click(within(panel).getByRole('button', { name: '닫기' }));
+    await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'false'));
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(glyph).not.toHaveClass('is-open');
+    expect(glyph.querySelector('svg')).toBe(svg);
+});
+
+it.each([400, 401])('일회용 코드 확인이 거절되면 입력을 비우고 선택으로 돌아가요 (%s)', async status => {
+    fixture.api.getLoginMethods.mockResolvedValue(methods({
+        passwordEnabled: false, socialProvider: 'NAVER', browserTrust: 'REMEMBERED', deviceFactorAvailable: true,
+    }));
+    fixture.mfaGet.mockResolvedValue({ available: true, enabled: true, credentials: [{ kind: 'PASSKEY' }, { kind: 'TOTP' }], recoveryCodes: 1 });
+    const challenge = { purpose: 'MANAGE', passkeyAvailable: true, totpAvailable: true, verified: false };
+    fixture.mfaPost.mockResolvedValueOnce(challenge)
+        .mockRejectedValueOnce(Object.assign(new Error('인증 코드를 다시 확인해주세요.'), { status }))
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(challenge);
+    render(view(owner));
+    fireEvent.click(await screen.findByRole('button', { name: '로그인 기기 관리' }));
+    const codeChoice = await screen.findByRole('button', { name: '인증 앱 코드로 확인' });
+    expect(screen.getByRole('button', { name: '복구코드로 확인' })).toBeEnabled();
+    fireEvent.click(codeChoice);
+    fireEvent.change(await screen.findByLabelText('인증 앱 코드'), { target: { value: '123456' } });
+    fireEvent.submit(screen.getByRole('button', { name: '확인', exact: true }).closest('form'));
+    const restored = await screen.findByRole('button', { name: '인증 앱 코드로 확인' });
+    await waitFor(() => expect(restored).toBeEnabled());
+    expect(screen.queryByLabelText('인증 앱 코드')).not.toBeInTheDocument();
+    expect(fixture.mfaPost).toHaveBeenCalledWith('/api/auth/mfa/verify', { kind: 'TOTP', proof: '123456' }, expect.anything());
+    expect(fixture.api.getRegisteredDevices).not.toHaveBeenCalled();
+    expect(fixture.passkey).not.toHaveBeenCalled();
+    fireEvent.click(restored);
+    expect(await screen.findByLabelText('인증 앱 코드')).toHaveValue('');
+    const heading = screen.getByRole('heading', { name: '기기 관리 본인 확인' });
+    fireEvent.click(within(heading.parentElement).getByRole('button', { name: '닫기' }));
+    expect(await screen.findByRole('button', { name: '네이버로 본인 확인' })).toBeEnabled();
+});
+
+it('패스키 전용 확인을 코드로 진행할 수 없으면 네이버와 패스키 선택을 열어둬요', async () => {
+    fixture.api.getLoginMethods.mockResolvedValue(methods({
+        passwordEnabled: false, socialProvider: 'NAVER', browserTrust: 'REMEMBERED', deviceFactorAvailable: true,
+    }));
+    fixture.mfaGet.mockResolvedValue({ available: true, enabled: true, credentials: [{ kind: 'PASSKEY' }, { kind: 'TOTP' }] });
+    fixture.mfaPost.mockResolvedValueOnce({ purpose: 'MANAGE', passkeyAvailable: true, passkeyOnly: true, verified: false });
+    render(view(owner));
+    fireEvent.click(await screen.findByRole('button', { name: '로그인 기기 관리' }));
+    fireEvent.click(await screen.findByRole('button', { name: '인증 앱 코드로 확인' }));
+    await waitFor(() => expect(fixture.message.error).toHaveBeenCalledWith(expect.stringContaining('먼저 본인 확인')));
+    expect(screen.getByRole('button', { name: '인증 앱 코드로 확인' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button', { name: '네이버로 본인 확인' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '패스키로 확인' })).toBeEnabled();
+    expect(screen.queryByLabelText('인증 앱 코드')).not.toBeInTheDocument();
+    expect(fixture.mfaPost).toHaveBeenCalledTimes(2);
+    expect(fixture.api.getRegisteredDevices).not.toHaveBeenCalled();
+});
+
+it('접속 환경 보호가 꺼져 있어도 확인한 뒤 로그인 기기를 관리할 수 있어요', async () => {
+    fixture.api.getLoginMethods.mockResolvedValue(methods({ browserTrust: 'DISABLED', deviceSessionsAvailable: true }));
+    const current = { id: 'a'.repeat(64), current: true, registered: false, sessionState: 'ACTIVE', signedInAt: '2026-01-01T09:30:00Z' };
+    const remote = { ...current, id: 'b'.repeat(64), current: false };
+    fixture.api.getRegisteredDevices.mockResolvedValueOnce([current, remote]).mockResolvedValueOnce([current]);
+    render(view(owner));
+    fireEvent.click(await screen.findByRole('button', { name: '로그인 기기 관리' }));
+    expect(fixture.api.getRegisteredDevices).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('현재 비밀번호'), { target: { value: 'fixture-password' } });
+    fireEvent.click(screen.getByRole('button', { name: '기기 관리 본인 확인' }));
+    const signOut = await screen.findByRole('button', { name: '다른 브라우저 로그아웃' });
+    expect(screen.getByText('현재 브라우저')).toBeVisible();
+    expect(screen.queryByRole('button', { name: /등록 해제|이 기기 등록|현재 브라우저 로그아웃/ })).not.toBeInTheDocument();
+    fireEvent.click(signOut);
+    await act(async () => fixture.confirm.mock.calls.at(-1)[0].onOk());
+    expect(fixture.api.signOutRegisteredDevice).toHaveBeenCalledExactlyOnceWith(owner.id, remote.id);
+    expect(screen.queryByText('다른 브라우저')).not.toBeInTheDocument();
+    expect(screen.getByText('현재 브라우저')).toBeVisible();
+});
+
+it('소셜 확인이 취소된 콜백에서 같은 기기 관리 수단을 다시 열어요', async () => {
+    saveSecurityReturn(owner.id, 'devices');
+    fixture.api.getLoginMethods.mockResolvedValue(methods({
+        passwordEnabled: false, socialProvider: 'NAVER', browserTrust: 'REMEMBERED', deviceFactorAvailable: true,
+    }));
+    fixture.mfaGet.mockResolvedValue({ available: true, enabled: true, credentials: [{ kind: 'PASSKEY' }, { kind: 'TOTP' }] });
+    render(<AntApp><MemoryRouter initialEntries={['/my-page?security=retry']}><LoginSecuritySection user={owner} /></MemoryRouter></AntApp>);
+    expect(await screen.findByRole('button', { name: '네이버로 본인 확인' })).toBeEnabled();
+    expect(await screen.findByRole('button', { name: '인증 앱 코드로 확인' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '패스키로 확인' })).toBeEnabled();
+    expect(fixture.mfaPost).not.toHaveBeenCalled();
+});
+
+it('소셜 화면에서 브라우저 뒤로 가기를 하면 같은 기기 관리 선택을 다시 보여줘요', async () => {
+    fixture.api.getLoginMethods.mockResolvedValue(methods({
+        passwordEnabled: false, socialProvider: 'NAVER', browserTrust: 'REMEMBERED', deviceFactorAvailable: true,
+    }));
+    fixture.mfaGet.mockResolvedValue({ available: true, enabled: true, credentials: [{ kind: 'PASSKEY' }, { kind: 'TOTP' }] });
+    render(view(owner));
+    fireEvent.click(await screen.findByRole('button', { name: '로그인 기기 관리' }));
+    await screen.findByRole('button', { name: '인증 앱 코드로 확인' });
+    saveSecurityReturn(owner.id, 'devices');
+    const returned = new Event('pageshow');
+    Object.defineProperty(returned, 'persisted', { value: true });
+    fireEvent(window, returned);
+    await waitFor(() => expect(fixture.api.getLoginMethods).toHaveBeenCalledTimes(2));
+    expect(await screen.findByRole('button', { name: '네이버로 본인 확인' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '패스키로 확인' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '인증 앱 코드로 확인' })).toBeEnabled();
+    expect(takeSecurityReturn(owner.id)).toBeNull();
+    expect(fixture.mfaPost).not.toHaveBeenCalled();
+});
+
+it('확인됐다는 서버 응답이 없으면 기기 목록을 읽지 않고 선택으로 돌아가요', async () => {
+    fixture.api.getLoginMethods.mockResolvedValue(methods({
+        passwordEnabled: false, socialProvider: 'NAVER', browserTrust: 'REMEMBERED', deviceFactorAvailable: true,
+    }));
+    fixture.mfaGet.mockResolvedValue({ available: true, enabled: true, credentials: [{ kind: 'TOTP' }] });
+    const challenge = { purpose: 'MANAGE', totpAvailable: true, verified: false };
+    fixture.mfaPost.mockResolvedValueOnce(challenge).mockResolvedValueOnce(challenge);
+    render(view(owner));
+    fireEvent.click(await screen.findByRole('button', { name: '로그인 기기 관리' }));
+    fireEvent.click(await screen.findByRole('button', { name: '인증 앱 코드로 확인' }));
+    fireEvent.change(await screen.findByLabelText('인증 앱 코드'), { target: { value: '123456' } });
+    fireEvent.submit(screen.getByRole('button', { name: '확인', exact: true }).closest('form'));
+    expect(await screen.findByRole('button', { name: '네이버로 본인 확인' })).toBeEnabled();
+    expect(fixture.api.getRegisteredDevices).not.toHaveBeenCalled();
+    expect(fixture.message.error).toHaveBeenCalledWith(expect.stringContaining('본인 확인 결과'));
+});
+
+it('패스키 증명을 서버가 확인한 뒤에만 등록된 기기를 읽어요', async () => {
+    const result = defer();
+    fixture.api.getLoginMethods.mockResolvedValue(methods({
+        passwordEnabled: false, socialProvider: 'NAVER', browserTrust: 'REMEMBERED', deviceFactorAvailable: true,
+    }));
+    fixture.mfaGet.mockResolvedValue({ available: true, enabled: true, credentials: [{ kind: 'PASSKEY' }] });
+    fixture.mfaPost.mockResolvedValueOnce({ purpose: 'MANAGE', passkeyAvailable: true, passkeyOnly: true, verified: false })
+        .mockResolvedValueOnce('synthetic-options').mockReturnValueOnce(result.promise);
+    fixture.passkey.mockResolvedValueOnce('synthetic-credential');
+    fixture.api.getRegisteredDevices.mockResolvedValue([]);
+    render(view(owner));
+    fireEvent.click(await screen.findByRole('button', { name: '로그인 기기 관리' }));
+    fireEvent.click(await screen.findByRole('button', { name: '패스키로 확인' }));
+    await waitFor(() => expect(fixture.mfaPost).toHaveBeenCalledWith('/api/auth/mfa/verify',
+        { kind: 'PASSKEY', proof: 'synthetic-credential' }, expect.anything()));
+    expect(fixture.api.getRegisteredDevices).not.toHaveBeenCalled();
+    await act(async () => result.resolve({ purpose: 'MANAGE', verified: true }));
+    expect(await screen.findByText('표시할 로그인 기기가 없어요.')).toBeVisible();
+    expect(fixture.api.getRegisteredDevices).toHaveBeenCalledExactlyOnceWith(owner.id);
+    expect(fixture.message.success).toHaveBeenCalledWith('기기 관리 본인 확인을 완료했어요.');
+});
+
+const socialCases = [['NAVER', '네이버'], ['GOOGLE', 'Google'], ['KAKAO', '카카오']];
+it.each(socialCases.flatMap(([provider]) => [true, false].map(enrolled => [provider, enrolled])))(
+    '소셜 확인 뒤 등록한 인증 수단 유무와 관계없이 기기 목록으로 이어져요 (%s, %s)', async (provider, enrolled) => {
+    saveSecurityReturn(owner.id, 'devices');
+    fixture.api.getLoginMethods.mockResolvedValue(methods({
+        passwordEnabled: false, socialProvider: provider, socialProofFresh: true,
+        browserTrust: 'DISABLED', deviceSessionsAvailable: true, deviceFactorAvailable: enrolled,
+    }));
+    fixture.mfaGet.mockResolvedValue({ available: true, enabled: enrolled, credentials: enrolled ? [{ kind: 'TOTP' }] : [] });
+    fixture.api.getRegisteredDevices.mockResolvedValue([]);
+    render(<AntApp><MemoryRouter initialEntries={['/my-page?security=verified']}><LoginSecuritySection user={owner} /></MemoryRouter></AntApp>);
+    expect(await screen.findByText('표시할 로그인 기기가 없어요.')).toBeVisible();
+    expect(fixture.mfaPost).toHaveBeenCalledExactlyOnceWith('/api/member/login-methods/confirm',
+        { action: 'DEVICES', password: undefined }, expect.anything());
+    expect(fixture.api.getRegisteredDevices).toHaveBeenCalledExactlyOnceWith(owner.id);
+    expect(screen.queryByRole('heading', { name: '기기 관리 본인 확인' })).not.toBeInTheDocument();
+    expect(fixture.api.beginLoginMethodOAuth).not.toHaveBeenCalled();
+});
+
+it.each(['패스키로 확인', '인증 앱 코드로 확인', '복구코드로 확인'])(
+    '서버가 같은 기기 관리 확인을 완료했으면 다시 인증하지 않아요 (%s)', async label => {
+    fixture.api.getLoginMethods.mockResolvedValue(methods({
+        passwordEnabled: false, socialProvider: 'GOOGLE', socialProofFresh: true,
+        browserTrust: 'DISABLED', deviceSessionsAvailable: true, deviceFactorAvailable: true,
+    }));
+    fixture.mfaGet.mockResolvedValue({ available: true, enabled: true,
+        credentials: [{ kind: 'PASSKEY' }, { kind: 'TOTP' }], recoveryCodes: 1 });
+    fixture.api.getRegisteredDevices.mockResolvedValue([]);
+    render(view(owner));
+    fireEvent.click(await screen.findByRole('button', { name: '로그인 기기 관리' }));
+    fireEvent.click(await screen.findByRole('button', { name: label }));
+    expect(await screen.findByText('표시할 로그인 기기가 없어요.')).toBeVisible();
+    expect(fixture.mfaPost).toHaveBeenCalledOnce();
+    expect(fixture.api.getRegisteredDevices).toHaveBeenCalledExactlyOnceWith(owner.id);
+    expect(fixture.passkey).not.toHaveBeenCalled();
+    expect(fixture.message.error).not.toHaveBeenCalled();
+});
+
+it.each(socialCases.flatMap(([provider, label]) => [true, false].map(direct => [provider, label, direct])))(
+    '기기 관리에서 연결한 소셜을 같은 조건으로 선택할 수 있어요 (%s, %s, %s)', async (provider, label, deviceFactorAvailable) => {
+    fixture.api.getLoginMethods.mockResolvedValue(methods({
+        passwordEnabled: false, socialProvider: provider, browserTrust: 'NOT_REMEMBERED', deviceFactorAvailable,
+    }));
+    fixture.mfaGet.mockResolvedValue({ available: true, enabled: true, credentials: [{ kind: 'PASSKEY' }, { kind: 'TOTP' }] });
+    fixture.api.beginLoginMethodOAuth.mockResolvedValueOnce({ authorizationUrl: '/unsupported' });
+    render(view(owner));
+    fireEvent.click(await screen.findByRole('button', { name: '로그인 기기 관리' }));
+    if (deviceFactorAvailable) {
+        expect(await screen.findByRole('button', { name: '패스키로 확인' })).toBeVisible();
+        expect(screen.getByRole('button', { name: '인증 앱 코드로 확인' })).toBeVisible();
+    } else {
+        expect(screen.queryByRole('button', { name: '패스키로 확인' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: '인증 앱 코드로 확인' })).not.toBeInTheDocument();
+    }
+    fireEvent.click(screen.getByRole('button', { name: `${label}로 본인 확인` }));
+    await waitFor(() => expect(fixture.message.error).toHaveBeenCalledWith('로그인 요청을 확인하지 못했어요.'));
+    expect(fixture.api.beginLoginMethodOAuth).toHaveBeenCalledExactlyOnceWith(owner.id,
+        { provider, currentPassword: undefined, reauthenticate: true });
+    expect(fixture.mfaPost).not.toHaveBeenCalled();
+    expect(fixture.api.getRegisteredDevices).not.toHaveBeenCalled();
+});
+
+it('등록한 인증 앱만 있는 경우에도 직접 본인 확인을 시작할 수 있어요', async () => {
+    fixture.api.getLoginMethods.mockResolvedValue(methods({
+        passwordEnabled: false, socialProvider: 'NAVER', browserTrust: 'REMEMBERED', deviceFactorAvailable: true,
+    }));
+    fixture.mfaGet.mockResolvedValue({ available: true, enabled: true, credentials: [{ kind: 'TOTP' }] });
+    fixture.mfaPost.mockResolvedValueOnce({ purpose: 'MANAGE', totpAvailable: true, verified: false });
+    render(view(owner));
+    fireEvent.click(await screen.findByRole('button', { name: '로그인 기기 관리' }));
+    fireEvent.click(await screen.findByRole('button', { name: '인증 앱 코드로 확인' }));
+    expect(await screen.findByLabelText('인증 앱 코드')).toBeVisible();
+    expect(screen.queryByRole('button', { name: '패스키로 확인' })).not.toBeInTheDocument();
+    expect(fixture.passkey).not.toHaveBeenCalled();
+    expect(fixture.api.getRegisteredDevices).not.toHaveBeenCalled();
+});
+
+it('기기 등록용 소셜 확인 뒤 등록까지 마치면 같은 확인으로 목록을 갱신해요', async () => {
+    saveSecurityReturn(owner.id, 'devices');
+    fixture.api.getLoginMethods.mockResolvedValue(methods({ passwordEnabled: false, socialProvider: 'GOOGLE', socialProofFresh: true, browserTrust: 'NOT_REMEMBERED' }));
+    fixture.api.getRegisteredDevices.mockResolvedValueOnce([]).mockResolvedValueOnce([
+        { id: 'a'.repeat(64), os: 'windows', browser: 'chrome', current: true, sessionState: 'ACTIVE' },
+    ]);
+    render(<AntApp><MemoryRouter initialEntries={['/my-page?security=verified']}><LoginSecuritySection user={owner} /></MemoryRouter></AntApp>);
+    fireEvent.click(await screen.findByRole('button', { name: '이 기기 등록' }));
+    expect(await screen.findByText('이 기기 · 로그인 중 · 등록됨')).toBeVisible();
+    expect(fixture.api.registerCurrentDevice).toHaveBeenCalledExactlyOnceWith(owner.id);
+    expect(fixture.api.getRegisteredDevices).toHaveBeenCalledTimes(2);
+    expect(fixture.mfaPost).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: '로그인 기기 관리' })).toHaveAttribute('aria-expanded', 'true');
+    expect(fixture.mfaPost).toHaveBeenCalledWith('/api/member/login-methods/confirm', { action: 'DEVICES', password: undefined }, expect.anything());
+    expect(fixture.message.success).toHaveBeenCalledWith('이 기기 등록을 완료했어요.');
+    expect(screen.queryByLabelText('로그인 이메일')).not.toBeInTheDocument();
+});
+
 it('소셜 본인 확인 뒤 시작했던 이메일 설정 폼을 바로 열어요', async () => {
     saveSecurityReturn(owner.id, 'setup-password');
     fixture.api.getLoginMethods.mockResolvedValue(methods({ passwordEnabled: false, socialProvider: 'GOOGLE', socialProofFresh: true }));
@@ -37,6 +388,110 @@ it('소셜 본인 확인 뒤 시작했던 이메일 설정 폼을 바로 열어�
     expect(await screen.findByLabelText('로그인 이메일')).toBeVisible();
     await waitFor(() => expect(document.activeElement).toHaveClass('reserve-login-security-panel'));
     expect(fixture.api.setLoginMethodPassword).not.toHaveBeenCalled();
+});
+
+it('이메일 해제 목적의 본인 확인 뒤에는 최종 확인만 열고 해제는 실행하지 않아요', async () => {
+    saveSecurityReturn(owner.id, 'remove-password');
+    fixture.api.getLoginMethods.mockResolvedValue(methods({ socialProvider: 'NAVER', socialProofFresh: true }));
+    render(<AntApp><MemoryRouter initialEntries={['/my-page?security=verified']}><LoginSecuritySection user={owner} /></MemoryRouter></AntApp>);
+    await waitFor(() => expect(fixture.confirm).toHaveBeenCalledOnce());
+    expect(fixture.confirm.mock.calls[0][0]).toMatchObject({
+        title: '이메일 로그인을 해제할까요?',
+        content: expect.stringContaining('네이버로 다시 로그인해주세요.'),
+        okText: '해제',
+    });
+    expect(screen.queryByLabelText('로그인 이메일')).toBeNull();
+    expect(fixture.api.removeLoginMethodPassword).not.toHaveBeenCalled();
+    expect(fixture.mfaPost).not.toHaveBeenCalled();
+});
+
+it('이메일 해제가 서버에서 성공하면 로그인 화면에 제공자 안내를 넘겨요', async () => {
+    fixture.api.getLoginMethods.mockResolvedValue(methods({ socialProvider: 'NAVER', socialProofFresh: true }));
+    fixture.api.removeLoginMethodPassword.mockResolvedValue(null);
+    render(view(owner));
+    fireEvent.click(await screen.findByRole('button', { name: '이메일 로그인 해제' }));
+    expect(fixture.navigate).not.toHaveBeenCalled();
+    await act(async () => fixture.confirm.mock.calls[0][0].onOk());
+    expect(fixture.api.removeLoginMethodPassword).toHaveBeenCalledExactlyOnceWith(owner.id);
+    expect(fixture.logout).toHaveBeenCalledOnce();
+    expect(fixture.navigate).toHaveBeenCalledExactlyOnceWith('/login', {
+        replace: true, state: { reserveRouteMotion: 'from-right', emailLoginRemoved: 'NAVER' },
+    });
+});
+
+it('해제 응답 유실 뒤 기존 세션이 끝났으면 확인 안내와 함께 로그인으로 이동해요', async () => {
+    fixture.api.getLoginMethods.mockResolvedValue(methods({ socialProvider: 'NAVER', socialProofFresh: true }));
+    fixture.api.removeLoginMethodPassword.mockRejectedValueOnce(Object.assign(new Error('connection lost'), { isResponseUnconfirmed: true }));
+    fixture.mfaGet.mockResolvedValue({ member: null, refreshPossible: false });
+    render(view(owner));
+    fireEvent.click(await screen.findByRole('button', { name: '이메일 로그인 해제' }));
+    await act(async () => fixture.confirm.mock.calls[0][0].onOk());
+    expect(fixture.api.removeLoginMethodPassword).toHaveBeenCalledExactlyOnceWith(owner.id);
+    expect(fixture.mfaGet).toHaveBeenCalledWith('/api/auth/session', { skipAuthRefresh: true, timeout: 4000 });
+    expect(fixture.message.success).not.toHaveBeenCalled();
+    expect(fixture.logout).toHaveBeenCalledOnce();
+    expect(fixture.navigate).toHaveBeenCalledWith('/login', { replace: true, state: {
+        reserveRouteMotion: 'from-right', loginMethodUnconfirmed: 'NAVER', from: { pathname: '/my-page', hash: '#login-security' },
+    } });
+});
+
+it('해제 응답과 조회가 끊기면 재로그인을 선택할 수 있고 해제 요청은 한 번만 보내요', async () => {
+    fixture.api.getLoginMethods.mockResolvedValue(methods({ socialProvider: 'NAVER', socialProofFresh: true }));
+    fixture.api.removeLoginMethodPassword.mockRejectedValueOnce(Object.assign(new Error('connection lost'), { isResponseUnconfirmed: true }));
+    fixture.mfaGet.mockRejectedValueOnce(new Error('offline'));
+    render(view(owner));
+    fireEvent.click(await screen.findByRole('button', { name: '이메일 로그인 해제' }));
+    await act(async () => fixture.confirm.mock.calls[0][0].onOk());
+    expect(screen.getByRole('status')).toHaveTextContent('네이버로 다시 로그인한 뒤 보안 설정에서 확인해주세요.');
+    expect(fixture.logout).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '다시 로그인' }));
+    expect(fixture.logout).toHaveBeenCalledOnce();
+    expect(fixture.api.removeLoginMethodPassword).toHaveBeenCalledOnce();
+});
+
+it('본인 확인 중 연결이 끊기면 저장을 보내거나 결과 확인 안내를 띄우지 않아요', async () => {
+    fixture.api.getLoginMethods.mockResolvedValue(methods({ socialProvider: 'NAVER', socialProofFresh: true }));
+    fixture.mfaPost.mockRejectedValueOnce(Object.assign(new Error('connection lost'), { isResponseUnconfirmed: true }));
+    render(view(owner));
+    fireEvent.click(await screen.findByRole('button', { name: '이메일 로그인 해제' }));
+    await act(async () => fixture.confirm.mock.calls[0][0].onOk());
+    expect(fixture.api.removeLoginMethodPassword).not.toHaveBeenCalled();
+    expect(fixture.mfaGet).not.toHaveBeenCalledWith('/api/auth/session', expect.anything());
+    expect(screen.queryByRole('button', { name: '다시 로그인' })).toBeNull();
+    expect(fixture.logout).not.toHaveBeenCalled();
+});
+
+it('이메일 해제 확인을 마친 뒤 계정이 바뀌면 열린 확인창으로 해제할 수 없어요', async () => {
+    saveSecurityReturn(owner.id, 'remove-password');
+    fixture.api.getLoginMethods.mockResolvedValue(methods({ socialProvider: 'NAVER', socialProofFresh: true }));
+    render(<AntApp><MemoryRouter initialEntries={['/my-page?security=verified']}><LoginSecuritySection user={owner} /></MemoryRouter></AntApp>);
+    await waitFor(() => expect(fixture.confirm).toHaveBeenCalledOnce());
+    const approval = fixture.confirm.mock.calls[0][0];
+    act(() => useAuthStore.setState({ user: { id: 8 }, sessionRevision: 71 }));
+    await act(async () => approval.onOk());
+    expect(fixture.api.removeLoginMethodPassword).not.toHaveBeenCalled();
+    expect(fixture.mfaPost).not.toHaveBeenCalled();
+    expect(fixture.logout).not.toHaveBeenCalled();
+});
+
+it('이메일 해제의 본인 확인을 취소하면 같은 해제 목적부터 다시 안내해요', async () => {
+    saveSecurityReturn(owner.id, 'remove-password');
+    fixture.api.getLoginMethods.mockResolvedValue(methods({ socialProvider: 'NAVER', socialProofFresh: false }));
+    render(<AntApp><MemoryRouter initialEntries={['/my-page?security=retry']}><LoginSecuritySection user={owner} /></MemoryRouter></AntApp>);
+    expect(await screen.findByRole('button', { name: '이메일 로그인 해제: 네이버로 본인 확인' })).toBeVisible();
+    expect(screen.queryByLabelText('로그인 이메일')).toBeNull();
+    expect(fixture.confirm).not.toHaveBeenCalled();
+    expect(fixture.api.removeLoginMethodPassword).not.toHaveBeenCalled();
+});
+
+it('복귀하는 동안 이메일 로그인이 이미 해제되었으면 다른 작업을 열지 않아요', async () => {
+    saveSecurityReturn(owner.id, 'remove-password');
+    fixture.api.getLoginMethods.mockResolvedValue(methods({ passwordEnabled: false, socialProvider: 'NAVER', socialProofFresh: true }));
+    render(<AntApp><MemoryRouter initialEntries={['/my-page?security=verified']}><LoginSecuritySection user={owner} /></MemoryRouter></AntApp>);
+    await screen.findByRole('button', { name: '이메일 로그인 설정', exact: true });
+    expect(screen.queryByLabelText('로그인 이메일')).toBeNull();
+    expect(fixture.confirm).not.toHaveBeenCalled();
+    expect(fixture.api.removeLoginMethodPassword).not.toHaveBeenCalled();
 });
 
 it('다른 계정의 폼 복귀 정보로 작업 폼을 열지 않아요', async () => {
@@ -55,6 +510,31 @@ it('연결 해제 폼을 복원해도 해제 요청은 자동으로 보내지 �
     expect(fixture.api.unlinkSocialLogin).not.toHaveBeenCalled();
 });
 
+it('패스키 등록 목적의 소셜 복귀는 비밀번호 설정 대신 인증 수단 관리로 이어져요', async () => {
+    saveSecurityReturn(owner.id, 'mfa');
+    fixture.api.getLoginMethods.mockResolvedValue(methods({ passwordEnabled: false, socialProvider: 'NAVER', socialProofFresh: true }));
+    render(<AntApp><MemoryRouter initialEntries={['/my-page?security=verified']}><LoginSecuritySection user={owner} /></MemoryRouter></AntApp>);
+    expect(await screen.findByRole('heading', { name: '인증 수단 관리' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '패스키 추가' })).toBeVisible();
+    expect(screen.queryByLabelText('로그인 이메일')).toBeNull();
+    expect(fixture.api.sendLoginMethodCode).not.toHaveBeenCalled();
+    expect(fixture.api.setLoginMethodPassword).not.toHaveBeenCalled();
+    expect(fixture.mfaPost).toHaveBeenCalledExactlyOnceWith('/api/member/mfa/manage', { password: undefined }, expect.anything());
+});
+
+it('패스키 등록을 선택하면 이메일 설정용 확인을 닫고 해당 목적만 안내해요', async () => {
+    fixture.api.getLoginMethods.mockResolvedValue(methods({ passwordEnabled: false, socialProvider: 'NAVER', socialProofFresh: false }));
+    render(view(owner));
+    fireEvent.click(await screen.findByRole('button', { name: '이메일 로그인 설정', exact: true }));
+    const emailProof = screen.getByRole('button', { name: '이메일 로그인 설정: 네이버로 본인 확인' }).closest('.reserve-login-security-proof');
+    fireEvent.click(screen.getByRole('button', { name: '패스키·인증 앱 등록', exact: true }));
+    expect(await screen.findByRole('button', { name: '패스키·인증 앱 등록 본인 확인' })).toBeVisible();
+    expect(emailProof).toHaveAttribute('inert');
+    await waitFor(() => expect(emailProof).not.toBeInTheDocument());
+    expect(screen.queryByLabelText('로그인 이메일')).toBeNull();
+    expect(fixture.api.beginLoginMethodOAuth).not.toHaveBeenCalled();
+});
+
 it('관리자 소셜 복귀는 관리 화면을 열어도 추가 인증을 자동 통과하지 않아요', async () => {
     const member = { ...owner, role: 'ADMIN' };
     useAuthStore.setState({ user: member });
@@ -71,7 +551,7 @@ it('본인 확인이 실패하면 원래 이메일 설정의 확인 안내부터
     saveSecurityReturn(owner.id, 'setup-password');
     fixture.api.getLoginMethods.mockResolvedValue(methods({ passwordEnabled: false, socialProvider: 'GOOGLE', socialProofFresh: false }));
     render(<AntApp><MemoryRouter initialEntries={['/my-page?security=retry']}><LoginSecuritySection user={owner} /></MemoryRouter></AntApp>);
-    expect(await screen.findByRole('button', { name: 'Google로 본인 확인' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: '이메일 로그인 설정: Google로 본인 확인' })).toBeVisible();
     expect(screen.queryByLabelText('로그인 이메일')).toBeNull();
     expect(fixture.message.success).not.toHaveBeenCalled();
 });
@@ -196,7 +676,7 @@ it('honors reduced motion while toggling email proof from the same plus', async 
         render(view(owner));
         const plus = await screen.findByRole('button', { name: '이메일 로그인 설정' });
         fireEvent.click(plus);
-        const panel = screen.getByRole('button', { name: 'Google로 본인 확인' }).closest('.reserve-login-security-proof');
+        const panel = screen.getByRole('button', { name: '이메일 로그인 설정: Google로 본인 확인' }).closest('.reserve-login-security-proof');
         expect(panel.style.animation).toBe('none');
         fireEvent.click(plus);
         expect(panel.style.animation).toBe('none');
@@ -206,10 +686,11 @@ it('honors reduced motion while toggling email proof from the same plus', async 
     } finally { media.mockRestore(); }
 });
 
-it.each([['NAVER', '네이버'], ['GOOGLE', 'Google'], ['KAKAO', '카카오']])('toggles social unlink directly under its own row: %s', async (provider, label) => {
+it.each(socialCases)('toggles social unlink directly under its own row: %s', async (provider, label) => {
     fixture.api.getLoginMethods.mockResolvedValue(methods({ socialProvider: provider, socialProofFresh: true }));
     render(view(owner));
     const unlink = await screen.findByRole('button', { name: `${label} 로그인 연결 해제` });
+    expect(screen.getByText(`${label} 연결됨`).querySelector('svg')).not.toBeInTheDocument();
     fireEvent.click(unlink);
     const form = screen.getByLabelText('현재 비밀번호').closest('form');
     const panel = form.closest('.reserve-login-security-panel');
@@ -268,10 +749,10 @@ it('closes the previous method form when selecting another row', async () => {
     fireEvent.click(screen.getByRole('button', { name: '이메일 로그인 해제' }));
     expect(screen.getByRole('button', { name: '비밀번호 변경' })).toHaveAttribute('aria-expanded', 'false');
     await waitFor(() => expect(screen.queryByRole('form', { name: '비밀번호 변경', hidden: true })).not.toBeInTheDocument());
-    expect(screen.getByRole('button', { name: '네이버로 본인 확인' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '이메일 로그인 해제: 네이버로 본인 확인' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: '비밀번호 변경' }));
     expect(screen.getByRole('form', { name: '비밀번호 변경' })).toBeInTheDocument();
-    const proof = screen.getByRole('button', { name: '네이버로 본인 확인', hidden: true }).closest('.reserve-login-security-proof');
+    const proof = screen.getByRole('button', { name: '이메일 로그인 해제: 네이버로 본인 확인', hidden: true }).closest('.reserve-login-security-proof');
     expect(proof).toHaveAttribute('inert');
     await waitFor(() => expect(proof).not.toBeInTheDocument());
     expect(fixture.api.removeLoginMethodPassword).not.toHaveBeenCalled();
@@ -286,9 +767,9 @@ it('reloads proof status after the API client normalizes an expired social-proof
     await act(async () => fixture.confirm.mock.calls.at(-1)[0].onOk());
     await waitFor(() => expect(fixture.api.getLoginMethods).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.getByRole('button', { name: '이메일 로그인 해제' })).toHaveAttribute('aria-expanded', 'false'));
-    expect(screen.queryByRole('button', { name: '네이버로 본인 확인' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '이메일 로그인 해제: 네이버로 본인 확인' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '이메일 로그인 해제' }));
-    expect(await screen.findByRole('button', { name: '네이버로 본인 확인' })).toBeEnabled();
+    expect(await screen.findByRole('button', { name: '이메일 로그인 해제: 네이버로 본인 확인' })).toBeEnabled();
     expect(fixture.api.removeLoginMethodPassword).toHaveBeenCalledOnce();
     expect(fixture.logout).not.toHaveBeenCalled();
 });
@@ -314,7 +795,7 @@ it('requires fresh social proof before enabling email login and never offers to 
     const svg = glyph.querySelector('svg');
     expect(setup).toHaveAttribute('aria-expanded', 'false');
     expect(setup).not.toHaveAttribute('aria-disabled');
-    expect(screen.queryByRole('button', { name: '네이버로 본인 확인' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '이메일 로그인 설정: 네이버로 본인 확인' })).not.toBeInTheDocument();
     fireEvent.click(setup);
     expect(screen.getByRole('button', { name: '이메일 로그인 설정' })).toBe(setup);
     expect(setup.querySelector('svg')).toBe(svg);
@@ -329,10 +810,11 @@ it('requires fresh social proof before enabling email login and never offers to 
     expect(fixture.api.setLoginMethodPassword).not.toHaveBeenCalled();
     expect(fixture.api.unlinkSocialLogin).not.toHaveBeenCalled();
     expect(screen.queryByLabelText('현재 비밀번호')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '네이버로 본인 확인' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: '네이버로 본인 확인' })).toHaveClass('reserve-social-login');
-    const proof = screen.getByRole('button', { name: '네이버로 본인 확인' }).closest('.reserve-login-security-proof');
+    expect(screen.getByRole('button', { name: '이메일 로그인 설정: 네이버로 본인 확인' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '이메일 로그인 설정: 네이버로 본인 확인' })).toHaveClass('reserve-social-login');
+    const proof = screen.getByRole('button', { name: '이메일 로그인 설정: 네이버로 본인 확인' }).closest('.reserve-login-security-proof');
     expect(proof.id).toBe(setup.getAttribute('aria-controls'));
+    expect(within(proof).queryByRole('button', { name: '닫기', exact: true })).not.toBeInTheDocument();
     expect(proof.style.animation).toContain('reserve-feed-replies-enter');
     fireEvent.click(setup);
     expect(setup.querySelector('svg')).toBe(svg);
@@ -377,10 +859,10 @@ it.each([
     fixture.api.beginLoginMethodOAuth.mockResolvedValue({ authorizationUrl });
     render(view(owner));
     fireEvent.click(await screen.findByRole('button', { name: '이메일 로그인 설정' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Google로 본인 확인' }));
+    fireEvent.click(await screen.findByRole('button', { name: '이메일 로그인 설정: Google로 본인 확인' }));
     await waitFor(() => expect(fixture.message.error).toHaveBeenCalledWith('로그인 요청을 확인하지 못했어요.'));
     expect(fixture.api.beginLoginMethodOAuth).toHaveBeenCalledWith(7, { provider: 'GOOGLE', currentPassword: undefined, reauthenticate: true });
-    expect(screen.getByRole('button', { name: 'Google로 본인 확인' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '이메일 로그인 설정: Google로 본인 확인' })).toBeEnabled();
     expect(fixture.logout).not.toHaveBeenCalled();
     expect(fixture.navigate).not.toHaveBeenCalled();
 });
@@ -390,7 +872,7 @@ it('invalidates the displayed email challenge when the user edits the email', as
     fixture.api.sendLoginMethodCode.mockResolvedValue({ challengeId: 'test-challenge', expiresAt: new Date(Date.now() + 300000).toISOString() });
     render(view(owner));
     fireEvent.click(await screen.findByRole('button', { name: '이메일 로그인 설정' }));
-    expect(screen.queryByRole('button', { name: '네이버로 본인 확인' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '이메일 로그인 설정: 네이버로 본인 확인' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '인증 코드 받기' }));
     await waitFor(() => expect(screen.getByRole('button', { name: '인증 코드 다시 받기' })).toBeInTheDocument());
     expect(await screen.findByLabelText('인증 코드')).toBeEnabled();
@@ -411,7 +893,7 @@ it('opens email setup after fresh proof returns and closes it from the same plus
         .mockResolvedValue(methods({ passwordEnabled: false, socialProvider: 'GOOGLE', socialProofFresh: true }));
     render(view(owner));
     fireEvent.click(await screen.findByRole('button', { name: '이메일 로그인 설정' }));
-    expect(screen.getByRole('button', { name: 'Google로 본인 확인' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '이메일 로그인 설정: Google로 본인 확인' })).toBeEnabled();
     const returned = new Event('pageshow');
     Object.defineProperty(returned, 'persisted', { value: true });
     fireEvent(window, returned);
@@ -423,6 +905,7 @@ it('opens email setup after fresh proof returns and closes it from the same plus
     fireEvent.click(setup);
     const form = screen.getByRole('form', { name: '이메일 로그인 설정' });
     const panel = form.closest('.reserve-login-security-panel');
+    expect(within(form).queryByRole('button', { name: '닫기', exact: true })).not.toBeInTheDocument();
     expect(panel.previousElementSibling).toContainElement(setup);
     expect(glyph).toHaveClass('is-open');
     expect(setup.querySelector('svg')).toBe(svg);
@@ -439,14 +922,14 @@ it('does not carry an expanded proof prompt into another account', async () => {
     fixture.api.getLoginMethods.mockResolvedValue(methods({ passwordEnabled: false, socialProvider: 'GOOGLE' }));
     const page = render(view(owner));
     fireEvent.click(await screen.findByRole('button', { name: '이메일 로그인 설정' }));
-    expect(screen.getByRole('button', { name: 'Google로 본인 확인' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '이메일 로그인 설정: Google로 본인 확인' })).toBeEnabled();
     const next = { id: 8, email: 'next@naver.com', role: 'USER' };
     fixture.api.getLoginMethods.mockResolvedValue(methods({ memberId: 8, email: next.email, passwordEnabled: false, socialProvider: 'NAVER' }));
     act(() => useAuthStore.setState({ user: next, sessionRevision: 71 }));
     page.rerender(view(next));
     await screen.findByRole('button', { name: '네이버 로그인 연결 해제' });
-    expect(screen.queryByRole('button', { name: 'Google로 본인 확인' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '네이버로 본인 확인' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '이메일 로그인 설정: Google로 본인 확인' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '이메일 로그인 설정: 네이버로 본인 확인' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '이메일 로그인 설정' })).toHaveAttribute('aria-expanded', 'false');
 });
 

@@ -2,6 +2,7 @@ import { useLayoutEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { DEFAULT_GUIDE_PATH, GUIDE_PAGES } from '../pages/legal/GuidePageMetadata';
 import { APP_ORIGIN } from '../config/siteUrls';
+import { STORE_DETAIL_PATH } from '../utils/storePublicAddress';
 
 const SITE_ORIGIN = APP_ORIGIN;
 
@@ -9,7 +10,7 @@ const SITE_ORIGIN = APP_ORIGIN;
 const INDEXABLE_PATHS = [
     /^\/$/,
     /^\/stores$/,
-    /^\/store\/\d+$/,
+    STORE_DETAIL_PATH,
     /^\/terms$/,
     /^\/privacy$/,
     /^\/content-sources$/,
@@ -36,15 +37,22 @@ export const isIndexablePath = (pathname) => {
 
 const canonicalPathFor = pathname => {
     const normalized = normalizeSeoPath(pathname);
-    return normalized === '/operation-guide' ? DEFAULT_GUIDE_PATH : normalized;
+    if (normalized === '/operation-guide') return DEFAULT_GUIDE_PATH;
+    return STORE_DETAIL_PATH.test(normalized) ? normalized.toLowerCase() : normalized;
 };
 
 export const canonicalUrlForPath = (pathname) => `${SITE_ORIGIN}${canonicalPathFor(pathname)}`;
 
+export const syncCanonicalPath = pathname => {
+    const url = canonicalUrlForPath(pathname);
+    document.querySelector('meta[property="og:url"]')?.setAttribute('content', url);
+    document.querySelector('link[rel="canonical"]')?.setAttribute('href', url);
+};
+
 /** 검색 결과의 사이트 계층(빵부스러기)에 쓰이는 경로별 이름표. */
 const BREADCRUMB_LABELS = [
     { pattern: /^\/stores$/, trail: [{ name: '가게 찾기', path: '/stores' }] },
-    { pattern: /^\/store\/\d+$/, trail: [{ name: '가게 찾기', path: '/stores' }, { name: '가게 상세', path: null }] },
+    { pattern: STORE_DETAIL_PATH, trail: [{ name: '가게 찾기', path: '/stores' }, { name: '가게 상세', path: null }] },
     { pattern: /^\/terms$/, trail: [{ name: '서비스 이용약관', path: '/terms' }] },
     { pattern: /^\/privacy$/, trail: [{ name: '개인정보 처리방침', path: '/privacy' }] },
     { pattern: /^\/content-sources$/, trail: [{ name: '콘텐츠 출처·권리 안내', path: '/content-sources' }] },
@@ -103,17 +111,12 @@ const useRouteSeo = () => {
     const { pathname } = useLocation();
 
     useLayoutEffect(() => {
-        const canonicalUrl = canonicalUrlForPath(pathname);
         const robots = isIndexablePath(pathname) ? 'index, follow' : 'noindex, nofollow';
 
         const robotsMeta = document.querySelector('meta[name="robots"]');
         if (robotsMeta) robotsMeta.setAttribute('content', robots);
 
-        const ogUrl = document.querySelector('meta[property="og:url"]');
-        if (ogUrl) ogUrl.setAttribute('content', canonicalUrl);
-
-        const canonical = document.querySelector('link[rel="canonical"]');
-        if (canonical) canonical.setAttribute('href', canonicalUrl);
+        syncCanonicalPath(pathname);
 
         syncBreadcrumbJsonLd(pathname);
     }, [pathname]);

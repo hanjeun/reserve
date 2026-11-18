@@ -5,7 +5,7 @@ import org.springframework.http.HttpStatus;
 
 @Getter
 public class ReservationException extends BusinessException {
-    public enum Code { RESERVATION_CHALLENGE_UNAVAILABLE }
+    public enum Code { RESERVATION_DUPLICATE, RESERVATION_CAPACITY, RESERVATION_NOTICE_CHANGED, RESERVATION_CHALLENGE_UNAVAILABLE }
 
     private final Code code;
     
@@ -20,6 +20,10 @@ public class ReservationException extends BusinessException {
     private ReservationException(String message, HttpStatus status, Code code) {
         super(message, status);
         this.code = code;
+    }
+
+    public static ReservationException conflict(Code code, String message) {
+        return new ReservationException(message, HttpStatus.CONFLICT, code);
     }
 
     public static ReservationException challengeUnavailable() {

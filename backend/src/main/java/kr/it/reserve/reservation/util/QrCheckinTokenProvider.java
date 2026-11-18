@@ -101,8 +101,7 @@ public class QrCheckinTokenProvider {
             mac.init(new SecretKeySpec(jwtSecret.getBytes(StandardCharsets.UTF_8), HMAC_ALG));
             return Keys.hmacShaKeyFor(mac.doFinal(DERIVATION_INFO.getBytes(StandardCharsets.UTF_8)));
         } catch (java.security.GeneralSecurityException e) {
-            // HmacSHA256 은 모든 JRE 가 반드시 제공한다. 여기 오면 런타임이 망가진 것이므로
-            // 조용히 로그인 키로 폴백하지 않는다 — 그러면 분리가 없던 일이 된다.
+            // 필수 알고리즘 미지원은 오류로 처리하고 로그인 키로 대체해 서명 경계를 합치지 않는다.
             throw new IllegalStateException("QR signing key derivation failed", e);
         }
     }

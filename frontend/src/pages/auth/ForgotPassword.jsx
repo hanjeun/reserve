@@ -1,7 +1,7 @@
 import { PageTitle, PageDescription } from '../../components/common/PageTypography';
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Form, Typography, Flex } from 'antd';
+import { Form, Typography } from 'antd';
 import { PageContainer, Button, FormInput } from '../../components/common';
 import { MailOutlined, LockOutlined } from '../../components/common/icons';
 import { useMessage } from '../../hooks';
@@ -9,11 +9,15 @@ import useDocumentTitle from '../../hooks/useDocumentTitle';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import { VALIDATION_RULES } from '../../utils/validation';
-import { colors, fontSize, animation } from '../../styles/tokens';
+import { handleApiError, isResponseUnconfirmed } from '../../utils/errorHandler';
+import { colors } from '../../styles/tokens';
+import { RecoveryEmailFields, RecoveryLoginLink } from './RecoveryFormParts';
+import { CODE_EXPIRED, formatTimer, remainingSeconds } from './recoveryEmailTimer';
 
 const { Text } = Typography;
 
-const TIMER_SEC = 5 * 60;
+const TIMER_MS = 5 * 60 * 1000;
+const CODE_REQUESTED_MESSAGE = '요청을 받았어요. 이메일 로그인이 설정된 주소라면 인증 코드를 보내요.';
 
 const STEPS = ['이메일 확인', '코드 인증', '비밀번호 변경'];
 
@@ -59,112 +63,139 @@ const ForgotPassword = () => {
     const { message } = useMessage();
     useDocumentTitle('비밀번호 찾기');
 
-    const [email, setEmail]             = useState('');
-    const [isCodeSent, setIsCodeSent]   = useState(false);
-    const [isVerified, setIsVerified]   = useState(false);
-    const [sendLoading, setSendLoading] = useState(false);
-    const [verifyLoading, setVerifyLoading] = useState(false);
-    const [submitLoading, setSubmitLoading] = useState(false);
-    const [timeLeft, setTimeLeft]       = useState(0);
-    const timerRef = useRef(null);
+    const [email, setEmail] = useState('');
+    const [step, setStep] = useState('email');
+    const [pending, setPending] = useState(null);
+    const [deadline, setDeadline] = useState(0);
+    const [timeLeft, setTimeLeft] = useState(0);
+    const [codeNotice, setCodeNotice] = useState('');
+    const operation = useRef(null);
+    const mounted = useRef(false);
+    const isCodeSent = step !== 'email';
+    const isVerified = step === 'password';
     const returnToLogin = () => navigate('/login', { state: { reserveRouteMotion: 'from-left' } });
 
-    useEffect(() => () => clearInterval(timerRef.current), []);
+    useEffect(() => {
+        mounted.current = true;
+        return () => { mounted.current = false; };
+    }, []);
 
-    const startTimer = () => {
-        clearInterval(timerRef.current);
-        setTimeLeft(TIMER_SEC);
-        timerRef.current = setInterval(() => {
-            setTimeLeft((prev) => {
-                if (prev <= 1) { clearInterval(timerRef.current); return 0; }
-                return prev - 1;
-            });
-        }, 1000);
+    const returnToCode = useCallback(notice => {
+        form.resetFields(['verificationCode', 'newPassword', 'confirmNewPassword']);
+        setStep('code');
+        setDeadline(0);
+        setTimeLeft(0);
+        setCodeNotice(notice);
+    }, [form]);
+
+    useEffect(() => {
+        if (!deadline) return undefined;
+        const update = () => {
+            const remaining = remainingSeconds(deadline);
+            setTimeLeft(remaining);
+            if (!remaining && isVerified && !operation.current) returnToCode(CODE_EXPIRED);
+        };
+        const timer = setInterval(update, 1000);
+        document.addEventListener('visibilitychange', update);
+        return () => {
+            clearInterval(timer);
+            document.removeEventListener('visibilitychange', update);
+        };
+    }, [deadline, isVerified, returnToCode]);
+
+    const startTimer = until => {
+        setDeadline(until);
+        setTimeLeft(remainingSeconds(until));
     };
 
-    const formatTimer = (sec) => {
-        const m = String(Math.floor(sec / 60)).padStart(2, '0');
-        const s = String(sec % 60).padStart(2, '0');
-        return `${m}:${s}`;
+    const begin = kind => {
+        if (operation.current || !mounted.current) return false;
+        operation.current = kind;
+        setPending(kind);
+        return true;
+    };
+    const finish = () => {
+        operation.current = null;
+        if (mounted.current) setPending(null);
     };
 
     const handleSendCode = async () => {
+        if (!begin('send')) return;
         try {
-            await form.validateFields(['email']);
-            const emailVal = form.getFieldValue('email').trim();
-            setSendLoading(true);
-            await api.post(API_ENDPOINTS.PASSWORD_RESET.SEND_CODE, { email: emailVal });
-
-            // 가입 여부는 동일한 안내로 응답하고 실제 차단은 서버에서 처리한다.
-
-            message.success('입력하신 이메일로 인증 코드를 보냈어요.');
-            setEmail(emailVal);
-            setIsCodeSent(true);
-            setIsVerified(false);
-            startTimer();
+            const address = isCodeSent ? email : (await form.validateFields(['email'])).email.trim();
+            if (!mounted.current) return;
+            await api.post(API_ENDPOINTS.PASSWORD_RESET.SEND_CODE, { email: address });
+            if (!mounted.current) return;
+            form.setFieldValue('verificationCode', '');
+            form.setFieldValue('email', address);
+            setEmail(address);
+            setStep('code');
+            setCodeNotice('');
+            startTimer(Date.now() + TIMER_MS);
+            message.success(CODE_REQUESTED_MESSAGE);
         } catch (err) {
-            if (!err?.errorFields) {
-                const msg = typeof err === 'string' ? err : err?.message;
-                message.error(msg || '발송에 실패했어요.');
+            if (mounted.current && !err?.errorFields && !err?.isStaleSession) {
+                message.error(err?.message || '코드를 요청하지 못했어요.');
             }
         } finally {
-            setSendLoading(false);
-        }
-    };
-
-    const handleResend = async () => {
-        try {
-            setSendLoading(true);
-            // 재발송도 같은 이유로 가입 여부를 구분하지 않는다(위 handleSendCode 주석 참고).
-            await api.post(API_ENDPOINTS.PASSWORD_RESET.SEND_CODE, { email });
-            message.success('인증 코드를 재발송했어요.');
-            startTimer();
-        } catch (err) {
-            const msg = typeof err === 'string' ? err : err?.message;
-            message.error(msg || '재발송에 실패했어요.');
-        } finally {
-            setSendLoading(false);
+            finish();
         }
     };
 
     const handleVerifyCode = async () => {
-        // AntD Form 화면이므로 인라인 에러는 setFields 로 붙인다(useEmailVerification 과 같은 규약).
-        const setCodeError = (msg) => form.setFields([{ name: 'verificationCode', errors: [msg] }]);
-
-        if (timeLeft === 0) return setCodeError('인증 시간이 만료됐어요. 재발송해주세요.');
+        if (operation.current) return;
+        const setCodeError = msg => form.setFields([{ name: 'verificationCode', errors: [msg] }]);
+        if (Date.now() >= deadline) return setCodeError(CODE_EXPIRED);
         const code = form.getFieldValue('verificationCode')?.trim();
-        if (!code) return setCodeError('인증번호를 입력해주세요.');
-        setVerifyLoading(true);
+        if (!code || !/^[0-9]{6}$/.test(code)) return setCodeError('6자리 인증 코드를 입력해주세요.');
+        if (!begin('verify')) return;
         try {
-            await api.post(API_ENDPOINTS.PASSWORD_RESET.VERIFY_CODE, { email, code });
+            const result = await api.post(API_ENDPOINTS.PASSWORD_RESET.VERIFY_CODE, { email, code });
+            if (!mounted.current) return;
+            const verifiedUntil = result === null ? deadline : Date.parse(result?.expiresAt);
+            if (!Number.isFinite(verifiedUntil) || verifiedUntil <= Date.now()) {
+                returnToCode(CODE_EXPIRED);
+                return;
+            }
+            startTimer(verifiedUntil);
+            setCodeNotice('');
+            setStep('password');
             message.success('인증됐어요.');
-            setIsVerified(true);
-            clearInterval(timerRef.current);
         } catch (err) {
-            const msg = typeof err === 'string' ? err : err?.message;
-            setCodeError(msg || '인증번호가 올바르지 않아요.');
+            if (!mounted.current || err?.isStaleSession || err?.name === 'AbortError') return;
+            if (err?.data?.code === 'PASSWORD_RESET_CODE_INVALID' || err?.status === 400) {
+                setCodeError(err?.message || '인증 코드를 다시 확인해주세요.');
+            } else {
+                handleApiError(err, message, '인증 코드를 확인하지 못했어요.');
+            }
         } finally {
-            setVerifyLoading(false);
+            finish();
         }
     };
 
-    const handleResetPassword = async (values) => {
+    const handleResetPassword = async values => {
+        if (operation.current) return;
+        if (Date.now() >= deadline) return returnToCode(CODE_EXPIRED);
         const code = form.getFieldValue('verificationCode')?.trim();
-        setSubmitLoading(true);
+        if (!begin('reset')) return;
         try {
             await api.post(API_ENDPOINTS.PASSWORD_RESET.RESET, {
-                email,
-                code,
-                newPassword: values.newPassword,
-                newPasswordConfirm: values.confirmNewPassword,
+                email, code, newPassword: values.newPassword, newPasswordConfirm: values.confirmNewPassword,
             });
+            if (!mounted.current) return;
             message.success('비밀번호가 변경됐어요.');
             returnToLogin();
         } catch (err) {
-            const msg = typeof err === 'string' ? err : err?.message;
-            message.error(msg || '변경에 실패했어요.');
+            if (!mounted.current || err?.isStaleSession) return;
+            if (isResponseUnconfirmed(err)) {
+                returnToCode('변경 결과를 확인하지 못했어요. 새 비밀번호로 로그인해보고, 로그인할 수 없으면 새 코드를 받아주세요.');
+            } else if (err?.data?.code === 'PASSWORD_RESET_CODE_INVALID' || Date.now() >= deadline) {
+                returnToCode('인증 코드를 다시 받아주세요.');
+            } else {
+                message.error(err?.message || '비밀번호를 변경하지 못했어요.');
+            }
         } finally {
-            setSubmitLoading(false);
+            finish();
         }
     };
 
@@ -175,21 +206,17 @@ const ForgotPassword = () => {
         indicatorStep = 1;
     }
 
-    let timerInfo = null;
-    if (!isVerified) {
-        if (timeLeft > 0) {
-            timerInfo = { text: `남은 시간 ${formatTimer(timeLeft)}`, isWarning: timeLeft <= 60 };
-        } else if (isCodeSent) {
-            timerInfo = { text: '시간 만료 — 재발송해주세요', isWarning: true };
-        }
-    }
+    const timerText = timeLeft > 0
+        ? (isVerified ? '변경까지 남은 시간 ' : '남은 시간 ') + formatTimer(timeLeft)
+        : '인증 시간이 만료됐어요. 코드를 다시 받아주세요.';
 
     return (
         <PageContainer size="sm" paddingTop="60px" center>
             <div className="fade-in-up">
                 <PageTitle style={styles.title}><MailOutlined aria-hidden="true" /> 비밀번호 찾기</PageTitle>
                 <PageDescription style={styles.subtitle}>
-                    가입한 이메일로 인증 후 비밀번호를 재설정해요
+                    이메일 로그인을 설정한 계정의 비밀번호를 재설정해요.
+                    소셜 로그인만 사용한다면 로그인 화면에서 연결한 서비스를 선택해주세요.
                 </PageDescription>
 
                 <StepIndicator current={indicatorStep} />
@@ -201,43 +228,8 @@ const ForgotPassword = () => {
                     requiredMark={false}
                     onFinish={isVerified ? handleResetPassword : undefined}
                 >
-                    {/* Step 0 & 1: 이메일 + 코드 (Signup과 완전히 동일한 구조) ── */}
-                    {!isVerified && (
-                        <>
-                            {/* 이메일 + 코드발송/재발송 버튼 — Signup의 이메일 행과 동일 */}
-                            <Form.Item name="email" rules={VALIDATION_RULES.email}>
-                                <FormInput.WithButton
-                                    placeholder="가입한 이메일 주소"
-                                    disabled={isCodeSent}
-                                    buttonText={isCodeSent ? '재발송' : '코드발송'}
-                                    buttonLoading={sendLoading}
-                                    onButtonClick={isCodeSent ? handleResend : handleSendCode}
-                                />
-                            </Form.Item>
-
-                            {/* 인증번호 — 코드 발송 후 표시, Signup의 인증번호 행과 동일 */}
-                            {isCodeSent && (
-                                <Form.Item
-                                    name="verificationCode"
-                                    rules={[{ required: true, message: '인증번호를 입력해주세요' }]}
-                                    style={{ animation: animation?.slideUpIn }}
-                                    extra={
-                                        timerInfo
-                                            ? <span style={{ color: timerInfo.isWarning ? colors.error.main : colors.text.tertiary, fontSize: 12 }}>{timerInfo.text}</span>
-                                            : null
-                                    }
-                                >
-                                    <FormInput.WithButton
-                                        placeholder="6자리 인증번호"
-                                        buttonText="확인"
-                                        buttonLoading={verifyLoading}
-                                        buttonDisabled={timeLeft === 0}
-                                        onButtonClick={handleVerifyCode}
-                                    />
-                                </Form.Item>
-                            )}
-                        </>
-                    )}
+                    {!isVerified && <RecoveryEmailFields emailPlaceholder="로그인 이메일 주소" sent={isCodeSent} pending={pending}
+                        timeLeft={timeLeft} codeNotice={codeNotice} timerText={timerText} onSend={handleSendCode} onVerify={handleVerifyCode} />}
 
                     {/* Step 2: 비밀번호 변경 (인증 완료 후) ── */}
                     {isVerified && (
@@ -260,29 +252,15 @@ const ForgotPassword = () => {
                             >
                                 <FormInput type="password" placeholder="새 비밀번호 확인" />
                             </Form.Item>
-                            <Button variant="primary" htmlType="submit" block loading={submitLoading} icon={<LockOutlined />}>
+                            <Text style={{ display: 'block', color: colors.text.tertiary, marginBottom: 12 }}>{timerText}</Text>
+                            <Button variant="primary" htmlType="submit" block loading={pending === 'reset'} icon={<LockOutlined />}>
                                 비밀번호 변경
                             </Button>
                         </>
                     )}
                 </Form>
 
-                <Flex justify="center" style={{ marginTop: 20 }}>
-                    <button
-                        type="button"
-                        className="reserve-text-link"
-                        onClick={returnToLogin}
-                        style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontSize: fontSize.sm,
-                            padding: '2px 0',
-                        }}
-                    >
-                        로그인으로 돌아가기
-                    </button>
-                </Flex>
+                <RecoveryLoginLink />
             </div>
         </PageContainer>
     );

@@ -1,7 +1,7 @@
 package kr.it.reserve.payment.service;
 
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.LockModeType;
+import kr.it.reserve.global.persistence.CurrentLockedState;
 import kr.it.reserve.global.error.MemberException;
 import kr.it.reserve.global.error.PaymentException;
 import kr.it.reserve.global.error.ReservationException;
@@ -39,15 +39,15 @@ final class FinancialReservationLocks {
             // 탈퇴 후에도 거래 이력의 환불은 진행할 수 있다. 외부 요청자의 활성 여부만 아래에서 확인한다.
             locked.put(memberId, members.findByIdForPaymentUpdate(memberId).orElseThrow(MemberException::notFound));
         }
-        // 중첩 호출에서 이미 바꾼 취소 결정·pending을 먼저 flush해 refresh가 지우지 않게 한다.
-        entityManager.flush();
-        for (Long memberId : ordered) entityManager.refresh(locked.get(memberId), LockModeType.PESSIMISTIC_WRITE);
+        for (Long memberId : ordered) CurrentLockedState.refresh(entityManager, locked.get(memberId));
         Member actor = actorId == null ? null : locked.get(actorId);
         if (actor != null && actor.getDeletedAt() != null) throw MemberException.notFound();
         Reservation reservation = reservations.findByIdForPaymentUpdate(reservationId)
                 .orElseThrow(ReservationException::notFound);
-        entityManager.flush();
-        entityManager.refresh(reservation, LockModeType.PESSIMISTIC_WRITE);
+        var payment = reservation.getPayment();
+        CurrentLockedState.refresh(entityManager, reservation);
+        // 예약의 REFRESH cascade는 결제의 잠금 옵션을 전달하지 않아 같은 결제를 다시 현재화한다.
+        if (payment != null) CurrentLockedState.refresh(entityManager, payment);
         if (reservation.getMember() == null || !Objects.equals(payerId, reservation.getMember().getId())) {
             throw new PaymentException("예약 정보가 변경됐어요. 다시 시도해주세요.", HttpStatus.CONFLICT);
         }

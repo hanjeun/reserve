@@ -155,7 +155,7 @@ const ContentSources = () => {
 
             <Section title="정정·권리 문의">
                 <Paragraph>
-                    출처 표기, 이용 조건 또는 권리 관련 내용의 정정이 필요하면 권리 근거와 함께 reserve@reserve.it.kr로 알려주시기 바랍니다.
+                    출처 표기, 이용 조건 또는 권리 관련 내용의 정정이 필요하면 권리 근거와 함께 support@reserve.it.kr로 알려주시기 바랍니다.
                 </Paragraph>
             </Section>
         </PageContainer>

@@ -2,7 +2,7 @@ import { createElement, forwardRef } from 'react';
 import PropTypes from 'prop-types';
 import SvgIcon from './SvgIcon';
 import {
-    GridGlyph, ArrowLeftGlyph, ArrowRightGlyph, AuditGlyph, ChartGlyph, BellGlyph, CalendarGlyph, CameraGlyph,
+    GridGlyph, ArrowLeftGlyph, ArrowRightGlyph, AuditGlyph, ChartGlyph, BellGlyph, BellOffGlyph, CalendarGlyph, CameraGlyph,
     CheckCircleGlyph, CheckCircleFilledGlyph, CheckGlyph, ClockGlyph, CloseCircleFilledGlyph, CloseGlyph, ServerGlyph,
     CommentGlyph, CopyGlyph, CardGlyph, HeadsetGlyph, DeleteGlyph, DesktopGlyph, DollarGlyph, DoubleLeftGlyph,
     DoubleRightGlyph, DownloadGlyph, DownGlyph, EditGlyph, PinGlyph, WarningCircleGlyph, WarningCircleFilledGlyph,
@@ -37,6 +37,7 @@ export const ArrowRightOutlined = /*#__PURE__*/createIcon('ArrowRightOutlined', 
 export const AuditOutlined = /*#__PURE__*/createIcon('AuditOutlined', AuditGlyph);
 export const BarChartOutlined = /*#__PURE__*/createIcon('BarChartOutlined', ChartGlyph);
 export const BellOutlined = /*#__PURE__*/createIcon('BellOutlined', BellGlyph);
+export const BellOffOutlined = /*#__PURE__*/createIcon('BellOffOutlined', BellOffGlyph);
 export const FolderOutlined = /*#__PURE__*/createIcon('FolderOutlined', FolderGlyph);
 export const CalendarOutlined = /*#__PURE__*/createIcon('CalendarOutlined', CalendarGlyph);
 export const CameraOutlined = /*#__PURE__*/createIcon('CameraOutlined', CameraGlyph);

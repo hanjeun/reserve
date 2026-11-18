@@ -31,6 +31,11 @@ export function paymentWasCancelled(result, method) {
         || result?.pgCode == null && /^\[3001\]\s*사용자\s+Web\s+Close\s*$/i.test(result?.message || ''));
 }
 
+export function tossMerchantUnavailable(result, method) {
+    return method?.pgProvider === 'tosspay_v2' && result?.pgCode === 'COMMON_INVALID_PARAMETER'
+        && [result.pgMessage, result.message].some(text => /가맹점\s*정보[^\r\n]{0,24}없습니다/.test(text ?? ''));
+}
+
 export function configuredPaymentMethods(env = import.meta.env, prepared) {
     const methods = [];
     const toss = env.VITE_PORTONE_TOSS_CHANNEL_KEY;

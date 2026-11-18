@@ -85,6 +85,19 @@ describe('MyPage business edit prefill', () => {
         Element.prototype.scrollIntoView = vi.fn();
     });
 
+    it('keeps the seasonal effect switch in the device appearance settings', () => {
+        localStorage.setItem('reserve-winter-effect-off', '1');
+        const view = show();
+        const seasonSwitch = screen.getByRole('switch', { name: '계절 효과' });
+        expect(seasonSwitch).not.toBeChecked();
+        fireEvent.click(seasonSwitch);
+        expect(seasonSwitch).toBeChecked();
+        view.unmount();
+        show();
+        expect(screen.getByRole('switch', { name: '계절 효과' })).toBeChecked();
+        expect(memberService.updateMember).not.toHaveBeenCalled();
+    });
+
     it('keeps the pending application closed on failure and retries with actual existing fields', async () => {
         await openBusiness();
         businessService.getMyStatus.mockRejectedValueOnce({ status: 503 });
@@ -154,17 +167,18 @@ describe('MyPage business edit prefill', () => {
         const marketing = deferred();
         memberService.updateMember.mockReturnValueOnce(mail.promise);
         memberService.updateMarketingConsent.mockReturnValueOnce(marketing.promise);
-        const switches = screen.getAllByRole('switch');
-        fireEvent.click(switches[0]);
-        fireEvent.click(switches[1]);
+        const mailSwitch = screen.getByRole('switch', { name: '예약 알림 메일' });
+        const marketingSwitch = screen.getByRole('switch', { name: '이메일 마케팅 수신' });
+        fireEvent.click(mailSwitch);
+        fireEvent.click(marketingSwitch);
         await settle(marketing, {});
         await settle(mail, {});
         expect(useAuthStore.getState().user).toMatchObject({ emailNotificationEnabled: false, marketingAgreed: true });
-        expect(switches[0]).not.toBeChecked();
-        expect(switches[1]).toBeChecked();
+        expect(mailSwitch).not.toBeChecked();
+        expect(marketingSwitch).toBeChecked();
         act(() => useAuthStore.getState().updateUser({ ...useAuthStore.getState().user, emailNotificationEnabled: true, marketingAgreed: false }));
-        expect(switches[0]).toBeChecked();
-        expect(switches[1]).not.toBeChecked();
+        expect(mailSwitch).toBeChecked();
+        expect(marketingSwitch).not.toBeChecked();
     });
 
     it('does not apply an old consent response after a new session for the same account', async () => {
@@ -172,11 +186,12 @@ describe('MyPage business edit prefill', () => {
         show();
         const request = deferred();
         memberService.updateMember.mockReturnValueOnce(request.promise);
-        fireEvent.click(screen.getAllByRole('switch')[0]);
+        const mailSwitch = screen.getByRole('switch', { name: '예약 알림 메일' });
+        fireEvent.click(mailSwitch);
         act(() => useAuthStore.setState({ sessionRevision: 71 }));
         await settle(request, {});
         expect(useAuthStore.getState().user.emailNotificationEnabled).toBe(true);
-        expect(screen.getAllByRole('switch')[0]).toBeChecked();
+        expect(mailSwitch).toBeChecked();
     });
 
     it('retries an initial status failure with a loading boundary before exposing any application form', async () => {

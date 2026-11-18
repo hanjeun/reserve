@@ -135,7 +135,7 @@ public class CustomerWaitingService {
                 ? entries.teamsAhead(entry.getStoreId(), WaitingStatus.ACTIVE, entry.getBusinessDate(), entry.getEntryNumber()) : 0;
         return new MyWaitingResponse(WaitingEntryResponse.from(entry), store == null ? "가게" : store.getName(),
                 store == null ? null : store.getMainImageUrl(), store == null ? null : store.getMainImageWidth(),
-                store == null ? null : store.getMainImageHeight(), ahead);
+                store == null ? null : store.getMainImageHeight(), ahead, store == null ? null : store.getPublicId());
     }
 
     @Transactional
@@ -206,6 +206,17 @@ public class CustomerWaitingService {
         return WaitingEntryResponse.from(entry);
     }
 
+    @Transactional
+    public void hideCancelled(Member actor, Long entryId) {
+        Member member = lockedMember(actor);
+        if (entries.hideCancelledForCustomer(entryId, member.getId(), WaitingStatus.CANCELLED, nowUtc()) > 0) return;
+
+        WaitingEntry entry = entries.findByIdAndMemberId(entryId, member.getId())
+                .orElseThrow(() -> new WaitingException("내 대기 접수를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
+        if (entry.getStatus() == WaitingStatus.CANCELLED && entry.getCustomerHiddenAt() != null) return;
+        throw conflict("취소된 웨이팅만 내 목록에서 삭제할 수 있어요.");
+    }
+
     public WaitingQrResponse entryQr(Member actor, Long entryId) {
         validateMember(actor);
         WaitingEntry entry = ownEntry(actor, entryId);
@@ -219,7 +230,8 @@ public class CustomerWaitingService {
         if (store.getStatus() != StoreStatus.ACTIVE || store.isWaitingPaused() || !store.resolveWaitingIntakeMode().allowsOnsite()) {
             throw conflict("현장 QR 접수를 켠 가게에서 사용할 수 있어요.");
         }
-        return tokens.issueOnsite(storeId);
+        WaitingQrResponse qr = tokens.issueOnsite(storeId);
+        return new WaitingQrResponse(qr.token(), qr.expiresAt(), store.getPublicId());
     }
 
     @Transactional

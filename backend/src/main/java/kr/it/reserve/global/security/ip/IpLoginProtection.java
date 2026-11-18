@@ -9,13 +9,18 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
+import java.time.Instant;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.List;
 
 public class IpLoginProtection {
     public static class Unavailable extends AuthException {
         public Unavailable() { super("접속 환경을 확인할 수 없어요. 잠시 후 다시 로그인해주세요.", HttpStatus.SERVICE_UNAVAILABLE); }
     }
+    private static final SecureRandom BROWSER_RANDOM = new SecureRandom();
     private static final String GRANT = IpLoginProtection.class.getName() + ".grant";
     private static final String PREFERENCE = IpLoginProtection.class.getName() + ".preference";
     private static final String COOKIE = IpLoginProtection.class.getName() + ".cookie";
@@ -28,6 +33,10 @@ public class IpLoginProtection {
     private final byte[] key;
     private record Grant(Long member, int version, String network) {
         @Override public String toString() { return "Grant[redacted]"; }
+    }
+
+    public record RegisteredBrowser(String id, String os, String browser, Instant expiresAt, boolean current, List<String> sessionReferences) {
+        @Override public String toString() { return "RegisteredBrowser[redacted]"; }
     }
 
     IpLoginProtection(IpProtectionProperties properties, IpProtectionStore store) {
@@ -102,13 +111,117 @@ public class IpLoginProtection {
                     request.setAttribute(COOKIE, "");
                     request.setAttribute(RESULT, "NOT_REMEMBERED");
                 } else if ((strong || approved) && Boolean.TRUE.equals(preference)) {
-                    if (raw == null) { byte[] random = new byte[32]; new java.security.SecureRandom().nextBytes(random); raw = Base64.getUrlEncoder().withoutPadding().encodeToString(random); }
+                    if (raw == null) raw = newBrowserId();
                     store.rememberBrowser(owner, digest("browser", raw), network, prefix(request), family(request));
                     request.setAttribute(COOKIE, raw);
                     request.setAttribute(RESULT, "REMEMBERED");
                 }
             } catch (IpProtectionStore.Unavailable failure) { request.setAttribute(RESULT, "UNAVAILABLE"); }
         };
+    }
+
+    /** 정상 로그인이 커밋된 요청의 유효한 등록만 연장해요. */
+    public void renewBrowserAfterLogin(LoginIdentity member) {
+        if (!enabled) return;
+        HttpServletRequest request = request();
+        String raw = cookies.browserCookie(request);
+        if (raw == null || request.getAttribute(PREFERENCE) != null) return;
+        try {
+            if (store.renewBrowser(owner(member), digest("browser", raw), network(request), prefix(request), family(request)))
+                request.setAttribute(COOKIE, raw);
+        } catch (IpProtectionStore.Unavailable ignored) {
+            // 연장 실패로 이미 완료된 로그인을 되돌리지 않아요.
+        }
+    }
+
+    /** 발급된 세션과 등록 기기의 연결만 기록하고 기기 신뢰 기간은 연장하지 않아요. */
+    public void trackSession(LoginIdentity member, String sessionId) {
+        if (!enabled) return;
+        HttpServletRequest request = request();
+        String raw = request.getAttribute(COOKIE) instanceof String updated ? updated : cookies.browserCookie(request);
+        if (raw == null || raw.isEmpty()) return;
+        String environment = environment(request);
+        try {
+            store.trackBrowser(owner(member), digest("browser", raw), digest("family", environment),
+                    environment, sessionReference(member, sessionId));
+        } catch (IpProtectionStore.Unavailable ignored) {
+            // 기기 목록 부가 정보 장애는 이미 커밋된 로그인에 영향을 주지 않아요.
+        }
+    }
+
+    public List<RegisteredBrowser> registeredBrowsers(LoginIdentity member, String sessionId) {
+        HttpServletRequest request = request();
+        String raw = cookies.browserCookie(request);
+        String browserHash = raw == null ? null : digest("browser", raw);
+        String owner = owner(member);
+        String reference = sessionReference(member, sessionId);
+        try {
+            return store.devices(owner).stream().map(entry -> {
+                String[] metadata = entry.metadata().split(":");
+                List<String> references = metadata.length < 3 ? List.of() : Arrays.asList(metadata).subList(2, metadata.length);
+                boolean current = entry.browser().equals(browserHash) || references.contains(reference);
+                String[] name = metadata.length >= 2 ? metadata : (current ? environment(request).split(":") : new String[]{"other", "other"});
+                return new RegisteredBrowser(publicBrowserId(owner, entry.browser()), name[0], name[1],
+                        Instant.ofEpochMilli(entry.expiresAt()), current, references);
+            }).toList();
+        } catch (IpProtectionStore.Unavailable failure) { throw unavailable(); }
+    }
+
+    public void registerCurrentBrowser(LoginIdentity member, String sessionId, String ticket) {
+        registerBrowser(member, sessionId, ticket, false);
+    }
+
+    public void rememberAfterLogin(LoginIdentity member, String sessionId, String ticket) {
+        registerBrowser(member, sessionId, ticket, true);
+    }
+
+    private void registerBrowser(LoginIdentity member, String sessionId, String ticket, boolean completedLogin) {
+        if (!enabled) throw expired();
+        HttpServletRequest request = request();
+        String previous = cookies.browserCookie(request);
+        String raw = previous == null ? newBrowserId() : previous;
+        String environment = environment(request);
+        try {
+            if (!store.registerBrowser(owner(member), digest("browser", raw), network(request), prefix(request), digest("family", environment),
+                    environment, sessionReference(member, sessionId), digest("ticket", ticket),
+                    binding(ticket, member, request, previous), completedLogin ? "" : binding(ticket, member, request, raw))) {
+                throw new AuthException(completedLogin ? "기기 등록 확인 시간이 지났거나 접속 환경이 바뀌었어요."
+                        : "기기를 관리하려면 본인 확인을 다시 진행해주세요.", HttpStatus.PRECONDITION_REQUIRED);
+            }
+            request.setAttribute(COOKIE, raw);
+        } catch (IpProtectionStore.Unavailable failure) { throw unavailable(); }
+    }
+
+    public Runnable retireBrowserRegistrations(LoginIdentity member) {
+        if (!enabled) return () -> { };
+        String retired = owner(member);
+        return () -> {
+            // 이전 인증 버전은 DB 커밋과 동시에 신뢰 대상에서 빠져요.
+            try { store.forgetBrowsers(retired); }
+            catch (IpProtectionStore.Unavailable ignored) { }
+        };
+    }
+
+    public void forgetRegisteredBrowser(LoginIdentity member, String deviceId) {
+        String owner = owner(member);
+        try {
+            for (var entry : store.devices(owner)) {
+                if (publicBrowserId(owner, entry.browser()).equals(deviceId)) {
+                    store.forgetBrowser(owner, entry.browser());
+                    break;
+                }
+            }
+        } catch (IpProtectionStore.Unavailable failure) { throw unavailable(); }
+    }
+
+    public String sessionReference(LoginIdentity member, String sessionId) {
+        return digest("device-session", owner(member) + ":" + sessionId);
+    }
+    private String publicBrowserId(String owner, String browser) { return digest("device", owner + ":" + browser); }
+    private static String newBrowserId() {
+        byte[] random = new byte[32];
+        BROWSER_RANDOM.nextBytes(random);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(random);
     }
 
     private boolean trustedBrowser(LoginIdentity member, HttpServletRequest request) {
@@ -163,14 +276,15 @@ public class IpLoginProtection {
             return digest("prefix", HexFormat.of().formatHex(java.util.Arrays.copyOf(address, address.length == 4 ? 3 : 8)));
         } catch (java.net.UnknownHostException invalid) { throw unavailable(); }
     }
-    private String family(HttpServletRequest request) {
+    private String family(HttpServletRequest request) { return digest("family", environment(request)); }
+    private static String environment(HttpServletRequest request) {
         String agent = request.getHeader("User-Agent");
         if (agent == null || agent.length() > 2048) agent = "";
         String os = agent.contains("Android") ? "android" : agent.contains("iPhone") || agent.contains("iPad") ? "ios"
                 : agent.contains("Windows") ? "windows" : agent.contains("Macintosh") ? "mac" : agent.contains("Linux") ? "linux" : "other";
         String browser = agent.contains("Edg/") ? "edge" : agent.contains("Firefox/") || agent.contains("FxiOS/") ? "firefox"
                 : agent.contains("Chrome/") || agent.contains("CriOS/") ? "chrome" : agent.contains("Safari/") ? "safari" : "other";
-        return digest("family", os + ":" + browser);
+        return os + ":" + browser;
     }
 
     public long blocked(HttpServletRequest request) {
@@ -184,7 +298,13 @@ public class IpLoginProtection {
     }
 
     private String owner(LoginIdentity member) { return digest("member", member.getId() + ":" + member.getAuthVersion()); }
-    private String binding(String ticket, LoginIdentity member) { return digest("binding", member.getId() + ":" + network(request()) + ":" + cookies.browserCookie(request()) + ":" + family(request()) + ":" + ticket); }
+    private String binding(String ticket, LoginIdentity member) {
+        HttpServletRequest request = request();
+        return binding(ticket, member, request, cookies.browserCookie(request));
+    }
+    private String binding(String ticket, LoginIdentity member, HttpServletRequest request, String browser) {
+        return digest("binding", member.getId() + ":" + network(request) + ":" + browser + ":" + family(request) + ":" + ticket);
+    }
     private String network(HttpServletRequest request) {
         String literal = addresses.extract(request);
         if (literal == null) throw unavailable();

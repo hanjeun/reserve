@@ -8,11 +8,14 @@ import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.notification.service.ReservationNotificationDispatcher;
 import kr.it.reserve.notification.service.ReservationNotificationService;
 import kr.it.reserve.notification.service.ReservationNotificationService.Item;
+import kr.it.reserve.notification.entity.ReservationNotification;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.service.ReservationUpdates;
 import kr.it.reserve.reservation.service.ReservationUpdates.NotificationKind;
 import kr.it.reserve.store.entity.Store;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -25,10 +28,15 @@ import org.springframework.test.context.transaction.TestTransaction;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -49,12 +57,25 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Transactional
 class ReservationNotificationIntegrationTest {
     private static final String INBOX = "/api/chat/notifications";
+    private static final Clock SAME_TICK = Clock.fixed(Instant.parse("2030-01-01T00:00:00.123456900Z"), ZoneOffset.UTC);
     @Autowired EntityManager entityManager;
     @Autowired ReservationUpdates reservationUpdates;
     @Autowired ReservationNotificationService notifications;
     @Autowired ReservationNotificationDispatcher dispatcher;
     @Autowired MockMvc mvc;
     @Autowired ApplicationEvents events;
+
+    @BeforeEach
+    void useTheSameNanoTickForEnqueueAndDispatch() {
+        ReflectionTestUtils.setField(notifications, "clock", SAME_TICK);
+        ReflectionTestUtils.setField(dispatcher, "clock", SAME_TICK);
+    }
+
+    @AfterEach
+    void restoreSystemClocks() {
+        ReflectionTestUtils.setField(notifications, "clock", Clock.systemUTC());
+        ReflectionTestUtils.setField(dispatcher, "clock", Clock.systemUTC());
+    }
 
     @Test
     void deliversOnlyOnceToEachRecipientAndExposesPrivateDetailsThroughChat() throws Exception {
@@ -142,6 +163,8 @@ class ReservationNotificationIntegrationTest {
         for (int index = 0; index <= ReservationNotificationService.PAGE_SIZE; index++) {
             reservationUpdates.approved(reservation);
         }
+        entityManager.flush();
+        entityManager.clear();
         dispatcher.dispatch();
 
         var latest = notifications.inbox(customer, null);
@@ -149,6 +172,29 @@ class ReservationNotificationIntegrationTest {
         assertThat(latest.items()).hasSize(ReservationNotificationService.PAGE_SIZE);
         assertThat(older.items()).hasSize(1).allSatisfy(item -> assertThat(item.id()).isLessThan(latest.nextBefore()));
         assertThat(older.nextBefore()).isNull();
+    }
+
+    @Test
+    void aDeferredNotificationRemainsPendingUntilItsStoredRetryBoundary() {
+        Member customer = member("retry", Role.USER);
+        Reservation reservation = reservation(customer, member("retry-owner", Role.BUSINESS));
+        reservationUpdates.approved(reservation);
+        LocalDateTime now = LocalDateTime.now(SAME_TICK);
+        Long id = notifications.due(now).getFirst();
+        notifications.defer(id, now);
+        entityManager.flush();
+        entityManager.clear();
+
+        LocalDateTime retryAt = now.truncatedTo(ChronoUnit.MICROS).plusSeconds(10);
+        var stored = entityManager.find(ReservationNotification.class, id);
+        assertThat(stored.getAttempts()).isEqualTo(1);
+        assertThat(stored.getNextAttemptAt()).isEqualTo(retryAt);
+        assertThat(notifications.due(retryAt.minusNanos(1))).doesNotContain(id);
+        assertThat(notifications.due(retryAt)).contains(id);
+        notifications.deliver(id, retryAt.minusNanos(1));
+        assertThat(notifications.inbox(customer, null).items()).isEmpty();
+        notifications.deliver(id, retryAt);
+        assertThat(notifications.inbox(customer, null).items()).hasSize(1);
     }
 
     @Test
@@ -161,7 +207,7 @@ class ReservationNotificationIntegrationTest {
         TestTransaction.end();
 
         dispatcher.dispatch();
-        assertThat(notifications.due(LocalDateTime.now().plusDays(1))).isEmpty();
+        assertThat(notifications.due(LocalDateTime.now(SAME_TICK).plusDays(1))).isEmpty();
         assertThat(entityManager.find(Member.class, customerId)).isNull();
     }
 

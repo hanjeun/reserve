@@ -21,6 +21,7 @@ public class ChatMessageResponse {
     private String content;
     private String clientMessageId;
     private String imageUrl;
+    private String imageThumbnailUrl;
     private String imageOriginalFilename;
     private Integer imageWidth;
     private Integer imageHeight;
@@ -64,6 +65,7 @@ public class ChatMessageResponse {
         // 지원 대화의 담당자는 계정이 바뀌어도 같은 브랜드로 표시하고 개인 프로필은 노출하지 않는다.
         boolean supportAdmin = m.getSenderRole() == SenderRole.ADMIN
                 && m.getRoom() != null && m.getRoom().getType() == ChatRoom.RoomType.SUPPORT;
+        String imageUrl = m.getImageKey() == null || (m.isRetracted() && !reportContext) ? null : "/api/chat/images/" + m.getId();
         return ChatMessageResponse.builder()
                 .id(m.getId())
                 .senderRole(m.getSenderRole().name())
@@ -71,7 +73,8 @@ public class ChatMessageResponse {
                 .senderName(supportAdmin ? ConversationSummaryResponse.SUPPORT_NAME : null)
                 .content(resolveContent(m, reportContext))
                 .clientMessageId(m.getClientMessageId())
-                .imageUrl(m.getImageKey() == null || (m.isRetracted() && !reportContext) ? null : "/api/chat/images/" + m.getId())
+                .imageUrl(imageUrl)
+                .imageThumbnailUrl(reportContext || imageUrl == null ? null : imageUrl + "/thumbnail")
                 .imageOriginalFilename(m.getImageKey() == null || (m.isRetracted() && !reportContext) ? null : m.getImageOriginalFilename())
                 .imageWidth(m.isRetracted() && !reportContext ? null : m.getImageWidth())
                 .imageHeight(m.isRetracted() && !reportContext ? null : m.getImageHeight())

@@ -10,12 +10,15 @@ import { MY_WAITING_STATUSES, MY_WAITING_SORTS } from './waitingDirectoryFilters
 import { radius } from '../../styles/tokens';
 import IconToolSkeleton from '../common/IconToolSkeleton';
 import ListingContent from '../common/ListingContent';
+import { MyReservationCardSkeleton, ReservationSummaryCardSkeleton } from '../common/Skeletons';
 
 export const MY_WAITING_HELP = '열려 있는 동안 대기 현황이 자동으로 갱신돼요. 입장·취소한 내역은 당일에 확인할 수 있어요.';
 
-/** 웨이팅은 사진 없는 명단이다. 실제 명단의 행·카드 틀을 로딩에도 그대로 쓴다. */
+/** 사업자 명단과 고객의 예약형 목록은 각 화면과 같은 골격을 사용한다. */
 export function WaitingListSkeleton({ view = 'list', count = 3, personal = false }) {
     const cards = view === 'cards';
+    if (personal) return cards ? <ReservationSummaryCardSkeleton count={count} showPrice={false} />
+        : <MyReservationCardSkeleton count={count} actionCount={2} showPrice={false} />;
     const content = <>
         <div className="reserve-waiting-entry-content">
             <div className="reserve-waiting-entry-head" style={{ minHeight: cards ? 28 : 24 }}>
@@ -23,16 +26,14 @@ export function WaitingListSkeleton({ view = 'list', count = 3, personal = false
                 <Bone width={62} height={24} borderRadius={6} />
             </div>
             <div className="reserve-waiting-name" style={{ minHeight: cards ? 24 : 20 }}>
-                <Bone width={personal ? 132 : 92} height={cards ? 15 : 13} style={{ maxWidth: '65%' }} />
+                <Bone width={92} height={cards ? 15 : 13} style={{ maxWidth: '65%' }} />
                 <Bone width={28} height={13} />
             </div>
-            {personal
-                ? <div className="reserve-waiting-form-help" style={{ minHeight: 20, display: 'flex', alignItems: 'center' }}><Bone width="75%" height={13} /></div>
-                : <div className="reserve-waiting-times" style={{ minHeight: 18, alignItems: 'center' }}><Bone width={86} height={12} /></div>}
+            <div className="reserve-waiting-times" style={{ minHeight: 18, alignItems: 'center' }}><Bone width={86} height={12} /></div>
         </div>
         <div className="reserve-waiting-actions">
             <Bone width={50} height={36} borderRadius={radius.md} />
-            <Bone width={personal ? 74 : 50} height={36} borderRadius={radius.md} />
+            <Bone width={50} height={36} borderRadius={radius.md} />
         </div>
     </>;
     return <ul className={`reserve-waiting-entries reserve-waiting-entries--${view}${cards ? ' rsv-store-grid' : ''}`} aria-hidden="true">

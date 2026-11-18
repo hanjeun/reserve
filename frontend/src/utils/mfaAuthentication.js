@@ -43,8 +43,11 @@ async function verificationStatus(state, signal) {
     const result = await api.post('/api/auth/mfa/status', undefined, config(signal));
     assertCurrentSession(state.epoch);
     signal?.throwIfAborted();
-    if (!state.reference || result?.completionId !== state.reference)
-        throw new Error('인증 요청이 바뀌었어요. 인증을 다시 시작해주세요.');
+    if (!state.reference || result?.completionId !== state.reference) {
+        const failure = new Error('인증 요청이 바뀌었어요. 인증을 다시 시작해주세요.');
+        failure.name = 'MfaRequestChangedError';
+        throw failure;
+    }
     state.verificationPending = false;
     return result.verified === true ? result : null;
 }
@@ -153,10 +156,10 @@ export async function finishMfaSession(signal, defer = false, completion = {}) {
     if (!completion.issued) {
         try {
             const result = await api.post(defer ? '/api/auth/mfa/defer' : '/api/auth/mfa/finish',
-                !defer && (completion.reference || completion.rememberBrowser != null)
-                    ? { ...(completion.reference ? { completionId: completion.reference } : {}),
-                        ...(completion.rememberBrowser != null ? { rememberBrowser: completion.rememberBrowser } : {}) } : undefined, config(signal));
-            completion.browser = result?.browser;
+                !defer && completion.reference
+                    ? { completionId: completion.reference,
+                        ...(completion.offerBrowserRegistration ? { offerBrowserRegistration: true } : {}) } : undefined, config(signal));
+            completion.browserRegistrationAvailable = result?.browserRegistration === 'AVAILABLE';
         } catch (failure) {
             assertCurrentSession(completion.epoch);
             signal?.throwIfAborted();

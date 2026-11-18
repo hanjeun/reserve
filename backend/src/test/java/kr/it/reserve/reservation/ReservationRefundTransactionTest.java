@@ -321,10 +321,10 @@ class ReservationRefundTransactionTest {
 
         Long storeId = tx.execute(ignored -> reservationRepository.findById(reservationId).orElseThrow().getStore().getId());
         var day = ServiceTime.today().plusDays(7);
-        assertThat(reservationRepository.sumActiveGuestsGroupedByTime(storeId, day)).hasSize(1);
+        assertThat(reservationRepository.sumActiveGuestsGroupedByTime(storeId, day, null)).hasSize(1);
         assertThat(expiry.expireIfDue(reservationId, LocalDateTime.now().plusHours(1)))
                 .isEqualTo(ReservationExpiryProcessor.ExpiryResult.CANCELLED);
-        assertThat(reservationRepository.sumActiveGuestsGroupedByTime(storeId, day)).isEmpty();
+        assertThat(reservationRepository.sumActiveGuestsGroupedByTime(storeId, day, null)).isEmpty();
         verify(pg, never()).cancelPayment(anyString(), anyInt(), anyString(), anyString());
         assertThat(payments.findById(paymentId).orElseThrow().getStatus()).isEqualTo(Payment.PaymentStatus.FAILED);
         assertThat(reservationRepository.findById(reservationId).orElseThrow().getStatus()).isEqualTo(Reservation.ReservationStatus.CANCELLED);

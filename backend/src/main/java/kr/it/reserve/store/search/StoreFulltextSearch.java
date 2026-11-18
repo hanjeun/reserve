@@ -43,7 +43,7 @@ public class StoreFulltextSearch {
     @PersistenceContext private EntityManager entityManager;
     private volatile Boolean available;
 
-    public record Preview(Long id, String name, String category, String address) {}
+    public record Preview(Long id, String publicId, String name, String category, String address, String mainImageUrl) {}
 
     /** 짧은 문자·기호는 LIKE로, 색인 가능한 두 글자는 연산자 없는 후보로만 사용한다. */
     public String candidateQuery(String keyword) {
@@ -68,7 +68,7 @@ public class StoreFulltextSearch {
         return result.map(StoreResponse::fromEntity);
     }
 
-    /** 누락 행 한 건으로 후보의 완전성을 확인하고, 같은 스냅샷에서 공개 텍스트만 제한 조회한다. */
+    /** 누락 행 한 건으로 후보의 완전성을 확인하고, 같은 스냅샷에서 공개 미리보기를 제한 조회한다. */
     @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW, isolation = Isolation.REPEATABLE_READ, timeout = 3)
     public List<Preview> preview(Specification<Store> literalSearch, String candidate, int resultLimit) {
         if (resultLimit < 1 || resultLimit > 6) throw new IllegalArgumentException("Invalid store preview limit");
@@ -81,8 +81,8 @@ public class StoreFulltextSearch {
         Specification<Store> selected = missing ? literalSearch : StoreSearchSpecification.withFulltextCandidate(literalSearch, candidate);
         var query = builder.createQuery(Preview.class);
         var root = query.from(Store.class);
-        query.select(builder.construct(Preview.class, root.get("id"), root.get("name"),
-                root.get("category"), root.get("address")));
+        query.select(builder.construct(Preview.class, root.get("id"), root.get("publicId"), root.get("name"),
+                root.get("category"), root.get("address"), root.get("mainImageUrl")));
         query.where(selected.toPredicate(root, query, builder));
         return entityManager.createQuery(query).setMaxResults(resultLimit).getResultList();
     }

@@ -20,7 +20,7 @@ public class ReservationConsentService {
     public static final String VERSION = "2026-10-27";
     public record Proof(boolean privacyAccepted, boolean conditionsAccepted, @jakarta.validation.constraints.Size(max = 32) String version,
             @jakarta.validation.constraints.Pattern(regexp = "[0-9a-f]{64}") String noticeHash) { }
-    public record Notice(boolean enabled, String version, String hash, Map<String, Object> details) { }
+    public record Notice(boolean enabled, String version, String hash, Map<String, Object> details, String storePublicId) { }
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
     private final StoreRepository stores;
@@ -36,7 +36,7 @@ public class ReservationConsentService {
     }
     @Transactional(readOnly = true)
     public Notice notice(Long storeId) {
-        if (!enabled) return new Notice(false, VERSION, null, Map.of());
+        if (!enabled) return new Notice(false, VERSION, null, Map.of(), null);
         Store store = stores.findById(storeId).filter(value -> !value.isDeleted() && !value.isSuspended())
                 .orElseThrow(() -> new ReservationException("가게를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
         return notice(store);
@@ -59,7 +59,7 @@ public class ReservationConsentService {
         details.put("partialRefundRate", store.getPartialRefundRate());
         details.put("attendanceRefundEnabled", true);
         String digest = digest(VERSION + ":" + store.getOwner().getId() + ":" + encoded(details));
-        return new Notice(true, VERSION, digest, details);
+        return new Notice(true, VERSION, digest, details, store.getPublicId());
     }
     public Notice validate(Store lockedStore, Proof proof) {
         if (!enabled) return null;
@@ -67,7 +67,8 @@ public class ReservationConsentService {
         if (proof == null || !proof.privacyAccepted() || !proof.conditionsAccepted())
             throw new ReservationException("예약 조건과 개인정보 제공 안내를 확인하고 동의해주세요.", HttpStatus.BAD_REQUEST);
         if (!VERSION.equals(proof.version()) || !notice.hash().equals(proof.noticeHash()))
-            throw new ReservationException("예약 안내가 변경됐어요. 새 내용을 확인한 뒤 다시 신청해주세요.", HttpStatus.CONFLICT);
+            throw ReservationException.conflict(ReservationException.Code.RESERVATION_NOTICE_CHANGED,
+                    "예약 안내가 변경됐어요. 새 내용을 확인한 뒤 다시 신청해주세요.");
         return notice;
     }
     /** 예약 저장과 같은 트랜잭션에서만 동의 증거를 남긴다. */

@@ -45,6 +45,10 @@ public final class FileStoragePaths {
         return USER_ROOT + memberId + "/feed/images";
     }
 
+    public static String reviewImage(Long memberId) {
+        return USER_ROOT + memberId + "/reviews/images";
+    }
+
     /** 계정 사진과 별도로 선택한 공개 피드 프로필 이미지. */
     public static String feedProfile(Long memberId) {
         return USER_ROOT + memberId + "/feed/profiles";

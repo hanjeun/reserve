@@ -25,6 +25,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.SliceImpl;
+import org.springframework.http.HttpStatus;
 
 import java.util.List;
 import java.util.Optional;
@@ -47,6 +48,34 @@ class ChatModerationServiceTest {
     @Mock ChatReportEvidenceRepository evidenceRepository;
     @Mock ChatReportAuditService auditService;
     @InjectMocks ChatModerationService service;
+
+    @Test
+    void onlyParticipantsCanLeaveAndAStaleRestoreDoesNotReopenTheRoom() {
+        Member customer = member(7L);
+        Member owner = businessMember(8L);
+        ChatRoom room = room(customer);
+        when(roomRepository.findByIdForUpdate(21L)).thenReturn(Optional.of(room));
+        when(storeRepository.findById(31L)).thenReturn(Optional.of(store(owner)));
+
+        assertThatThrownBy(() -> service.leave(member(9L), 21L, "MEMBER"))
+                .isInstanceOf(ChatException.class).extracting("status").isEqualTo(HttpStatus.FORBIDDEN);
+        assertThatThrownBy(() -> service.leave(customer, 21L, "OWNER"))
+                .isInstanceOf(ChatException.class).extracting("status").isEqualTo(HttpStatus.FORBIDDEN);
+
+        service.setHidden(customer, 21L, "MEMBER", true);
+        service.leave(customer, 21L, "MEMBER");
+        var leftAt = room.getMemberLeftAt();
+        service.leave(customer, 21L, "MEMBER");
+        assertThat(room.getMemberLeftAt()).isNotNull().isEqualTo(leftAt);
+        assertThat(room.getMemberHiddenAt()).isNull();
+        assertThat(room.hasLeft(SenderRole.OWNER, owner.getId())).isFalse();
+        assertThatThrownBy(() -> service.setHidden(customer, 21L, "MEMBER", false))
+                .isInstanceOf(ChatException.class).extracting("status").isEqualTo(HttpStatus.CONFLICT);
+
+        service.leave(owner, 21L, "OWNER");
+        assertThat(room.hasLeft(SenderRole.OWNER, owner.getId())).isTrue();
+        assertThat(room.hasLeft(SenderRole.OWNER, 9L)).isFalse();
+    }
 
     @Test
     void memberCanBlockAStoreRoomAndOwnerCannotClearTheMemberFlag() {

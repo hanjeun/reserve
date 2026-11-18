@@ -18,6 +18,7 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
@@ -26,9 +27,14 @@ public class ReservationEditApiController {
     private final ReservationEditQueryService queries;
     private final RateLimiter limiter;
 
-    @GetMapping("/edit-store")
+    @GetMapping(value = "/edit-store", params = "!storePublicId")
     public ApiResponse<StoreResponse> getEditStore(@PathVariable Long id, @RequestParam Long storeId) {
         return ApiResponse.success(queries.getEditStore(id, storeId, readMember()), "예약 변경용 가게 조회 성공");
+    }
+
+    @GetMapping(value = "/edit-store", params = {"storePublicId", "!storeId"})
+    public ApiResponse<StoreResponse> getEditStoreByPublicId(@PathVariable Long id, @RequestParam UUID storePublicId) {
+        return ApiResponse.success(queries.getEditStoreByPublicId(id, storePublicId, readMember()), "예약 변경용 가게 조회 성공");
     }
 
     @GetMapping("/availability")

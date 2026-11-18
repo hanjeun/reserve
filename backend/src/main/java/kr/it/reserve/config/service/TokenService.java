@@ -5,15 +5,17 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
 import kr.it.reserve.config.jwt.TokenProvider;
-import kr.it.reserve.config.jwt.JwtProperties;
 import kr.it.reserve.config.jwt.TokenProvider.RefreshTokenInspection;
 import kr.it.reserve.config.jwt.entity.RefreshToken;
 import kr.it.reserve.config.jwt.repository.RefreshTokenRepository;
 import kr.it.reserve.config.service.RefreshRejectedException.Reason;
+import kr.it.reserve.config.updates.EntityUpdates;
+import kr.it.reserve.global.error.AuthException;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,11 +30,12 @@ import java.util.Objects;
 @Service
 public class TokenService {
     static final Duration PREVIOUS_TOKEN_GRACE = Duration.ofSeconds(60);
+    private static final Duration REMEMBER_LOGIN_WINDOW = Duration.ofMinutes(10);
     private static final String RELOGIN_MESSAGE = "로그인이 만료됐어요. 다시 로그인해주세요.";
     private final TokenProvider tokenProvider;
     private final RefreshTokenRepository refreshTokenRepository;
     private final MemberRepository memberRepository;
-    private final JwtProperties jwtProperties;
+    private final EntityUpdates updates;
     @PersistenceContext private EntityManager entityManager;
     private Clock clock = Clock.systemUTC();
 
@@ -56,14 +59,16 @@ public class TokenService {
         RefreshToken row = refreshTokenRepository.findBySessionIdForUpdate(proof.sessionId(), proof.memberId()).orElse(null);
         if (row == null) throw reject(Reason.UNKNOWN_TOKEN, proof.memberId());
         entityManager.refresh(row, LockModeType.PESSIMISTIC_WRITE);
-        if (!contextMatches(row, proof)) throw reject(Reason.INVALID_JWT, proof.memberId());
+        boolean previousBrowserToken = Boolean.FALSE.equals(proof.persistence()) && previousToken(row, proof, presentedToken);
+        if (!sameSession(row, proof) || !sameExpiry(row, proof) && !previousBrowserToken)
+            throw reject(Reason.INVALID_JWT, proof.memberId());
         if (member == null || member.isDeleted()) return removeAndReject(row, Reason.MEMBER_UNAVAILABLE);
         if (proof.authVersion() != member.getAuthVersion()) return removeAndReject(row, Reason.AUTH_VERSION_CHANGED);
         if (!tokenProvider.isLoginSessionCurrent(member, proof.oauthAuthenticatedAt(), proof.loginMethod())) {
             return removeAndReject(row, Reason.OAUTH_AUTHENTICATION_REVOKED);
         }
         LocalDateTime now = LocalDateTime.now(clock);
-        if (!row.isLiveAt(now)) return removeAndReject(row, Reason.EXPIRED_SESSION);
+        if (!tokenProvider.isSessionLive(member, row, now)) return removeAndReject(row, Reason.EXPIRED_SESSION);
 
         long generation = proof.rotationVersion();
         long currentGeneration = row.getRotationVersion();
@@ -73,7 +78,7 @@ public class TokenService {
             if (!row.rotatedWithin(PREVIOUS_TOKEN_GRACE, now)) return removeAndReject(row, Reason.REUSED_TOKEN);
             if (proof.state() == TokenProvider.RefreshTokenState.EXPIRED) throw reject(Reason.EXPIRED_JWT, proof.memberId());
             liftExpiredSuspension(member);
-            try { return result(tokenProvider.currentSessionTokens(row, proof.persistence())); }
+            try { return result(recoverCurrent(row, proof.persistence())); }
             catch (JwtException inconsistent) { return removeAndReject(row, Reason.SESSION_INCONSISTENT); }
         }
         if (generation != currentGeneration || !row.isCurrentToken(presentedToken)
@@ -81,6 +86,69 @@ public class TokenService {
         if (proof.state() == TokenProvider.RefreshTokenState.EXPIRED) return removeAndReject(row, Reason.EXPIRED_JWT);
         liftExpiredSuspension(member);
         return result(tokenProvider.rotateSession(row, proof.persistence()));
+    }
+
+    @Transactional(readOnly = true)
+    public String rememberOffer(String presented, Member member, String sid) {
+        if (presented == null || member == null || sid == null || !member.isTermsAgreed()) return null;
+        var proof = tokenProvider.inspectRefreshToken(presented);
+        if (!matchesActor(proof, member, sid) || !Boolean.FALSE.equals(proof.persistence())) return null;
+        return refreshTokenRepository.findBySessionIdAndMemberId(sid, member.getId())
+                .filter(row -> sameSession(row, proof) && sameExpiry(row, proof) && currentToken(row, proof, presented)
+                        && eligibleForRemember(member, row, LocalDateTime.now(clock)))
+                .map(row -> rememberReference(row.getSessionId())).orElse(null);
+    }
+
+    @Transactional
+    public RefreshResult rememberLogin(String presented, Member authenticated, String sid, String reference) {
+        if (presented == null || sid == null || !rememberReference(sid).equals(reference)) throw rememberUnavailable();
+        var proof = tokenProvider.inspectRefreshToken(presented);
+        if (!matchesActor(proof, authenticated, sid)) throw rememberUnavailable();
+        Member member = memberRepository.findActiveByIdForUpdate(proof.memberId()).orElseThrow(TokenService::rememberUnavailable);
+        entityManager.flush();
+        entityManager.refresh(member, LockModeType.PESSIMISTIC_WRITE);
+        var row = refreshTokenRepository.findBySessionIdForUpdate(sid, member.getId()).orElseThrow(TokenService::rememberUnavailable);
+        entityManager.refresh(row, LockModeType.PESSIMISTIC_WRITE);
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (!sameSession(row, proof) || !eligibleForRemember(member, row, now)) throw rememberUnavailable();
+
+        if (sameExpiry(row, proof) && currentToken(row, proof, presented)) {
+            return result(Boolean.FALSE.equals(proof.persistence()) ? tokenProvider.rememberSession(member, row)
+                    : tokenProvider.currentSessionTokens(row, proof.persistence()));
+        }
+        if (previousToken(row, proof, presented) && row.rotatedWithin(PREVIOUS_TOKEN_GRACE, now)
+                && (sameExpiry(row, proof) || Boolean.FALSE.equals(proof.persistence()))) {
+            var current = recoverCurrent(row, proof.persistence());
+            return result(current.persistent() ? current : tokenProvider.rememberSession(member, row));
+        }
+        throw rememberUnavailable();
+    }
+
+    private boolean eligibleForRemember(Member member, RefreshToken row, LocalDateTime now) {
+        String method = row.getLoginMethod();
+        var oauthAt = row.getOauthAuthenticatedAt();
+        boolean recentOAuth = ("OAUTH".equals(method) || "OAUTH_MFA".equals(method)) && oauthAt != null
+                && !oauthAt.isBefore(row.getCreatedAt().minus(REMEMBER_LOGIN_WINDOW));
+        return member.isTermsAgreed() && !member.isDeleted() && !member.isSuspended() && member.getAuthVersion() == row.getAuthVersion()
+                && !now.isBefore(row.getCreatedAt()) && now.isBefore(row.getCreatedAt().plus(REMEMBER_LOGIN_WINDOW))
+                && ("PASSKEY".equals(method) || recentOAuth)
+                && tokenProvider.isSessionLive(member, row, now) && tokenProvider.isLoginSessionCurrent(member, oauthAt, method);
+    }
+
+    private static boolean matchesActor(RefreshTokenInspection proof, Member member, String sid) {
+        return member != null && proof.state() == TokenProvider.RefreshTokenState.VALID && sid.equals(proof.sessionId())
+                && Objects.equals(member.getId(), proof.memberId()) && member.getAuthVersion() == proof.authVersion();
+    }
+
+    private static String rememberReference(String sid) { return RefreshToken.hash("remember-oauth:" + sid); }
+
+    private static AuthException rememberUnavailable() {
+        return new AuthException("이 로그인에서 유지 선택을 적용할 수 없어요.", HttpStatus.CONFLICT);
+    }
+
+    private TokenProvider.IssuedSession recoverCurrent(RefreshToken row, Boolean previousPersistence) {
+        return Boolean.FALSE.equals(previousPersistence) ? tokenProvider.recoverRotatedSession(row, previousPersistence)
+                : tokenProvider.currentSessionTokens(row, previousPersistence);
     }
 
     /** 회전 뒤 늦게 도착한 로그아웃도 검증된 세션 식별자로 해당 기기만 폐기한다. */
@@ -93,20 +161,34 @@ public class TokenService {
         RefreshToken row = refreshTokenRepository.findBySessionIdForUpdate(proof.sessionId(), proof.memberId()).orElse(null);
         if (row != null) {
             entityManager.refresh(row, LockModeType.PESSIMISTIC_WRITE);
-            if (contextMatches(row, proof) && proof.rotationVersion() <= row.getRotationVersion()) refreshTokenRepository.delete(row);
+            if (sameSession(row, proof) && (sameExpiry(row, proof) || Boolean.FALSE.equals(proof.persistence()))
+                    && proof.rotationVersion() <= row.getRotationVersion()) removeSession(row);
         }
     }
 
     public RefreshRejectedException rejectMissingCookie() { return reject(Reason.MISSING_COOKIE, null); }
-    private static boolean contextMatches(RefreshToken row, RefreshTokenInspection proof) {
+    private static boolean sameSession(RefreshToken row, RefreshTokenInspection proof) {
         return Objects.equals(row.getMemberId(), proof.memberId()) && Objects.equals(row.getSessionId(), proof.sessionId())
                 && row.getAuthVersion() == proof.authVersion() && Objects.equals(row.getLoginMethod(), proof.loginMethod())
-                && Objects.equals(row.getOauthAuthenticatedAt(), proof.oauthAuthenticatedAt())
-                && Objects.equals(row.getAbsoluteExpiresAt(), proof.absoluteExpiresAt());
+                && Objects.equals(row.getOauthAuthenticatedAt(), proof.oauthAuthenticatedAt());
+    }
+    private static boolean sameExpiry(RefreshToken row, RefreshTokenInspection proof) {
+        return Objects.equals(row.getAbsoluteExpiresAt(), proof.absoluteExpiresAt());
+    }
+    private static boolean currentToken(RefreshToken row, RefreshTokenInspection proof, String presented) {
+        return proof.rotationVersion() == row.getRotationVersion() && Objects.equals(proof.jti(), row.getRefreshJti())
+                && row.isCurrentToken(presented);
+    }
+    private static boolean previousToken(RefreshToken row, RefreshTokenInspection proof, String presented) {
+        return proof.rotationVersion() == row.getRotationVersion() - 1 && row.isPreviousToken(presented);
     }
     private RefreshResult removeAndReject(RefreshToken row, Reason reason) {
-        refreshTokenRepository.delete(row);
+        removeSession(row);
         throw reject(reason, row.getMemberId());
+    }
+    private void removeSession(RefreshToken row) {
+        refreshTokenRepository.delete(row);
+        updates.recheckSessions(row.getMemberId());
     }
     private static RefreshResult result(TokenProvider.IssuedSession pair) {
         return new RefreshResult(pair.accessToken(), pair.refreshToken(), pair.refreshMaxAge(), pair.persistent());

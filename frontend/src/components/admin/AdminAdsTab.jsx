@@ -1,18 +1,15 @@
 import React, { useState } from 'react';
-import { Tag, Typography } from 'antd';
+import { Tag } from 'antd';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { StopOutlined } from '../common/icons';
-import { Button, AdminTableSkeleton, DataState, DataTable, FilterToolbar } from '../common';
+import { Button, AdminTableSkeleton, DataState, PagedDataTable, FilterToolbar, Tooltip } from '../common';
 import SanctionModal from './SanctionModal';
 import { useMessage, useQueryParamsState } from '../../hooks';
-import useDebounce from '../../hooks/useDebounce';
 import { adKeys } from '../../hooks/queryKeys';
+import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
 import { invalidateAdData } from '../../hooks/invalidateAfterWrite';
 import adService from '../../services/adService';
 import { AD_TYPE_LABELS } from '../../constants';
-import { colors, fontSize } from '../../styles/tokens';
-
-const { Text } = Typography;
 
 const STATUS_CONFIG = {
     PENDING_PAYMENT: { color: 'default', label: '결제 대기' },
@@ -24,6 +21,8 @@ const STATUS_CONFIG = {
 
     CANCELLED:       { color: 'default', label: '취소됨' },
     REFUNDED:        { color: 'purple',  label: '환불됨' },
+    REFUND_PENDING:  { color: 'warning', label: '환불 확인 중' },
+    REVIEW_REQUIRED: { color: 'warning', label: '결제 확인 필요' },
 };
 
 /**
@@ -55,19 +54,18 @@ const AdminAdsTab = () => {
     const { message } = useMessage();
     const queryClient = useQueryClient();
     const [{ search, page: pageStr }, setQuery] = useQueryParamsState(QUERY_DEFAULTS);
-    const debouncedSearch = useDebounce(search, 300);
     const page = Number(pageStr) || 0;
     const setPage = (p) => setQuery({ page: String(p) });
-    // 검색어가 바뀌면 현재 페이지 범위가 달라지므로 0페이지로 복귀(하나의 setQuery 호출로 묶음 — useQueryParamState.js 상단 주석 참고).
-    const handleSearchChange = (e) => setQuery({ search: e.target.value, page: '0' });
+    // 검색어와 페이지를 함께 바꿔 이전 페이지 번호가 새 검색에 남지 않게 한다.
+    const handleSearchChange = search => setQuery({ search, page: '0' });
     // 중단 사유 입력은 SanctionModal의 AD_SUSPEND 형식을 사용한다.
 
     const [suspendTarget, setSuspendTarget] = useState(null);
 
     const { data, isLoading: loading, isFetching, isPlaceholderData, error: adsError, refetch } = useQuery({
-        queryKey: [...adKeys.admin(), page, debouncedSearch],
-        queryFn: async () => {
-            const result = await adService.getAllAds(page, PAGE_SIZE, debouncedSearch);
+        queryKey: [...adKeys.admin(), page, search.trim()],
+        queryFn: async ({ signal }) => {
+            const result = await adService.getAllAds(page, PAGE_SIZE, search, signal);
             return {
                 ads: result?.content ?? [],
                 // Spring 페이지의 page 하위 메타데이터를 읽는다.
@@ -92,9 +90,6 @@ const AdminAdsTab = () => {
         onError: () => message.error('중단 처리에 실패했어요.'),
     });
 
-    // 클라이언트 필터(filteredAds)는 제거했다 — 서버가 검색까지 처리하므로 받은 결과가 곧 정답이다.
-    // useDebounce는 그대로 둔다. 이제는 "리렌더 억제"가 아니라 **타이핑 한 글자마다 서버를 때리지
-    // 않기 위한 것**이라 오히려 더 중요해졌다(300ms).
     const handleSuspend = (record) => setSuspendTarget(record);
 
     const columns = [
@@ -105,9 +100,14 @@ const AdminAdsTab = () => {
         {
             title: '상태', dataIndex: 'status', key: 'status', width: 160,
             render: (v, r) => (
-                <div>
+                <div className="reserve-ad-table-status">
                     <Tag color={STATUS_CONFIG[v]?.color}>{STATUS_CONFIG[v]?.label || v}</Tag>
-                    {r.suspendReason && <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary, display: 'block' }}>{r.suspendReason}</Text>}
+                    {r.suspendReason && <>
+                        <span aria-hidden="true">·</span>
+                        <Tooltip title={r.suspendReason}>
+                            <span className="reserve-ad-table-status-reason" tabIndex={0}>{r.suspendReason}</span>
+                        </Tooltip>
+                    </>}
                 </div>
             ),
         },
@@ -123,26 +123,19 @@ const AdminAdsTab = () => {
 
     // 광고 목록 본문 — 오류 → 로딩(스켈레톤) → 표 순으로 판정한다.
     const renderAdList = () => {
-        if (adsError) {
+        if (isBlockingListReadError(adsError, ads)) {
             return (
                 <DataState state="error" kind="advertisement" subject="광고 목록" error={adsError}
                     onRetry={refetch} retrying={isFetching} />
             );
         }
-        if (loading || isPlaceholderData || search.trim() !== debouncedSearch.trim()) {
-            return (
-                <AdminTableSkeleton
-                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
-                    cols={SKELETON_COLS}
-                    headers={SKELETON_HEADERS}
-                    actionBtns={1}
-                    pagination={totalElements ? { current: page + 1, pageSize: PAGE_SIZE, total: totalElements } : null}
-                />
-            );
-        }
         return (
-            <DataTable
+            <PagedDataTable
+                placeholder={(loading || isPlaceholderData) && <AdminTableSkeleton
+                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
+                    cols={SKELETON_COLS} headers={SKELETON_HEADERS} actionBtns={1} />}
                 rowKey="id"
+                scroll={{ x: SKELETON_COLS.reduce((total, width) => total + width, 0) }}
                 columns={columns}
                 dataSource={ads}
                 pagination={{
@@ -161,11 +154,13 @@ const AdminAdsTab = () => {
         <div>
             <FilterToolbar
                 count={totalElements}
-                search={{ value: search, onChange: handleSearchChange, placeholder: '가게명으로 검색' }}
+                search={{ value: search, onSubmit: handleSearchChange, placeholder: '가게명으로 검색' }}
                 onReload={refetch}
                 loading={loading || isFetching}
                 initialLoading={loading}
             />
+            {adsError && !isBlockingListReadError(adsError, ads) && <DataState compact state="error" kind="advertisement"
+                subject="광고 목록 갱신" error={adsError} onRetry={refetch} retrying={isFetching} />}
             {renderAdList()}
 
             <SanctionModal

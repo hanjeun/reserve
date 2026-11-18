@@ -14,6 +14,7 @@ export default function useStoreNewsEvents(enabled, managed = false) {
         if (!enabled || live.present) return undefined;
         let stopped = false, stream, reconnect, pending, fallback;
         let failures = 0;
+        let retryAt = 0;
         const current = () => !stopped && useAuthStore.getState().sessionRevision === revision;
         const refresh = () => {
             if (!current() || document.hidden || pending) return;
@@ -29,19 +30,27 @@ export default function useStoreNewsEvents(enabled, managed = false) {
             stream = connection;
             connection.addEventListener('ready', () => {
                 if (!current() || stream !== connection) return;
-                failures = 0; clearInterval(fallback); fallback = undefined; refresh();
+                failures = 0; retryAt = 0; clearInterval(fallback); fallback = undefined; refresh();
             });
             connection.addEventListener('news-changed', () => { if (stream === connection) refresh(); });
             connection.onerror = () => {
                 if (!current() || stream !== connection) return;
                 connection.close(); stream = undefined; poll();
-                if (current() && !document.hidden) reconnect = setTimeout(connect, Math.min(30_000, 5_000 * 2 ** Math.min(failures++, 3)));
+                retryAt = Date.now() + Math.min(30_000, 5_000 * 2 ** Math.min(failures++, 3));
+                if (!document.hidden) resume();
             };
+        };
+        const resume = () => {
+            const remaining = retryAt - Date.now();
+            if (remaining > 0) {
+                poll();
+                reconnect = setTimeout(connect, remaining);
+            } else connect();
         };
         const visibility = () => {
             clearTimeout(reconnect); clearTimeout(pending); pending = undefined;
             clearInterval(fallback); fallback = undefined; stream?.close(); stream = undefined;
-            if (!document.hidden) connect();
+            if (!document.hidden) resume();
         };
         connect(); document.addEventListener('visibilitychange', visibility);
         return () => {

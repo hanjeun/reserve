@@ -14,7 +14,7 @@ export function newReservationRequestId() {
 }
 
 // 요약 해시와 임의 요청 ID만 저장하고 폼 내용·인증 정보는 제외한다.
-export async function reservationRequestAttempt(scope, payload, submittedRequestId = null) {
+export async function reservationRequestAttempt(scope, payload, submittedRequestId = null, { reuseOnly = false } = {}) {
     if (submittedRequestId !== null && !UUID.test(submittedRequestId)) throw new Error('예약 요청 번호를 확인해주세요.');
     const time = /^\d{2}:\d{2}:00$/.test(payload.reservationTime) ? payload.reservationTime.slice(0, 5) : payload.reservationTime;
     const fields = [payload.storeId, payload.reservationDate, time,
@@ -32,6 +32,7 @@ export async function reservationRequestAttempt(scope, payload, submittedRequest
     }
     const reused = saved?.hash === hash && UUID.test(saved?.requestId ?? '')
         && (submittedRequestId === null || saved.requestId === submittedRequestId);
+    if (reuseOnly && !reused) return null;
     if (!reused) saved = { hash, requestId: submittedRequestId ?? newReservationRequestId() };
     pending.set(scope, saved);
     if (canPersist) {

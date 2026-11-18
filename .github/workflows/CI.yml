@@ -116,6 +116,9 @@ jobs:
           CI_FORCE_TESTS: ${{ github.event_name == 'workflow_dispatch' || vars.CI_FORCE_TESTS == 'true' }}
           CI_TEST_CONFIG_REVISION: ${{ vars.CI_TEST_CONFIG_REVISION }}
         run: node scripts/ci-evidence.mjs restore backend
+      - name: Test actual JAR compatibility verifier
+        if: steps.evidence.outputs.reused != 'true'
+        run: node --test scripts/tests/release-compatibility.test.mjs
       - name: Test backend (unit, Spring/H2, isolated MySQL and Redis)
         id: backend_tests
         if: steps.evidence.outputs.reused != 'true'
@@ -406,6 +409,13 @@ jobs:
             --label reserve.feature-compat=waiting-signup-hidden-feed-oauth-login-session-admission-mfa-completion-test-settlement-v11 \
             -t "reserve-security:$COMMIT_SHA" \
             ./backend
+
+      - name: Verify actual backend JAR compatibility
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          IMAGE_ID=$(docker image inspect --format '{{.Id}}' "reserve-security:$COMMIT_SHA")
+          bash scripts/check-release-compatibility-image.sh "$IMAGE_ID"
 
       - name: Scan backend image vulnerabilities
         env:

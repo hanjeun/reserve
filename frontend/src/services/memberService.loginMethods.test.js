@@ -44,5 +44,7 @@ it.each(['legacy', 'v1'])('routes every login-method operation through the authe
         ['delete', `${root}/password`], ['delete', `${root}/social`], ['put', `${root}/password`],
     ]);
     for (const request of requests.slice(1)) expect(request.headers.get('X-Reserve-Member-Id')).toBe('7');
+    expect(requests.slice(1, 3).map(request => Boolean(request.skipAuthRefresh))).toEqual([false, false]);
+    expect(requests.slice(3).map(request => request.skipAuthRefresh)).toEqual([true, true, true, true]);
     expect(JSON.parse(requests[5].data)).toEqual({ currentPassword: 'Original123!' });
 });

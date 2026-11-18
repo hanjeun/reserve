@@ -8,6 +8,7 @@ export const ENTITY_LABELS = {
     MEMBER:      { label: '회원',       color: 'purple'  },
     STORE:       { label: '가게',       color: 'green'   },
     RESERVATION: { label: '예약',       color: 'orange'  },
+    PAYMENT:     { label: '결제',       color: 'blue'    },
     REVIEW:      { label: '리뷰',       color: 'volcano' },
 };
 
@@ -27,6 +28,7 @@ export const AUDIT_TYPE_OPTIONS = [
     { value: 'RECEIVED_INQUIRY', label: '받은 문의' },
     { value: 'MEMBER',      label: '회원' },
     { value: 'STORE',       label: '가게' },
+    { value: 'PAYMENT',     label: '결제' },
     { value: 'RESERVATION', label: '예약' },
     { value: 'REVIEW',      label: '리뷰' },
 ];

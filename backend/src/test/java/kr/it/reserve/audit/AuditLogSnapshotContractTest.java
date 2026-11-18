@@ -1,5 +1,6 @@
 package kr.it.reserve.audit;
 
+import kr.it.reserve.global.trash.ReceivedInquiryTrash;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.it.reserve.advertisement.entity.AdStatus;
@@ -12,7 +13,6 @@ import kr.it.reserve.audit.service.AuditCleanupWorker;
 import kr.it.reserve.audit.service.AuditLogService;
 import kr.it.reserve.audit.service.AdminSanctionService;
 import kr.it.reserve.global.error.AuditException;
-import kr.it.reserve.global.trash.ReceivedInquiryTrash;
 import kr.it.reserve.mailbox.entity.AdminSentMail;
 import kr.it.reserve.mailbox.repository.AdminSentMailRepository;
 import kr.it.reserve.member.entity.Member;
@@ -23,6 +23,7 @@ import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.review.entity.Review;
 import kr.it.reserve.review.repository.ReviewRepository;
+import kr.it.reserve.review.service.ReviewMutationGuard;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.repository.StoreRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -76,6 +77,7 @@ class AuditLogSnapshotContractTest {
     @Mock private StoreRepository storeRepository;
     @Mock private PaymentService paymentService;
     @Mock private ReceivedInquiryTrash inquiryTrash;
+    @Mock private ReviewMutationGuard reviewMutations;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private AuditLogService service;
@@ -83,7 +85,7 @@ class AuditLogSnapshotContractTest {
     @BeforeEach
     void setUp() {
         service = new AuditLogService(auditLogRepository, adminSentMailRepository, reservationRepository,
-                reviewRepository, advertisementRepository, objectMapper, auditCleanupWorker, paymentService, inquiryTrash);
+                reviewRepository, advertisementRepository, objectMapper, auditCleanupWorker, paymentService, inquiryTrash, reviewMutations);
         Member actor = Member.builder().id(90L).email(ACTOR_EMAIL).build();
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(actor, null, List.of()));
@@ -157,7 +159,7 @@ class AuditLogSnapshotContractTest {
         String content = "12345678901234567890원문은 삭제하지 않고 보존합니다";
         Review review = Review.builder().id(31L).store(store()).member(Member.builder().id(7L).build())
                 .rating(5).content(content).build();
-        when(reviewRepository.findById(31L)).thenReturn(Optional.of(review));
+        when(reviewMutations.lockReview(31L, false)).thenReturn(Optional.of(review));
         LocalDateTime started = LocalDateTime.now(Clock.systemDefaultZone());
 
         service.softDeleteReview(31L);
@@ -167,8 +169,9 @@ class AuditLogSnapshotContractTest {
         assertRecordedLog("REVIEW", 31L, SOFT_DELETE_ACTION,
                 Map.of("가게", "스냅샷 가게", "작성자", "", "별점", "5점", "내용", "12345678901234567890..."),
                 started, 30);
-        verify(reviewRepository).findById(31L);
-        verifyNoMoreInteractions(auditLogRepository, reviewRepository);
+        verify(reviewMutations).lockReview(31L, false);
+        verify(reviewMutations).updateRating(review.getStore());
+        verifyNoMoreInteractions(auditLogRepository, reviewRepository, reviewMutations);
         verifyNoInteractions(adminSentMailRepository, reservationRepository, advertisementRepository, auditCleanupWorker);
     }
 
@@ -202,6 +205,9 @@ class AuditLogSnapshotContractTest {
         Reservation reservation = reservation(); reservation.softDelete();
         if (RESERVATION_TYPE.equalsIgnoreCase(entityType))
             when(reservationRepository.findByIdForUpdate(51L)).thenReturn(Optional.of(reservation));
+        Review review = Review.builder().id(51L).store(store()).deletedAt(started).build();
+        if ("REVIEW".equalsIgnoreCase(entityType))
+            when(reviewMutations.lockReview(51L, true)).thenReturn(Optional.of(review));
 
         service.restore(entityType, 51L);
 
@@ -213,14 +219,18 @@ class AuditLogSnapshotContractTest {
                 verify(reservationRepository).findByIdForUpdate(51L);
                 assertThat(reservation.isDeleted()).isFalse();
             }
-            case "REVIEW" -> verify(reviewRepository).restoreById(51L);
+            case "REVIEW" -> {
+                verify(reviewMutations).lockReview(51L, true);
+                verify(reviewMutations).updateRating(review.getStore());
+                assertThat(review.isDeleted()).isFalse();
+            }
             case "ADVERTISEMENT" -> verify(advertisementRepository).restoreById(51L);
             default -> throw new AssertionError("Unexpected test type: " + entityType);
         }
         verify(auditLogRepository).deleteSoftDeleteLog(normalizedType, 51L);
         assertRecordedLog(entityType, 51L, "RESTORE", Map.of(), started, 90);
         verifyNoMoreInteractions(auditLogRepository, adminSentMailRepository,
-                reservationRepository, reviewRepository, advertisementRepository);
+                reservationRepository, reviewRepository, advertisementRepository, reviewMutations);
         verifyNoInteractions(auditCleanupWorker);
     }
 
@@ -249,7 +259,7 @@ class AuditLogSnapshotContractTest {
     @DisplayName("회원 정지는 기간·정규화된 사유와 같은 관리자의 90일 감사 기록을 남긴다")
     void memberSuspensionKeepsItsReasonAndAuditIdentity() throws Exception {
         Member member = Member.builder().id(7L).email("customer@example.test").role(Role.USER).build();
-        when(memberRepository.findByIdAndDeletedAtIsNull(7L)).thenReturn(Optional.of(member));
+        when(memberRepository.findActiveByIdForUpdate(7L)).thenReturn(Optional.of(member));
         LocalDateTime started = LocalDateTime.now(Clock.systemDefaultZone());
 
         new AdminSanctionService(memberRepository, storeRepository, service)
@@ -260,6 +270,7 @@ class AuditLogSnapshotContractTest {
         assertThat(member.getSuspendReason()).isEqualTo("반복 위반");
         assertThat(member.isSuspended()).isTrue();
         assertThat(member.isDeleted()).isFalse();
+        verify(memberRepository).findActiveByIdForUpdate(7L);
         assertRecordedLog("MEMBER", 7L, "SUSPEND",
                 Map.of("이메일", "customer@example.test", "사유", "3일 정지 / 반복 위반"), started, 90);
         verifyNoInteractions(storeRepository, auditCleanupWorker);

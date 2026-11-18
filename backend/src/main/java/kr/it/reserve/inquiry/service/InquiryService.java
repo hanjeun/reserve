@@ -5,6 +5,7 @@ import kr.it.reserve.file.service.SupportMailPhotos;
 import kr.it.reserve.file.util.ImageFileValidator.ValidatedImage;
 import kr.it.reserve.global.common.PageRequests;
 import kr.it.reserve.global.error.InquiryException;
+import kr.it.reserve.global.support.PaymentReceiptRequests;
 import kr.it.reserve.global.trash.ReceivedInquiryTrash;
 import kr.it.reserve.inquiry.dto.InquiryDto;
 import kr.it.reserve.inquiry.entity.Inquiry;
@@ -24,11 +25,13 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class InquiryService {
+public class InquiryService implements PaymentReceiptRequests {
 
     private final InquiryRepository inquiryRepository;
     private final MemberRepository memberRepository;
@@ -36,6 +39,17 @@ public class InquiryService {
     private final AdminMailService adminMailService;
     private final ApplicationEventPublisher events;
     private final SupportMailPhotos mailPhotos;
+
+    @Override
+    public Optional<Long> requesterFor(long inquiryId, String merchantUid) {
+        var orderNumber = Pattern.compile("(?<![A-Za-z0-9_-])" + Pattern.quote(merchantUid) + "(?![A-Za-z0-9_-])");
+        return inquiryRepository.findById(inquiryId)
+                .filter(inquiry -> !inquiry.isDeleted() && !inquiry.isInboundEmail())
+                .filter(inquiry -> orderNumber.matcher(inquiry.getTitle()).find() || orderNumber.matcher(inquiry.getContent()).find())
+                .map(Inquiry::getMember)
+                .filter(member -> member.getDeletedAt() == null)
+                .map(Member::getId);
+    }
 
     // 공통 페이징 생성 유틸
     private Pageable getPageable(int page, int size) {

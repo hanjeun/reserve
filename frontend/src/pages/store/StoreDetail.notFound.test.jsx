@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import StoreDetail from './StoreDetail';
-import { useStoreData } from '../../hooks';
+import { useStoreData, useStoreDetailActions } from '../../hooks';
 import useAuthStore from '../../store/useAuthStore';
 
 vi.mock('../../api/axios', () => ({ default: {} }));
@@ -16,7 +16,7 @@ vi.mock('../../hooks', () => ({
     useMessage: () => ({ message: {} }),
     usePayment: () => ({ pay: vi.fn(), paying: false }),
     useWindowWidth: () => 1280,
-    useStoreDetailActions: () => ({}),
+    useStoreDetailActions: vi.fn(() => ({})),
     useStoreImageHint: () => null,
 }));
 
@@ -59,10 +59,20 @@ describe('store detail for an address that is not a store', () => {
         expect(screen.getByRole('link', { name: '가게에 전화하기 02-1234-5678' })).toHaveAttribute('href', 'tel:0212345678');
     });
 
-    it('does not send a non-numeric id to the API and shows the not-found state without a retry', () => {
-        renderAt('/store/abc');
+    it('uses the public UUID for the read and the returned numeric ID for store actions', () => {
+        const publicId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+        const store = { id: 12, publicId, ownerId: 7, name: '공유 가게', reservationEnabled: false };
+        useStoreData.mockReturnValue({ ...idle, store });
+        renderAt('/store/' + publicId.toUpperCase());
+        expect(useStoreData).toHaveBeenCalledWith(publicId.toUpperCase(), { reservationId: null });
+        expect(useStoreDetailActions).toHaveBeenLastCalledWith(expect.objectContaining({ id: 12, store }));
+        expect(screen.getByRole('heading', { name: '공유 가게' })).toBeInTheDocument();
+    });
 
-        expect(useStoreData).toHaveBeenCalledWith(null, { reservationId: null });
+    it.each(['abc', '42'])('shows the not-found state without a retry for a retired or invalid address %s', address => {
+        renderAt('/store/' + address);
+
+        expect(useStoreData).toHaveBeenCalledWith(address, { reservationId: null });
         expect(screen.getByText('요청하신 가게를 찾을 수 없어요.')).toBeInTheDocument();
         expect(screen.queryByRole('alert')).toBeNull();
         expect(screen.queryByRole('button', { name: '다시 불러오기' })).toBeNull();

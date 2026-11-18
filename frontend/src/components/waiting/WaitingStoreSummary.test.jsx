@@ -6,9 +6,9 @@ import { LiveUpdatesContext } from '../../hooks/useLiveUpdatesStatus';
 
 const clients = [];
 afterEach(() => { clients.splice(0).forEach(client => client.clear()); vi.useRealTimers(); });
-const store = { id: 31, waitingIntakeMode: 'REMOTE', waitingPaused: false, waitingTeams: 2 };
+const store = { id: 31, publicId: '11111111-1111-4111-8111-111111111111', waitingIntakeMode: 'REMOTE', waitingPaused: false, waitingTeams: 2 };
 function Detail({ read }) {
-    const { data } = useQuery({ queryKey: ['stores', 'detail', '31'], queryFn: read, initialData: store, staleTime: Infinity });
+    const { data } = useQuery({ queryKey: ['stores', 'detail', store.publicId], queryFn: read, initialData: store, staleTime: Infinity });
     return <WaitingStoreSummary store={data} detail />;
 }
 const clientFor = () => {
@@ -24,7 +24,11 @@ it('refreshes the current detail aggregate when opened and renders the updated s
     expect(read).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: '웨이팅 정보: 접수 가능, 대기 2팀' }));
     await waitFor(() => expect(screen.getByRole('button', { name: '웨이팅 정보: 접수 중지, 대기 4팀' })).toHaveAttribute('aria-expanded', 'true'));
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['stores', 'detail', '31'], exact: true }, { cancelRefetch: false });
+    expect(invalidate).toHaveBeenCalledExactlyOnceWith({ queryKey: ['stores'], predicate: expect.any(Function) }, { cancelRefetch: false });
+    const [{ predicate }] = invalidate.mock.calls[0];
+    expect(predicate({ queryKey: ['stores', 'detail', '31'] })).toBe(true);
+    expect(predicate({ queryKey: ['stores', 'detail', '32'] })).toBe(false);
+    expect(predicate({ queryKey: ['stores', 'list', store.publicId] })).toBe(false);
     expect(read).toHaveBeenCalledOnce();
     expect(screen.getByText('대기 4팀')).toBeInTheDocument();
 });

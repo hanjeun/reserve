@@ -11,8 +11,9 @@ const originalWidth = window.innerWidth;
 const clients = [];
 const setWidth = value => Object.defineProperty(window, 'innerWidth', { configurable: true, value });
 const cover = container => container.querySelector('.reserve-data-skeleton [style*="aspect-ratio"]');
+const publicIdFor = id => '00000000-0000-4000-8000-' + String(id).padStart(12, '0');
 const documentHint = (id, extra = {}) => {
-    for (const [key, value] of Object.entries({ id, url: `https://cdn.reserve.it.kr/users/3/stores/${id}/images/first.webp`, width: 600, height: 800, ...extra })) {
+    for (const [key, value] of Object.entries({ id, 'public-id': publicIdFor(id), url: `https://cdn.reserve.it.kr/users/3/stores/${id}/images/first.webp`, width: 600, height: 800, ...extra })) {
         const meta = document.createElement('meta'); meta.name = `reserve-store-image-${key}`; meta.content = String(value); document.head.append(meta);
     }
 };
@@ -26,9 +27,10 @@ describe('one store detail loading frame', () => {
     it.each([[899, '700px', '20px 24px 80px'], [900, '1200px', '32px 24px 80px']])(
         'has the detailed frame and exact photo ratio immediately at %ipx without a query provider', (width, maxWidth, padding) => {
             setWidth(width); documentHint(width);
-            const { container } = render(<RouteSkeletonPreview pathname={`/store/${width}`} />);
+            const { container } = render(<RouteSkeletonPreview pathname={`/store/${publicIdFor(width)}`} />);
             expect(container.querySelector('.reserve-route-skeleton--detail .reserve-page-container')).toHaveStyle({ maxWidth, padding });
             expect(cover(container).style.aspectRatio).toBe('600 / 800');
+            expect(Boolean(container.querySelector('.reserve-store-section-nav-skeleton'))).toBe(width < 900);
             expect(container.querySelector('img,button,input,a')).toBeNull();
         });
 
@@ -55,7 +57,7 @@ describe('one store detail loading frame', () => {
 
     it('keeps the full carousel track height from the document through the public data frame', () => {
         documentHint(806, { width: 1200, height: 500, 'layout-ratio': 0.75 });
-        const { container, rerender } = render(<RouteSkeletonPreview pathname="/store/806" />);
+        const { container, rerender } = render(<RouteSkeletonPreview pathname={`/store/${publicIdFor(806)}`} />);
         expect(cover(container)).toHaveStyle({ aspectRatio: '0.75' });
         const client = new QueryClient(); clients.push(client);
         const first = 'https://cdn.reserve.it.kr/users/3/stores/806/images/first.webp';

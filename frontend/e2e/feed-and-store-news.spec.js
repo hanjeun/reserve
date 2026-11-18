@@ -128,6 +128,51 @@ test('benefits write icon opens the approval writer directly and keeps a photo a
     await page.screenshot({ path: testInfo.outputPath('benefits-approved.png') });
 });
 
+for (const theme of ['light', 'dark']) test(`photo uploads keep the add tile first and separate preview from removal (${theme})`, async ({ page }) => {
+    await page.addInitScript(value => localStorage.setItem('reserve:theme', value), theme);
+    await setup(page, 'BUSINESS');
+    await page.goto('/benefits');
+    await page.getByRole('button', { name: '가게 소식 작성', exact: true }).click();
+    const editor = page.getByRole('dialog', { name: /새 가게 소식|가게 소식 미리보기/ });
+    await editor.getByLabel('혜택 사진 선택').setInputFiles(Array.from({ length: 5 }, (_, index) => ({
+        name: `photo-${index}.png`, mimeType: 'image/png', buffer: image,
+    })));
+    const list = editor.locator('.reserve-picture-upload .ant-upload-list-picture-card');
+    const photos = list.locator(':scope > .ant-upload-list-item-container');
+    await expect(photos).toHaveCount(5);
+    await page.evaluate(() => document.fonts.ready);
+    await list.evaluate(async node => {
+        const animations = node.getAnimations({ subtree: true }).filter(animation => Number.isFinite(animation.effect.getComputedTiming().iterations));
+        await Promise.allSettled(animations.map(animation => animation.finished));
+    });
+    const add = list.locator(':scope > .ant-upload-select');
+    const position = async locator => locator.evaluate(node => {
+        const box = node.getBoundingClientRect();
+        return { x: box.x, y: box.y, width: box.width, height: box.height };
+    });
+    const initial = await position(add);
+    const first = await position(photos.first());
+    expect(initial.x + initial.width).toBeLessThanOrEqual(first.x);
+    await expect.poll(async () => Math.abs((await position(add)).y - (await position(photos.first())).y)).toBeLessThan(1);
+    await list.evaluate(node => { node.scrollLeft = node.scrollWidth; });
+    await expect.poll(async () => Math.abs((await position(add)).x - initial.x)).toBeLessThan(1);
+    const actions = photos.last().locator('.ant-upload-list-item-actions');
+    const preview = actions.locator(':scope > a');
+    const remove = actions.locator(':scope > button');
+    await preview.focus();
+    const previewBox = await position(preview);
+    const removeBox = await position(remove);
+    for (const box of [previewBox, removeBox]) {
+        expect(box.width).toBeGreaterThanOrEqual(44);
+        expect(box.height).toBeGreaterThanOrEqual(44);
+    }
+    expect(removeBox.x - previewBox.x - previewBox.width).toBeGreaterThanOrEqual(11.5);
+    expect(Math.abs(removeBox.y - previewBox.y)).toBeLessThan(1);
+    await preview.click();
+    await expect(page.locator('.reserve-image-preview img')).toBeVisible();
+    await expect(photos).toHaveCount(5);
+});
+
 test('an ordinary member chooses a public profile and publishes a photo without a store or real-name disclosure', async ({ page }, testInfo) => {
     const state = await setup(page, 'USER');
     await page.goto('/feed');

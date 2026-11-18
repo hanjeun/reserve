@@ -24,6 +24,17 @@ describe('auth identity transitions', () => {
         expect(useAuthStore.getState().authRestoring).toBe(false);
         expect(useAuthStore.getState().user).toEqual(a);
     });
+    it('기기 등록 선택은 현재 로그인 메모리에만 두고 계정 전환 때 지워요', () => {
+        const browserRegistrationReference = 'd'.repeat(64);
+        useAuthStore.getState().login(a, { browserRegistrationReference });
+        expect(useAuthStore.getState().browserRegistrationReference).toBe(browserRegistrationReference);
+        expect(localStorage.getItem('auth-storage')).not.toContain(browserRegistrationReference);
+        useAuthStore.getState().updateUser({ ...a, name: 'renamed' });
+        expect(useAuthStore.getState().browserRegistrationReference).toBe(browserRegistrationReference);
+        useAuthStore.getState().login(b);
+        expect(useAuthStore.getState().browserRegistrationReference).toBeNull();
+    });
+
     it('A checkAuth success cannot restore A after B logs in', async () => {
         useAuthStore.getState().login(a);
         const pending = deferred();

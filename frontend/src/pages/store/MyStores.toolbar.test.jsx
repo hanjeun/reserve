@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import MyStores from './MyStores';
 
 const ownedStores = [
@@ -97,4 +97,14 @@ describe('my stores shared toolbar', () => {
         expect(routeParams().get('view')).toBe('list');
         expect(routeParams().get('utm_source')).toBe('yes');
     });
+});
+
+it('sends the previous store drafts address to the store category', async () => {
+    render(<MemoryRouter initialEntries={['/my-stores?view=drafts']}>
+        <Routes>
+            <Route path="/my-stores" element={<MyStores />} />
+            <Route path="/drafts" element={<RouteProbe />} />
+        </Routes>
+    </MemoryRouter>);
+    expect(await screen.findByTestId('route')).toHaveTextContent('?tab=stores');
 });

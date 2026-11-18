@@ -1,8 +1,9 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeftOutlined, BellOutlined } from '../common/icons';
+import { ArrowLeftOutlined } from '../common/icons';
 import { Button, DataState } from '../common';
+import LoadingImage from '../common/LoadingImage';
 import TextLink from '../common/TextLink';
 import MessengerThreadSkeleton from './MessengerThreadSkeleton';
 import { chatListQueryPolicy } from './chatListQueryPolicy';
@@ -11,6 +12,7 @@ import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
 import { chatKeys } from '../../hooks/queryKeys';
 import { chatService } from '../../services';
 import { formatTime } from '../../utils/date';
+import notificationArt from '../../assets/state-illustrations/empty-notification-512.webp?url&no-inline';
 
 const TITLE = 'RESERVE 알림';
 const COPY = {
@@ -21,13 +23,21 @@ const COPY = {
 const EMPTY = [];
 const sentAt = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' });
 
+function NotificationAvatar({ thread = false }) {
+    const shape = thread ? 'reserve-messenger-thread-avatar' : 'reserve-messenger-row-icon';
+    return <span className={shape + ' reserve-messenger-notification-avatar'} aria-hidden="true">
+        <LoadingImage src={notificationArt} width={42} height={42} alt="" draggable={false} />
+    </span>;
+}
+NotificationAvatar.propTypes = { thread: PropTypes.bool };
+
 export function ReservationNotificationEntry({ buttonRef, selected, onSelect, pollUnread }) {
     const { data } = useQuery({ queryKey: chatKeys.unread(), queryFn: chatService.getUnread,
         ...chatListQueryPolicy, enabled: pollUnread, staleTime: 30_000 });
     const { notifications: unread } = chatUnreadCounts(data);
     return <button type="button" ref={buttonRef} className={`reserve-messenger-row${selected ? ' is-selected' : ''}`}
         aria-current={selected ? 'true' : undefined} onClick={onSelect}>
-        <span className="reserve-messenger-row-icon" aria-hidden="true"><BellOutlined /></span>
+        <NotificationAvatar />
         <span className="reserve-messenger-row-copy">
             <span className="reserve-messenger-row-line"><strong>{TITLE}</strong></span>
             <span className="reserve-messenger-row-preview">예약 상태와 일정 안내</span>
@@ -115,7 +125,7 @@ export default function ReservationNotificationThread({ onBack, onAnimationEnd, 
         <header className="reserve-messenger-thread-heading">
             <button type="button" className="reserve-messenger-mobile-back" onClick={onBack} disabled={returningToList}
                 aria-label="대화 목록으로 돌아가기"><ArrowLeftOutlined /></button>
-            <span className="reserve-messenger-thread-avatar" aria-hidden="true"><BellOutlined /></span>
+            <NotificationAvatar thread />
             <span className="reserve-messenger-thread-copy"><strong ref={heading} id={titleId} tabIndex={-1}>{TITLE}</strong></span>
         </header>
         <div className="reserve-messenger-thread-body" ref={scroll} aria-busy={query.isPending}>

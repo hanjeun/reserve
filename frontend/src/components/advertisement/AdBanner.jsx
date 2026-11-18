@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
+import { storeDetailPath } from '../../utils/storePublicAddress';
 import { colors } from '../../styles/tokens';
 import { getDetailImageUrl } from '../../utils/image';
 import adService from '../../services/adService';
@@ -57,7 +58,7 @@ const AdBanner = ({ ads }) => {
     const handleBannerClick = () => {
         void adService.recordClick(ad.id);
         recordAdClick(ad.id, ad.storeId);
-        navigate(`/store/${ad.storeId}`);
+        navigate(storeDetailPath({ publicId: ad.storePublicId }) ?? '/stores');
     };
 
     return (

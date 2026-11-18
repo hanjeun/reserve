@@ -1,11 +1,14 @@
 package kr.it.reserve.global.holiday;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.it.reserve.global.common.ServiceTime;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.ResourceAccessException;
@@ -25,19 +28,19 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-/**
- * 공휴일 조회 — <b>"실패해도 예약이 멀쩡한가"가 이 테스트의 전부다.</b>
- *
- * <p>이 기능은 달력을 빨갛게 칠하는 것 말고는 하는 일이 없다. 그래서 여기서 지켜야 할 계약은
- * "공휴일을 잘 찾는다"보다 <b>"못 찾아도 조용히 비켜준다"</b>가 먼저다 —
- * 외부 포털이 죽었다고 우리 예약 화면이 같이 죽으면, 안 사도 될 장애를 사 온 것이다.
- */
+/** 외부 공휴일 조회가 실패해도 예약 달력 조회가 중단되지 않는지 검증한다. */
 @ExtendWith(MockitoExtension.class)
 class HolidayServiceTest {
 
     @Mock private RestTemplate restTemplate;
+    @Mock private MockedStatic<ServiceTime> time;
 
     private static final YearMonth JAN = YearMonth.of(2026, 1);
+
+    @BeforeEach
+    void fixedDate() {
+        time.when(ServiceTime::today).thenReturn(JAN.atDay(1));
+    }
 
     /** 실제 응답 모양 그대로 — 빨간날(Y) 사이에 빨간날이 아닌 국경일(N)이 섞여 있다. */
     private static final String TWO_ITEMS = """
@@ -60,6 +63,14 @@ class HolidayServiceTest {
         HolidayService s = service("");
 
         assertThat(s.holidaysOf(JAN)).isEmpty();
+        verifyNoInteractions(restTemplate);
+    }
+
+    @Test
+    void skipsUnsupportedMonthsEvenWhenCalledDirectlyByTheReservationCalendar() {
+        HolidayService s = service("KEY");
+        assertThat(s.holidaysOf(JAN.minusMonths(13))).isEmpty();
+        assertThat(s.holidaysOf(JAN.plusMonths(37))).isEmpty();
         verifyNoInteractions(restTemplate);
     }
 

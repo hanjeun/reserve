@@ -16,6 +16,14 @@ import java.util.Optional;
 
 public interface AdPaymentAttemptRepository extends JpaRepository<AdPaymentAttempt, Long> {
     Optional<AdPaymentAttempt> findByMerchantUid(String merchantUid);
+
+    @Query("""
+            SELECT a FROM AdPaymentAttempt a
+            WHERE a.merchantUid = :merchantUid AND a.ownerId = :memberId AND a.everPaid = true
+            AND a.state IN ('PAID', 'REFUNDED', 'REFUND_PENDING')
+            AND EXISTS (SELECT m.id FROM Member m WHERE m.id = :memberId AND m.deletedAt IS NULL)
+            """)
+    Optional<AdPaymentAttempt> findReceiptOrder(@Param("merchantUid") String merchantUid, @Param("memberId") long memberId);
     @Query("SELECT p.adId FROM AdPaymentAttempt p WHERE p.merchantUid = :uid")
     Optional<Long> findAdId(@Param("uid") String uid);
     @Query("SELECT p.adId FROM AdPaymentAttempt p WHERE p.id = :id")

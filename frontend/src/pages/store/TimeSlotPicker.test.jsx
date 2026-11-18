@@ -1,13 +1,21 @@
 import React, { useEffect } from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render as renderUi, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Form } from 'antd';
 import dayjs from 'dayjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReservationPanel, TimeSlotPicker } from '../../components/reservation/StoreReservationPanel';
 
 const api = vi.hoisted(() => ({ get: vi.fn() }));
+let queryClient;
+beforeEach(() => { queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } }); });
+function QueryHarness({ children }) {
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+}
+const render = ui => renderUi(ui, { wrapper: QueryHarness });
 afterEach(async () => {
     cleanup();
+    queryClient.clear();
     // 언마운트 뒤에도 남는 Form.Item의 10ms 콜백은 jsdom 정리 전에 실행한다.
 
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
@@ -214,7 +222,7 @@ describe('time slot lookup and submission boundaries', () => {
         const onFinish = vi.fn();
         render(<PanelHarness initialTime="10:00" editingReservation={editingReservation} onForm={onForm} onFinish={onFinish} />);
         expect(await screen.findByRole('button', { name: '10:00' })).toBeEnabled();
-        expect(screen.getByRole('button', { name: '11:00' })).toBeDisabled();
+        expect(screen.queryByRole('button', { name: '11:00' })).not.toBeInTheDocument();
         expect(form.getFieldValue('reservationTime')).toBe('10:00');
         expect(screen.getByText(/기존 예약 시간이에요/)).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: '예약 변경하기' }));
@@ -230,7 +238,8 @@ describe('time slot lookup and submission boundaries', () => {
         let form;
         const onForm = value => { form = value; };
         render(<PanelHarness initialTime="10:00" initialDate={context.initialDate} editingReservation={context.editing} onForm={onForm} onFinish={vi.fn()} />);
-        expect(await screen.findByRole('button', { name: '10:00' })).toBeDisabled();
+        expect(await screen.findByText('이 날은 예약이 마감됐어요')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: '10:00' })).not.toBeInTheDocument();
         expect(form.getFieldValue('reservationTime')).toBeUndefined();
         let validation;
         await act(async () => {
@@ -276,6 +285,46 @@ describe('time slot lookup and submission boundaries', () => {
             validation = await form.validateFields(['reservationTime']).catch(error => error);
         });
         expect(validation.errorFields[0].errors).toContain('예약 가능한 시간을 다시 불러와 주세요.');
+    });
+
+    it('enforces the remaining guest limit and retires a slot when it fills during a refresh', async () => {
+        const available = { ...slot(), remainingCapacity: 2 };
+        const full = { ...slot('10:00', false), remainingCapacity: 0 };
+        api.get.mockResolvedValueOnce([available]).mockResolvedValueOnce([full]);
+        let form;
+        const onForm = value => { form = value; };
+        render(<PanelHarness initialTime="10:00" onForm={onForm} onFinish={vi.fn()} />);
+        const time = await screen.findByRole('button', { name: '10:00' });
+        expect(time).toHaveAttribute('aria-pressed', 'true');
+        const add = screen.getByRole('button', { name: '인원 늘리기' });
+        fireEvent.click(add);
+        expect(form.getFieldValue('guestCount')).toBe(2);
+        expect(add).toBeDisabled();
+        let validation;
+        await act(async () => {
+            form.setFieldValue('guestCount', 3);
+            validation = await form.validateFields(['guestCount']).catch(error => error);
+        });
+        expect(validation.errorFields[0].errors).toContain('최대 2명까지 예약할 수 있어요.');
+
+        await act(async () => { await queryClient.invalidateQueries({ queryKey: ['reservations'] }); });
+        await waitFor(() => expect(time).toBeDisabled());
+        expect(time).toBeInTheDocument();
+        expect(time).toHaveAttribute('aria-hidden', 'true');
+        expect(time.style.animation).toContain('reserve-time-slot-exit');
+        expect(form.getFieldValue('reservationTime')).toBeUndefined();
+        expect(await screen.findByText('이 날은 예약이 마감됐어요')).toBeInTheDocument();
+        expect(time).not.toBeInTheDocument();
+    });
+
+    it('does not allow an edit prefill for a slot with explicit zero remaining places', async () => {
+        api.get.mockResolvedValue([{ ...slot('10:00', false), remainingCapacity: 0 }]);
+        let form;
+        const onForm = value => { form = value; };
+        render(<PanelHarness initialTime="10:00" editingReservation={editingReservation} onForm={onForm} onFinish={vi.fn()} />);
+        await screen.findByText('이 날은 예약이 마감됐어요');
+        expect(form.getFieldValue('reservationTime')).toBeUndefined();
+        expect(screen.queryByRole('button', { name: '10:00' })).not.toBeInTheDocument();
     });
 
     it('retains a DAY edit original slot even when it fills public capacity', async () => {

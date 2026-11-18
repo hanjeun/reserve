@@ -30,7 +30,9 @@ test('the full candidate retains legacy callbacks and rejects an already bootstr
     assert.match(candidate, /ssl_certificate \/etc\/letsencrypt\/live\/reserve\.it\.kr\/fullchain\.pem;/);
     assert.equal(candidate.match(/location \/oauth2\/authorization\//g)?.length, 2);
     assert.equal(candidate.match(/location \/login\/oauth2\//g)?.length, 2);
-    assert.match(candidate, /drafts\/transfer\|login\|signup\/social\|oauth2\/callback/);
+    assert.match(candidate, /location ~ \^\/\(signup\/social\|oauth2\/callback\)\/\?\$ \{ try_files/);
+    assert.match(candidate, /location ~ \^\/login\/\?\$ \{[^}]+\}[\s\S]*?return 302 https:\/\/app\.reserve\.it\.kr\/login;/);
+    assert.match(candidate, /location ~ \^\/drafts\/transfer\/\?\$ \{[^}]+\}[\s\S]*?return 302 https:\/\/app\.reserve\.it\.kr\/my-stores;/);
     assert.match(candidate, /root \/usr\/share\/nginx\/html\/legacy-domain\.current;/);
     const bootstrap = domainSplitHttpNginx(installed);
     assert.throws(() => domainSplitHttpNginx(bootstrap), /already configured/);

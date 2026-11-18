@@ -1,16 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import Pagination from '../../components/common/Pagination';
+import AnimatedContent from '../../components/common/AnimatedContent';
 import { ArrowRightOutlined } from '../../components/common/icons';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { DataState, FilterMenu, RefreshButton } from '../../components/common';
 import useStoreNewsEvents from '../../hooks/useStoreNewsEvents';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
+import useListSelectionMotion from '../../hooks/useListSelectionMotion';
+import useInitialLoading from '../../hooks/useInitialLoading';
 import BenefitListSkeleton from '../../components/common/BenefitListSkeleton';
 import ListingCount from '../../components/common/ListingCount';
 import { BenefitRow } from '../../components/store-news/StoreNewsPresentation';
+import ContentLikeButton from '../../components/feed/ContentLikeButton';
 import { StoreNewsPublicToolbarSkeleton } from '../../components/store-news/StoreNewsSkeleton';
 import StoreNewsEditor from '../../components/store-news/StoreNewsEditor';
+import { canManageStoreNews } from '../../utils/storeNews';
 import { StoreNewsManageAction, StoreNewsWriteAction } from '../../components/store-news/StoreNewsActions';
 import { useStoreNewsConfig } from '../../hooks/storeNewsQueries';
 import { useWindowWidth } from '../../hooks/useWindowWidth';
@@ -20,7 +25,6 @@ import benefitService from '../../services/benefitService';
 import useAuthStore from '../../store/useAuthStore';
 import { STORE_NEWS_TYPES } from '../../utils/storeNews';
 import useListQueryNormalization from '../../hooks/useListQueryNormalization';
-import useLiveUpdatesStatus from '../../hooks/useLiveUpdatesStatus';
 import { isBlockingListReadError, isReadAccessDenied, refetchFailedReads } from '../../hooks/liveUpdateQueries';
 import { readQuerySelection, writeQuerySelection } from '../../utils/querySelection';
 
@@ -33,12 +37,13 @@ export { BenefitRow };
 export default function Benefits() {
     useDocumentTitle('혜택 · 가게 소식');
     const isMobile = useWindowWidth() < 576;
-    const automatic = useLiveUpdatesStatus().domains.includes('NEWS');
     const user = useAuthStore(state => state.user);
-    const business = user?.role === 'BUSINESS';
+    const viewerId = user?.id ?? null;
+    const business = canManageStoreNews(user);
     const config = useStoreNewsConfig(true);
     const approvalReady = config.data?.benefitApprovalEnabled === true;
     const listRef = useRef(null);
+    const resultsRef = useRef(null);
     useStoreNewsEvents(approvalReady && config.data?.benefitEventsEnabled === true);
     const [editor, setEditor] = useState({ mounted: false, open: false });
     const writeUnavailable = config.isPending ? '작성 가능 여부를 확인하고 있어요.'
@@ -58,24 +63,29 @@ export default function Benefits() {
         updated.set(key, writeQuerySelection(key, value));
         setParams(updated);
     };
-    const { data, isPending, isFetching, isError, isSuccess, isPlaceholderData, error, refetch } = useQuery({
-        queryKey: [...benefitKeys.list(queryParams), 'approved-only'],
+    const { data, dataUpdatedAt, isPending, isFetching, isError, isSuccess, isPlaceholderData, error, refetch } = useQuery({
+        queryKey: [...benefitKeys.list(queryParams), 'approved-only', ...(viewerId ? [viewerId] : [])],
         queryFn: ({ signal }) => benefitService.getList(queryParams, signal),
         enabled: approvalReady,
         staleTime: 60000,
-        placeholderData: keepPreviousData,
+        placeholderData: (previous, query) => (query?.queryKey[4] ?? null) === viewerId ? keepPreviousData(previous) : undefined,
     });
     const items = Array.isArray(data?.content) ? data.content : [];
+    const resultsLoading = isPending || isPlaceholderData;
     const blockingError = isBlockingListReadError(error, items);
     const configFailure = config.isError && (!config.data || isReadAccessDenied(config.error));
     const refreshFailure = !configFailure && !(approvalReady && blockingError) && (approvalReady && isError ? { error } : config.isError ? config : null);
     const retryReads = () => refetchFailedReads([config, ...(approvalReady ? [{ isError, refetch }] : [])]);
     const retrying = isFetching || config.isFetching;
     useListRefreshAnchor(listRef, `${page}:${type}:${period}`, isFetching, data);
+    useListSelectionMotion(resultsRef, {
+        selection: JSON.stringify([type, period]), view: 'news', ids: items.map(item => item.id),
+        ready: approvalReady && !resultsLoading && !configFailure && !blockingError,
+    });
     const rawTotal = data?.page?.totalElements ?? data?.totalElements ?? 0;
     const total = Number.isSafeInteger(rawTotal) && rawTotal >= 0 ? rawTotal : 0;
     const totalPages = Math.max(1, Math.ceil(total / BENEFIT_PAGE_SIZE));
-    const coldLoading = config.isPending || approvalReady && isPending;
+    const coldLoading = useInitialLoading(config.isPending || approvalReady && isPending);
     const firstPageParams = new URLSearchParams(params);
     firstPageParams.set('page', '1');
     const firstPageTo = { pathname: '/benefits', search: firstPageParams.toString() };
@@ -95,7 +105,7 @@ export default function Benefits() {
         if (configFailure) return <DataState state="error" title="혜택 상태를 불러오지 못했어요." error={config.error} onRetry={retryReads} retrying={retrying} />;
         if (config.data?.benefitApprovalEnabled !== true) return <DataState state="empty" kind="news" title="관리자 승인형 혜택을 준비하고 있어요."
             description="혜택은 사진과 이용 조건을 확인하고 승인 후 공개해요." />;
-        if (isPending) return <BenefitsSkeleton />;
+        if (resultsLoading) return <BenefitsSkeleton />;
         if (blockingError) {
             return (
                 <DataState state="error" kind="news" subject="가게 소식" error={error}
@@ -107,32 +117,35 @@ export default function Benefits() {
                 title={total > 0 ? '이 페이지에는 소식이 없어요.' : '아직 등록된 가게 소식이 없어요.'}
                 action={<Link to={total > 0 ? firstPageTo : '/stores'} className="reserve-benefits-text-link reserve-text-link">{total > 0 ? '첫 페이지로' : '가게 둘러보기'} <ArrowRightOutlined aria-hidden="true" /></Link>} />;
         }
-        return <div className="reserve-benefit-list" aria-busy={isFetching}>{items.map(item => <BenefitRow key={item.id} item={item} />)}</div>;
+        return <div ref={resultsRef} className="reserve-benefit-list" aria-busy={isFetching}>{items.map(item => <BenefitRow key={item.id} item={item}
+            actions={Number.isSafeInteger(item.likeCount) ? <ContentLikeButton type="NEWS" targetId={item.id} showCount={false} pageUpdatedAt={dataUpdatedAt}
+                initialStatus={{ liked: item.liked, likeCount: item.likeCount, commentCount: 0 }} /> : undefined} />)}</div>;
     };
     return (
         <section className="reserve-benefits-page" aria-labelledby="benefits-title">
             <h1 id="benefits-title" className="reserve-discovery-visually-hidden">혜택</h1>
-            {coldLoading ? <StoreNewsPublicToolbarSkeleton business={business} type={type} period={period} showRefresh={!automatic} /> : <div className="reserve-explore-filters reserve-store-news-toolbar" data-discovery-swipe-ignore="true">
+            {coldLoading ? <StoreNewsPublicToolbarSkeleton business={business} type={type} period={period} /> : <div className="reserve-explore-filters reserve-store-news-toolbar" data-discovery-swipe-ignore="true">
                 {business && <div className="reserve-store-news-actions">
                     <StoreNewsWriteAction unavailableReason={writeUnavailable} onWrite={() => setEditor({ mounted: true, open: true })} />
                     <StoreNewsManageAction />
                 </div>}
-                <ListingCount>{approvalReady && data && !blockingError ? `${total.toLocaleString('ko-KR')}개 소식` : approvalReady ? '소식 확인 필요' : '혜택 상태 확인 필요'}</ListingCount>
+                {!(approvalReady && resultsLoading) && <ListingCount>{approvalReady && data && !blockingError ? `${total.toLocaleString('ko-KR')}개 소식` : approvalReady ? '소식 확인 필요' : '혜택 상태 확인 필요'}</ListingCount>}
                 <div className="reserve-explore-filter-controls">
                     <FilterMenu appearance="plain" aria-label="가게 소식 종류" value={type} options={[{ value: 'ALL', label: '모든 소식' }, ...STORE_NEWS_TYPES]} onChange={value => changeFilter('newsType', value)} />
                     <FilterMenu appearance="plain" aria-label="가게 소식 기간" value={period} options={[{ value: 'ONGOING', label: '진행 소식' }, { value: 'ALL', label: '전체 기간' }]} onChange={value => changeFilter('period', value)} />
-                    {!automatic && <RefreshButton onReload={refetch} loading={isFetching} disabled={!approvalReady} label={isMobile ? '' : '새로고침'} aria-label="혜택 새로고침" />}
+                    <RefreshButton onReload={refetch} loading={isFetching} disabled={!approvalReady} label={isMobile ? '' : '새로고침'} aria-label="혜택 새로고침" />
                 </div>
             </div>}
             <section ref={listRef} id="benefit-news" className="reserve-benefits-news" aria-label="가게 소식">
-                <div className="reserve-benefits-news-content">
+                <AnimatedContent className="reserve-benefits-news-content" motionKey={String(page)} ready={!resultsLoading}
+                    keepResultsHeight={total > BENEFIT_PAGE_SIZE}>
                     {refreshFailure && <DataState compact state="error" title={approvalReady && isError ? '목록을 갱신하지 못했어요. 현재 내용은 유지했어요.' : '혜택 상태를 갱신하지 못했어요.'}
                         error={refreshFailure.error} onRetry={retryReads} retrying={retrying} />}
                     {renderNews()}
-                </div>
+                </AnimatedContent>
                 {isFetching && !isPending && !isError && <p className="reserve-discovery-visually-hidden"><output>소식을 새로 불러오는 중</output></p>}
                 {!configFailure && !isPending && !blockingError && data && total > BENEFIT_PAGE_SIZE && (
-                    <nav aria-label="가게 소식 페이지" className="reserve-benefits-pagination"><Pagination current={page} pageSize={BENEFIT_PAGE_SIZE} total={total} showSizeChanger={false} showLessItems={isMobile} size={isMobile ? 'small' : 'default'} onChange={next => { const updated = new URLSearchParams(params); updated.set('page', String(next)); setParams(updated); window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }} /></nav>
+                    <nav aria-label="가게 소식 페이지" className="reserve-benefits-pagination"><Pagination current={page} pageSize={BENEFIT_PAGE_SIZE} total={total} showSizeChanger={false} showLessItems={isMobile} size={isMobile ? 'small' : 'default'} disabled={isPlaceholderData} onChange={next => { const updated = new URLSearchParams(params); updated.set('page', String(next)); setParams(updated); window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }} /></nav>
                 )}
             </section>
             {business && editor.mounted && <StoreNewsEditor open={editor.open}

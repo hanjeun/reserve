@@ -63,17 +63,17 @@ const applyHidden = (previous, ids) => {
     return changed ? next : previous;
 };
 
-const newClientMessageId = () => {
+export const newClientMessageId = () => {
     if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
     if (!globalThis.crypto?.getRandomValues) return null;
     return Array.from(globalThis.crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('');
 };
 
 // 같은 본문·첨부를 다시 보내면 직전 식별자를 재사용한다.
-const reuseOrNewClientMessageId = (retry, text, attachment) => (
+const reuseOrNewClientMessageId = (retry, text, attachment, requestedId) => (
     retry?.content === text && retry?.attachment === attachment
         ? retry.clientMessageId
-        : newClientMessageId()
+        : requestedId || newClientMessageId()
 );
 
 // 중단 가능하면 signal 을, 사진이 있으면 첨부까지 넘긴다(없는 인자는 넘기지 않는다).
@@ -249,12 +249,12 @@ export default function useChatThread({
      *
      * @returns {Promise<boolean|null>} false만 현재 대화 실패다. null은 대화 전환/언마운트로 무시할 응답이다
      */
-    const submit = useCallback(async (content, attachment = null) => {
+    const submit = useCallback(async (content, attachment = null, requestedId) => {
         const text = String(content ?? '').trim();
         const active = activeRef.current;
         if (active?.scope !== scope) return null;
         if ((!text && !attachment) || active.sending || roomId == null || !active.ready || active.invalidated) return false;
-        const clientMessageId = reuseOrNewClientMessageId(retryRef.current, text, attachment);
+        const clientMessageId = reuseOrNewClientMessageId(retryRef.current, text, attachment, requestedId);
         if (!clientMessageId) { onError?.('안전한 연결에서 다시 시도해주세요.'); return false; }
         active.sending = true;
         const controller = cancellable ? new AbortController() : null;
@@ -268,6 +268,7 @@ export default function useChatThread({
             content: text || (attachment ? '사진 전송 중' : ''),
             senderRole: myRole,
             clientMessageId,
+            localSendId: clientMessageId,
             createdAt: new Date().toISOString(),
             pending: true,
         }]);
@@ -275,9 +276,10 @@ export default function useChatThread({
         try {
             const sent = await callSend(send, controller, roomId, text, clientMessageId, attachment);
             if (activeRef.current !== active || active.invalidated) return null;
+            // 전송 응답으로 교체해도 처음 그린 말풍선의 화면 키를 유지한다.
             setMessages((prev) => mergeById(
                 prev.filter((m) => m.id !== tempId),
-                sent ? [sent] : [],
+                sent ? [{ ...sent, localSendId: clientMessageId }] : [],
             ));
             if (retryRef.current?.clientMessageId === clientMessageId) retryRef.current = null;
             onSent?.(sent);

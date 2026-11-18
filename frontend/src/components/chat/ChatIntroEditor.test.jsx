@@ -106,6 +106,10 @@ describe('chat intro editor', () => {
         expect(onSave).not.toHaveBeenCalled();
         fireEvent.change(screen.getByLabelText('답변 2'), { target: { value: '불가' } });
         expect(screen.queryByText('답변을 입력해주세요.')).toBeNull();
+        const question = within(preview()).getByRole('button', { name: '주차', exact: true });
+        fireEvent.click(question);
+        expect(within(preview()).getByText('가능', { exact: true })).toBeInTheDocument();
+        expect(within(preview()).queryByText('불가', { exact: true })).toBeNull();
     });
 
     it('allows at most five questions and removes items', () => {

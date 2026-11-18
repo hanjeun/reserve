@@ -2,6 +2,8 @@ package kr.it.reserve.feed.news.controller;
 
 import kr.it.reserve.config.util.SecurityUtil;
 import kr.it.reserve.global.common.ApiResponse;
+import kr.it.reserve.global.common.SseResponses;
+import kr.it.reserve.global.common.PublicId;
 import kr.it.reserve.promotion.dto.PromotionDto;
 import kr.it.reserve.promotion.service.PromotionService;
 import kr.it.reserve.feed.news.service.StoreNewsService;
@@ -12,7 +14,6 @@ import kr.it.reserve.feed.FeedException;
 import kr.it.reserve.global.ratelimit.RateLimiter;
 import kr.it.reserve.global.ratelimit.IpExtractor;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -33,13 +34,14 @@ public class PromotionApiController {
     private final RateLimiter limiter;
     private final StoreNewsEvents events;
     @GetMapping(value = "/public/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter events(HttpServletRequest http, HttpServletResponse response) {
-        response.setHeader("Cache-Control", "no-store"); response.setHeader("X-Accel-Buffering", "no");
-        String address = IpExtractor.extract(http);
-        if (!limiter.tryConsume("news-events-public:" + address, RateLimiter.Policy.AD_METRIC)) {
-            throw new FeedException("잠시 후 다시 연결해주세요.", HttpStatus.TOO_MANY_REQUESTS);
-        }
-        return events.subscribePublic(address);
+    public ResponseEntity<SseEmitter> events(HttpServletRequest http) {
+        return SseResponses.open(() -> {
+            String address = IpExtractor.extract(http);
+            if (!limiter.tryConsume("news-events-public:" + address, RateLimiter.Policy.AD_METRIC)) {
+                throw new FeedException("잠시 후 다시 연결해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+            }
+            return events.subscribePublic(address);
+        });
     }
 
     @GetMapping("/public")
@@ -47,13 +49,20 @@ public class PromotionApiController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size, @RequestParam(required = false) Long storeId,
             @RequestParam(required = false) String newsType, @RequestParam(defaultValue = "ONGOING") String period) {
-        return publicResponse(news.publicList(page, size, storeId, newsType, period), "가게 소식 목록 조회 성공");
+        Long viewerId = SecurityUtil.isLoggedIn() ? SecurityUtil.getCurrentMemberId() : null;
+        return publicResponse(news.publicList(page, size, storeId, newsType, period, viewerId), "가게 소식 목록 조회 성공");
     }
 
-    @GetMapping("/public/{promotionId}")
+    @GetMapping("/public/{promotionId:[0-9]+}")
     public ResponseEntity<ApiResponse<PromotionDto.PublicPromotionDetailResponse>> getPublicPromotion(
             @PathVariable Long promotionId) {
         return publicResponse(news.publicDetail(promotionId), "가게 소식 상세 조회 성공");
+    }
+
+    @GetMapping("/public" + PublicId.SEGMENT)
+    public ResponseEntity<ApiResponse<PromotionDto.PublicPromotionDetailResponse>> getPublicPromotionById(
+            @PathVariable java.util.UUID publicId) {
+        return publicResponse(news.publicDetailById(publicId), "가게 소식 상세 조회 성공");
     }
 
     @PostMapping("/public/{promotionId:[0-9]+}/reports")

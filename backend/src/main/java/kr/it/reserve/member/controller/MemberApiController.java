@@ -3,9 +3,9 @@ package kr.it.reserve.member.controller;
 import kr.it.reserve.config.util.SecurityUtil;
 import kr.it.reserve.config.util.CookieUtil;
 import kr.it.reserve.global.common.ApiResponse;
-import kr.it.reserve.global.error.MemberException;
 import kr.it.reserve.global.ratelimit.IpExtractor;
 import kr.it.reserve.global.ratelimit.RateLimiter;
+import kr.it.reserve.member.MemberUpdateLimit;
 import kr.it.reserve.member.dto.LocationUpdateRequest;
 import kr.it.reserve.member.dto.MemberResponse;
 import kr.it.reserve.member.dto.MemberUpdateRequest;
@@ -20,7 +20,6 @@ import org.springframework.web.multipart.MultipartFile;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
 
 @RequiredArgsConstructor
 @RestController
@@ -98,11 +97,7 @@ public class MemberApiController {
 
     private Member limitedUpdate(HttpServletRequest http, String missingMemberMessage) {
         Member member = SecurityUtil.getCurrentMember(missingMemberMessage);
-        // 수정 경로가 달라도 같은 한도를 쓰며 IP 거절 뒤에는 회원 한도를 소비하지 않는다.
-        if (!limiter.tryConsume("member-update:ip:" + IpExtractor.extract(http), RateLimiter.Policy.MEMBER_UPDATE_IP)
-                || !limiter.tryConsume("member-update:member:" + member.getId(), RateLimiter.Policy.MEMBER_UPDATE)) {
-            throw new MemberException("수정 요청이 너무 많아요. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
-        }
+        MemberUpdateLimit.require(limiter, member.getId(), IpExtractor.extract(http));
         return member;
     }
 

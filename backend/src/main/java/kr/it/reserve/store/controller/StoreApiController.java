@@ -11,6 +11,7 @@ import kr.it.reserve.store.dto.StoreRegionGroup;
 import kr.it.reserve.store.dto.StoreStatisticsResponse;
 import kr.it.reserve.store.dto.StoreUpdateRequest;
 import kr.it.reserve.store.service.StoreService;
+import kr.it.reserve.store.util.StorePublicAddress;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -18,6 +19,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -81,10 +83,15 @@ public class StoreApiController {
     }
 
     // 가게 상세 조회 (공개 API — 공개 정보만 반환)
-    @GetMapping("/{id}")
+    @GetMapping(StorePublicAddress.NUMERIC_SEGMENT)
     public ApiResponse<StoreResponse> getStore(@PathVariable Long id) {
         StoreResponse store = storeService.getStore(id);
         return ApiResponse.success(store, "가게 상세 조회 성공");
+    }
+
+    @GetMapping(StorePublicAddress.UUID_SEGMENT)
+    public ApiResponse<StoreResponse> getStoreByPublicId(@PathVariable UUID publicId) {
+        return ApiResponse.success(storeService.getStoreByPublicId(publicId), "가게 상세 조회 성공");
     }
 
     // 가게 수정용 데이터 조회 (인증 + 소유자 본인만 — 내부 운영 설정 포함)
@@ -161,7 +168,6 @@ public class StoreApiController {
         return ApiResponse.success(null, "가게 영업이 종료됐어요.");
     }
 
-    // [중요] 사업자 권한 검증 공통 로직
     private void validateBusinessAuth(Member member) {
         if (!member.isBusiness() && !member.isAdmin()) {
             throw new StoreException("사업자 권한이 있는 회원만 접근할 수 있어요.", HttpStatus.FORBIDDEN);

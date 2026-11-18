@@ -3,15 +3,19 @@ import { SECTIONS } from './Home.constants';
 import HeroSection from './sections/HeroSection';
 import FeatureSection from './sections/FeatureSection';
 import FaqSection from './sections/FaqSection';
+import MarketingBackdrop from './sections/MarketingBackdrop';
+import SceneNavigation from './sections/SceneNavigation';
 
-export default function Home({ isMobile = false }) {
+export default function Home({ isMobile = false, heroVideo }) {
     return (
-        <div style={{ backgroundColor: colors.background.default, overflowX: 'clip' }}>
+        <div className="marketing-home" style={{ overflowX: 'clip' }}>
+            <MarketingBackdrop />
+            <SceneNavigation firstFeature={heroVideo ? 1 : 0} />
 
-            <HeroSection isMobile={isMobile} />
+            <HeroSection heroVideo={heroVideo} isMobile={isMobile} />
 
             {SECTIONS.map((sec, i) => (
-                <FeatureSection key={sec.id} sec={sec} index={i} isMobile={isMobile} />
+                (!heroVideo || i > 1) && <FeatureSection key={sec.id} sec={sec} index={i} isMobile={isMobile} />
             ))}
 
             <FaqSection isMobile={isMobile} />

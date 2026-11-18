@@ -7,8 +7,10 @@ import kr.it.reserve.config.jwt.TokenProvider;
 import kr.it.reserve.config.service.RefreshRejectedException;
 import kr.it.reserve.config.service.TokenService;
 import kr.it.reserve.config.util.CookieUtil;
+import kr.it.reserve.config.util.SecurityUtil;
 import kr.it.reserve.global.error.GlobalExceptionHandler;
 import kr.it.reserve.global.ratelimit.RateLimiter;
+import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.service.MemberService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,6 +18,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -60,6 +64,25 @@ class AuthRefreshCookieContractTest {
                 .build();
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"OAUTH", "PASSKEY"})
+    void acceptedRememberChoiceOnlyReturnsCredentialsInSecurePersistentCookies(String method) throws Exception {
+        var member = Member.builder().id(1L).termsAgreed(true).build();
+        var auth = new UsernamePasswordAuthenticationToken(member, null, List.of());
+        auth.setDetails(new SecurityUtil.OAuthAuthenticationDetails(null, method, "fixture-sid", false));
+        SecurityContextHolder.getContext().setAuthentication(auth);
+        try {
+            when(tokenService.rememberLogin("synthetic-browser", member, "fixture-sid", "fixture-choice"))
+                    .thenReturn(new TokenService.RefreshResult("synthetic-access", "synthetic-remembered", Duration.ofDays(30), true));
+            var response = mockMvc.perform(post("/api/auth/remember-login").cookie(new Cookie("refresh_token", "synthetic-browser"))
+                            .contentType("application/json").content("{\"reference\":\"fixture-choice\"}"))
+                    .andExpect(status().isOk()).andReturn().getResponse();
+            assertThat(response.getHeaders(HttpHeaders.SET_COOKIE)).anySatisfy(value -> assertThat(value)
+                    .startsWith("refresh_token=synthetic-remembered;").contains("Max-Age=2592000", "Secure", "HttpOnly", "SameSite=Lax"));
+            assertThat(response.getContentAsString()).doesNotContain("synthetic-access", "synthetic-remembered");
+        } finally { SecurityContextHolder.clearContext(); }
+    }
+
     @Test
     void anonymousSessionProbeDoesNotAttemptRefreshOrIssueCookies() throws Exception {
         var response = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/auth/session"))
@@ -85,8 +108,9 @@ class AuthRefreshCookieContractTest {
     @Test
     void publicLoginPolicyReturnsConfiguredDurationsWithoutIssuingCookies() throws Exception {
         var response = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/auth/login-policy"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.idleSeconds").value(1209600))
-                .andExpect(jsonPath("$.data.absoluteSeconds").value(2592000)).andReturn().getResponse();
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.idleSeconds").value(2592000))
+                .andExpect(jsonPath("$.data.absoluteSeconds").value(7776000))
+                .andExpect(jsonPath("$.data.browserIdleSeconds").value(3600)).andReturn().getResponse();
         assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
         assertThat(response.getHeaders("Set-Cookie")).isEmpty();
         org.mockito.Mockito.verifyNoInteractions(memberService, tokenProvider, passwordEncoder, tokenService, rateLimiter);
@@ -103,7 +127,7 @@ class AuthRefreshCookieContractTest {
         when(memberService.findByEmailOrNull("member@example.test")).thenReturn(member);
         when(passwordEncoder.matches("test-password", "stored-test-hash")).thenReturn(true);
         when(tokenProvider.issueSession(member, null, true)).thenReturn(
-                new TokenProvider.IssuedSession("login-access", "login-refresh", Duration.ofDays(14)));
+                new TokenProvider.IssuedSession("login-access", "login-refresh", Duration.ofDays(30)));
         var response = mockMvc.perform(post("/api/auth/login").contentType("application/json")
                         .content("{\"email\":\"member@example.test\",\"password\":\"test-password\",\"rememberMe\":true}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.id").value(7))
@@ -114,7 +138,7 @@ class AuthRefreshCookieContractTest {
                 .anySatisfy(cookie -> assertThat(cookie).startsWith("access_token=login-access;")
                         .contains("Max-Age=1800", "Secure", "HttpOnly", "SameSite=Lax"))
                 .anySatisfy(cookie -> assertThat(cookie).startsWith("refresh_token=login-refresh;")
-                        .contains("Max-Age=1209600", "Secure", "HttpOnly", "SameSite=Lax"));
+                        .contains("Max-Age=2592000", "Secure", "HttpOnly", "SameSite=Lax"));
     }
 
     @Test

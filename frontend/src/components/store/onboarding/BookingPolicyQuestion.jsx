@@ -4,6 +4,7 @@ import { BOOKING_DEADLINE_OPTIONS } from '../../../constants';
 import { onboardingFieldRules, reservationApplies } from '../../../utils/storeOnboarding';
 import InactiveReservationNotice from './InactiveReservationNotice';
 import { usePolicyValues } from './questionValues';
+import BookingOpeningFields from './BookingOpeningFields';
 
 export function BookingPolicyQuestion({ onEdit }) {
     const values = usePolicyValues();
@@ -23,6 +24,7 @@ export function BookingPolicyQuestion({ onEdit }) {
             <Form.Item label="예약 마감" name="bookingDeadlineHours" rules={onboardingFieldRules('bookingDeadlineHours', values)}>
                 <FormSelect options={BOOKING_DEADLINE_OPTIONS} placeholder="제한 없음" />
             </Form.Item>
+            <BookingOpeningFields />
             <Form.Item label="예약 자동 승인" name="autoApprovalEnabled" valuePropName="checked" extra="끄면 사업자가 확인한 뒤 승인해요."><Switch /></Form.Item>
             <Form.Item label="이용 자동 완료" name="autoCompletionEnabled" valuePropName="checked"
                 extra="QR 체크인한 예약을 이용 종료 후 완료하고 보증금을 전액 환불해요. 끄면 직접 완료해요."><Switch /></Form.Item>

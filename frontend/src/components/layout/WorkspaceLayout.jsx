@@ -13,8 +13,11 @@ import { WorkspaceMenuContext } from './workspaceMenu';
 
 const { Sider, Content } = Layout;
 const CONTENT_TOP = Number.parseInt(heights.header, 10) + 24;
+const SIDEBAR_MAX_SHIFT = 20;
+const SIDEBAR_SETTLE_TIME = 65;
+const SIDEBAR_SCROLL_NOISE = 4;
 
-/** 두 관리 패널과 해당 로딩 화면의 메뉴·제목·작업 영역을 함께 배치한다. */
+/** 작업 화면과 골격의 메뉴·제목·본문을 같은 구조로 배치한다. */
 export default function WorkspaceLayout({ title, groups, activeKey, hrefFor, onSelect, loading = false, children }) {
     const id = useId();
     const { pathname } = useLocation();
@@ -27,13 +30,15 @@ export default function WorkspaceLayout({ title, groups, activeKey, hrefFor, onS
     if (menuKey !== activeKey) { setMenuKey(activeKey); setMenuOpen(false); }
     if (menuOpen && !mobile) setMenuOpen(false);
     const headingRef = useRef(null);
+    const siderRef = useRef(null);
+    const sidebarRef = useRef(null);
     const focusAfterClose = useRef(false);
     const drawerFocusTarget = useRef('menu');
     const previousOpen = useRef(false);
     const previousKey = useRef(activeKey);
     const active = groups.flatMap(group => group.items).find(item => item.key === activeKey);
     const Icon = active?.icon;
-    const heading = active?.label || title;
+    const heading = active?.heading || active?.label || title;
     useDocumentTitle(heading);
     const focusMenu = useCallback(() => document.getElementById(`${id}-toggle`)?.focus({ preventScroll: true }), [id]);
     // 입장 모션이 끝나기 전에 닫아도 메뉴 버튼으로 복귀한다. 완료 콜백이 생략될 수 있다.
@@ -51,14 +56,65 @@ export default function WorkspaceLayout({ title, groups, activeKey, hrefFor, onS
             buttonId: `${id}-toggle`, controlsId: mobile ? (menuOpen ? `${id}-drawer` : undefined) : `${id}-side`, toggle: toggleMenu });
     }, [publish, id, pathname, title, mobile, menuOpen, sidebarOpen, loading, toggleMenu]);
     useLayoutEffect(() => () => { clear?.(id); }, [clear, id]);
+    useEffect(() => {
+        if (loading || mobile || !sidebarOpen || reducedMotion) return;
+        const sider = siderRef.current;
+        const viewport = sidebarRef.current;
+        let scroll = window.scrollY;
+        let target = sider.getBoundingClientRect().top + scroll;
+        let shift = 0;
+        let previousTime;
+        let frame;
+
+        // sticky 위치를 기준으로, 스크롤이 이동시킨 거리만 짧게 따라잡는다.
+        const followScroll = time => {
+            if (previousTime != null) shift *= Math.exp((previousTime - time) / SIDEBAR_SETTLE_TIME);
+            const nextScroll = window.scrollY;
+            if (nextScroll !== scroll) {
+                const nextTarget = sider.getBoundingClientRect().top + nextScroll;
+                const distance = target - nextTarget;
+                if (Math.abs(distance) > SIDEBAR_SCROLL_NOISE) {
+                    shift = Math.max(-SIDEBAR_MAX_SHIFT, Math.min(SIDEBAR_MAX_SHIFT, shift + distance));
+                }
+                target = nextTarget;
+                scroll = nextScroll;
+            }
+            if (Math.abs(shift) < 0.5) {
+                shift = 0;
+                previousTime = frame = undefined;
+                viewport.style.removeProperty('--workspace-sider-translate');
+                return;
+            }
+            viewport.style.setProperty('--workspace-sider-translate', `0 ${shift.toFixed(2)}px`);
+            previousTime = time;
+            frame = requestAnimationFrame(followScroll);
+        };
+        const onScroll = () => { frame ??= requestAnimationFrame(followScroll); };
+        window.addEventListener('scroll', onScroll, { passive: true });
+        return () => {
+            window.removeEventListener('scroll', onScroll);
+            cancelAnimationFrame(frame);
+            viewport.style.removeProperty('--workspace-sider-translate');
+        };
+    }, [activeKey, loading, mobile, reducedMotion, sidebarOpen]);
+    useEffect(() => {
+        if (loading || mobile || !sidebarOpen) return;
+        const viewport = sidebarRef.current;
+        const selected = viewport?.querySelector('a[aria-current="page"]');
+        if (!selected) return;
+        const range = viewport.getBoundingClientRect();
+        const item = selected.getBoundingClientRect();
+        const offset = item.top < range.top ? item.top - range.top : Math.max(0, item.bottom - range.bottom);
+        if (offset) viewport.scrollBy({ top: offset, behavior: reducedMotion ? 'instant' : 'smooth' });
+    }, [activeKey, loading, mobile, reducedMotion, sidebarOpen]);
     const focusContent = useCallback(() => {
         const headingElement = headingRef.current?.querySelector('.reserve-page-title');
         if (!focusAfterClose.current || !headingElement || document.documentElement.dataset.reserveModalOpen === 'true') return;
         focusAfterClose.current = false;
         headingElement.focus({ preventScroll: true });
         const top = headingElement.getBoundingClientRect().top + window.scrollY - CONTENT_TOP;
-        window.scrollTo({ top: Math.max(0, top), behavior: 'instant' });
-    }, []);
+        window.scrollTo({ top: Math.max(0, top), behavior: reducedMotion ? 'instant' : 'smooth' });
+    }, [reducedMotion]);
 
     // 같은 기능의 필터 업데이트는 위치를 유지하고 기능 이동만 작업 영역으로 돌아온다.
     useEffect(() => {
@@ -107,8 +163,9 @@ export default function WorkspaceLayout({ title, groups, activeKey, hrefFor, onS
             </PageTitle>
         </header>
         <Layout className={'reserve-workspace-layout' + (!sidebarOpen ? ' is-menu-collapsed' : '')}>
-            <Sider width={216} collapsed={!sidebarOpen} collapsedWidth={0} trigger={null} className="reserve-workspace-sider">
-                <div id={`${id}-side`} inert={mobile || !sidebarOpen} aria-hidden={mobile || !sidebarOpen ? true : undefined}>{navigation('side')}</div>
+            <Sider ref={siderRef} width={216} collapsed={!sidebarOpen} collapsedWidth={0} trigger={null} className="reserve-workspace-sider">
+                <div id={`${id}-side`} className="reserve-workspace-sider-viewport" ref={sidebarRef}
+                    inert={mobile || !sidebarOpen} aria-hidden={mobile || !sidebarOpen ? true : undefined}>{navigation('side')}</div>
             </Sider>
             <Content className="reserve-workspace-main">
                 <div className="reserve-workspace-content">{children}</div>

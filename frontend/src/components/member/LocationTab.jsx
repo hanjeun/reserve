@@ -30,15 +30,13 @@ const LocationTab = ({ user }) => {
     );
     const [loading, setLoading] = useState(false);
 
-    // 주소 컬럼이 생기기 전에 위치를 등록한 기존 회원은 좌표만 있고 주소는 null이다.
-    // "위치는 등록되어 있지만 그게 어떤 주소인지는 보여줄 수 없는" 상태임을 안내문으로 따로 알린다.
+    // 좌표만 저장된 회원은 표시할 주소가 없으므로 별도 안내를 사용한다.
     const savedWithoutAddress = hasSaved && !user?.locationAddress;
 
     // 주소 초기화는 우편번호·상세주소·좌표를 함께 갱신한다.
 
     const onFinish = async (values) => {
-        // coords 는 Form 필드가 아니라 AddressSearch 의 onMeta 로만 들어오는 값이라 rules 로 못 잡는다.
-        // 그래도 사용자가 볼 때는 "주소 칸의 문제"이므로, 토스트 대신 setFields 로 그 칸에 붙인다.
+        // 좌표는 Form 외부 값이므로 직접 검증하고 주소 필드에 오류를 표시한다.
         if (!coords) {
             form.setFields([{ name: 'address', errors: ['검색 결과에서 주소를 선택해주세요'] }]);
             return;

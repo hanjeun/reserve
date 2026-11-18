@@ -1,6 +1,6 @@
 import { PageTitle, PageDescription } from '../../components/common/PageTypography';
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Typography, Checkbox } from 'antd';
 import { PageContainer, Button } from '../../components/common';
 import { useMessage } from '../../hooks';
@@ -15,6 +15,7 @@ const { Text } = Typography;
 
 const SocialAgreement = () => {
     const navigate = useNavigate();
+    const [params] = useSearchParams();
     const { message } = useMessage();
     const { logout, updateUser, user } = useAuthStore();
     useDocumentTitle('서비스 이용 동의');
@@ -39,6 +40,10 @@ const SocialAgreement = () => {
             });
             // 로컬 스토어도 동기화 (termsAgreed + marketingAgreed 반영)
             updateUser({ ...user, termsAgreed: true, marketingAgreed: agreements.marketing });
+            if (params.get('remember') === '1') {
+                navigate('/oauth2/callback?remember=1', { replace: true });
+                return;
+            }
             message.success('환영해요! RESERVE를 시작해보세요.');
             // 약관 동의 완료 후 저장된 복귀 경로로 이동한다.
 

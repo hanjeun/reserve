@@ -1,7 +1,7 @@
 import useMemberWithdrawal from '../../hooks/useMemberWithdrawal';
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Typography, Divider, Tabs } from 'antd';
-import { CameraOutlined, UserOutlined, ShopOutlined, EnvironmentOutlined, IdcardOutlined } from '../../components/common/icons';
+import { UserOutlined, ShopOutlined, EnvironmentOutlined, IdcardOutlined } from '../../components/common/icons';
 import { PageContainer, Button, Avatar } from '../../components/common';
 import { useSearchParams } from 'react-router-dom';
 import { useWindowWidth } from '../../hooks';
@@ -15,23 +15,25 @@ import { colors, fontSize, breakpoints } from '../../styles/tokens';
 
 import NameTab from '../../components/member/NameTab';
 import LoginSecuritySection from '../../components/member/LoginSecuritySection';
-import ProfileImageTab from '../../components/member/ProfileImageTab';
 import LocationTab from '../../components/member/LocationTab';
 import BusinessTab from '../../components/member/BusinessTab';
 import { NotificationSection, StoreDraftSection, AppearanceSection } from '../../components/member/AccountPreferences';
 import styles from '../../components/member/myPageStyles';
 import PublicProfileSkeleton from '../../components/member/PublicProfileSkeleton';
+import AnimatedContent from '../../components/common/AnimatedContent';
+import { normalizeProfileSettingsTab } from '../../utils/feed';
 
 const { Text } = Typography;
 const PublicProfileTab = lazy(() => import('../../components/member/PublicProfileTab'));
 const MyPage = () => {
-    const { user, checkAuth } = useAuthStore();
+    const user = useAuthStore(state => state.user);
+    const checkAuth = useAuthStore(state => state.checkAuth);
     useDocumentTitle('마이페이지');
     const { handleDeleteAccount, withdrawChecking } = useMemberWithdrawal();
     const [params, setParams] = useSearchParams();
 
     // 마이페이지 진입 시 항상 최신 user 정보를 서버에서 재조회 (localStorage 캐시 신뢰하지 않음)
-    useEffect(() => { checkAuth(true); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => { void checkAuth(true); }, [checkAuth]);
 
     const tabItems = [
         {
@@ -40,13 +42,8 @@ const MyPage = () => {
             children: <NameTab user={user} />,
         },
         {
-            key: 'photo',
-            label: <span style={styles.tabLabel}><CameraOutlined style={{ marginRight: 6 }} />사진</span>,
-            children: <ProfileImageTab user={user} />,
-        },
-        {
-            key: 'public-profile',
-            label: <span style={styles.tabLabel}><IdcardOutlined style={{ marginRight: 6 }} />공개 프로필</span>,
+            key: 'profile',
+            label: <span style={styles.tabLabel}><IdcardOutlined aria-hidden="true" style={{ marginRight: 6 }} />프로필</span>,
             children: <Suspense fallback={<PublicProfileSkeleton />}><PublicProfileTab /></Suspense>,
         },
         {
@@ -61,7 +58,15 @@ const MyPage = () => {
         }] : []),
     ];
     const requestedTab = params.get('tab');
-    const activeTab = tabItems.some(item => item.key === requestedTab) ? requestedTab : 'name';
+    const normalizedTab = normalizeProfileSettingsTab(requestedTab);
+    const activeTab = tabItems.some(item => item.key === normalizedTab) ? normalizedTab : 'name';
+    const [initialTab] = useState(activeTab);
+    const animatedTabs = tabItems.map(item => ({
+        ...item,
+        children: <AnimatedContent motionKey={activeTab} ready={item.key === activeTab} animateOnMount={item.key !== initialTab}>
+            {item.children}
+        </AnimatedContent>,
+    }));
     useEffect(() => {
         if (requestedTab === activeTab) return;
         setParams(previous => { const next = new URLSearchParams(previous); next.set('tab', activeTab); return next; }, { replace: true });
@@ -108,7 +113,7 @@ const MyPage = () => {
             {/* 정보 수정 탭 */}
             <div style={styles.tabsCard}>
                 <Text strong style={styles.sectionTitle}>내 정보 수정</Text>
-                <Tabs activeKey={activeTab} onChange={selectTab} items={tabItems} className="reserve-pill-tabs" tabBarGutter={4} animated={{ inkBar: true, tabPane: false }} />
+                <Tabs activeKey={activeTab} onChange={selectTab} items={animatedTabs} className="reserve-pill-tabs" tabBarGutter={8} animated={{ inkBar: true, tabPane: false }} />
             </div>
             {isPC && securitySection}
         </>

@@ -13,10 +13,11 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class ReservationNotificationDispatcher {
     private final ReservationNotificationService notifications;
+    private Clock clock = Clock.systemUTC();
 
     @Scheduled(fixedDelay = 5_000)
     public void dispatch() {
-        var now = LocalDateTime.now(Clock.systemUTC());
+        var now = LocalDateTime.now(clock);
         for (Long id : notifications.due(now)) {
             try {
                 notifications.deliver(id, now);

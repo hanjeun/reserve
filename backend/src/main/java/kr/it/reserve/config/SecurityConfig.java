@@ -7,6 +7,8 @@ import kr.it.reserve.config.oauth2.OAuth2AuthenticationFailureHandler;
 import kr.it.reserve.config.oauth2.OAuth2AuthenticationSuccessHandler;
 import kr.it.reserve.config.oauth2.TrustedOAuth2AuthorizationRequestResolver;
 import kr.it.reserve.global.common.ApiResponse;
+import kr.it.reserve.global.common.PublicStoreAddress;
+import kr.it.reserve.global.common.PublicId;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -90,7 +92,7 @@ public class SecurityConfig {
                         //   경로를 넓히지 말 것 — "/api/payment/**" 로 풀면 결제·환불 API 가 통째로 열린다.
                         .requestMatchers(org.springframework.http.HttpMethod.POST,
                                 ApiPaths.withV1Aliases("/api/payment/webhook/portone")).permitAll()
-                        // 수신 메일은 원본 본문의 서명으로 인증해요.
+                        // 수신 메일은 해당 경로의 원본 본문 서명으로 인증한다.
                         .requestMatchers(org.springframework.http.HttpMethod.POST,
                                 ApiPaths.withV1Aliases(ApiPaths.RESEND_INBOUND)).permitAll()
                         // 제공자 이벤트는 브라우저 세션 대신 서명된 SET 본문을 검증한다.
@@ -104,10 +106,15 @@ public class SecurityConfig {
                         // 인증 진입점만 공개한다. agree-terms는 로그인 직후의 회원 상태를 바꾸므로
                         // /api/auth/**로 함께 열면 @AuthenticationPrincipal null 경로가 생긴다.
                         .requestMatchers(org.springframework.http.HttpMethod.POST,
-                                ApiPaths.withV1Aliases("/api/auth/login", "/api/auth/signup", "/api/auth/refresh", "/api/auth/logout"))
+                                ApiPaths.withV1Aliases("/api/auth/login", "/api/auth/signup", "/api/auth/refresh",
+                                        "/api/auth/logout", "/api/auth/oauth-outcome"))
                                 .permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
                                 ApiPaths.withV1Aliases("/api/auth/login-policy", "/api/auth/session")).permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, ApiPaths.withV1Aliases(
+                                "/api/auth/account-recovery/start", "/api/auth/account-recovery/passkey",
+                                "/api/auth/account-recovery/backup", "/api/auth/account-recovery/complete",
+                                "/api/auth/account-recovery/email/send-code", "/api/auth/account-recovery/email/verify-code")).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.POST, ApiPaths.withV1Aliases(
                                 "/api/auth/mfa/status", "/api/auth/mfa/totp/setup", "/api/auth/mfa/totp/confirm",
                                 "/api/auth/mfa/passkey/login", "/api/auth/mfa/passkey/options", "/api/auth/mfa/passkey/confirm",
@@ -124,12 +131,15 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
                                 ApiPaths.withV1Aliases("/api/updates/public/events")).permitAll()
 
-                        // 필요한 공개 GET만 허용하고 상세 ID는 숫자로 제한해 개인 경로가 매칭되지 않게 한다.
+                        // 숫자·공개 UUID 상세만 허용해 수정·통계 경로가 매칭되지 않게 한다.
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
-                                ApiPaths.withV1Aliases("/api/stores", "/api/stores/regions", "/api/stores/{id:\\d+}")).permitAll()
+                                ApiPaths.withV1Aliases("/api/stores", "/api/stores/regions",
+                                        "/api/stores" + PublicStoreAddress.NUMERIC_SEGMENT,
+                                        "/api/stores" + PublicStoreAddress.UUID_SEGMENT)).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
                                 ApiPaths.withV1Aliases("/api/reviews/store/{storeId:\\d+}", "/api/reviews/store/{storeId:\\d+}/stats",
-                                        "/api/reviews/{id:\\d+}")).permitAll()
+                                        "/api/reviews/{id:\\d+}", "/api/reviews/{id:\\d+}/photos/{photoId:\\d+}",
+                                        "/api/reviews/{id:\\d+}/comments")).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
                                 ApiPaths.withV1Aliases("/api/notices", "/api/notices/highlights", "/api/notices/{id:\\d+}")).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
@@ -139,22 +149,26 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.POST,
                                 ApiPaths.withV1Aliases("/api/notices/{id:\\d+}/view")).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
-                                ApiPaths.withV1Aliases("/api/public/store-pages/{id:\\d+}")).permitAll()
+                                ApiPaths.withV1Aliases(PublicStoreAddress.PAGE_PREFIX + PublicStoreAddress.UUID_SEGMENT)).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.HEAD,
-                                ApiPaths.withV1Aliases("/api/public/store-pages/{id:\\d+}")).permitAll()
+                                ApiPaths.withV1Aliases(PublicStoreAddress.PAGE_PREFIX + PublicStoreAddress.UUID_SEGMENT)).permitAll()
                         // 지역 사진은 공개 탐색 보조 정보다. 키·원본 URL은 서버 안에서만 처리한다.
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
                                 ApiPaths.withV1Aliases("/api/tourism/region-photos/**")).permitAll()
                         // 가게 소식 v1의 최소 공개 응답만 허용한다. 기존 /my·/my-stores·CUD는 인증 유지.
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
-                                ApiPaths.withV1Aliases("/api/promotions/public", "/api/promotions/public/events", "/api/promotions/public/{promotionId}")).permitAll()
+                                ApiPaths.withV1Aliases("/api/promotions/public", "/api/promotions/public/events", "/api/promotions/public/{promotionId:[0-9]+}",
+                                        "/api/promotions/public" + PublicId.SEGMENT)).permitAll()
                         // 공개 피드의 최소 읽기만 허용한다. me/쓰기/신고/관리자 증거는 인증을 유지한다.
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
                                 ApiPaths.withV1Aliases("/api/feed/config", "/api/feed/regions", "/api/feed/posts", "/api/feed/posts/{id:\\d+}",
+                                        "/api/feed/posts" + PublicId.SEGMENT, "/api/feed/comments" + PublicId.SEGMENT,
                                         "/api/feed/interactions/config", "/api/feed/likes/{type:POST|NEWS|COMMENT}/{id:\\d+}", "/api/feed/comments/{id:\\d+}",
                                         "/api/feed/posts/{id:\\d+}/comments", "/api/feed/comments/{id:\\d+}/replies",
                                         "/api/feed/authors/{publicId:[0-9a-fA-F\\-]{36}}",
                                         "/api/feed/authors/{publicId:[0-9a-fA-F\\-]{36}}/posts",
+                                        "/api/feed/authors/{publicId:[0-9a-fA-F\\-]{36}}/comments",
+                                        "/api/feed/authors/{publicId:[0-9a-fA-F\\-]{36}}/reviews",
                                         "/api/feed/media/{id:\\d+}")).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
                                 ApiPaths.withV1Aliases("/api/store-news/config", "/api/store-news/media/{id:\\d+}")).permitAll()
@@ -224,6 +238,8 @@ public class SecurityConfig {
 
                 // JWT 필터 등록
                 .addFilterBefore(new IpProtectionFilter(ipProtection.getIfAvailable(), objectMapper), OAuth2AuthorizationRequestRedirectFilter.class)
+                .addFilterAfter(new PublicReadRateLimitFilter(entryLimiters.getIfAvailable(), objectMapper),
+                        IpProtectionFilter.class)
                 .addFilterBefore(new OAuthStartRateLimitFilter(entryLimiters.getIfAvailable(), objectMapper),
                         OAuth2AuthorizationRequestRedirectFilter.class)
                 .addFilterBefore(new JwtAuthenticationFilter(tokenProvider), UsernamePasswordAuthenticationFilter.class)

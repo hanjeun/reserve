@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Tag } from 'antd';
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { AdminTableSkeleton, Button, DataState, DataTable, FilterToolbar, SegmentedControl } from '../common';
+import { AdminTableSkeleton, Button, DataState, PagedDataTable, FilterToolbar, SegmentedControl } from '../common';
 import CopyableText from '../common/CopyableText';
 import { useMessage } from '../../hooks';
 import { adminKeys } from '../../hooks/queryKeys';
@@ -72,11 +72,10 @@ const AdPaymentOperations = () => {
     if (query.isError) {
         ledgerContent = <DataState state="error" kind="payment" subject="광고 결제 원장" error={query.error}
             onRetry={query.refetch} retrying={query.isFetching} />;
-    } else if (query.isPending) {
-        ledgerContent = <AdminTableSkeleton rows={6} headers={columns.map(column => column.title)}
-            cols={columns.map(column => column.width)} actionBtns={2} />;
     } else {
-        ledgerContent = <DataTable columns={columns} dataSource={query.data?.content ?? []} rowKey="id"
+        ledgerContent = <PagedDataTable columns={columns} dataSource={query.data?.content ?? []} rowKey="id"
+            placeholder={(query.isPending || query.isPlaceholderData) && <AdminTableSkeleton rows={6}
+                headers={columns.map(column => column.title)} cols={columns.map(column => column.width)} actionBtns={2} />}
             locale={{ emptyText: '표시할 광고 결제 시도가 없어요.' }}
             pagination={{ current: page, pageSize: PAGE_SIZE,
                 total: query.data?.page?.totalElements ?? query.data?.totalElements ?? 0, onChange: setPage }} />;

@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 
 const account = { id: 41, name: 'UI 검사 회원', email: 'ui-check@example.test', role: 'USER', termsAgreed: true };
 const store = {
-    id: 81, name: 'UI 검증 가게', category: '카페', description: '사진과 예약 안내 확인', ownerId: 8,
+    id: 81, publicId: '00000000-0000-4000-8000-000000000081', name: 'UI 검증 가게', category: '카페', description: '사진과 예약 안내 확인', ownerId: 8,
     mainImageUrl: 'https://reserve-image.test/ui-first.svg', mainImageWidth: 800, mainImageHeight: 450,
     detailImageUrls: ['https://reserve-image.test/ui-first.svg', 'https://reserve-image.test/ui-second.svg'],
     reservationSlotMinutes: 30, bookingType: 'TIME', openTime: '09:00', closeTime: '18:00',
@@ -27,7 +27,7 @@ async function mockUiApi(page, { signedIn = false } = {}) {
         if (path === '/api/member/me') return signedIn ? ok(route, account)
             : route.fulfill({ status: 401, json: { success: false, message: '로그인이 필요합니다.' } });
         if (path === '/api/auth/refresh') return route.fulfill({ status: 401, json: { success: false, message: '로그인이 필요합니다.' } });
-        if (path === '/api/stores/81') return ok(route, store);
+        if (path === '/api/stores/00000000-0000-4000-8000-000000000081') return ok(route, store);
         if (path === '/api/stores') return ok(route, { content: [store], page: { number: 0, totalElements: 1, totalPages: 1 } });
         if (path === '/api/reservations/calendar') {
             const month = dayjs(`${url.searchParams.get('month')}-01`);
@@ -95,7 +95,7 @@ test('first card press does not zoom its photo on touch, while desktop hover and
 
 test('gallery slide corners stay rounded during movement and original preview remains unrounded', async ({ page }) => {
     await mockUiApi(page);
-    await page.goto('/store/81');
+    await page.goto('/store/00000000-0000-4000-8000-000000000081');
     const gallery = page.locator('.reserve-store-gallery');
     await expect(gallery.locator('.slick-active .ant-image-img').first()).toBeVisible();
     const sampling = gallery.evaluate(element => new Promise(resolve => {
@@ -130,7 +130,7 @@ test('gallery slide corners stay rounded during movement and original preview re
 
 test('out-of-period dates stay disabled without visible period labels and valid dates can still be picked', async ({ page }) => {
     await mockUiApi(page);
-    await page.goto('/store/81');
+    await page.goto('/store/00000000-0000-4000-8000-000000000081');
     await page.getByRole('button', { name: '예약 날짜', exact: true }).click();
     const calendar = page.getByRole('dialog', { name: '예약 날짜 선택' });
     await expect(calendar).toBeVisible();

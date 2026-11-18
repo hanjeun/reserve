@@ -1,28 +1,56 @@
 import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
-import { Form } from 'antd';
+import { Form, Typography } from 'antd';
 import { FormInput } from '../common';
+import SocialLoginButton from '../common/SocialLoginButton';
+import Tooltip from '../common/Tooltip';
 import useExitAnimation from '../../hooks/useExitAnimation';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import LoginMethodFormActions from './LoginMethodFormActions';
+import LoginSecurityPanelHeading from './LoginSecurityPanelHeading';
 import { VALIDATION_RULES } from '../../utils/validation';
 import { useMessage } from '../../hooks';
 import { reportLoginMethodFormError } from './loginMethodFeedback';
+import styles from './myPageStyles';
 
 const SETUP_FIELDS = ['email', 'code', 'password', 'confirmation'];
 
-export function LoginMethodPasswordProof({ busy, submitText, actionText = submitText, onSubmit, onCancel }) {
+export function LoginMethodSocialProof({ title, description, provider, buttonLabel, disabled, onConfirm, onClose, actions }) {
+    const social = provider && onConfirm && <Tooltip title={buttonLabel}>
+        <SocialLoginButton provider={provider} data-provider={provider} label={buttonLabel} disabled={disabled} onClick={onConfirm} />
+    </Tooltip>;
+    const heading = <LoginSecurityPanelHeading onClose={onClose} disabled={disabled}><Typography.Text strong>{title}</Typography.Text></LoginSecurityPanelHeading>;
+    const hint = <Typography.Text style={{ ...styles.loginMethodHint, marginTop: 0, overflowWrap: 'anywhere' }}>{description}</Typography.Text>;
+    if (social && !actions && !onClose) return <div className="reserve-login-proof-single">
+        <div className="reserve-login-proof-copy">{heading}{hint}</div>
+        {social}
+    </div>;
+    return <>
+        {heading}
+        <div className={actions ? 'reserve-login-proof-options reserve-login-proof-options--multiple' : 'reserve-login-proof-options'}>
+            {hint}
+            {actions ? <div className="reserve-mfa-management-actions" role="group" aria-label="인증 수단">{social}{actions}</div> : social}
+        </div>
+    </>;
+}
+LoginMethodSocialProof.propTypes = { title: PropTypes.string.isRequired, description: PropTypes.string.isRequired,
+    provider: PropTypes.oneOf(['google', 'naver', 'kakao']), buttonLabel: PropTypes.string.isRequired,
+    disabled: PropTypes.bool, onConfirm: PropTypes.func, onClose: PropTypes.func, actions: PropTypes.node };
+
+export function LoginMethodPasswordProof({ busy, submitText, actionText = submitText, description, onSubmit, onCancel }) {
     const [form] = Form.useForm();
     const { message } = useMessage();
     return <Form form={form} aria-label={submitText} layout="vertical" requiredMark={false} onFinish={values => onSubmit(values.currentPassword)}
         onFinishFailed={failure => reportLoginMethodFormError(failure, form, message)}>
+        <LoginSecurityPanelHeading onClose={onCancel} disabled={busy}><Typography.Text strong>{submitText}</Typography.Text></LoginSecurityPanelHeading>
+        {description && <Typography.Text style={{ ...styles.loginMethodHint, marginBottom: 12 }}>{description}</Typography.Text>}
         <Form.Item name="currentPassword" label="현재 비밀번호" rules={[{ required: true, message: '현재 비밀번호를 먼저 입력해주세요.' }]}>
             <FormInput type="password" autoComplete="current-password" disabled={busy} maxLength={64} />
         </Form.Item>
-        <LoginMethodFormActions submitLabel={submitText} submitText={actionText} busy={busy} onCancel={onCancel} />
+        <LoginMethodFormActions submitLabel={submitText} submitText={actionText} busy={busy} />
     </Form>;
 }
-LoginMethodPasswordProof.propTypes = { busy: PropTypes.bool, submitText: PropTypes.string.isRequired, actionText: PropTypes.string,
+LoginMethodPasswordProof.propTypes = { busy: PropTypes.bool, submitText: PropTypes.string.isRequired, actionText: PropTypes.string, description: PropTypes.string,
     onSubmit: PropTypes.func.isRequired, onCancel: PropTypes.func.isRequired };
 
 export function LoginMethodPasswordSetup({ email, busy, onSend, onSubmit, onCancel, onError }) {
@@ -34,7 +62,7 @@ export function LoginMethodPasswordSetup({ email, busy, onSend, onSubmit, onCanc
     const mounted = useRef(false);
     useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
     const reducedMotion = useReducedMotion();
-    const { shouldRender: renderCode, isClosing: codeClosing } = useExitAnimation(Boolean(challenge), reducedMotion ? 0 : 200);
+    const { shouldRender: renderCode } = useExitAnimation(Boolean(challenge), reducedMotion ? 0 : 200);
     const send = async () => {
         if (busy || sendLock.current) return;
         sendLock.current = true;
@@ -69,15 +97,16 @@ export function LoginMethodPasswordSetup({ email, busy, onSend, onSubmit, onCanc
             const errorFields = [...failure.errorFields].sort((left, right) => SETUP_FIELDS.indexOf(left.name[0]) - SETUP_FIELDS.indexOf(right.name[0]));
             reportLoginMethodFormError({ ...failure, errorFields }, form, message);
         }}>
+        <LoginSecurityPanelHeading onClose={onCancel} disabled={busy || sending}><Typography.Text strong>이메일 로그인 설정</Typography.Text></LoginSecurityPanelHeading>
         <Form.Item name="email" label="로그인 이메일" rules={VALIDATION_RULES.email}
             extra="인증한 이메일을 계정의 연락 이메일로도 사용해요.">
             <FormInput.WithButton type="email" autoComplete="email" disabled={busy} maxLength={254}
                 buttonText={challenge ? '재발송' : '코드발송'} buttonAriaLabel={challenge ? '인증 코드 다시 받기' : '인증 코드 받기'}
                 buttonLoading={sending} buttonDisabled={busy} onButtonClick={send} />
         </Form.Item>
-        {renderCode && <div className="reserve-login-security-code" inert={!challenge || codeClosing ? true : undefined}
+        {(challenge || renderCode) && <div className="reserve-login-security-code" inert={!challenge ? true : undefined}
             style={{ display: 'grid', gridTemplateRows: '1fr', animation: reducedMotion ? 'none'
-                : !challenge || codeClosing ? 'reserve-feed-replies-exit 200ms ease-in both' : 'reserve-feed-replies-enter 200ms ease-out both' }}>
+                : !challenge ? 'reserve-feed-replies-exit 200ms ease-in both' : 'reserve-feed-replies-enter 200ms ease-out both' }}>
             <div style={{ minHeight: 0, overflow: 'hidden' }}><Form.Item name="code" label="인증 코드" preserve={false}
                 rules={[{ required: true, pattern: /^[0-9]{6}$/, message: '6자리 인증 코드를 입력해주세요.' }]}>
                 <FormInput inputMode="numeric" autoComplete="one-time-code" maxLength={6} disabled={busy || !challenge} />
@@ -94,9 +123,9 @@ export function LoginMethodPasswordSetup({ email, busy, onSend, onSubmit, onCanc
             <FormInput type="password" autoComplete="new-password" maxLength={64} disabled={busy} />
         </Form.Item>
         <p>인증 코드는 5분간 유효해요. 설정 후 다시 로그인해주세요.</p>
-        <LoginMethodFormActions submitLabel="이메일 로그인 설정" submitText="설정" busy={busy} onCancel={onCancel}
+        <LoginMethodFormActions submitLabel="이메일 로그인 설정" submitText="설정" busy={busy}
             unavailableReason={challenge ? '' : '먼저 이메일 인증 코드를 받아주세요.'} />
     </Form>;
 }
 LoginMethodPasswordSetup.propTypes = { email: PropTypes.string, busy: PropTypes.bool, onSend: PropTypes.func.isRequired,
-    onSubmit: PropTypes.func.isRequired, onCancel: PropTypes.func.isRequired, onError: PropTypes.func.isRequired };
+    onSubmit: PropTypes.func.isRequired, onCancel: PropTypes.func, onError: PropTypes.func.isRequired };

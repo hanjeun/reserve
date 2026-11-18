@@ -7,6 +7,7 @@ import kr.it.reserve.global.ratelimit.IpExtractor;
 import kr.it.reserve.global.ratelimit.RateLimiter;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.reservation.dto.ReservationCreateRequest;
+import kr.it.reserve.reservation.dto.ReservationCompletionResponse;
 import kr.it.reserve.reservation.dto.QrCheckinResponse;
 import kr.it.reserve.reservation.dto.ReservationResponse;
 import kr.it.reserve.reservation.dto.ReservationRequestResult;
@@ -92,8 +93,11 @@ public class ReservationApiController {
     }
 
     @GetMapping("/my/store/{storeId}/completed")
-    public ResponseEntity<ApiResponse<ReservationResponse>> getMyLatestCompletedForStore(@PathVariable Long storeId) {
-        ReservationResponse reservation = reservationService.getLatestCompletedReservationForStore(SecurityUtil.getCurrentMember(), storeId);
+    public ResponseEntity<ApiResponse<ReservationResponse>> getMyLatestCompletedForStore(@PathVariable Long storeId,
+            @RequestParam(required = false) Long reservationId) {
+        Member member = SecurityUtil.getCurrentMember();
+        ReservationResponse reservation = reservationId == null ? reservationService.getLatestCompletedReservationForStore(member, storeId)
+                : reservationService.getCompletedReservationForStore(member, storeId, reservationId);
         return ResponseEntity.ok(ApiResponse.success(reservation, "조회 성공"));
     }
 
@@ -189,6 +193,12 @@ public class ReservationApiController {
                 "전체 예약 목록 조회 성공"));
     }
 
+    @PostMapping("/admin/{id}/no-show-correction")
+    public ApiResponse<Void> correctNoShowRestriction(@PathVariable Long id) {
+        reservationService.correctNoShowRestriction(id, SecurityUtil.getCurrentMember());
+        return ApiResponse.success(null, "노쇼 제한 기록을 정정했어요.");
+    }
+
     @GetMapping("/store/status-summary")
     public ResponseEntity<ApiResponse<kr.it.reserve.reservation.dto.ReservationStatusSummaryResponse>>
             getStoreReservationSummary() {
@@ -252,11 +262,10 @@ public class ReservationApiController {
     }
 
     @PatchMapping("/{id}/complete")
-    public ResponseEntity<ApiResponse<Void>> completeReservation(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<ReservationCompletionResponse>> completeReservation(@PathVariable Long id) {
         Member member = SecurityUtil.getCurrentMember();
         validateBusinessAuth(member);
-        reservationService.completeReservation(id, member);
-        return ResponseEntity.ok(ApiResponse.success(null, "이용 완료 처리됐어요."));
+        return ResponseEntity.ok(ApiResponse.success(reservationService.completeReservation(id, member), "이용 완료 처리됐어요."));
     }
 
     @PatchMapping("/{id}/no-show")
@@ -265,6 +274,14 @@ public class ReservationApiController {
         validateBusinessAuth(member);
         reservationService.markNoShow(id, member);
         return ResponseEntity.ok(ApiResponse.success(null, "노쇼 처리됐어요."));
+    }
+
+    @PatchMapping("/{id}/undo-no-show")
+    public ApiResponse<Void> undoNoShow(@PathVariable Long id) {
+        Member member = SecurityUtil.getCurrentMember();
+        validateBusinessAuth(member);
+        reservationService.undoNoShow(id, member);
+        return ApiResponse.success(null, "노쇼 처리를 되돌렸어요.");
     }
 
     // QR 체크인은 승인 상태를 바꾸지 않고 방문 시각만 기록한다. 서명 검증과 별도로 호출량을 제한한다.

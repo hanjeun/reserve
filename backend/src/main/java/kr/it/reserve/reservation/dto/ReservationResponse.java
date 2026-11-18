@@ -2,6 +2,7 @@ package kr.it.reserve.reservation.dto;
 
 import kr.it.reserve.global.common.ServiceTime;
 import kr.it.reserve.reservation.entity.Reservation;
+import kr.it.reserve.reservation.service.ReservationNoShowPolicy;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -22,6 +23,7 @@ public class ReservationResponse {
     private Long id;
     private String reservationCode;
     private Long storeId;
+    private String storePublicId;
     private String storeName;
     private String storeMainImageUrl;
     private Long memberId;
@@ -46,7 +48,9 @@ public class ReservationResponse {
     private Integer depositAmount;
     private Integer noShowDeposit;  // 가게의 노쇼방지금 설정 금액
     private LocalDateTime checkedInAt;
+    private LocalDateTime manualVisitConfirmedAt;
     private LocalDateTime usageEndsAt;
+    private Instant noShowAvailableAt;
     private Boolean autoCompletionEnabled;
     private Boolean attendanceRefundEnabled;
 
@@ -54,10 +58,18 @@ public class ReservationResponse {
     private Integer paymentTimeoutMinutes;
     private Instant paymentDeadline;
 
-    // 리뷰 관련 필드 (null = 아직 리뷰 미작성)
+    // 삭제된 리뷰의 작성 여부와 조회 가능한 리뷰 ID를 구분한다.
     private Long reviewId;
+    private boolean reviewWritten;
     private boolean personalInfoHidden;
     private Instant personalInfoVisibleUntil;
+    private boolean noShowRestrictionCorrectable;
+
+    public static ReservationResponse fromAdminEntity(Reservation reservation, boolean correctable) {
+        var response = fromManagementEntity(reservation);
+        response.noShowRestrictionCorrectable = correctable;
+        return response;
+    }
 
     public static ReservationResponse fromManagementEntity(Reservation reservation) {
         ReservationResponse response = fromEntity(reservation);
@@ -77,16 +89,21 @@ public class ReservationResponse {
         return deadline == null ? null : deadline.atZone(ZoneId.systemDefault()).toInstant();
     }
 
-    public static ReservationResponse fromEntity(Reservation reservation) {
-        return fromEntityWithReviewId(reservation, null);
+    private static Instant noShowAvailableAt(Reservation reservation) {
+        var available = ReservationNoShowPolicy.availableAt(reservation);
+        return available == null ? null : available.atZone(ServiceTime.ZONE).toInstant();
     }
 
-    /** 리뷰 ID를 포함한 응답 생성 (내 예약 목록 전용) */
-    public static ReservationResponse fromEntityWithReviewId(Reservation reservation, Long reviewId) {
+    public static ReservationResponse fromEntity(Reservation reservation) {
+        return fromEntityWithReview(reservation, null, false);
+    }
+
+    public static ReservationResponse fromEntityWithReview(Reservation reservation, Long reviewId, boolean reviewExists) {
         return ReservationResponse.builder()
                 .id(reservation.getId())
                 .reservationCode(reservation.getReservationCode())
                 .storeId(reservation.getStore().getId())
+                .storePublicId(reservation.getStore().getPublicId())
                 .storeName(reservation.getStore().getName())
                 .storeMainImageUrl(reservation.getStore().getMainImageUrl())
                 .memberId(reservation.getMember().getId())
@@ -103,13 +120,16 @@ public class ReservationResponse {
                 .depositAmount(reservation.getDepositAmount())
                 .noShowDeposit(reservation.getStore().getNoShowDeposit())
                 .checkedInAt(ServiceTime.toServiceZone(reservation.getCheckedInAt()))
+                .manualVisitConfirmedAt(ServiceTime.toServiceZone(reservation.getManualVisitConfirmedAt()))
                 .usageEndsAt(reservation.getUsageEndsAt())
+                .noShowAvailableAt(noShowAvailableAt(reservation))
                 .autoCompletionEnabled(reservation.getAutoCompletionEnabled())
                 .attendanceRefundEnabled(reservation.getAttendanceRefundEnabled())
                 .allowLatePayment(reservation.getStore().getAllowLatePayment())
                 .paymentTimeoutMinutes(reservation.getStore().getPaymentTimeoutMinutes())
                 .paymentDeadline(paymentDeadline(reservation))
                 .reviewId(reviewId)
+                .reviewWritten(reservation.isReviewWritten() || reviewExists)
                 .build();
     }
 }

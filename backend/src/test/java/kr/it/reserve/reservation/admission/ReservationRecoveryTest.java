@@ -11,6 +11,7 @@ import kr.it.reserve.reservation.dto.ReservationCreateRequest;
 import kr.it.reserve.reservation.dto.ReservationRequestResult;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
+import kr.it.reserve.reservation.service.ReservationNoShowRestriction;
 import kr.it.reserve.reservation.service.ReservationService;
 import kr.it.reserve.reservation.util.QrCheckinTokenProvider;
 import kr.it.reserve.store.entity.Store;
@@ -55,7 +56,7 @@ class ReservationRecoveryTest {
         request = new ReservationCreateRequest(10L, LocalDate.now().plusDays(2), LocalTime.NOON, 1, null, false);
         request.setRequestId(KEY);
         var guard = new ReservationCreationGuard(requests, admission);
-        service = new ReservationService(reservations, stores, mock(HolidayService.class), payments, emails, members, audits, qr, guard, org.mockito.Mockito.mock(kr.it.reserve.reservation.service.ReservationConsentService.class));
+        service = new ReservationService(reservations, stores, mock(HolidayService.class), payments, emails, members, audits, qr, guard, org.mockito.Mockito.mock(kr.it.reserve.reservation.service.ReservationConsentService.class), mock(ReservationNoShowRestriction.class));
         reservation = Reservation.builder().id(50L).member(member).store(Store.builder().id(10L).name("synthetic").build())
                 .reservationDate(request.getReservationDate()).reservationTime(request.getReservationTime()).guestCount(1).build();
         when(members.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(member));

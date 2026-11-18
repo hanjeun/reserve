@@ -2,6 +2,7 @@ import React, { useId, useState } from 'react';
 import { ArrowLeftOutlined, CloseOutlined, DownOutlined, MessageOutlined } from '../common/icons';
 import { Bone, Button, DataState, Tooltip } from '../common';
 import ConversationListSkeleton from './ConversationListSkeleton';
+import SegmentedControl from '../common/SegmentedControl';
 import MessengerThreadSkeleton from './MessengerThreadSkeleton';
 import MessengerListHeading from './MessengerListHeading';
 import MessengerHome from './MessengerHome';
@@ -12,6 +13,7 @@ import MessengerAvatar from './MessengerAvatar';
 import { SupportAvatar } from './SupportIdentity';
 import ChatBubbleList from './ChatBubbleList';
 import ChatComposer from './ChatComposer';
+import useMessengerStore from '../../store/useMessengerStore';
 import ChatModerationMenu from './ChatModerationMenu';
 import ChatRetentionNotice from './ChatRetentionNotice';
 import { matchesSelection, viewerRoleOf } from './messengerContentModel';
@@ -62,8 +64,8 @@ function StaleListError({ query, rows, title }) {
     );
 }
 
-function MoreButton({ query, children }) {
-    if (!query.hasNextPage) return null;
+function MoreButton({ query, more, children }) {
+    if (!more) return null;
     return (
         <Button
             variant="ghost-sm-primary"
@@ -91,7 +93,7 @@ function ListRows({ query, coldError, rows, subject, emptyText, children }) {
     return children;
 }
 
-function AdminInboxSection({ query, rows, showThread, selection, onChoose }) {
+function AdminInboxSection({ query, rows, more, showThread, selection, onChoose }) {
     return (
         <section className="reserve-messenger-support-section" aria-label="고객지원 문의">
             <StaleListError query={query} rows={rows}
@@ -106,12 +108,12 @@ function AdminInboxSection({ query, rows, showThread, selection, onChoose }) {
                     />
                 ))}
             </ListRows>
-            <MoreButton query={query}>고객 문의 더 보기</MoreButton>
+            <MoreButton query={query} more={more}>고객 문의 더 보기</MoreButton>
         </section>
     );
 }
 
-function CustomerSection({ query, rows, customerRows, showHidden, hasHiddenNotification, showThread, selection, onChoose, onVisibilityChange }) {
+function CustomerSection({ query, rows, customerRows, more, showHidden, hasHiddenNotification, showThread, selection, onChoose, onVisibilityChange, onLeave }) {
     return (
         <section aria-labelledby="reserve-my-conversations">
             <h2 id="reserve-my-conversations" className={`reserve-messenger-section-label${customerRows.length === 0 ? ' reserve-messenger-sr-only' : ''}`}>내 문의</h2>
@@ -126,6 +128,7 @@ function CustomerSection({ query, rows, customerRows, showHidden, hasHiddenNotif
                         owner={false}
                         hidden={showHidden}
                         onVisibilityChange={onVisibilityChange}
+                        onLeave={onLeave}
                         selected={showThread && matchesSelection(row, selection)}
                         onSelect={() => onChoose(row.type === 'SUPPORT'
                             ? { kind: 'support' }
@@ -133,12 +136,12 @@ function CustomerSection({ query, rows, customerRows, showHidden, hasHiddenNotif
                     />
                 ))}
             </ListRows>
-            <MoreButton query={query}>대화 더 보기</MoreButton>
+            <MoreButton query={query} more={more}>대화 더 보기</MoreButton>
         </section>
     );
 }
 
-function OwnerInboxSection({ query, rows, showHidden, showThread, selection, onChoose, onVisibilityChange }) {
+function OwnerInboxSection({ query, rows, more, showHidden, showThread, selection, onChoose, onVisibilityChange, onLeave }) {
     return (
         <section aria-labelledby="reserve-store-inbox">
             <h2 id="reserve-store-inbox" className="reserve-messenger-section-label">손님 문의</h2>
@@ -152,30 +155,47 @@ function OwnerInboxSection({ query, rows, showHidden, showThread, selection, onC
                         owner
                         hidden={showHidden}
                         onVisibilityChange={onVisibilityChange}
+                        onLeave={onLeave}
                         selected={showThread && matchesSelection(row, selection)}
                         onSelect={() => onChoose({ kind: 'owner', roomId: row.roomId })}
                     />
                 ))}
             </ListRows>
-            <MoreButton query={query}>문의 더 보기</MoreButton>
+            <MoreButton query={query} more={more}>문의 더 보기</MoreButton>
         </section>
     );
 }
 
-function ConversationSections({ lists, canAdminSupport, canOwnStores, showHidden, hasHiddenNotification, rowProps }) {
+function matchingConversations(query, rows, unreadOnly, allRows = rows) {
+    const visibleRows = unreadOnly ? rows.filter(row => row.unread > 0) : rows;
+    // 일반 목록은 안 읽은 방을 먼저 보내므로 마지막이 읽은 방이면 더 조회할 필요가 없다.
+    const more = query.hasNextPage && (!unreadOnly || allRows.at(-1)?.unread > 0);
+    return { rows: visibleRows, more, hasSection: query.isLoading || query.isError || visibleRows.length > 0 || more };
+}
+
+function ConversationSections({ lists, canAdminSupport, canOwnStores, showHidden, notificationVisible, filter, rowProps }) {
     const { memberQuery, ownerQuery, adminQuery, memberRows, ownerRows, adminRows, customerRows } = lists;
-    const showOwnerInbox = canOwnStores && (ownerQuery.isLoading || ownerQuery.isError || ownerRows.length > 0);
+    const unreadOnly = filter === 'unread';
+    const member = matchingConversations(memberQuery, customerRows, unreadOnly, memberRows);
+    const owner = matchingConversations(ownerQuery, ownerRows, unreadOnly);
+    const admin = matchingConversations(adminQuery, adminRows, unreadOnly);
+    const showMember = filter !== 'received' && (!unreadOnly || member.hasSection);
+    const showAdmin = canAdminSupport && !showHidden && filter !== 'my' && (!unreadOnly || admin.hasSection);
+    const showOwnerInbox = canOwnStores && filter !== 'my' && (filter === 'received' || owner.hasSection);
+    if (unreadOnly && !showMember && !showAdmin && !showOwnerInbox && !notificationVisible) {
+        return <DataState state="empty" kind="message" title="안 읽은 대화가 없어요." />;
+    }
     return (
         <>
-            {canAdminSupport && !showHidden && (
-                <AdminInboxSection query={adminQuery} rows={adminRows} {...rowProps} />
+            {showAdmin && (
+                <AdminInboxSection query={adminQuery} rows={admin.rows} more={admin.more} {...rowProps} />
             )}
 
-            <CustomerSection query={memberQuery} rows={memberRows} customerRows={customerRows}
-                showHidden={showHidden} hasHiddenNotification={hasHiddenNotification} {...rowProps} />
+            {showMember && <CustomerSection query={memberQuery} rows={memberRows} customerRows={member.rows} more={member.more}
+                showHidden={showHidden} hasHiddenNotification={showHidden && notificationVisible} {...rowProps} />}
 
             {showOwnerInbox && (
-                <OwnerInboxSection query={ownerQuery} rows={ownerRows} showHidden={showHidden} {...rowProps} />
+                <OwnerInboxSection query={ownerQuery} rows={owner.rows} more={owner.more} showHidden={showHidden} {...rowProps} />
             )}
         </>
     );
@@ -183,8 +203,14 @@ function ConversationSections({ lists, canAdminSupport, canOwnStores, showHidden
 
 export function ConversationListPanel({
     headingLevel, inert, lists, showHidden, onToggleHidden, onFindStore, canAdminSupport, canOwnStores,
-    rowProps, notificationEntry, navigation,
+    rowProps, notificationEntry, notificationVisible, navigation, filter, onFilterChange,
 }) {
+    const options = [
+        { value: 'all', label: '전체' },
+        { value: 'my', label: '내 문의' },
+        ...(canOwnStores || canAdminSupport ? [{ value: 'received', label: '받은 문의' }] : []),
+        { value: 'unread', label: '안 읽음' },
+    ];
     return (
         <aside className="reserve-messenger-list" aria-label="대화 목록"
             inert={inert ? true : undefined}>
@@ -192,6 +218,9 @@ export function ConversationListPanel({
                 refreshing={lists.conversationListsFetching}
                 onRefresh={lists.refreshConversationLists}
                 showHidden={showHidden} onToggleHidden={onToggleHidden} onFindStore={onFindStore} />
+            {!showHidden && <div className="reserve-messenger-list-filters">
+                <SegmentedControl options={options} value={filter} onChange={onFilterChange} block={false} aria-label="대화 목록 필터" />
+            </div>}
 
             <div className="reserve-messenger-list-scroll" aria-busy={lists.conversationListsLoading}>
                 {notificationEntry}
@@ -200,8 +229,8 @@ export function ConversationListPanel({
                         onRetry={lists.refreshConversationLists} retrying={lists.conversationListsFetching} />
                 ) : (
                     <ConversationSections lists={lists} canAdminSupport={canAdminSupport}
-                        canOwnStores={canOwnStores} showHidden={showHidden}
-                        hasHiddenNotification={showHidden && Boolean(notificationEntry)} rowProps={rowProps} />
+                        canOwnStores={canOwnStores} showHidden={showHidden} filter={filter}
+                        notificationVisible={notificationVisible} rowProps={rowProps} />
                 )}
             </div>
             {navigation}
@@ -236,13 +265,19 @@ function ThreadMessages({ messages, thread, selection, history, onLoadOlder, onR
                     </Button>
                 </div>
             )}
-            {messages.some(message => !message.hidden) ? <ChatBubbleList messages={messages} mine={thread?.viewerRole || viewerRoleOf(selection)}
+            <ChatBubbleList messages={messages} mine={thread?.viewerRole || viewerRoleOf(selection)}
                 searchMessageId={searchMessageId}
-                roomId={thread?.roomId} onRetracted={onRetracted}
+                roomId={thread?.roomId} onRetracted={onRetracted} emptyText={emptyText}
                 reportRole={thread?.type === 'STORE' ? thread.viewerRole : undefined} />
-                : <DataState state="empty" kind="message" title={emptyText} />}
         </div>
     );
+}
+
+function ThreadIntro({ store, userName, title, supportName, content, onAsk, disabled, draftKey }) {
+    const draftLength = useMessengerStore(state => state.drafts[draftKey]?.length ?? 0);
+    return <ChatIntro variant={store ? 'store' : 'support'} userName={userName} displayName={store ? title : supportName}
+        notice={content.notice ?? undefined} greeting={content.greeting ?? undefined} items={content.items}
+        onAsk={onAsk} disabled={disabled} draftLength={draftLength} />;
 }
 
 function ThreadBody({ loading, loadError, openError, onReload, intro, emptyText, messageProps }) {
@@ -256,12 +291,7 @@ function ThreadBody({ loading, loadError, openError, onReload, intro, emptyText,
         );
     }
     if (intro.show) {
-        return (
-            <ChatIntro variant={intro.store ? 'store' : 'support'} userName={intro.userName}
-                displayName={intro.store ? intro.title : intro.supportName}
-                notice={intro.content.notice ?? undefined} greeting={intro.content.greeting ?? undefined} items={intro.content.items}
-                onAsk={intro.onAsk} disabled={intro.disabled} draftLength={intro.draftLength} />
-        );
+        return <ThreadIntro {...intro} />;
     }
     return <ThreadMessages {...messageProps} emptyText={emptyText} />;
 }
@@ -297,7 +327,8 @@ function OwnerReplies({ draft, sending, onInsert }) {
     );
 }
 
-function ThreadComposerArea({ closed, disabledMessage, showOwnerReplies, draft, sending, onDraftChange, composerProps }) {
+function ThreadComposerArea({ closed, disabledMessage, showOwnerReplies, draftKey, sending, onDraftChange, composerProps }) {
+    const draft = useMessengerStore(state => closed ? '' : state.drafts[draftKey] ?? '');
     if (closed) {
         return (
             <output className="reserve-messenger-closed">

@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { Tag } from 'antd';
 import AdPaymentOperations from './AdPaymentOperations';
+import PaymentReceiptLookup from './PaymentReceiptLookup';
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { AdminTableSkeleton, Button, DataState, DataTable, FilterToolbar, SegmentedControl, SegmentedGrid } from '../common';
+import { AdminTableSkeleton, Button, DataState, PagedDataTable, FilterToolbar, SegmentedControl, SegmentedGrid } from '../common';
 import CopyableText from '../common/CopyableText';
 import { useMessage } from '../../hooks';
 import { adminKeys } from '../../hooks/queryKeys';
 import { invalidateAdminData, invalidateReservationData } from '../../hooks/invalidateAfterWrite';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
-import { breakpoints, colors, fontSize, radius } from '../../styles/tokens';
+import { breakpoints, fontSize } from '../../styles/tokens';
 import { useWindowWidth } from '../../hooks/useWindowWidth';
 
 const PAGE_SIZE = 20;
@@ -19,6 +20,7 @@ const QUEUES = [
     { value: 'issues', label: '수동 대사' },
     { value: 'webhooks', label: '웹훅 inbox' },
     { value: 'ads', label: '광고 결제' },
+    { value: 'receipts', label: '영수증 조회' },
 ];
 
 const AGE_OPTIONS = [
@@ -192,8 +194,6 @@ const PaymentOperationsTab = () => {
         webhooks: '처리가 끝나지 않은 PortOne 웹훅이에요. 재처리는 같은 멱등 관문을 통과해요.',
     };
 
-    // 목록 영역 — 오류 / 스켈레톤 / 표. 광고 큐에서는 activeQuery·columns 가 없으므로
-    // 미리 계산하지 않고 렌더 시점(광고 외 큐)에만 호출한다.
     const renderTableBody = () => {
         if (activeQuery.isError) {
             return (
@@ -201,18 +201,11 @@ const PaymentOperationsTab = () => {
                     onRetry={activeQuery.refetch} retrying={activeQuery.isFetching} />
             );
         }
-        if (loading) {
-            return (
-                <AdminTableSkeleton
-                    rows={6}
-                    cols={columns.map((column) => column.width ?? null)}
-                    headers={columns.map((column) => column.title)}
-                    actionBtns={queue === 'issues' ? 0 : 1}
-                />
-            );
-        }
         return (
-            <DataTable
+            <PagedDataTable
+                placeholder={loading && <AdminTableSkeleton rows={6}
+                    cols={columns.map(column => column.width ?? null)} headers={columns.map(column => column.title)}
+                    actionBtns={queue === 'issues' ? 0 : 1} />}
                 columns={columns}
                 dataSource={data}
                 rowKey={queue === 'ready' ? 'paymentId' : 'id'}
@@ -230,21 +223,21 @@ const PaymentOperationsTab = () => {
     return (
         <div>
             <div style={{ maxWidth: 560, marginBottom: 16 }}>
-                {narrow ? <SegmentedGrid columns={2} options={QUEUES} value={queue} onChange={handleQueueChange} />
+                {narrow ? <SegmentedGrid columns={2} gap={8} options={QUEUES} value={queue} onChange={handleQueueChange} />
                     : <SegmentedControl options={QUEUES} value={queue} onChange={handleQueueChange} />}
             </div>
 
-            {queue === 'ads' ? <AdPaymentOperations /> : <>
-            <div style={styles.notice}>{descriptions[queue]}</div>
+            {queue === 'receipts' && <PaymentReceiptLookup />}
+            {queue === 'ads' && <AdPaymentOperations />}
+            {activeQuery && <>
+            <p className="reserve-payment-operations-notice">{descriptions[queue]}</p>
 
             <FilterToolbar
                 selects={queue === 'ready' ? [{
                     value: olderThanDays,
                     onChange: handleAgeChange,
                     options: AGE_OPTIONS,
-                    // 가장 긴 선택지("30일 이상"·"90일 이상")와 화살표가 들어가는 최대 폭.
-                    // 건수가 있을 때 FilterToolbar는 실제 선택값 폭으로 줄여 건수와 붙인다.
-                    width: 76,
+                    fitContent: true,
                 }] : []}
                 count={total}
                 onReload={activeQuery.refetch}
@@ -256,19 +249,6 @@ const PaymentOperationsTab = () => {
             </>}
         </div>
     );
-};
-
-const styles = {
-    notice: {
-        padding: '12px 16px',
-        marginBottom: 16,
-        border: `1px solid ${colors.border.light}`,
-        borderRadius: radius.md,
-        background: colors.gray[50],
-        color: colors.text.tertiary,
-        fontSize: fontSize.sm,
-        lineHeight: 1.6,
-    },
 };
 
 export default PaymentOperationsTab;

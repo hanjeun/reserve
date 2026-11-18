@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useLocation, useParams, useNavigate } from "react-router-dom";
 import { Form } from 'antd';
 import StoreOnboardingSkeleton from "../../components/store/StoreOnboardingSkeleton";
 import StoreOnboarding from "../../components/store/StoreOnboarding";
@@ -14,6 +14,7 @@ import useAuthStore from '../../store/useAuthStore';
 const StoreEdit = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { key: entryKey, state } = useLocation();
     const [form] = Form.useForm();
     const { message } = useMessage();
     const { formReady, formRef } = useFormReady();
@@ -27,7 +28,9 @@ const StoreEdit = () => {
     // 숫자가 아닌 가게 ID는 API로 보내지 않는다.
 
     const validId = /^\d+$/.test(id ?? '') && Number.isSafeInteger(Number(id)) && Number(id) > 0;
-    const { store, loading, error, refetch } = useStoreData(validId ? id : null, { forEdit: true });
+    const { store, loading, error, refetch } = useStoreData(validId ? id : null, {
+        forEdit: true, editDraftEntryKey: state?.storeDraftResume ? entryKey : null,
+    });
 
     // 소유자 검증 — store 로딩 후 본인 가게가 아니면 리다이렉트
     useEffect(() => {

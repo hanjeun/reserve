@@ -7,7 +7,8 @@
 <br />
 
 [![Release](https://img.shields.io/github/v/release/hanjeun/reserve?style=flat-square&label=release&color=2F80ED)](https://github.com/hanjeun/reserve/releases)
-[![CI/CD](https://img.shields.io/github/actions/workflow/status/hanjeun/reserve/CI.yml?branch=main&style=flat-square&label=CI%2FCD)](https://github.com/hanjeun/reserve/actions/workflows/CI.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/hanjeun/reserve/CI.yml?branch=main&style=flat-square&label=CI)](https://github.com/hanjeun/reserve/actions/workflows/CI.yml)
+[![CD](https://img.shields.io/github/actions/workflow/status/hanjeun/reserve/CD.yml?branch=main&style=flat-square&label=CD)](https://github.com/hanjeun/reserve/actions/workflows/CD.yml)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.1.2-6DB33F?style=flat-square&logo=springboot&logoColor=white)
 ![Java](https://img.shields.io/badge/Java-21-007396?style=flat-square&logo=openjdk&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)

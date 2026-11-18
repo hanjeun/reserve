@@ -10,6 +10,7 @@ import kr.it.reserve.chat.repository.ChatMessageRepository;
 import kr.it.reserve.file.service.FileStorageService;
 import kr.it.reserve.file.util.FileStoragePaths;
 import kr.it.reserve.file.util.ImageFileValidator;
+import kr.it.reserve.file.util.JpegOrientation;
 import kr.it.reserve.global.error.ChatException;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.Role;
@@ -43,8 +44,13 @@ public class ChatImageService {
         return bounded(() -> chatService.sendImage(member, roomId, request.getContent(), request.getClientMessageId(), () -> {
             var image = ImageFileValidator.inspect(file);
             String prefix = FileStoragePaths.chatImage(member.getId(), roomId);
-            String key = storage.storeEncryptedChatImage(cipher.encrypt(image.bytes(), prefix), prefix);
-            return new ChatImagePayload(key, image.contentType(), image.width(), image.height(), image.bytes().length,
+            int orientation = JpegOrientation.read(image.bytes());
+            byte[] thumbnail = ChatImageThumbnail.create(image.bytes(), orientation);
+            String key = storage.storeEncryptedChatImage(cipher.encrypt(image.bytes(), prefix),
+                    cipher.encrypt(thumbnail, thumbnailContext(prefix)), prefix);
+            int width = orientation >= 5 ? image.height() : image.width();
+            int height = orientation >= 5 ? image.width() : image.height();
+            return new ChatImagePayload(key, image.contentType(), width, height, image.bytes().length,
                     file.getOriginalFilename());
         }));
     }
@@ -52,6 +58,25 @@ public class ChatImageService {
     @Transactional(readOnly = true)
     public ImageContent read(Member member, Long messageId) {
         return readContent(readableImage(member, messageId));
+    }
+
+    @Transactional(readOnly = true)
+    public ImageContent thumbnail(Member member, Long messageId) {
+        ChatMessage message = readableImage(member, messageId);
+        String prefix = FileStoragePaths.chatImage(message.getSenderMemberId(), message.getRoom().getId());
+        String context = thumbnailContext(prefix);
+        return bounded(() -> {
+            byte[] thumbnail = cipher.decrypt(storage.readEncryptedChatThumbnail(message.getImageKey(), prefix, () -> {
+                byte[] original = cipher.decrypt(storage.readEncryptedChatImage(message.getImageKey(), prefix), prefix);
+                return cipher.encrypt(ChatImageThumbnail.create(original, JpegOrientation.read(original)), context);
+            }), context);
+            String type = (thumbnail[0] & 0xff) == 0x89 ? "image/png" : "image/jpeg";
+            return new ImageContent(thumbnail, type);
+        });
+    }
+
+    private static String thumbnailContext(String prefix) {
+        return prefix + "/thumbnail";
     }
 
     @Transactional(readOnly = true)

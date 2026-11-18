@@ -25,13 +25,16 @@ final class ReservationAttendance {
     private final QrCheckinTokenProvider qrCheckinTokenProvider;
     private final ReservationUpdates updates;
     private final Consumer<Long> beforeReservationLock;
+    private final ReservationNoShowRestriction noShowRestrictions;
 
     ReservationAttendance(ReservationRepository reservations, QrCheckinTokenProvider tokens,
-                          ReservationUpdates updates, Consumer<Long> beforeReservationLock) {
+                          ReservationUpdates updates, Consumer<Long> beforeReservationLock,
+                          ReservationNoShowRestriction noShowRestrictions) {
         reservationRepository = reservations;
         qrCheckinTokenProvider = tokens;
         this.updates = updates;
         this.beforeReservationLock = beforeReservationLock;
+        this.noShowRestrictions = noShowRestrictions;
     }
 
     String generateQrCheckinToken(Long reservationId, Member member) {
@@ -94,36 +97,49 @@ final class ReservationAttendance {
         return new QrCheckinResponse(ReservationResponse.fromEntity(reservation), false);
     }
 
-    void completeReservation(Long id, Member owner) {
+    Completion completeReservation(Long id, Member owner) {
         Reservation reservation = findByIdForUpdateOrThrow(id);
         ReservationAccess.owner(reservation, owner);
 
-        if (reservation.getStatus() == Reservation.ReservationStatus.COMPLETED) return;
+        if (reservation.getStatus() == Reservation.ReservationStatus.COMPLETED) return new Completion(reservation, false);
         // 승인 후 시간이 지난 UNCONFIRMED도 완료·노쇼 처리할 수 있다.
         if (!ReservationAccess.approved(reservation)) {
             throw new ReservationException("승인된 예약만 이용완료 처리할 수 있어요.", HttpStatus.BAD_REQUEST);
         }
 
-        if (Boolean.TRUE.equals(reservation.getAttendanceRefundEnabled()) && reservation.getCheckedInAt() == null) {
-            throw new ReservationException("QR 체크인을 확인한 뒤 이용 완료할 수 있어요.", HttpStatus.BAD_REQUEST);
+        if (!reservation.hasAttendanceConfirmation()) {
+            var date = reservation.getReservationDate();
+            if (date == null || date.isAfter(ServiceTime.today())) {
+                throw new ReservationException("예약일이 되면 방문을 확인하고 이용 완료할 수 있어요.", HttpStatus.BAD_REQUEST);
+            }
+            reservation.setManualVisitConfirmedAt(LocalDateTime.now(Clock.systemDefaultZone()));
         }
         reservation.setStatus(Reservation.ReservationStatus.COMPLETED);
         changed(reservation);
+        return new Completion(reservation, true);
     }
+
+    record Completion(Reservation reservation, boolean changed) { }
 
     void markNoShow(Long id, Member owner) {
         Reservation reservation = findByIdForUpdateOrThrow(id);
         ReservationAccess.owner(reservation, owner);
 
+        if (reservation.hasAttendanceConfirmation()) {
+            throw new ReservationException("방문이 확인된 예약은 노쇼로 처리할 수 없어요.", HttpStatus.BAD_REQUEST);
+        }
+        if (reservation.getStatus() == Reservation.ReservationStatus.NO_SHOW) return;
         if (!ReservationAccess.approved(reservation)) {
             throw new ReservationException("승인된 예약만 노쇼 처리할 수 있어요.", HttpStatus.BAD_REQUEST);
         }
-        if (reservation.getCheckedInAt() != null) {
-            throw new ReservationException("체크인된 예약은 노쇼로 처리할 수 없어요.", HttpStatus.BAD_REQUEST);
-        }
+        var now = ServiceTime.now();
+        ReservationNoShowPolicy.requireAvailable(reservation, now);
 
+        reservation.setNoShowPreviousStatus(reservation.getStatus());
         reservation.setStatus(Reservation.ReservationStatus.NO_SHOW);
+        noShowRestrictions.record(reservation, now);
         changed(reservation);
+        log.info("No-show recorded: reservationId={}, storeId={}, ownerId={}", id, reservation.getStore().getId(), owner.getId());
     }
 
     private void changed(Reservation reservation) {

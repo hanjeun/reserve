@@ -1,25 +1,28 @@
-import React, { useContext, useLayoutEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react';
 import { Typography, Divider, Checkbox } from 'antd';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Pagination from '../common/Pagination';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { SendOutlined, InboxOutlined, ArrowLeftOutlined, DeleteOutlined, MailOutlined, ClockCircleOutlined } from '../common/icons';
-import { Badge, Button, DataState, FormTextArea, FormInput, FormField, FilterToolbar, SegmentedControl } from '../common';
+import { SendOutlined, InboxOutlined, ArrowLeftOutlined, DeleteOutlined, MailOutlined, ClockCircleOutlined, FileTextOutlined } from '../common/icons';
+import { Button, DataState, FormTextArea, FormInput, FormField, FilterToolbar, SegmentedControl } from '../common';
 import MailDraftModal from '../common/MailDraftModal';
 import MailPhotoStrip from '../common/MailPhotoStrip';
 import AnimatedContent from '../common/AnimatedContent';
+import CopyableText from '../common/CopyableText';
 import DetailInfoRows from '../common/DetailInfoRows';
 import IconTool from '../common/IconTool';
 import { Bone } from '../common/Skeletons';
 import { useMessage, useWindowWidth, useQueryParamsState, useFormErrors } from '../../hooks';
+import useMailDrafts from '../../hooks/useMailDrafts';
 import { adminKeys } from '../../hooks/queryKeys';
 import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
 import api from '../../api/axios';
 import { versionedApiUrl } from '../../api/apiVersion';
 import { previewMailDraft, sendMailDraft } from '../../services/mailService';
 import { API_ENDPOINTS } from '../../constants';
-import { EMAIL_REGEX } from '../../utils/validation';
 import { colors, fontSize, fontWeight, radius } from '../../styles/tokens';
 import { WorkspaceActivityContext } from '../layout/workspaceActivity';
+import useComposeMail from './useComposeMail';
 
 const { Text, Title, Paragraph } = Typography;
 
@@ -86,45 +89,6 @@ const useMailData = (received, page, search) => {
         totalElements: data?.totalElements ?? 0,
         loading, isFetching, isPlaceholderData, error, refetch,
     };
-};
-
-const useComposeMail = ({ message }) => {
-    const queryClient = useQueryClient();
-    const [composing, setComposing] = useState(false);
-    // 광고성 발송 여부를 구분한다.
-
-    const [composeForm, setComposeForm] = useState({ toEmail: '', subject: '', body: '', marketing: false });
-    const { errors, validate, clearError, resetErrors } = useFormErrors();
-
-    const resetCompose = () => { setComposing(false); setComposeForm({ toEmail: '', subject: '', body: '', marketing: false }); resetErrors(); };
-
-    const sendMutation = useMutation({
-        mutationFn: ({ form, photos }) => sendMailDraft(API_ENDPOINTS.MAIL.COMPOSE, form, photos),
-        onSuccess: () => {
-            message.success('메일을 보냈어요.');
-            resetCompose();
-            void queryClient.invalidateQueries({ queryKey: adminKeys.sentMails() });
-        },
-        onError: (error) => message.error(mailErrorStatus(error) === 429 ? MAIL_LIMIT_MESSAGE : '메일 발송에 실패했어요.'),
-    });
-
-    const validateCompose = () => {
-        const trimmedEmail = composeForm.toEmail.trim();
-        // 모든 필드를 한 번에 검증해 각 입력 아래에 오류를 표시한다.
-
-        return validate((e) => {
-            if (!trimmedEmail) e.toEmail = '받는 사람 이메일을 입력해주세요.';
-            else if (!EMAIL_REGEX.test(trimmedEmail)) e.toEmail = '올바른 이메일 형식을 입력해주세요.';
-            if (!composeForm.subject.trim()) e.subject = '제목을 입력해주세요.';
-            if (!composeForm.body.trim()) e.body = '내용을 입력해주세요.';
-        });
-    };
-
-    const handleComposeSend = photos => {
-        if (!sendMutation.isPending) sendMutation.mutate({ form: { ...composeForm, toEmail: composeForm.toEmail.trim() }, photos });
-    };
-    return { composing, setComposing, composeForm, setComposeForm, composeSending: sendMutation.isPending,
-        resetCompose, validateCompose, handleComposeSend, errors, clearError };
 };
 
 const useTrashMail = ({ message, onTrashed }) => {
@@ -218,8 +182,8 @@ const SearchBar = ({ folder, onFolderChange, value, onSubmit, onReload, loading,
  */
 // 행 패딩은 MailItem의 본문 버튼과 맞춘다.
 //   다르면 로딩이 끝나는 순간 글자가 옆으로 튄다.
-const MailListSkeleton = () => (
-    <div style={styles.singlePanel}>
+const MailListSkeleton = ({ framed = true }) => (
+    <div style={framed ? styles.singlePanel : undefined}>
         {['sk-0', 'sk-1', 'sk-2', 'sk-3'].map((key) => (
             <div key={key} style={{ padding: '14px 16px', borderBottom: `1px solid ${colors.border.light}` }}>
                 {/* 1줄: 받는 사람 + 보낸 시각 */}
@@ -236,11 +200,8 @@ const MailListSkeleton = () => (
     </div>
 );
 
-/**
- * 목록 한 줄. 목록은 메일 선택만 맡고, 삭제는 상세 화면 오른쪽의 단일 동작으로 둔다.
- * 행마다 휴지통 아이콘을 반복하면 날짜와 제목보다 삭제가 먼저 보여 목록을 읽기 어려웠다.
- */
-const MailItem = ({ mail, received, isSelected, onClick }) => (
+/* 발송한 메일은 상세에서 휴지통으로 옮기며, 초안 삭제는 로컬 저장소에만 적용한다. */
+const MailItem = ({ mail, received, isSelected, onClick, onDeleteDraft }) => (
     <div className={`reserve-maillist-item${isSelected ? ' is-selected' : ''}`} style={styles.mailItem}>
         <button type="button" aria-current={isSelected ? 'true' : undefined} onClick={event => onClick(mail, event.currentTarget)}
             className="reserve-maillist-main" style={styles.mailItemMain}>
@@ -248,7 +209,10 @@ const MailItem = ({ mail, received, isSelected, onClick }) => (
                 <Text style={{ fontSize: fontSize.sm, fontWeight: fontWeight.medium, color: colors.text.primary, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {received ? mail.memberEmail || mail.memberName : mail.toEmail}
                 </Text>
-                <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary, flexShrink: 0 }}>{formatDate(received ? mail.createdAt : mail.sentAt)}</Text>
+                {onDeleteDraft && <Text style={styles.mailMeta}>임시 저장됨</Text>}
+                <Text style={styles.mailMeta}>
+                    {formatDate(onDeleteDraft ? new Date(mail.savedAt).toISOString() : (received ? mail.createdAt : mail.sentAt))}
+                </Text>
             </div>
             <Text style={{ display: 'block', fontSize: fontSize.sm, marginTop: 2, fontWeight: fontWeight.medium, color: colors.text.secondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {(received ? mail.title : mail.subject) || '(제목 없음)'}
@@ -257,6 +221,10 @@ const MailItem = ({ mail, received, isSelected, onClick }) => (
                 {received ? `${mail.statusDisplayName || ''} · ${mail.content || ''}` : mail.bodyPreview || ''}
             </Text>
         </button>
+        {onDeleteDraft && <div style={styles.draftAction}>
+            <IconTool label={`${mail.subject || '제목 없는 메일'} 초안 삭제`} icon={<DeleteOutlined aria-hidden="true" />}
+                onClick={() => onDeleteDraft(mail.id)} />
+        </div>}
     </div>
 );
 
@@ -293,12 +261,11 @@ const MailDetailContent = ({ mail, received, onReply, onTrash, trashing }) => (
             </div>
         </div>
         {received && <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-            <Badge variant={mail.status === 'PENDING' ? 'category' : 'keyword'}>{mail.statusDisplayName}</Badge>
-            <Text type="secondary" style={{ fontSize: fontSize.sm }}>
-                {mail.inboundEmail ? '지원 이메일' : mail.categoryDisplayName}
-            </Text>
+            <Text style={styles.mailMeta}>{mail.statusDisplayName}</Text>
+            <Text style={styles.mailMeta}>{mail.inboundEmail ? '지원 이메일' : mail.categoryDisplayName}</Text>
         </div>}
         <DetailInfoRows rows={[
+            ...(received ? [{ Icon: FileTextOutlined, label: '문의 번호', value: <CopyableText value={mail.id} label="문의 번호" /> }] : []),
             { Icon: MailOutlined, label: received ? '보낸 사람' : '받는 사람',
                 value: received ? mail.memberEmail || mail.memberName : mail.toEmail },
             { Icon: ClockCircleOutlined, label: received ? '받은 시간' : '보낸 시간',
@@ -343,7 +310,10 @@ const MailPagination = ({ page, total, onChange, simple = false }) => {
 };
 
 const MailboxTab = () => {
-    const { message } = useMessage();
+    const { message, confirm } = useMessage();
+    const active = useContext(WorkspaceActivityContext);
+    const location = useLocation();
+    const navigate = useNavigate();
     const isMobile = useWindowWidth() < 768;
     const [{ search, page: pageStr, mailFolder }, setQuery] = useQueryParamsState(QUERY_DEFAULTS, { privateKeys: ['search'] });
     const page = Number(pageStr) || 1;
@@ -356,9 +326,22 @@ const MailboxTab = () => {
     const backButton = useRef(null);
 
     const mail = useMailData(received, page, search);
-    const send = useComposeMail({ message });
+    const includeDrafts = !received && page === 1;
+    const { ownerId, queryKey: draftKey, query: draftQuery } = useMailDrafts(active && includeDrafts);
+    const send = useComposeMail({ message, ownerId, draftKey,
+        onSendError: error => message.error(mailErrorStatus(error) === 429 ? MAIL_LIMIT_MESSAGE : '메일 발송에 실패했어요.') });
+    const resumeId = location.state?.mailDraftResume;
+    const resume = useEffectEvent(id => {
+        const state = { ...location.state };
+        delete state.mailDraftResume;
+        navigate({ pathname: location.pathname, search: location.search, hash: location.hash }, { replace: true, state });
+        void send.openDraft(id);
+    });
+    useEffect(() => {
+        if (active && !received && ownerId != null && typeof resumeId === 'string') resume(resumeId);
+    }, [active, received, ownerId, resumeId]);
     const reply = useInquiryReply(message);
-    const selectedMail = selection?.folder === folder ? mail.mails.find(item => item.id === selection.id) : null;
+    const selectedMail = !mail.isPlaceholderData && selection?.folder === folder ? mail.mails.find(item => item.id === selection.id) : null;
     const backToList = () => {
         setSelection(null);
         requestAnimationFrame(() => {
@@ -383,39 +366,69 @@ const MailboxTab = () => {
     };
     const handleSearchChange = search => { setQuery({ search, page: '1' }); setSelection(null); };
     const handlePageChange = p => { setQuery({ page: String(p) }); setSelection(null); };
+    const showSavedDraft = () => {
+        send.resetCompose();
+        setQuery({ mailFolder: 'sent', page: '1', search: '' });
+        setSelection(null);
+    };
+    const deleteDraft = id => confirm({ title: '임시저장한 메일을 삭제할까요?',
+        content: '이 브라우저에 저장된 메일 초안과 첨부 사진이 삭제돼요.', okText: '삭제', cancelText: '취소',
+        onOk: async () => {
+            try { await send.removeDraft(id); message.success('메일 초안을 삭제했어요.'); }
+            catch { message.error('메일 초안을 삭제하지 못했어요. 다시 시도해주세요.'); }
+        } });
+    const reload = () => {
+        void mail.refetch();
+        if (includeDrafts && ownerId != null) void draftQuery.refetch();
+    };
 
-    // "보낸 메일이 없습니다"는 검색어가 없을 때만 띄우는 게 맞다.
-    // 검색 결과가 0건인 건 목록 패널 안의 "검색 결과가 없습니다"가 담당한다.
-    const isEmpty = mail.totalElements === 0 && !search.trim();
-    const showLoading = mail.loading || mail.isPlaceholderData;
-    const showError = !showLoading && isBlockingListReadError(mail.error, mail.mails);
+    const term = search.trim().toLowerCase();
+    const drafts = includeDrafts ? (draftQuery.data ?? EMPTY_MAILS).filter(item =>
+        !term || item.subject.toLowerCase().includes(term) || item.toEmail.toLowerCase().includes(term)) : EMPTY_MAILS;
+    const isEmpty = mail.totalElements === 0 && !term && !drafts.length;
+    const mailPageLoading = mail.loading || mail.isPlaceholderData;
+    const showLoading = !drafts.length && (mailPageLoading
+        || includeDrafts && ownerId != null && draftQuery.isPending);
+    const showError = !showLoading && !drafts.length && isBlockingListReadError(mail.error, mail.mails);
     const showEmpty = !showLoading && !showError && isEmpty;
-    const showMobDetail = !showLoading && !showError && !showEmpty && isMobile && !!selectedMail;
-    const showMobList = !showLoading && !showError && !showEmpty && isMobile;
-    const showDesktop = !showLoading && !showError && !showEmpty && !isMobile;
+    const showInitialSkeleton = showLoading && !mail.totalElements;
+    const showPanels = !showInitialSkeleton && !showError && !showEmpty;
+    const showMobDetail = showPanels && isMobile && !!selectedMail;
+    const showMobList = showPanels && isMobile;
+    const showDesktop = showPanels && !isMobile;
     useLayoutEffect(() => {
         if (showMobDetail) backButton.current?.querySelector('button')?.focus({ preventScroll: true });
     }, [showMobDetail]);
-    const listItems = mail.mails.length === 0 ? <DataState state="empty" kind="mail" title="검색 결과가 없어요." />
-        : mail.mails.map(item => <MailItem key={item.id} mail={item} received={received} isSelected={item.id === selectedMail?.id} onClick={selectMail} />);
+    const listItems = !drafts.length && !mail.mails.length ? <DataState state="empty" kind="mail" title="검색 결과가 없어요." />
+        : <>
+            {drafts.map(item => <MailItem key={`draft:${item.id}`} mail={item} onDeleteDraft={deleteDraft}
+                onClick={() => void send.openDraft(item.id)} />)}
+            {mailPageLoading ? <MailListSkeleton framed={false} /> : mail.mails.map(item => <MailItem key={item.id} mail={item} received={received}
+                isSelected={item.id === selectedMail?.id} onClick={selectMail} />)}
+        </>;
     const detail = selectedMail && (
         <AnimatedContent motionKey={`${folder}:${selectedMail.id}`} animateOnMount>
             <MailDetailContent mail={selectedMail} received={received}
                 onReply={reply.setTarget} onTrash={trash.askAndTrash} trashing={trash.trashing} />
         </AnimatedContent>
     );
+    const listBody = style => <AnimatedContent style={style} motionKey={`${folder}:${page}:${search}`}
+        ready={!showLoading && !mailPageLoading} keepResultsHeight={isMobile && mail.totalElements > PAGE_SIZE}
+        aria-busy={showLoading || mailPageLoading}>
+        {showLoading ? <MailListSkeleton framed={false} /> : listItems}
+    </AnimatedContent>;
 
     return (
         <div ref={mailbox}>
             <SearchBar folder={folder} onFolderChange={handleFolderChange} value={search} onSubmit={handleSearchChange}
-                onReload={mail.refetch} loading={mail.loading || mail.isFetching}
-                initialLoading={mail.loading}
-                onCompose={() => send.setComposing(true)} />
+                onReload={reload} loading={mail.loading || mail.isFetching || includeDrafts && draftQuery.isFetching}
+                initialLoading={showInitialSkeleton} onCompose={send.startCompose} />
 
             {mail.error && !showError && <DataState compact state="error" subject={`${subject} 갱신`}
                 error={mail.error} onRetry={mail.refetch} retrying={mail.isFetching} />}
-            <AnimatedContent motionKey={`${folder}:${page}:${search}`} ready={!showLoading}>
-            {showLoading && <MailListSkeleton />}
+            {includeDrafts && draftQuery.error && <DataState compact state="error" subject="메일 초안"
+                error={draftQuery.error} onRetry={draftQuery.refetch} retrying={draftQuery.isFetching} />}
+            {showInitialSkeleton && <MailListSkeleton />}
 
             {showError && (
                 <DataState state="error" kind="mail" subject={subject} error={mail.error}
@@ -439,7 +452,7 @@ const MailboxTab = () => {
 
             {showMobList && (
                 <div hidden={!!selectedMail}>
-                    <div style={styles.singlePanel}>{listItems}</div>
+                    {listBody(styles.singlePanel)}
                     {/* 모바일은 폭이 좁아 simple 모드("1 / 5") — 번호 버튼을 다 깔면 줄바꿈이 난다. */}
                     <MailPagination page={page} total={mail.totalElements} onChange={handlePageChange} simple />
                 </div>
@@ -448,9 +461,7 @@ const MailboxTab = () => {
             {showDesktop && (
                 <div style={styles.splitPane}>
                     <div style={styles.listPanel}>
-                        <div style={{ flex: 1, overflowY: 'auto' }}>
-                            {listItems}
-                        </div>
+                        {listBody(styles.scrollableList)}
                         {/* 목록 패널 바닥에 고정 — flex:1 인 스크롤 영역 밖에 두어야 항상 보인다. */}
                         <MailPagination page={page} total={mail.totalElements} onChange={handlePageChange} />
                     </div>
@@ -468,8 +479,6 @@ const MailboxTab = () => {
                     </div>
                 </div>
             )}
-            </AnimatedContent>
-
             <MailDraftModal title="문의 답변" open={Boolean(reply.target)} onClose={reply.close}
                 navigationDirty={Boolean(reply.answer)} sendText="답변 보내기" validate={reply.validateAnswer}
                 onSend={reply.submit} sending={reply.sending}
@@ -483,13 +492,14 @@ const MailboxTab = () => {
                 ]}>
                 <FormField label="받는 사람"><Text>{reply.target?.memberEmail}</Text></FormField>
                 <FormField label="답변" error={reply.errors.answer}>
-                    <FormTextArea rows={8} value={reply.answer} maxLength={2000} showCount
+                    <FormTextArea aria-label="답변" rows={8} value={reply.answer} maxLength={2000} showCount
                         onChange={event => { reply.setAnswer(event.target.value); reply.clearError('answer'); }} />
                 </FormField>
             </MailDraftModal>
 
             <MailDraftModal title="새 메일 작성" open={send.composing} onClose={send.resetCompose}
-                navigationDirty={Boolean(send.composeForm.toEmail || send.composeForm.subject || send.composeForm.body || send.composeForm.marketing)}
+                navigationDirty={send.changed} initialPhotos={send.initialPhotos}
+                onSaveDraft={ownerId == null ? undefined : send.saveDraft} onDraftSaved={showSavedDraft}
                 validate={send.validateCompose} onSend={send.handleComposeSend} sending={send.composeSending}
                 loadPreview={signal => previewMailDraft(API_ENDPOINTS.MAIL.PREVIEW, send.composeForm, signal)}
                 previewFields={[
@@ -497,16 +507,14 @@ const MailboxTab = () => {
                     { label: '제목', value: send.composeForm.subject },
                 ]}>
                 <FormField label="받는 사람" error={send.errors.toEmail}>
-                    <FormInput placeholder="example@email.com" value={send.composeForm.toEmail}
+                    <FormInput aria-label="받는 사람" placeholder="example@email.com" value={send.composeForm.toEmail}
                         onChange={(e) => { send.setComposeForm(f => ({ ...f, toEmail: e.target.value })); send.clearError('toEmail'); }} />
                 </FormField>
                 <FormField label="제목" error={send.errors.subject}>
-                    <FormInput placeholder="메일 제목" value={send.composeForm.subject}
+                    <FormInput aria-label="제목" placeholder="메일 제목" value={send.composeForm.subject}
                         onChange={(e) => { send.setComposeForm(f => ({ ...f, subject: e.target.value })); send.clearError('subject'); }} maxLength={500} showCount />
                 </FormField>
                 <FormField label="광고성 정보">
-                    {/* 체크하면 서버가 수신자의 마케팅 수신 동의를 확인하고, 동의하지 않았거나
-                        회원이 아니면 발송을 거부한다. 정보통신망법상 광고성 정보는 사전 동의가 필요하다. */}
                     <Checkbox
                         checked={send.composeForm.marketing}
                         onChange={(e) => send.setComposeForm(f => ({ ...f, marketing: e.target.checked }))}
@@ -514,13 +522,13 @@ const MailboxTab = () => {
                         <Text style={{ fontSize: fontSize.sm }}>
                             광고·홍보 메일이에요
                             <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary, display: 'block' }}>
-                                체크하면 수신 동의한 회원에게만 발송돼요
+                                입력한 주소의 회원이 광고 메일 수신에 동의한 경우에만 발송돼요.
                             </Text>
                         </Text>
                     </Checkbox>
                 </FormField>
                 <FormField label="내용" error={send.errors.body}>
-                    <FormTextArea rows={8} placeholder="메일 내용을 입력하세요..." value={send.composeForm.body}
+                    <FormTextArea aria-label="내용" rows={8} placeholder="메일 내용을 입력하세요..." value={send.composeForm.body}
                         onChange={(e) => { send.setComposeForm(f => ({ ...f, body: e.target.value })); send.clearError('body'); }}
                         maxLength={5000} showCount />
                 </FormField>
@@ -530,6 +538,9 @@ const MailboxTab = () => {
 };
 
 const styles = {
+    scrollableList: { flex: 1, overflowY: 'auto' },
+    mailMeta: { fontSize: fontSize.xs, fontWeight: fontWeight.regular, color: colors.text.tertiary, flexShrink: 0 },
+    draftAction: { alignSelf: 'center', marginRight: 4 },
     singlePanel:  { border: `1px solid ${colors.border.default}`, borderRadius: radius.lg, overflow: 'hidden', background: colors.background.paper },
     emptyPanel:   { border: `1px solid ${colors.border.default}`, borderRadius: radius.lg, background: colors.background.paper },
     splitPane:    { display: 'flex', height: 'clamp(400px, calc(100svh - 280px), 680px)', border: `1px solid ${colors.border.default}`, borderRadius: radius.lg, overflow: 'hidden', background: colors.background.paper },

@@ -10,6 +10,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
@@ -24,6 +25,8 @@ import java.util.Map;
 public class StoreResponse {
     
     private Long id;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String publicId;
     private String name;
     private String description;
     private String address;
@@ -102,6 +105,15 @@ public class StoreResponse {
     private List<Integer> closedDays;
     private List<String> closedDates;
     private Integer maxAdvanceBookingDays;
+    private BookingOpeningResponse bookingOpening;
+
+    public record BookingOpeningResponse(LocalDateTime opensAt, LocalDate from, LocalDate to, long serverTime) {
+        static BookingOpeningResponse of(Store store) {
+            var opening = store.getBookingOpening();
+            return opening == null ? null : new BookingOpeningResponse(opening.getOpensAt(), opening.getFrom(), opening.getTo(),
+                    System.currentTimeMillis());
+        }
+    }
 
     private LocalDateTime createdAt;
     private Long ownerId;  // 소유자 ID (프론트 권한 검증용)
@@ -165,6 +177,7 @@ public class StoreResponse {
         List<String> detailUrls = store.getDetailImageList();
         return StoreResponse.builder()
                 .id(store.getId())
+                .publicId(store.getPublicId())
                 .name(store.getName())
                 .description(store.getDescription())
                 .address(store.getAddress())
@@ -214,6 +227,7 @@ public class StoreResponse {
                 .closedDays(store.getClosedDayList())
                 .closedDates(store.getClosedDateList().stream().map(java.time.LocalDate::toString).toList())
                 .maxAdvanceBookingDays(store.getMaxAdvanceBookingDays())
+                .bookingOpening(BookingOpeningResponse.of(store))
                 .createdAt(store.getCreatedAt())
                 .ownerId(store.getOwner() != null ? store.getOwner().getId() : null)
                 .status(store.getStatus() != null ? store.getStatus().name() : "ACTIVE")

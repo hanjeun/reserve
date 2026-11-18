@@ -3,6 +3,37 @@
 .reserve-booking-panel--desktop .reserve-booking-panel-form { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .reserve-booking-panel-fields { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; }
 .reserve-booking-panel-submit { flex: 0 0 auto; padding-top: 16px; background: var(--c-bg-paper); }
+.reserve-booking-request textarea.ant-input { line-height: 1.5; }
+.reserve-booking-request textarea.ant-input:enabled::placeholder { color: var(--c-text-secondary); opacity: 1; }
+
+.reserve-booking-opening {
+    display: grid;
+    gap: 4px;
+    margin-block-end: 20px;
+    color: var(--c-text-primary);
+}
+.reserve-booking-opening-time {
+    display: flex;
+    align-items: baseline;
+    font-weight: 700;
+    font-size: 1.5rem;
+    font-variant-numeric: tabular-nums;
+}
+.reserve-booking-opening-dates { color: var(--c-text-secondary); }
+
+.reserve-time-slot-group:not(:has(.rsv-time-pill)) { display: none; }
+.reserve-time-slot-group:has(.rsv-time-pill) + .reserve-time-slot-group { margin-top: 14px; }
+@keyframes reserve-time-slot-exit {
+    to { opacity: 0; transform: scale(0.9); }
+}
+
+.reserve-reservation-completion {
+    margin: 12px 0;
+    color: var(--c-text-primary);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+.reserve-reservation-completion:empty { margin: 0; }
 @media (max-height: 420px) {
     .reserve-booking-panel--desktop { max-height: none; }
     .reserve-booking-panel-fields { overflow-y: visible; }

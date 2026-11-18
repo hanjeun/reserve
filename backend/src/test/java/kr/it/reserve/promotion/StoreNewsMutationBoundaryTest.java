@@ -38,6 +38,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static kr.it.reserve.global.persistence.CurrentLockedStateTestSupport.managedEntities;
 
 @ExtendWith(MockitoExtension.class)
 class StoreNewsMutationBoundaryTest {
@@ -59,6 +60,7 @@ class StoreNewsMutationBoundaryTest {
 
     @BeforeEach
     void setUp() {
+        managedEntities(entityManager);
         owner = Member.builder().id(7L).role(Role.BUSINESS).termsAgreed(true).build();
         store = Store.builder().id(3L).owner(owner).name("가게").address("서울 강남구").build();
         profile = FeedProfile.create(owner, NOW);

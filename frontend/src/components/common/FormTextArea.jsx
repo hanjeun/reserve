@@ -1,11 +1,11 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { Input } from 'antd';
-import { colors, radius } from '../../styles/tokens';
+import { colors, field } from '../../styles/tokens';
 
 const { TextArea } = Input;
 
-const TEXTAREA_PADDING = '10px 12px';
+const TEXTAREA_PADDING = `10px ${field.paddingInline}`;
 
 const FormTextArea = ({
     rows = 4,
@@ -17,8 +17,8 @@ const FormTextArea = ({
     ...rest
 }) => {
     const wrapperStyle = {
-        borderRadius: radius.lg,
-        backgroundColor: disabled ? colors.gray[100] : colors.gray[50],
+        borderRadius: field.radius,
+        backgroundColor: disabled ? colors.gray[100] : field.bg,
         border: 'none',
         // AntD의 외부 카운터가 다음 필드와 겹치지 않도록 공간을 확보한다.
 

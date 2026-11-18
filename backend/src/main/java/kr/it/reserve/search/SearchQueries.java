@@ -19,6 +19,9 @@ import kr.it.reserve.promotion.entity.Promotion;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.repository.StoreSearchSpecification;
 import kr.it.reserve.store.search.StoreFulltextSearch;
+import kr.it.reserve.store.util.StorePublicAddress;
+import kr.it.reserve.store.util.StorePublicImage;
+import kr.it.reserve.global.common.PublicId;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
@@ -40,6 +43,7 @@ public class SearchQueries {
     private final StoreFulltextSearch storeFulltextSearch;
     @Value("${search.store.fulltext-enabled:true}") private boolean fulltextEnabled;
     @Value("${search.store.unified-fulltext-enabled:false}") private boolean unifiedFulltextEnabled;
+    @Value("${s3.env-prefix:}") private String imageEnvironment = "";
     @PersistenceContext private EntityManager entityManager;
 
     @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW, timeout = 3)
@@ -50,7 +54,8 @@ public class SearchQueries {
                 new StoreSearchSpecification.DistanceCandidates(null, null, 0), ServiceTime.today()));
         Specification<Store> matches = visible;
         Specification<Store> literal = (root, query, cb) -> {
-            Predicate predicate = cb.and(matches.toPredicate(root, query, cb), activeMember(root.join("owner"), cb));
+            Predicate predicate = cb.and(matches.toPredicate(root, query, cb), activeMember(root.join("owner"), cb),
+                    cb.isNotNull(root.get("publicId")));
             if (query.getResultType() != Long.class && query.getResultType() != long.class) {
                 var order = new java.util.ArrayList<>(query.getOrderList());
                 Predicate original = cb.or(java.util.stream.Stream.of("name", "description", "address", "category", "keywords")
@@ -66,9 +71,7 @@ public class SearchQueries {
             if (!candidate.isEmpty()) {
                 try {
                     return storeFulltextSearch.preview(literal, candidate, input.limit() + 1).stream()
-                            .map(row -> item(row.id(), "STORE", row.name(),
-                                    SearchQuery.text(row.category(), 50) + " · " + SearchQuery.text(row.address(), 100),
-                                    "/store/" + row.id())).toList();
+                            .map(row -> storeItem(row.id(), row.publicId(), row.name(), row.category(), row.address(), row.mainImageUrl())).toList();
                 } catch (DataAccessException failure) {
                     // 실패한 MATCH 트랜잭션이 끝난 뒤 원문 조회로 복귀한다.
                     storeFulltextSearch.disable();
@@ -78,13 +81,19 @@ public class SearchQueries {
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<Tuple> query = cb.createTupleQuery();
         var root = query.from(Store.class);
-        query.multiselect(root.get("id").alias("id"), root.get("name").alias("title"),
-                root.get("category").alias("category"), root.get("address").alias("address"));
+        query.multiselect(root.get("id").alias("id"), root.get("publicId").alias("publicId"), root.get("name").alias("title"),
+                root.get("category").alias("category"), root.get("address").alias("address"), root.get("mainImageUrl").alias("thumbnail"));
         query.where(literal.toPredicate(root, query, cb));
         return entityManager.createQuery(query).setMaxResults(input.limit() + 1).getResultList().stream()
-                .map(row -> item(row.get("id", Long.class), "STORE", row.get("title", String.class),
-                        SearchQuery.text(row.get("category", String.class), 50) + " · " + SearchQuery.text(row.get("address", String.class), 100),
-                        "/store/" + row.get("id", Long.class))).toList();
+                .map(row -> storeItem(row.get("id", Long.class), row.get("publicId", String.class),
+                        row.get("title", String.class), row.get("category", String.class), row.get("address", String.class),
+                        row.get("thumbnail", String.class))).toList();
+    }
+
+    private SearchResponse.Item storeItem(Long id, String publicId, String name, String category, String address, String mainImageUrl) {
+        return new SearchResponse.Item(id, "STORE", SearchQuery.text(name, 100),
+                SearchQuery.text(category, 50) + " · " + SearchQuery.text(address, 100),
+                StorePublicAddress.path(publicId), publicId, StorePublicImage.thumbnail(mainImageUrl, id, imageEnvironment));
     }
 
     @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW, timeout = 3)
@@ -93,17 +102,17 @@ public class SearchQueries {
         CriteriaQuery<Tuple> query = cb.createTupleQuery();
         var root = query.from(Promotion.class);
         var keyword = cb.parameter(String.class, "keyword");
-        query.multiselect(root.get("id").alias("id"), root.get("title").alias("title"),
+        query.multiselect(root.get("id").alias("id"), root.get("publicId").alias("publicId"), root.get("title").alias("title"),
                 cb.substring(root.get("content"), 1, 160).alias("description"));
         query.where(cb.and(StoreNewsPolicy.publicSpecification(null, null, true).toPredicate(root, query, cb),
+                cb.isNotNull(root.get("publicId")),
                 cb.or(cb.like(cb.lower(root.get("title")), keyword, '!'),
                         cb.like(cb.lower(root.get("content")), keyword, '!'), cb.like(cb.lower(root.get("tags")), keyword, '!'))));
         query.orderBy(cb.asc(cb.<Integer>selectCase().when(cb.equal(cb.lower(root.get("title")), input.exact()), 0)
                 .when(cb.like(cb.lower(root.get("title")), input.prefix(), '!'), 1).otherwise(2)),
                 cb.desc(root.get("createdAt")), cb.desc(root.get("id")));
         return entityManager.createQuery(query).setParameter("keyword", input.pattern()).setMaxResults(input.limit() + 1)
-                .getResultList().stream().map(row -> item(row.get("id", Long.class), "BENEFIT", row.get("title", String.class),
-                        row.get("description", String.class), "/benefits/" + row.get("id", Long.class))).toList();
+                .getResultList().stream().map(row -> publicItem(row, "BENEFIT", "/benefits/", row.get("title", String.class))).toList();
     }
 
     @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW, timeout = 3)
@@ -112,17 +121,23 @@ public class SearchQueries {
         CriteriaQuery<Tuple> query = cb.createTupleQuery();
         var root = query.from(FeedPost.class);
         var keyword = cb.parameter(String.class, "keyword");
-        query.multiselect(root.get("id").alias("id"), root.get("profile").get("nickname").alias("title"),
+        query.multiselect(root.get("id").alias("id"), root.get("publicId").alias("publicId"), root.get("profile").get("nickname").alias("title"),
                 cb.substring(root.get("content"), 1, 160).alias("description"));
-        query.where(cb.and(feeds.publicSearchSpecification().toPredicate(root, query, cb), cb.isNull(root.get("deletedAt")),
+        query.where(cb.and(feeds.publicSearchSpecification().toPredicate(root, query, cb),
+                cb.isNotNull(root.get("publicId")), cb.isNull(root.get("deletedAt")),
                 cb.or(cb.like(cb.lower(root.get("content")), keyword, '!'),
                         cb.like(cb.lower(root.get("profile").get("nickname")), keyword, '!'),
                         cb.like(cb.lower(root.get("region")), keyword, '!'))));
         query.orderBy(cb.desc(root.get("createdAt")), cb.desc(root.get("id")));
         return entityManager.createQuery(query).setParameter("keyword", input.pattern()).setMaxResults(input.limit() + 1)
-                .getResultList().stream().map(row -> item(row.get("id", Long.class), "FEED",
-                        row.get("title", String.class) + "의 게시글", row.get("description", String.class),
-                        "/feed/posts/" + row.get("id", Long.class))).toList();
+                .getResultList().stream().map(row -> publicItem(row, "FEED", "/feed/posts/",
+                        row.get("title", String.class) + "의 게시글")).toList();
+    }
+
+    private SearchResponse.Item publicItem(Tuple row, String type, String prefix, String title) {
+        String publicId = row.get("publicId", String.class);
+        return new SearchResponse.Item(row.get("id", Long.class), type, SearchQuery.text(title, 100),
+                SearchQuery.text(row.get("description", String.class), 160), PublicId.path(prefix, publicId), publicId);
     }
 
     public List<SearchResponse.Item> reservations(SearchQuery input, Long memberId) {

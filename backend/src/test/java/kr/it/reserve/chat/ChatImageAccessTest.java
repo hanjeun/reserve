@@ -43,7 +43,25 @@ class ChatImageAccessTest {
         when(hidden.existsByMemberIdAndMessageId(customer.getId(), 33L)).thenReturn(true);
         assertThatThrownBy(() -> images.read(customer, 33L)).isInstanceOf(ChatException.class)
                 .extracting("status").isEqualTo(org.springframework.http.HttpStatus.NOT_FOUND);
+        assertThatThrownBy(() -> images.thumbnail(customer, 33L)).isInstanceOf(ChatException.class)
+                .extracting("status").isEqualTo(org.springframework.http.HttpStatus.NOT_FOUND);
         verifyNoInteractions(storage);
+    }
+
+    @Test void theThumbnailUsesTheScopedCompanionWithoutLoadingTheOriginal() {
+        var photo = photo();
+        when(messages.findById(33L)).thenReturn(Optional.of(photo));
+        when(rooms.findById(10L)).thenReturn(Optional.of(room));
+        byte[] preview = {(byte) 0x89, 1, 2, 3};
+        when(storage.readEncryptedChatThumbnail(eq(photo.getImageKey()), eq("users/1/chat/10"), any()))
+                .thenReturn(cipher.encrypt(preview, "users/1/chat/10/thumbnail"));
+
+        var result = images.thumbnail(customer, 33L);
+
+        assertThat(result.contentType()).isEqualTo("image/png");
+        assertThat(result.bytes()).isEqualTo(preview);
+        assertThat(ChatMessageResponse.from(photo).getImageThumbnailUrl()).isEqualTo("/api/chat/images/33/thumbnail");
+        verify(storage, never()).readEncryptedChatImage(anyString(), anyString());
     }
 
     @Test void adminCannotReadUnreportedStorePhotoThroughParticipantApi() {

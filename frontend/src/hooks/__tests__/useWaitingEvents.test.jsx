@@ -2,6 +2,7 @@ import { act, render } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, expect, it, vi } from 'vitest';
 import useWaitingEvents from '../useWaitingEvents';
+import useStoreNewsEvents from '../useStoreNewsEvents';
 const state = vi.hoisted(() => ({ revision: 1, loggedIn: true, expireSession: vi.fn() }));
 vi.mock('../../store/useAuthStore', () => {
     const read = () => ({ sessionRevision: state.revision, isLoggedIn: state.loggedIn, expireSession: state.expireSession });
@@ -9,6 +10,7 @@ vi.mock('../../store/useAuthStore', () => {
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); state.revision = 1; state.loggedIn = true; state.expireSession.mockReset(); });
 function Subscriber() { useWaitingEvents(); return null; }
+function NewsSubscriber() { useStoreNewsEvents(true); return null; }
 it('refreshes authenticated waiting caches on events and closes the old account stream', () => {
     const streams = [];
     class FakeSource {
@@ -29,7 +31,7 @@ it('refreshes authenticated waiting caches on events and closes the old account 
     view.unmount(); expect(streams[1].close).toHaveBeenCalledTimes(1);
 });
 
-function fixture() {
+function fixture(Listener = Subscriber) {
     const streams = [];
     class FakeSource {
         listeners = {}; close = vi.fn();
@@ -39,9 +41,26 @@ function fixture() {
     vi.stubGlobal('EventSource', FakeSource);
     const client = new QueryClient();
     const invalidate = vi.spyOn(client, 'invalidateQueries');
-    const view = render(<QueryClientProvider client={client}><Subscriber /></QueryClientProvider>);
+    const view = render(<QueryClientProvider client={client}><Listener /></QueryClientProvider>);
     return { streams, invalidate, view };
 }
+
+it.each([['waiting', Subscriber], ['news', NewsSubscriber]])('keeps the %s fallback deadline when the tab returns', async (_scope, Listener) => {
+    vi.useFakeTimers();
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+    const { streams, view } = fixture(Listener);
+    act(() => streams[0].onerror());
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    hidden.mockReturnValue(true);
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    hidden.mockReturnValue(false);
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    await act(() => vi.advanceTimersByTimeAsync(3999));
+    expect(streams).toHaveLength(1);
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    expect(streams).toHaveLength(2);
+    view.unmount();
+});
 
 it('expires a revoked session and stops all late events or reconnection', async () => {
     vi.useFakeTimers();

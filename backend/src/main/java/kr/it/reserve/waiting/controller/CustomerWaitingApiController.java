@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import kr.it.reserve.config.util.SecurityUtil;
 import kr.it.reserve.global.common.ApiResponse;
+import kr.it.reserve.global.common.SseResponses;
 import kr.it.reserve.global.ratelimit.RateLimiter;
 import kr.it.reserve.global.ratelimit.IpExtractor;
 import kr.it.reserve.store.dto.StoreResponse;
@@ -71,6 +72,17 @@ public class CustomerWaitingApiController {
                 .body(ApiResponse.success(waiting.personalEntry(member, entryId), "내 웨이팅을 불러왔어요."));
     }
 
+    @DeleteMapping("/my/{entryId:[0-9]+}")
+    @PreAuthorize("isAuthenticated()")
+    public ApiResponse<Void> hideCancelled(@PathVariable Long entryId) {
+        var member = SecurityUtil.getCurrentMember();
+        if (!rateLimiter.tryConsume("waiting-remove:member:" + member.getId(), RateLimiter.Policy.RESERVATION_REMOVE)) {
+            throw new WaitingException("삭제 요청이 많아요. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+        }
+        waiting.hideCancelled(member, entryId);
+        return ApiResponse.success(null, "내 웨이팅에서 삭제했어요.");
+    }
+
     @PostMapping("/stores/{storeId}/entries")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<WaitingEntryResponse>> join(@PathVariable Long storeId,
@@ -114,9 +126,8 @@ public class CustomerWaitingApiController {
     @GetMapping(value = "/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<SseEmitter> events() {
-        return ResponseEntity.ok().header("Cache-Control", "no-store").header("X-Accel-Buffering", "no")
-                .body(streams.subscribe(SecurityUtil.getCurrentMember(), SecurityUtil.getOAuthAuthenticationAt(),
-                        SecurityUtil.getLoginMethod(), SecurityUtil.getSessionId()));
+        return SseResponses.open(() -> streams.subscribe(SecurityUtil.getCurrentMember(),
+                SecurityUtil.getOAuthAuthenticationAt(), SecurityUtil.getLoginMethod(), SecurityUtil.getSessionId()));
     }
 
     public record QrRequest(@NotBlank(message = "QR 토큰이 필요해요.") @Size(max = 2048, message = "올바른 QR을 확인해주세요.") String token) {}

@@ -39,6 +39,20 @@ beforeEach(() => {
     mocks.read.mockReturnValue(reply());
 });
 
+it('검색 확정에서 이전 페이지를 조회하지 않아요', async () => {
+    show('/my-reservations?page=3&status=CONFIRMED&sort=oldest');
+    await waitFor(() => expect(mocks.read.mock.lastCall[0].page).toBe(2));
+    mocks.read.mockClear();
+    const input = screen.getByPlaceholderText('가게명, 예약번호로 검색');
+    fireEvent.change(input, { target: { value: '합성 검색' } });
+    expect(mocks.read).not.toHaveBeenCalled();
+    fireEvent.submit(input.closest('form'));
+    await waitFor(() => expect(mocks.read.mock.lastCall[0]).toMatchObject({ page: 0, search: '합성 검색' }));
+    const applied = mocks.read.mock.calls.map(([query]) => query).filter(query => query.search === '합성 검색');
+    expect(applied.map(query => query.page)).not.toContain(2);
+    expect(params().has('reservationKeyword')).toBe(false);
+});
+
 it('같은 계정의 미결제 안내를 내 예약에서 한 번 표시하고 목록을 다시 조회해요', async () => {
     const result = reply(); mocks.read.mockReturnValue(result);
     show({ pathname: '/my-reservations', search: '?page=2&status=PENDING',
@@ -54,6 +68,19 @@ it('이전 계정의 결제 실패 안내는 새 계정에 표시하지 않아�
     expect(mocks.message.modal.info).not.toHaveBeenCalled();
 });
 
+it.each([
+    { memberId: 7, sessionRevision: 1, visible: true },
+    { memberId: 8, sessionRevision: 1, visible: false },
+    { memberId: 7, sessionRevision: 0, visible: false },
+])('예약 완료 안내는 제출한 계정과 같은 세션에서만 보여요 (%j)', ({ memberId, sessionRevision, visible }) => {
+    const text = '예약이 완료됐어요.';
+    show({ pathname: '/my-reservations', state: { reservationCompletion: { text, memberId, sessionRevision } } });
+    const notice = screen.queryByText(text);
+    if (visible) expect(notice).toHaveAttribute('role', 'status');
+    else expect(notice).toBeNull();
+    expect(mocks.message.message.success).not.toHaveBeenCalled();
+});
+
 it('예약 내역이 없으면 새 예약을 시작할 가게 목록으로 이어줘요', () => {
     mocks.read.mockReturnValue(reply({ reservations: [], total: 0, totalPages: 0 }));
     show('/my-reservations');
@@ -66,6 +93,8 @@ it('빈 검색 결과에서는 보기와 웨이팅 조건을 보존하고 예약
     show('/my-reservations?status=PENDING&view=cards&waitingPage=2');
     const input = screen.getByPlaceholderText('가게명, 예약번호로 검색');
     fireEvent.change(input, { target: { value: '없는 가게' } });
+    expect(mocks.read.mock.lastCall[0].search).toBeUndefined();
+    fireEvent.submit(input.closest('form'));
     await waitFor(() => expect(mocks.read.mock.lastCall[0].search).toBe('없는 가게'));
     expect(screen.queryByRole('link', { name: '예약할 가게 찾기' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '검색 조건 초기화' }));
@@ -82,7 +111,8 @@ it('uses the server count and order, preserves pages across view changes, and re
     expect(screen.getByText('41건')).toBeInTheDocument();
     expect([...container.querySelectorAll('[data-list-item-id]')].map(element => element.dataset.listItemId))
         .toEqual(['reservation:9', 'reservation:24']);
-    fireEvent.click(screen.getByTitle('2'));
+    const pagination = within(screen.getByRole('navigation', { name: '내 예약 목록 페이지' }));
+    fireEvent.click(pagination.getByText('2', { selector: 'a' }));
     await waitFor(() => expect(mocks.read.mock.lastCall[0].page).toBe(1));
     fireEvent.click(screen.getByRole('button', { name: '사진형 보기로 전환' }));
     await waitFor(() => expect(params().get('view')).toBe('cards'));
@@ -94,26 +124,33 @@ it('uses the server count and order, preserves pages across view changes, and re
     fireEvent.click(screen.getByRole('button', { name: '예약 상태' }));
     fireEvent.click(await screen.findByRole('menuitemradio', { name: '승인 대기' }));
     await waitFor(() => expect(mocks.read.mock.lastCall[0]).toMatchObject({ page: 0, status: 'PENDING' }));
-    fireEvent.click(screen.getByTitle('2'));
+    fireEvent.click(pagination.getByText('2', { selector: 'a' }));
+    await waitFor(() => expect(mocks.read.mock.lastCall[0].page).toBe(1));
     fireEvent.change(screen.getByPlaceholderText('가게명, 예약번호로 검색'), { target: { value: '예약번호' } });
+    fireEvent.submit(screen.getByPlaceholderText('가게명, 예약번호로 검색').closest('form'));
     await waitFor(() => expect(mocks.read.mock.lastCall[0]).toMatchObject({ page: 0, search: '예약번호' }));
     expect(params().get('waitingPage')).toBe('2');
 });
 
-it('검색 대기에는 결과만 골격으로 바꾸고 입력과 포커스를 유지해요', async () => {
+it('확정한 검색만 골격으로 바꾸고 미확정 입력과 포커스를 유지해요', async () => {
     const result = show('/my-reservations?view=list');
     const input = screen.getByPlaceholderText('가게명, 예약번호로 검색');
     input.focus();
     fireEvent.change(input, { target: { value: '가' } });
-    expect(screen.getByLabelText('예약 목록을 불러오는 중')).toBeInTheDocument();
-    expect(screen.queryByText('서버 첫 예약')).toBeNull();
+    expect(screen.getByText('서버 첫 예약')).toBeInTheDocument();
+    expect(mocks.read.mock.lastCall[0].search).toBeUndefined();
     mocks.read.mockImplementation(query => reply({ loading: Boolean(query.search) }));
     fireEvent.change(input, { target: { value: '가게' } });
+    fireEvent.submit(input.closest('form'));
     await waitFor(() => expect(mocks.read.mock.lastCall[0].search).toBe('가게'));
+    expect(screen.getByLabelText('예약 목록을 불러오는 중')).toBeInTheDocument();
+    expect(screen.queryByText('서버 첫 예약')).toBeNull();
     expect(screen.getByPlaceholderText('가게명, 예약번호로 검색')).toBe(input);
     expect(input).toHaveFocus(); expect(input).toBeEnabled();
     fireEvent.change(input, { target: { value: '가게명' } });
     expect(input).toHaveValue('가게명'); expect(input).toHaveFocus();
+    expect(mocks.read.mock.lastCall[0].search).toBe('가게');
+    fireEvent.submit(input.closest('form'));
     await waitFor(() => expect(mocks.read.mock.lastCall[0].search).toBe('가게명'));
     mocks.read.mockReturnValue(reply({ reservations: [row(31, '가게명 결과')] }));
     result.rerender(<MemoryRouter><MyReservations /><LocationProbe /></MemoryRouter>);

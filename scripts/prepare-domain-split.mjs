@@ -55,7 +55,7 @@ export function domainSplitNginx(source) {
     const oauth = block(source, 'location /oauth2/authorization/ {');
     const callback = block(source, 'location /login/oauth2/ {');
     const csp = source.match(/add_header Content-Security-Policy-Report-Only "[^\n]+;[\r]?/);
-    if (!csp) throw new Error('Current app CSP policy is required for legacy draft recovery');
+    if (!csp) throw new Error('Current app CSP policy is required for legacy OAuth callbacks');
     return `${app}
 map $args $reserve_legacy_home_selection { default 0; ~(^|&)region(=|&|$) 1; }
 # 복구용 기존 앱 릴리스는 html/legacy-domain.current에 유지한다.
@@ -82,8 +82,16 @@ server {
     ${api}
     ${oauth}
     ${callback}
-    # 진행 중인 OAuth와 계정별 초안 내보내기는 기존 출처를 유지한다.
-    location ~ ^/(drafts/transfer|login|signup/social|oauth2/callback)/?$ { try_files /does-not-exist @legacy_spa; }
+    location ~ ^/login/?$ {
+        if ($request_method !~ ^(GET|HEAD)$) { return 405; }
+        return 302 https://app.reserve.it.kr/login;
+    }
+    location ~ ^/drafts/transfer/?$ {
+        if ($request_method !~ ^(GET|HEAD)$) { return 405; }
+        return 302 https://app.reserve.it.kr/my-stores;
+    }
+    # 진행 중인 OAuth 콜백과 가입은 기존 출처를 유지한다.
+    location ~ ^/(signup/social|oauth2/callback)/?$ { try_files /does-not-exist @legacy_spa; }
     location @legacy_spa {
         root /usr/share/nginx/html/legacy-domain.current;
         ${headers}

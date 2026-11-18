@@ -45,8 +45,8 @@
 .reserve-waiting-join-status { margin: 0 0 24px; padding: 12px; border-radius: 12px; background: var(--c-gray-100); color: var(--c-text-primary); font-size: 14px; line-height: 22px; }
 .reserve-waiting-join-steps { display: flex; flex-direction: column; gap: 20px; margin: 0; padding: 0; list-style: none; counter-reset: waiting-step; }
 .reserve-waiting-join-steps > li { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; counter-increment: waiting-step; }
-.reserve-waiting-join-steps > li::before { content: counter(waiting-step); display: flex; align-items: center; justify-content: center; align-self: start; height: 24px; border-radius: 8px; background: var(--c-gray-100); color: var(--c-text-secondary); font-size: 12px; font-weight: 600; }
-.reserve-waiting-join-steps strong { display: block; color: var(--c-text-primary); font-size: 14px; font-weight: 600; line-height: 24px; }
+.reserve-waiting-join-steps > li::before { content: counter(waiting-step); display: grid; place-items: center; align-self: start; height: 24px; border-radius: 8px; background: var(--c-gray-100); color: var(--c-text-secondary); font-size: 12px; font-weight: 600; line-height: 24px; }
+.reserve-waiting-join-steps strong { display: flex; align-items: center; min-height: 24px; margin: 0; color: var(--c-text-primary); font-size: 14px; font-weight: 600; line-height: 24px; }
 .reserve-waiting-join-steps p { margin: 4px 0 0; color: var(--c-text-secondary); font-size: 13px; line-height: 21px; overflow-wrap: anywhere; }
 .reserve-waiting-join-actions { display: flex; flex-direction: column; align-items: stretch; gap: 16px; margin-top: 24px; }
 .reserve-waiting-my-link { align-self: center; padding: 4px 0; font-size: 13px; line-height: 20px; }

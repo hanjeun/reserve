@@ -37,6 +37,8 @@ public class PortoneV2PaymentResponse {
     private Amount amount;
 
     private Method method;
+    private String receiptUrl;
+    private CashReceipt cashReceipt;
 
     private java.util.List<PortoneV2CancelResponse.Cancellation> cancellations;
 
@@ -81,6 +83,12 @@ public class PortoneV2PaymentResponse {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class EasyPay {
         private String provider;
+    }
+
+    @Getter @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class CashReceipt {
+        private String status;
+        private String url;
     }
 
     public int getAmount() {

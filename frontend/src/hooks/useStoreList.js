@@ -4,7 +4,7 @@
  */
 import { useCallback, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import storeService from '../services/storeService';
 import { storeKeys } from './queryKeys';
 import { rememberImageHints } from '../utils/imageHintCache';
@@ -12,9 +12,9 @@ import { hasDistanceCoordinates } from '../utils/distanceSort';
 import { STORE_LIST_PAGE_SIZE } from '../constants/storeListPageSize';
 import { normalizeListQueryParams } from '../utils/listQueryParams';
 import useDiscoveryRegion from './useDiscoveryRegion';
-import useDebounce from './useDebounce';
-import { isListQueryLoading, queryErrorStatus } from './liveUpdateQueries';
+import { isListQueryLoading, isReadAccessDenied, queryErrorStatus } from './liveUpdateQueries';
 import { readQuerySelection, writeQuerySelection } from '../utils/querySelection';
+import { keepListForSort } from './listSortPlaceholder';
 
 export { STORE_LIST_PAGE_SIZE };
 const FILTER_KEYS = new Set(['keyword', 'domain', 'region', 'sort', 'lat', 'lng']);
@@ -28,12 +28,13 @@ const readPage = (value) => {
 const readCount = (value, fallback) =>
     Number.isSafeInteger(value) && value >= 0 ? value : fallback;
 
+const orderKey = ({ sort, lat, lng }) => JSON.stringify(sort === 'distance' ? [sort, lat, lng] : [sort]);
+
 const useStoreList = () => {
     const [urlSearchParams, setUrlSearchParams] = useSearchParams();
     const normalizedParams = normalizeListQueryParams('/stores', urlSearchParams);
 
-    const keyword = normalizedParams.get('keyword') || '';
-    const searchKeyword = useDebounce(keyword, 300);
+    const keyword = (normalizedParams.get('keyword') || '').trim();
     const sort    = normalizedParams.get('sort')    || 'recommended';
     const lat     = normalizedParams.get('lat');
     const lng     = normalizedParams.get('lng');
@@ -41,6 +42,7 @@ const useStoreList = () => {
     const [region, rememberRegion] = useDiscoveryRegion(urlSearchParams);
     const rawPage = urlSearchParams.get('page');
     const page = readPage(rawPage);
+    const order = orderKey({ sort, lat, lng });
 
     const {
         data,
@@ -54,7 +56,7 @@ const useStoreList = () => {
     } = useQuery({
         // 페이지·크기도 키에 포함한다. 늦게 도착한 이전 페이지 응답은 현재 목록을 덮지 않는다.
         queryKey: storeKeys.list({ keyword, sort, lat, lng, domain, region, page: page - 1, size: STORE_LIST_PAGE_SIZE }),
-        enabled: keyword === searchKeyword,
+        refetchOnReconnect: false,
         queryFn: ({ signal }) =>
             storeService.getStores({
                 keyword, sort, page: page - 1, size: STORE_LIST_PAGE_SIZE,
@@ -63,25 +65,29 @@ const useStoreList = () => {
                 ...(region ? { region } : {}),
             }, signal),
         staleTime: 1000 * 60 * 3,
-        // 이동 중 건수·페이지 컨트롤은 유지하고 화면은 기존 스켈레톤으로 진행 상태를 표시한다.
-        placeholderData: keepPreviousData,
+        placeholderData: (previous, query) => {
+            if (isReadAccessDenied(query?.state.error)) return undefined;
+            const source = query?.queryKey[2];
+            // 검색 범위가 같은 정렬 변경만 이전 결과를 그대로 보여준다.
+            if (source?.keyword === keyword && source.domain === domain && source.region === region) {
+                return keepListForSort(previous, orderKey(source), order, source.page) ?? previous;
+            }
+            return previous;
+        },
     });
 
     const accessDenied = [401, 403].includes(queryErrorStatus(error));
     const hasData = data !== undefined && !accessDenied;
+    const previousOrder = isPlaceholderData ? data?.previousOrder : undefined;
+    const sorting = Boolean(previousOrder);
     const stores = useMemo(() => !accessDenied && Array.isArray(data?.content) ? data.content : [], [data, accessDenied]);
-    // Spring Boot 3.5의 page 하위 메타와 이전 평탄 응답을 모두 허용한다.
+    // 중첩된 page 메타와 기존 평탄 응답을 모두 허용한다.
     const totalElements = hasData ? readCount(data?.page?.totalElements ?? data?.totalElements, stores.length) : 0;
     const totalPages = hasData ? readCount(data?.page?.totalPages ?? data?.totalPages, Math.ceil(totalElements / STORE_LIST_PAGE_SIZE)) : 0;
     const lastPage = Math.max(1, totalPages);
     const pageOutOfRange = isSuccess && !isPlaceholderData && !error && page > lastPage;
 
-    // 가게 목록을 받을 때마다 각 가게의 커버 이미지 "비율"만 따로 적어둔다.
-    // 상세 페이지 스켈레톤이 커버 자리를 실제 비율로 그려야 이미지 도착 시 레이아웃이 안 튀는데,
-    // 그동안은 TanStack Query의 목록 캐시에서만 비율을 찾았다. 그런데 그 캐시가 없는 경우가
-    // 흔해서(상세 URL 직접 진입 / 상세에서 새로고침 / 홈·찜 목록에서 클릭 / gcTime 만료)
-    // "어떤 땐 비율이 딱 맞고 어떤 땐 큰 정사각형이 뜨는" 들쭉날쭉한 증상이 있었다.
-    // 비율은 몇 바이트짜리 메타데이터라 따로 오래 들고 있어도 안전하다 — utils/imageHintCache.js 참고.
+    // 목록 캐시가 없어도 상세 골격이 실제 사진 비율을 유지하도록 크기 힌트를 별도 보관한다.
     useEffect(() => {
         rememberImageHints(stores);
     }, [stores]);
@@ -126,8 +132,11 @@ const useStoreList = () => {
         totalElements,
         totalPages,
         page,
+        resultPage: sorting ? previousOrder.page + 1 : page,
+        resultOrder: previousOrder?.sort ?? order,
+        sorting,
         pageSize: STORE_LIST_PAGE_SIZE,
-        loading: isListQueryLoading({ isPending, isPlaceholderData }) || pageOutOfRange,
+        loading: isListQueryLoading({ isPending, isPlaceholderData: isPlaceholderData && !sorting }) || pageOutOfRange,
         initialLoading: isLoading,
         refetching: isFetching && !isLoading,
         hasData,

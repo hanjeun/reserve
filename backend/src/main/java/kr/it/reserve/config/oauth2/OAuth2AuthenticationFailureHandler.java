@@ -13,12 +13,10 @@ import org.springframework.security.web.authentication.SimpleUrlAuthenticationFa
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 
 /**
  * OAuth2 로그인 실패 시 처리하는 핸들러
- * errorCode를 한국어 메시지로 변환하여 /login?error=oauth2&message=... 로 리다이렉트
+ * 허용된 코드만 현재 브라우저 세션에 전달한다.
  */
 @Slf4j
 @Component
@@ -36,14 +34,12 @@ public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationF
         else log.error("OAuth2 login failed: errorType={}", exception.getClass().getSimpleName());
         kr.it.reserve.member.service.LoginMethodService.clearFlow(request);
 
-        String rawMessage = resolveMessage(exception);
-        String errorMessage = URLEncoder.encode(rawMessage, StandardCharsets.UTF_8);
         String baseUrl = siteUrls == null ? frontendUrl : siteUrls.frontendFor(request);
-
-        getRedirectStrategy().sendRedirect(request, response, baseUrl + "/login?error=oauth2&message=" + errorMessage);
+        getRedirectStrategy().sendRedirect(request, response,
+                OAuthLoginOutcome.redirect(request, baseUrl, new OAuthLoginOutcome.View(resolveCode(exception))));
     }
 
-    private String resolveMessage(AuthenticationException exception) {
+    private String resolveCode(AuthenticationException exception) {
         log.debug("OAuth2 failure type: {}", exception.getClass().getName());
 
         // 예외 원문은 공급자 응답·이메일·내부 구현 정보를 포함할 수 있으므로 URL로 전달하지 않는다.
@@ -59,20 +55,11 @@ public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationF
             if (end > 0) errorCode = msg.substring(1, end);
         }
 
-        log.debug("OAuth2 errorCode: {}", errorCode);
-
         return switch (errorCode) {
-            case "access_denied"                   -> "소셜 로그인을 취소했어요.";
-            case "authorization_request_not_found" -> "이 인증 요청은 이미 사용했거나 만료됐어요. 원래 화면에서 다시 시작해주세요.";
-            case "invalid_state"                   -> "인증 요청을 확인할 수 없어요. 원래 화면에서 다시 시작해주세요.";
-            case "email_conflict"                  -> "이미 가입된 이메일이에요. 기존 가입 방식으로 로그인한 뒤 마이페이지의 로그인 및 보안에서 소셜 계정을 연결해주세요.";
-            case "login_method_expired"            -> "본인 확인·연결 요청이 만료됐어요. 설정 화면에서 다시 시작해주세요.";
-            case "login_method_conflict"           -> "이미 연결된 소셜 계정이에요. 기존 연결을 확인해주세요.";
-            case "login_method_email_mismatch"     -> "현재 RESERVE 계정과 같은 이메일의 인증된 소셜 계정을 사용해주세요.";
-            case "login_method_identity_mismatch"  -> "처음 연결한 소셜 계정으로 본인 확인해주세요.";
-            case "oauth_reauthentication_required" -> "계정 보호를 위해 소셜 로그인을 다시 진행해주세요.";
-            case "ip_verification_unavailable"      -> "접속 환경을 확인할 수 없어요. 잠시 후 다시 로그인해주세요.";
-            default                                -> "소셜 로그인에 실패했어요. 다시 시도해주세요.";
+            case "access_denied", "authorization_request_not_found", "invalid_state", "email_conflict",
+                    "login_method_expired", "login_method_conflict", "login_method_email_mismatch",
+                    "login_method_identity_mismatch", "oauth_reauthentication_required", "ip_verification_unavailable", "account_protected" -> errorCode;
+            default -> "login_failed";
         };
     }
 }

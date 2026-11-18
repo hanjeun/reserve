@@ -60,13 +60,19 @@ final class StoreDirectory {
     }
 
     StoreResponse getStore(Long id) {
-        Store store = storeRepository.findById(id)
-                .orElseThrow(StoreException::notFound);
+        return publicDetail(storeRepository.findById(id).orElseThrow(StoreException::notFound));
+    }
+
+    StoreResponse getStoreByPublicId(String publicId) {
+        return publicDetail(storeRepository.findByPublicId(publicId).orElseThrow(StoreException::notFound));
+    }
+
+    private StoreResponse publicDetail(Store store) {
         if (store.getDeletedAt() != null || store.isSuspended()) {
             throw StoreException.notFound();
         }
         if (store.resolveWaitingIntakeMode() != WaitingIntakeMode.OFF) {
-            return StoreResponse.fromWaitingDirectory(store, waitingCounts.activeTeams(id));
+            return StoreResponse.fromWaitingDirectory(store, waitingCounts.activeTeams(store.getId()));
         }
         return StoreResponse.fromPublicEntity(store);
     }

@@ -26,11 +26,12 @@ if [[ ! -s "$TASK_SSH_DIR/known_hosts" ]]; then
 fi
 # 실패할 수 있는 SSH 출력은 GITHUB_OUTPUT에 스트리밍하지 않는다.
 STATUS=0
-ssh -i "$TASK_SSH_DIR/key" -o BatchMode=yes -o IdentitiesOnly=yes \
-  -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$TASK_SSH_DIR/known_hosts" \
-  -o GlobalKnownHostsFile=/dev/null -o ConnectTimeout=10 \
-  -o ServerAliveInterval=15 -o ServerAliveCountMax=2 \
-  "ubuntu@$RESERVE_SERVER_IP" bash -se > "$TASK_SSH_DIR/output" <<'REMOTE' || STATUS=$?
+{
+printf 'check_release_compatibility_image() {\n'
+cat "$(dirname "$0")/check-release-compatibility-image.sh"
+printf '\n}\n'
+cat <<'REMOTE'
+docker() { sudo docker "$@"; }
 set -eu
 SERVICE_ENV_LINE=$(sudo docker exec nginxserver cat /etc/nginx/conf.d/service-env.inc \
   | tr -d '\r\n')
@@ -54,9 +55,10 @@ if [ "$SCHEMA_COMPAT" != 'v280-mfa-completion-settlement-v1' ]; then
 fi
 FEATURE_COMPAT=$(sudo docker image inspect --format '{{index .Config.Labels "reserve.feature-compat"}}' "$ACTIVE_IMAGE")
 if [ "$FEATURE_COMPAT" != 'waiting-signup-hidden-feed-oauth-login-session-admission-mfa-completion-test-settlement-v11' ]; then
-  echo "Active recovery image does not support the current login-session and admission contract; prepare an approved compatible baseline before automatic deployment"
+  echo "Active recovery image does not support the current feed, OAuth security, login-session and automatic service-admission contract; prepare an approved compatible baseline before automatic deployment"
   exit 1
 fi
+check_release_compatibility_image "$ACTIVE_IMAGE"
 if { [ "$CURRENT_UPSTREAM" = "blue" ] && [ "$STATUS_BLUE" != "200" ]; } \
    || { [ "$CURRENT_UPSTREAM" = "green" ] && [ "$STATUS_GREEN" != "200" ]; }; then
   echo "Nginx points to an unhealthy upstream; refusing automatic deployment"
@@ -64,6 +66,12 @@ if { [ "$CURRENT_UPSTREAM" = "blue" ] && [ "$STATUS_BLUE" != "200" ]; } \
 fi
 echo "DETECTED_UPSTREAM=$CURRENT_UPSTREAM"
 REMOTE
+} | \
+ssh -i "$TASK_SSH_DIR/key" -o BatchMode=yes -o IdentitiesOnly=yes \
+  -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$TASK_SSH_DIR/known_hosts" \
+  -o GlobalKnownHostsFile=/dev/null -o ConnectTimeout=10 \
+  -o ServerAliveInterval=15 -o ServerAliveCountMax=2 \
+  "ubuntu@$RESERVE_SERVER_IP" bash -se > "$TASK_SSH_DIR/output" || STATUS=$?
 cat "$TASK_SSH_DIR/output"
 if [[ "$STATUS" -ne 0 ]]; then exit "$STATUS"; fi
 DETECTED=$(grep -E '^DETECTED_UPSTREAM=(blue|green)$' "$TASK_SSH_DIR/output" || true)

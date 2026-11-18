@@ -25,6 +25,35 @@ class ChatVisibilityQueryTest {
     @Autowired MemberRepository members;
     @Autowired EntityManager entityManager;
 
+    @Test void leavingRemovesBothPersonalListsAndKeepsHistoryForANewMessage() {
+        Member member = members.save(Member.builder().name("손님").email("leave@example.invalid").build());
+        var at = LocalDateTime.now();
+        var pageable = PageRequest.of(0, 10);
+        ChatRoom room = rooms.save(ChatRoom.builder().member(member).type(ChatRoom.RoomType.STORE).storeId(5L).build());
+        var message = messages.save(ChatMessage.builder().room(room).senderRole(SenderRole.OWNER)
+                .senderMemberId(81L).content("이전 대화").build());
+        room.onMessageSent(SenderRole.OWNER, at, "이전 대화");
+        room.leave(SenderRole.MEMBER, member.getId(), at);
+        rooms.flush();
+
+        assertThat(rooms.findForMember(member.getId(), pageable)).isEmpty();
+        assertThat(rooms.findHiddenForMember(member.getId(), pageable)).isEmpty();
+        assertThat(rooms.sumMemberUnread(member.getId())).isZero();
+        assertThat(rooms.findVisibleStoreInbox(ChatRoom.RoomType.STORE, List.of(5L), 81L, false, pageable)).hasSize(1);
+
+        room.leave(SenderRole.OWNER, 81L, at);
+        rooms.flush();
+        assertThat(rooms.findVisibleStoreInbox(ChatRoom.RoomType.STORE, List.of(5L), 81L, false, pageable)).isEmpty();
+        assertThat(rooms.findVisibleStoreInbox(ChatRoom.RoomType.STORE, List.of(5L), 81L, true, pageable)).isEmpty();
+        assertThat(rooms.findVisibleStoreInbox(ChatRoom.RoomType.STORE, List.of(5L), 82L, false, pageable)).hasSize(1);
+
+        room.onMessageSent(SenderRole.OWNER, at.plusSeconds(1), "새 대화");
+        rooms.flush();
+        assertThat(rooms.findForMember(member.getId(), pageable)).hasSize(1);
+        assertThat(rooms.sumMemberUnread(member.getId())).isEqualTo(1);
+        assertThat(messages.findById(message.getId()).orElseThrow().getContent()).isEqualTo("이전 대화");
+    }
+
     @Test void hidingDoesNotChangeOtherSideOrPageTotalsAndNewMessagesRestoreTheList() {
         Member member = members.save(Member.builder().name("손님").email("visibility@example.invalid").build());
         ChatRoom room = rooms.save(ChatRoom.builder().member(member).type(ChatRoom.RoomType.STORE).storeId(5L)

@@ -17,9 +17,17 @@
 | S3 | 사진·첨부파일 저장 |
 | CloudFront | 공개 이미지의 빠른 전송 |
 
-Redis 알림은 원본 데이터를 대신하지 않아요. 브라우저는 서버가 보내는 갱신 알림(SSE)을 받으면 API에서 최신 데이터를 다시 읽어요.
+Redis 알림은 원본 데이터를 대신하지 않아요. 브라우저는 서버가 보내는 갱신 알림(SSE)을 받으면 API에서 최신 데이터를 다시 읽어요. SSE 연결 한도에 걸리면 스트림 시작 전에 본문 없는 429와 Retry-After를 반환해요. 탭으로 돌아와도 예정된 재연결 시각을 지키고 그동안 주기 조회를 사용해요.
 
 프로필·가게 사진은 공개 이미지예요. 사업자 서류와 채팅·피드 첨부파일은 권한을 확인한 뒤 제공해요.
+
+사진 검증·피드와 리뷰 사진의 정규화·채팅 썸네일 생성은 프로세스 안의 한 처리 슬롯을 공유해요. 업로드 파일의 바이트를 읽기 전에 슬롯을 얻고, 최대 5초 안에 들어가지 못하면 429를 반환해요. 임시 이미지와 슬롯은 실패·중단 시에도 해제해요. 멀티파트 수신과 저장소 전송에는 각 요청·전송 한도를 함께 적용해요. 공개 피드·리뷰 사진 조회는 같은 IP 예산을 사용해요.
+
+리뷰는 예약의 작성 가능 상태를 같은 트랜잭션에서 한 번 소비해요. 저장에 실패하면 소비도 롤백하고 삭제한 리뷰의 예약은 다시 작성할 수 없어요. 리뷰의 별점 변경·숨김·삭제·복원은 가게별로 직렬화하고 공개 리뷰의 평균과 개수를 같은 트랜잭션에서 갱신해요.
+
+잠금 뒤 최신 상태가 필요한 금융·피드·인증 경로는 `CurrentLockedState`에서 같은 관리 객체와 잠금 강도를 유지해요. 정본 MySQL의 반복 읽기에서 이전 조회 스냅샷을 다시 적용하지 않도록 현재 고정된 Hibernate의 갱신 동작을 보완해요. Hibernate를 올릴 때는 MySQL의 재진입·버전·연관 결제 갱신 회귀를 함께 검증해요.
+
+채팅 사진은 업로드 원본과 긴 변 최대 320px 썸네일을 각각 암호화해 저장해요. 대화에서는 썸네일을 먼저 받고, 확대·저장할 때 원본을 요청해요. 썸네일을 보관하지 않은 채팅 사진은 조회할 때 원본에서 만들어요. 두 파일은 같은 권한과 보유기간 규칙을 적용해요.
 
 메신저 검색은 대화 상대·메시지·공개 가게를 구분해요. 개인 검색은 현재 회원·역할·대화 소유권을 매번 확인하고 숨김·차단·회수·보유기간을 적용해요. 관리자의 전체 대화 조회는 고객지원으로 한정해요. 검색어는 URL에 넣지 않고 읽기 전용 `POST /api/chat/search`로 전달하며 결과는 세션 메모리에서만 사용해요.
 
@@ -29,7 +37,7 @@ Redis 알림은 원본 데이터를 대신하지 않아요. 브라우저는 서�
 
 브라우저는 액세스·리프레시 정보를 HttpOnly 쿠키로 전송해요. 리프레시 쿠키는 두 인증 경로(`/api/auth`, `/api/v1/auth`)로 제한해요. 서명·issuer·audience·용도·기한을 검증하고 현재 회원 상태와 기기별 `login_session`을 확인해요.
 
-DB에는 리프레시 토큰 원문 대신 해시와 재구성에 필요한 비밀이 아닌 메타데이터를 저장해요. 갱신할 때 토큰을 회전하고, 직전 세대는 60초 동안 같은 결과를 복구해요. 더 오래된 세대의 재사용은 해당 기기의 세션을 회수해요. 기본 유지 기간은 마지막 갱신부터 14일이며 최초 로그인부터 30일을 넘지 않아요. 동시 로그인도 회원 잠금 안에서 최대 다섯 기기로 제한해요.
+DB에는 리프레시 토큰 원문 대신 해시와 재구성에 필요한 비밀이 아닌 메타데이터를 저장해요. 갱신할 때 토큰을 회전하고, 직전 세대는 60초 동안 같은 결과를 복구해요. 더 오래된 세대의 재사용은 해당 기기의 세션을 회수해요. 동시 로그인도 회원 잠금 안에서 최대 다섯 기기로 제한해요. 세션 종류별 기간은 [계정 보안](account-security.md#로그인)을 따라요.
 
 로그아웃한 기기는 다음 인증 요청부터 거부해요. 이미 열린 SSE는 다음 전송 또는 15초 heartbeat에서 세션을 다시 확인해 종료해요. 선택적 `kid`·키 목록을 지원하지만 실제 서명 키 변경은 별도 운영 절차로 진행해요.
 
@@ -46,7 +54,7 @@ GitHub Actions가 검사와 빌드를 수행해요. Lightsail의 Blue/Green 컨�
 | AWS Lightsail·Route 53 | 서버와 도메인 |
 | S3·CloudFront | 파일 저장과 이미지 전송 |
 | PortOne | 예약금·광고 결제 |
-| Resend | 이메일 발송 |
+| Resend | 이메일 발송과 지원 메일 수신 |
 | Google·Kakao·Naver | 소셜 로그인 |
 | Grafana·Loki·Alloy·Sentry | 서버 상태와 오류 관측 |
 
@@ -58,6 +66,8 @@ Resend의 이메일 수신을 연결한 뒤 **email.received**를 앱의 **POST 
 
 [수신 메일 DDL](../../backend/src/main/resources/db/manual/inquiry-inbound-email.sql), [문의 휴지통 DDL](../../backend/src/main/resources/db/manual/inquiry-trash.sql), [첨부 사진 DDL](../../backend/src/main/resources/db/manual/support-mail-photos.sql)을 적용한 뒤 앱을 시작해요. 문의와 발송 사진은 비공개 테이블에 저장하고 조회마다 관리자 권한과 휴지통 상태를 확인해요. 문의나 발송 기록이 영구 삭제되면 사진도 삭제돼요.
 
-운영 수신을 켤 때 GitHub `production`의 변수 `RESEND_INBOUND_ENABLED`를 `true`로 설정하고, `RESEND_INBOUND_ADDRESS`에 실제 지원 주소를 등록해요. 웹훅 서명 키 `RESEND_INBOUND_WEBHOOK_SECRET`과 Resend `Full access` 키 `RESEND_INBOUND_API_KEY`는 저장소 또는 `production` 시크릿에 등록해요. 활성화한 배포에서 두 시크릿을 앱에 전달해요. 발송에는 `RESEND_API_KEY`를 사용해요. 기존 지원 주소의 MX나 전달 설정은 해당 주소의 다른 메일 흐름과 함께 확인해요.
+운영 수신을 켤 때 GitHub `production`의 변수 `RESEND_INBOUND_ENABLED`를 `true`로 설정하고, `RESEND_INBOUND_ADDRESS`에 실제 지원 주소를 등록해요. 웹훅의 서명 키 `RESEND_INBOUND_WEBHOOK_SECRET`과 Resend `Full access` 키 `RESEND_INBOUND_API_KEY`는 저장소 또는 `production` 시크릿에 등록해요. 활성화한 배포에서 두 시크릿을 앱에 전달해요. 발송에는 `RESEND_API_KEY`를 사용해요. Resend의 `email.received` 이벤트는 앱 호스트의 `/api/inquiries/inbound/resend`로 보내요. 기존 지원 주소의 MX나 전달 설정은 해당 주소의 다른 메일 흐름과 함께 확인해요. [Resend 수신 설정](https://resend.com/features/inbound) · [API 키 권한](https://resend.com/changelog/new-api-key-permissions)
+
+로컬 `local` 프로필은 `~/.codex/local-data/RESERVE/local.properties`에서 같은 네 설정을 읽어요. 실제 수신 검증에는 Resend에서 접근할 수 있는 테스트 HTTPS 웹훅 주소와 그 웹훅의 서명 키를 사용해요.
 
 받은 문의와 보낸 메일은 관리자 휴지통에서 30일간 복구할 수 있어요. 받은 문의가 휴지통에 있는 동안 조회·회신 목록에서 숨겨지며 같은 수신 이벤트가 다시 와도 새 문의로 등록하지 않아요.

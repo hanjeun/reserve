@@ -62,7 +62,6 @@ public class AdminMailService {
     @Value("${mail.resend-inbound.recipient:}")
     private String inboundAddress;
 
-    /* 새 메일 작성 발송 + DB 저장 ───────────────────── */
     @Transactional
     public void compose(long adminId, ComposeMailRequest request, List<MultipartFile> uploads) {
         if (request.isMarketing()) {
@@ -120,7 +119,6 @@ public class AdminMailService {
         }
     }
 
-    /* 보낸 메일 목록 ─────────────────────────────────── */
     /** 한 번에 내려줄 수 있는 최대 건수. 호출측이 큰 size 를 보내 전량을 끌어가지 못하게 막는다. */
     private static final int MAX_PAGE_SIZE = 100;
 
@@ -137,7 +135,6 @@ public class AdminMailService {
         return mails.map(AdminSentMailResponse::from);
     }
 
-    /* 휴지통으로 이동 ────────────────────────────────── */
 
     /** 휴지통에서 복구할 수 있도록 목록에서만 숨기며 보존 기간 뒤 정리한다. */
     @Transactional
@@ -162,7 +159,6 @@ public class AdminMailService {
                 () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "메일을 찾을 수 없어요."));
     }
 
-    /* 이메일 발송 내부 메서드 ────────────────────────── */
     private void sendReplyEmail(String toEmail, String subject, String body, String replyTo, String messageId,
             List<ValidatedImage> photos) {
         try {

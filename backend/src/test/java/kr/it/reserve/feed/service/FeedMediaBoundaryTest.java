@@ -1,5 +1,7 @@
 package kr.it.reserve.feed.service;
 
+import kr.it.reserve.file.util.JpegOrientation;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import kr.it.reserve.feed.FeedException;
@@ -158,8 +160,8 @@ class FeedMediaBoundaryTest {
         assertThat(result.width()).isEqualTo(3);
         assertThat(result.height()).isEqualTo(2);
         assertThat(result.contentType()).isEqualTo("image/jpeg");
-        assertThat(FeedJpegOrientation.read(result.bytes())).isEqualTo(1);
-        assertThat(FeedJpegOrientation.read(new byte[] {(byte) 0xff, (byte) 0xd8, (byte) 0xff, (byte) 0xe1, 0, 127})).isEqualTo(1);
+        assertThat(JpegOrientation.read(result.bytes())).isEqualTo(1);
+        assertThat(JpegOrientation.read(new byte[] {(byte) 0xff, (byte) 0xd8, (byte) 0xff, (byte) 0xe1, 0, 127})).isEqualTo(1);
     }
 
     @Test

@@ -15,12 +15,44 @@ const frontend = workflow.jobs['build-frontend'];
 const cd = require('js-yaml').load(read('.github/workflows/CD.yml'));
 const deployment = cd.jobs['deploy-backend'];
 const backendTests = workflow.jobs['test-backend'];
+const frontendTests = workflow.jobs['test-frontend'];
 const frontendCoreTests = workflow.jobs['test-frontend-core'];
 const frontendBrowserTests = workflow.jobs['test-frontend-browser'];
-const frontendTests = workflow.jobs['test-frontend'];
 const staging = cd.jobs['stage-release'];
 const detectionScript = read('scripts/detect-active-upstream.sh');
 const step = (job, id) => job.steps.find(entry => entry.id === id);
+
+test('actual JAR review and profile compatibility is mandatory in image build, CI and both deployment boundaries', () => {
+    const dockerfile = read('backend/Dockerfile');
+    assert.match(dockerfile, /COPY --chown=appuser:appgroup tools\/VerifyReleaseCompatibility\.java/);
+    assert.match(dockerfile, /javac -d \/opt\/reserve\/compat/);
+    assert.match(dockerfile, /java -Xmx96m -cp \/opt\/reserve\/compat VerifyReleaseCompatibility \/app\.jar/);
+    assert.ok(read('backend/.dockerignore').includes('!tools/VerifyReleaseCompatibility.java'));
+    const build = backend.steps.findIndex(entry => entry.name === 'Build Docker image');
+    const probe = backend.steps.findIndex(entry => entry.name === 'Verify actual backend JAR compatibility');
+    const scan = backend.steps.findIndex(entry => entry.name === 'Scan backend image vulnerabilities');
+    assert.ok(build >= 0 && probe > build && scan > probe);
+    assert.match(backend.steps[probe].run, /IMAGE_ID=\$\(docker image inspect --format '\{\{\.Id\}\}'/);
+    assert.match(backend.steps[probe].run, /bash scripts\/check-release-compatibility-image\.sh "\$IMAGE_ID"/);
+    assert.equal(backend.steps[probe]['continue-on-error'], undefined);
+    const toolTests = backendTests.steps.find(entry => entry.name === 'Test actual JAR compatibility verifier');
+    assert.equal(toolTests.run, 'node --test scripts/tests/release-compatibility.test.mjs');
+    assert.equal(toolTests.if, "steps.evidence.outputs.reused != 'true'");
+    assert.match(detectionScript, /cat "\$\(dirname "\$0"\)\/check-release-compatibility-image\.sh"/);
+    assert.ok(detectionScript.indexOf('check_release_compatibility_image "$ACTIVE_IMAGE"') < detectionScript.indexOf('echo "DETECTED_UPSTREAM='));
+    const transfer = deployment.steps.find(entry => entry.name === 'Deploy deployment guards to EC2');
+    assert.ok(transfer.with.source.split(',').includes('scripts/check-release-compatibility-image.sh'));
+    const launch = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
+    const check = 'sudo bash /home/ubuntu/scripts/check-release-compatibility-image.sh';
+    assert.ok(launch.with.script.indexOf(check) > launch.with.script.indexOf('sudo docker pull'));
+    assert.ok(launch.with.script.indexOf(check) < launch.with.script.indexOf('sudo -E docker compose'));
+    assert.ok(launch.with.script.includes(check + ' "$RESERVE_IMAGE_REFERENCE" "$CURRENT_IMAGE"'));
+    const cutover = deployment.steps.find(entry => entry.name === 'Cut over frontend and backend');
+    assert.ok(cutover.with.script.includes(check + ' "$COMPATIBLE_IMAGE"'));
+    assert.ok(cutover.with.script.indexOf(check) < cutover.with.script.indexOf('trap rollback_cutover'));
+    for (const entry of [launch, cutover]) assert.equal(entry['continue-on-error'], undefined);
+});
+
 
 test('shared authentication activation refuses an unsupported recovery image before startup and again at cutover', () => {
     const launch = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
@@ -129,6 +161,44 @@ test('production forwards reservation protection settings and validates them bef
         assert.ifError(failure.error);
         assert.notEqual(failure.status, 0);
         assert.doesNotMatch(failure.stderr + failure.stdout, /fixture-private/);
+    }
+});
+
+test('production keeps Resend receiving off by default and requires all inbound settings to enable it', () => {
+    const launch = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
+    const flag = 'RESEND_INBOUND_ENABLED';
+    const address = 'RESEND_INBOUND_ADDRESS';
+    const secrets = ['RESEND_INBOUND_WEBHOOK_SECRET', 'RESEND_INBOUND_API_KEY'];
+    const names = [flag, address, ...secrets];
+    assert.ok(launch.env[flag].includes("vars.RESEND_INBOUND_ENABLED || 'false'"));
+    assert.ok(launch.env[address].includes('vars.' + address));
+    for (const secret of secrets) {
+        assert.ok(launch.env[secret].includes("vars.RESEND_INBOUND_ENABLED == 'true' && secrets." + secret));
+    }
+    for (const name of names) {
+        assert.ok(launch.with.envs.split(',').includes(name));
+        const fallback = name === flag ? 'false' : '';
+        for (const color of ['blue', 'green']) {
+            assert.ok(read('infra/compose/docker-compose-' + color + '.yml').includes(name + '=${' + name + ':-' + fallback + '}'));
+        }
+    }
+
+    const script = launch.with.script;
+    const start = script.indexOf('case "$RESEND_INBOUND_ENABLED"');
+    const end = script.indexOf('case "$RESERVE_RESERVATION_SHARED_LIMITS_ENABLED"', start);
+    assert.ok(start >= 0 && end > start && end < script.indexOf('sudo docker pull'));
+    const run = settings => spawnSync(process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash',
+        ['-eu', '-c', script.slice(start, end)], { encoding: 'utf8', timeout: 5000,
+            env: { ...process.env, [flag]: 'false', [address]: '', [secrets[0]]: '', [secrets[1]]: '', ...settings } });
+    assert.equal(run({}).status, 0);
+    const enabled = { [flag]: 'true', [address]: 'support@example.test',
+        [secrets[0]]: 'fixture-signing-secret', [secrets[1]]: 'fixture-api-key' };
+    assert.equal(run(enabled).status, 0);
+    for (const [name, value] of [[flag, 'invalid'], [address, ''], ...secrets.map(secret => [secret, ''])]) {
+        const failure = run({ ...enabled, [name]: value });
+        assert.ifError(failure.error);
+        assert.notEqual(failure.status, 0);
+        assert.doesNotMatch(failure.stderr + failure.stdout, /fixture-(?:signing-secret|api-key)/);
     }
 });
 
@@ -265,7 +335,8 @@ exec bash -se`,
         curl: `if [[ "$*" == *8080* ]]; then printf '%s' "$MOCK_BLUE"; else printf '%s' "$MOCK_GREEN"; fi`,
         sudo: `case "$*" in
   'docker exec nginxserver cat /etc/nginx/conf.d/service-env.inc') printf 'set $service_url blue;\\n' ;;
-  'docker inspect --format '* ) printf 'fixture-image\\n' ;;
+  'docker inspect --format '* ) printf 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\n' ;;
+  'docker run '* ) exit "$MOCK_CAPABILITY_FAILURE" ;;
   *reserve.schema-compat*) printf '%s\\n' "$MOCK_SCHEMA" ;;
   *reserve.feature-compat*) printf '%s\\n' "$MOCK_FEATURE" ;;
   *) exit 91 ;;
@@ -284,7 +355,7 @@ esac`,
                     GITHUB_OUTPUT: bashPath(output), TASK_SSH_CALLED: bashPath(called),
                     RESERVE_SERVER_IP: 'reserve.test', EC2_SSH_KEY: 'fixture-key', RESERVE_SSH_FINGERPRINT: 'SHA256:fixture',
                     MOCK_BLUE: '200', MOCK_GREEN: '000', MOCK_SCHEMA: 'v280-mfa-completion-settlement-v1', MOCK_FEATURE: 'waiting-signup-hidden-feed-oauth-login-session-admission-mfa-completion-test-settlement-v11',
-                    MOCK_REMOTE_FAILURE: '0', MOCK_AMBIGUOUS: 'false', ...overrides },
+                    MOCK_REMOTE_FAILURE: '0', MOCK_CAPABILITY_FAILURE: '0', MOCK_AMBIGUOUS: 'false', ...overrides },
             });
         assert.ifError(result.error);
         return { ...result, output: fs.readFileSync(output, 'utf8'), sshCalled: fs.existsSync(called) };
@@ -376,6 +447,7 @@ for (const [description, overrides] of [
     ['recovery without managed login methods', { MOCK_FEATURE: 'waiting-signup-hidden-feed-oauth-v7' }],
     ['recovery without automatic service admission', { MOCK_FEATURE: 'waiting-signup-hidden-feed-oauth-login-session-admission-v9' }],
     ['unsupported refund schema', { MOCK_SCHEMA: 'old' }],
+    ['a v11 image without the executable review/profile contract', { MOCK_CAPABILITY_FAILURE: '42' }],
     ['unhealthy live upstream', { MOCK_BLUE: '503' }],
     ['ambiguous upstream marker', { MOCK_AMBIGUOUS: 'true' }],
 ]) test(`upstream detection refuses ${description} without publishing deployment output`, () => {
@@ -432,43 +504,7 @@ test('provider security remains opt-in and forwards dedicated keys through the p
     assert.match(launch.with.script, /KAKAO_APP_ID:\?Kakao app ID is required/);
 });
 
-test('production keeps Resend receiving off by default and requires all inbound settings to enable it', () => {
-    const launch = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
-    const flag = 'RESEND_INBOUND_ENABLED';
-    const address = 'RESEND_INBOUND_ADDRESS';
-    const secrets = ['RESEND_INBOUND_WEBHOOK_SECRET', 'RESEND_INBOUND_API_KEY'];
-    const names = [flag, address, ...secrets];
-    assert.ok(launch.env[flag].includes("vars.RESEND_INBOUND_ENABLED || 'false'"));
-    assert.ok(launch.env[address].includes('vars.' + address));
-    for (const secret of secrets) {
-        assert.ok(launch.env[secret].includes("vars.RESEND_INBOUND_ENABLED == 'true' && secrets." + secret));
-    }
-    for (const name of names) {
-        assert.ok(launch.with.envs.split(',').includes(name));
-        const fallback = name === flag ? 'false' : '';
-        for (const color of ['blue', 'green']) {
-            assert.ok(read('infra/compose/docker-compose-' + color + '.yml').includes(name + '=${' + name + ':-' + fallback + '}'));
-        }
-    }
 
-    const script = launch.with.script;
-    const start = script.indexOf('case "$RESEND_INBOUND_ENABLED"');
-    const end = script.indexOf('case "$RESERVE_IMAGE_REFERENCE"', start);
-    assert.ok(start >= 0 && end > start && end < script.indexOf('sudo docker pull'));
-    const run = settings => spawnSync(process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash',
-        ['-eu', '-c', script.slice(start, end)], { encoding: 'utf8', timeout: 5000,
-            env: { ...process.env, [flag]: 'false', [address]: '', [secrets[0]]: '', [secrets[1]]: '', ...settings } });
-    assert.equal(run({}).status, 0);
-    const enabled = { [flag]: 'true', [address]: 'support@example.test',
-        [secrets[0]]: 'fixture-signing-secret', [secrets[1]]: 'fixture-api-key' };
-    assert.equal(run(enabled).status, 0);
-    for (const [name, value] of [[flag, 'invalid'], [address, ''], ...secrets.map(secret => [secret, ''])]) {
-        const failure = run({ ...enabled, [name]: value });
-        assert.ifError(failure.error);
-        assert.notEqual(failure.status, 0);
-        assert.doesNotMatch(failure.stderr + failure.stdout, /fixture-(?:signing-secret|api-key)/);
-    }
-});
 
 test('CodeQL skips duplicate dev pushes without removing PR, main or scheduled security scans', () => {
     const scan = require('js-yaml').load(read('.github/workflows/codeql.yml'));
@@ -582,7 +618,9 @@ test('backend tests are explicit, required, and run before packaging', () => {
     assert.match(runner, /gradlew test --rerun --no-daemon --console=plain/);
     for (const gate of ['RESERVE_MYSQL_LOGIN_TEST_ISOLATED', 'RESERVE_ADMISSION_MYSQL_TEST',
         'RESERVE_CAPACITY_MYSQL_TEST', 'RESERVE_MYSQL_OAUTH_TEST_ISOLATED', 'RESERVE_ADMISSION_REDIS_TEST',
-        'RESERVE_SERVICE_ADMISSION_HELPER_REDIS_TEST']) {
+        'RESERVE_SERVICE_ADMISSION_HELPER_REDIS_TEST', 'RESERVE_MYSQL_REVIEW_TEST_ISOLATED',
+        'RESERVE_MYSQL_FINANCIAL_TEST_ISOLATED', 'RESERVE_MYSQL_AUTH_STATE_TEST_ISOLATED',
+        'RESERVE_MYSQL_FEED_STATE_TEST_ISOLATED']) {
         assert.match(runner, new RegExp('(?:export )?' + gate + '=1'));
     }
     assert.doesNotMatch(runner, /--exclude-task|(?:^|\s)-x\s+test/);

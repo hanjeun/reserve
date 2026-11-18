@@ -34,15 +34,26 @@ public interface WaitingEntryRepository extends JpaRepository<WaitingEntry, Long
 
     boolean existsByStoreIdAndMemberIdAndStatusIn(Long storeId, Long memberId, Set<WaitingStatus> statuses);
 
-    String PERSONAL_VISIBLE_WINDOW = "(w.status IN :active OR w.finishedAt >= :dayStart)";
+    Optional<WaitingEntry> findByIdAndMemberId(Long id, Long memberId);
 
-    @Query("SELECT w FROM WaitingEntry w WHERE w.memberId = :memberId AND " + PERSONAL_VISIBLE_WINDOW
+    @Modifying
+    @Query("""
+            UPDATE WaitingEntry w SET w.customerHiddenAt = :hiddenAt
+             WHERE w.id = :id AND w.memberId = :memberId AND w.status = :cancelled
+               AND w.customerHiddenAt IS NULL
+            """)
+    int hideCancelledForCustomer(@Param("id") Long id, @Param("memberId") Long memberId,
+                                @Param("cancelled") WaitingStatus cancelled, @Param("hiddenAt") LocalDateTime hiddenAt);
+
+    String PERSONAL_VISIBLE_ENTRY = "w.customerHiddenAt IS NULL AND (w.status IN :active OR w.finishedAt >= :dayStart)";
+
+    @Query("SELECT w FROM WaitingEntry w WHERE w.memberId = :memberId AND " + PERSONAL_VISIBLE_ENTRY
             + " ORDER BY w.createdAt DESC, w.id DESC")
     Page<WaitingEntry> findPersonal(@Param("memberId") Long memberId, @Param("active") Set<WaitingStatus> active,
                                     @Param("dayStart") LocalDateTime dayStart, Pageable pageable);
 
     /** 상세 이동도 본인 목록과 같은 표시 기간과 DB 소유권 조건으로 조회한다. */
-    @Query("SELECT w FROM WaitingEntry w WHERE w.id = :entryId AND w.memberId = :memberId AND " + PERSONAL_VISIBLE_WINDOW
+    @Query("SELECT w FROM WaitingEntry w WHERE w.id = :entryId AND w.memberId = :memberId AND " + PERSONAL_VISIBLE_ENTRY
             + " AND EXISTS (SELECT viewer.id FROM Member viewer WHERE viewer.id = :memberId AND viewer.deletedAt IS NULL"
             + " AND (viewer.status = kr.it.reserve.member.entity.MemberStatus.ACTIVE OR (viewer.status = kr.it.reserve.member.entity.MemberStatus.SUSPENDED"
             + " AND viewer.suspendedUntil < :sanctions)))")
@@ -54,6 +65,7 @@ public interface WaitingEntryRepository extends JpaRepository<WaitingEntry, Long
     @Query(value = """
             SELECT w.* FROM waiting_entry w LEFT JOIN store s ON s.store_id = w.store_id
              WHERE w.member_id = :memberId
+               AND w.customer_hidden_at IS NULL
                AND (w.status IN (:active) OR w.finished_at >= :dayStart)
                AND (:status = 'ALL' OR w.status = :status)
                AND (:keyword = '' OR LOWER(COALESCE(s.store_name, '가게')) LIKE :keyword ESCAPE '!'
@@ -65,6 +77,7 @@ public interface WaitingEntryRepository extends JpaRepository<WaitingEntry, Long
             """, countQuery = """
             SELECT COUNT(*) FROM waiting_entry w LEFT JOIN store s ON s.store_id = w.store_id
              WHERE w.member_id = :memberId
+               AND w.customer_hidden_at IS NULL
                AND (w.status IN (:active) OR w.finished_at >= :dayStart)
                AND (:status = 'ALL' OR w.status = :status)
                AND (:keyword = '' OR LOWER(COALESCE(s.store_name, '가게')) LIKE :keyword ESCAPE '!'

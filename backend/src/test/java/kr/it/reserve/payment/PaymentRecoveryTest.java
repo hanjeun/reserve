@@ -1,6 +1,7 @@
 package kr.it.reserve.payment;
 
 import jakarta.persistence.EntityManager;
+import kr.it.reserve.global.persistence.CurrentLockedStateTestSupport;
 import jakarta.persistence.LockModeType;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -56,6 +57,7 @@ class PaymentRecoveryTest {
 
     @BeforeEach
     void transactionBoundaries() {
+        CurrentLockedStateTestSupport.managedEntities(entityManager);
         lenient().when(transactionManager.getTransaction(any()))
                 .thenAnswer(ignored -> new SimpleTransactionStatus());
         lenient().when(reservationRepository.findMemberIdById(100L)).thenReturn(Optional.of(200L));

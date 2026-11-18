@@ -80,8 +80,8 @@ public class ChatApiController {
     public ResponseEntity<ApiResponse<ChatMessageResponse>> sendSupport(
             @Valid @RequestBody SendMessageRequest request,
             HttpServletRequest httpRequest) {
-        if (!canSend(httpRequest)) return tooManyRequests();
         Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
+        if (!canSend(me, httpRequest)) return tooManyRequests();
         return ResponseEntity.ok(ApiResponse.success(
                 chatService.sendAsMember(me, request.getContent(), request.getClientMessageId()), SEND_SUCCESS_MESSAGE));
     }
@@ -108,8 +108,8 @@ public class ChatApiController {
             @PathVariable Long storeId,
             @Valid @RequestBody SendMessageRequest request,
             HttpServletRequest httpRequest) {
-        if (!canSend(httpRequest)) return tooManyRequests();
         Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
+        if (!canSend(me, httpRequest)) return tooManyRequests();
         return ResponseEntity.ok(ApiResponse.success(
                 chatService.sendAsMemberToStore(
                         me, storeId, request.getContent(), request.getClientMessageId()), SEND_SUCCESS_MESSAGE));
@@ -147,8 +147,8 @@ public class ChatApiController {
             @PathVariable Long roomId,
             @Valid @RequestBody SendMessageRequest request,
             HttpServletRequest httpRequest) {
-        if (!canSend(httpRequest)) return tooManyRequests();
         Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
+        if (!canSend(me, httpRequest)) return tooManyRequests();
         return ResponseEntity.ok(ApiResponse.success(
                 chatService.sendAsOwner(
                         me, roomId, request.getContent(), request.getClientMessageId()), SEND_SUCCESS_MESSAGE));
@@ -206,6 +206,13 @@ public class ChatApiController {
             @RequestParam String viewerRole, @RequestParam boolean hidden) {
         moderationService.setHidden(SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE), roomId, viewerRole, hidden);
         return ResponseEntity.ok(ApiResponse.success(null, hidden ? "내 목록에서 숨겼어요." : "대화를 복원했어요."));
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @PutMapping("/rooms/{roomId}/leave")
+    public ResponseEntity<ApiResponse<Void>> leaveConversation(@PathVariable Long roomId, @RequestParam String viewerRole) {
+        moderationService.leave(SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE), roomId, viewerRole);
+        return ResponseEntity.ok(ApiResponse.success(null, "채팅방에서 나갔어요."));
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -269,10 +276,7 @@ public class ChatApiController {
             @Valid @RequestBody SendMessageRequest request,
             HttpServletRequest httpRequest) {
         Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
-        if (!rateLimiter.tryConsume(IpExtractor.extract(httpRequest), RateLimiter.Policy.CHAT_SEND)) {
-            return ResponseEntity.status(429)
-                    .body(ApiResponse.error("메시지를 너무 빠르게 보내고 있어요. 잠시 후 다시 시도해주세요."));
-        }
+        if (!canSend(me, httpRequest)) return tooManyRequests();
         return ResponseEntity.ok(ApiResponse.success(
                 chatService.sendAsMember(me, request.getContent(), request.getClientMessageId()), SEND_SUCCESS_MESSAGE));
     }
@@ -300,8 +304,9 @@ public class ChatApiController {
         return ResponseEntity.ok(ApiResponse.success(chatService.myUnreadCount(me), QUERY_SUCCESS_MESSAGE));
     }
 
-    private boolean canSend(HttpServletRequest request) {
-        return rateLimiter.tryConsume(IpExtractor.extract(request), RateLimiter.Policy.CHAT_SEND);
+    private boolean canSend(Member member, HttpServletRequest request) {
+        return rateLimiter.tryConsume(member.getId().toString(), RateLimiter.Policy.CHAT_MEMBER_SEND)
+                && rateLimiter.tryConsume(IpExtractor.extract(request), RateLimiter.Policy.CHAT_SEND);
     }
 
     private ResponseEntity<ApiResponse<ChatMessageResponse>> tooManyRequests() {

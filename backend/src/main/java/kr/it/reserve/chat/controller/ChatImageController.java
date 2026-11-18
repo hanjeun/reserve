@@ -43,14 +43,14 @@ public class ChatImageController {
             @RequestPart("image") MultipartFile image, @Valid @ModelAttribute SendChatImageRequest request,
             HttpServletRequest httpRequest) {
         var member = SecurityUtil.getCurrentMember("로그인이 필요해요.");
-        if (!limiter.tryConsume(IpExtractor.extract(httpRequest), RateLimiter.Policy.CHAT_SEND)
-                || !limiter.tryConsume("chat-image-member:" + member.getId(), RateLimiter.Policy.CHAT_SEND)) {
+        if (!limiter.tryConsume(member.getId().toString(), RateLimiter.Policy.CHAT_MEMBER_SEND)
+                || !limiter.tryConsume(IpExtractor.extract(httpRequest), RateLimiter.Policy.CHAT_SEND)) {
             return ResponseEntity.status(429).body(ApiResponse.error("조금 천천히 보내주세요."));
         }
         return ResponseEntity.ok(ApiResponse.success(images.send(member, roomId, image, request), "전송 완료"));
     }
 
-    @RequestMapping(value = "/images/{messageId:[0-9]+}", method = RequestMethod.HEAD)
+    @RequestMapping(value = {"/images/{messageId:[0-9]+}", "/images/{messageId:[0-9]+}/thumbnail"}, method = RequestMethod.HEAD)
     public ResponseEntity<Void> checkRead(@PathVariable Long messageId) {
         images.assertReadable(SecurityUtil.getCurrentMember("로그인이 필요해요."), messageId);
         return ResponseEntity.noContent().cacheControl(CacheControl.noStore())
@@ -61,6 +61,11 @@ public class ChatImageController {
     public ResponseEntity<byte[]> read(@PathVariable Long messageId) {
         var image = images.read(SecurityUtil.getCurrentMember("로그인이 필요해요."), messageId);
         return imageResponse(image);
+    }
+
+    @GetMapping("/images/{messageId:[0-9]+}/thumbnail")
+    public ResponseEntity<byte[]> thumbnail(@PathVariable Long messageId) {
+        return imageResponse(images.thumbnail(SecurityUtil.getCurrentMember("로그인이 필요해요."), messageId));
     }
 
     static ResponseEntity<byte[]> imageResponse(ChatImageService.ImageContent image) {

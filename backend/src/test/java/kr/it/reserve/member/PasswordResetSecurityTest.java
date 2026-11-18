@@ -5,6 +5,7 @@ import kr.it.reserve.config.jwt.repository.RefreshTokenRepository;
 import kr.it.reserve.email.service.EmailService;
 import kr.it.reserve.global.error.MemberException;
 import kr.it.reserve.global.security.PwnedPasswordChecker;
+import kr.it.reserve.member.entity.AuthProvider;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.PasswordResetToken;
 import kr.it.reserve.member.repository.MemberRepository;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -43,8 +45,10 @@ class PasswordResetSecurityTest {
     private static final String EMAIL = "reset-security-test@example.com";
     private static final String WRONG_CODE = "000000";
     private static final String NEW_PASSWORD = "ChangedPassword123!";
+    private static final String INVALID_CODE_MESSAGE = "인증 코드를 확인하지 못했어요. 코드를 다시 확인하거나 새로 요청해주세요.";
 
     @Autowired private PasswordResetService service;
+    @Autowired private kr.it.reserve.member.controller.PasswordResetController controller;
     @Autowired private PasswordResetTokenRepository tokens;
     @Autowired private MemberRepository members;
     @Autowired private RefreshTokenRepository refreshTokens;
@@ -93,7 +97,8 @@ class PasswordResetSecurityTest {
         tx.executeWithoutResult(status -> refreshTokens.save(
                 new RefreshToken(memberId, "reset-test-session", LocalDateTime.now().plusDays(1))));
 
-        service.verifyCode(EMAIL, code);
+        assertThat(service.verifyCode(EMAIL, code)).isEqualTo(
+                currentToken().getExpiresAt().atZone(java.time.ZoneId.systemDefault()).toInstant());
         service.resetPassword(EMAIL, code, NEW_PASSWORD);
 
         Member updated = members.findByEmail(EMAIL).orElseThrow();
@@ -102,7 +107,7 @@ class PasswordResetSecurityTest {
         assertThat(refreshTokens.findByMemberId(memberId)).isEmpty();
         assertThat(tokens.findTopByEmailOrderByIdDesc(EMAIL)).isEmpty();
         assertThatThrownBy(() -> service.resetPassword(EMAIL, code, NEW_PASSWORD))
-                .isInstanceOf(MemberException.class).hasMessageContaining("존재하지");
+                .isInstanceOf(MemberException.class).hasMessage(INVALID_CODE_MESSAGE);
         assertThat(members.findByEmail(EMAIL).orElseThrow().getAuthVersion()).isEqualTo(1);
     }
 
@@ -116,20 +121,28 @@ class PasswordResetSecurityTest {
         }
         assertThat(currentToken().getAttemptCount()).isEqualTo(PasswordResetToken.MAX_VERIFY_ATTEMPTS);
         assertThatThrownBy(() -> service.verifyCode(EMAIL, code))
-                .isInstanceOf(MemberException.class).hasMessageContaining("초과");
+                .isInstanceOf(MemberException.class).hasMessage(INVALID_CODE_MESSAGE);
         assertThatThrownBy(() -> service.resetPassword(EMAIL, code, NEW_PASSWORD))
-                .isInstanceOf(MemberException.class).hasMessageContaining("초과");
+                .isInstanceOf(MemberException.class).hasMessage(INVALID_CODE_MESSAGE);
         assertThat(members.findByEmail(EMAIL).orElseThrow().getAuthVersion()).isZero();
     }
 
     @Test
-    void expiredHashCodeCannotBeVerifiedOrConsumed() {
+    void expiredHashCodeCannotBeVerifiedOrConsumed() throws Exception {
         saveToken("HASHED", encoder.encode("123456"), LocalDateTime.now().minusSeconds(1));
         assertThatThrownBy(() -> service.verifyCode(EMAIL, "123456"))
-                .isInstanceOf(MemberException.class).hasMessageContaining("만료");
+                .isInstanceOf(MemberException.class).hasMessage(INVALID_CODE_MESSAGE);
         assertThatThrownBy(() -> service.resetPassword(EMAIL, "123456", NEW_PASSWORD))
-                .isInstanceOf(MemberException.class).hasMessageContaining("만료");
+                .isInstanceOf(MemberException.class).hasMessage(INVALID_CODE_MESSAGE);
         assertThat(currentToken().getAttemptCount()).isZero();
+        var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/password-reset/reset")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + EMAIL + "\",\"code\":\"123456\",\"newPassword\":\""
+                                + NEW_PASSWORD + "\",\"newPasswordConfirm\":\"" + NEW_PASSWORD + "\"}"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.code")
+                        .value("PASSWORD_RESET_CODE_INVALID"));
     }
 
     @Test
@@ -174,6 +187,36 @@ class PasswordResetSecurityTest {
         assertThat(service.sendResetCode("missing-reset-test@example.com")).isFalse();
         assertThat(tokens.findTopByEmailOrderByIdDesc(EMAIL)).isEmpty();
         verifyNoInteractions(emailService);
+    }
+
+    @Test
+    void publicCodeFailuresDoNotDistinguishMissingAndSocialOnlyAccounts() {
+        String code = issueCode();
+        assertCodeFailure(() -> service.verifyCode(EMAIL, WRONG_CODE));
+        assertCodeFailure(() -> service.verifyCode("missing-reset-test@example.com", WRONG_CODE));
+        service.verifyCode(EMAIL, code);
+        tx.executeWithoutResult(status -> {
+            Member member = members.findByEmail(EMAIL).orElseThrow();
+            member.setProvider(AuthProvider.NAVER);
+            member.setProviderId("synthetic-reset-subject");
+            member.setPassword(null);
+        });
+
+        // 이미 인증된 코드가 남아 있어도 이메일 로그인을 복원할 수 없다.
+        assertCodeFailure(() -> service.verifyCode(EMAIL, code));
+        assertCodeFailure(() -> service.resetPassword(EMAIL, code, NEW_PASSWORD));
+        Member member = members.findByEmail(EMAIL).orElseThrow();
+        assertThat(member.getPassword()).isNull();
+        assertThat(member.getAuthVersion()).isZero();
+        assertThat(currentToken().getAttemptCount()).isOne();
+    }
+
+    private void assertCodeFailure(Runnable operation) {
+        assertThatThrownBy(operation::run)
+                .isInstanceOfSatisfying(MemberException.class, error -> {
+                    assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(error.getMessage()).isEqualTo(INVALID_CODE_MESSAGE);
+                });
     }
 
     @Test

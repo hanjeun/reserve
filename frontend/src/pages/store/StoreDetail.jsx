@@ -2,13 +2,14 @@ import { PageTitle } from '../../components/common/PageTypography';
 import PhotoGallery from '../../components/common/PhotoGallery';
 import WaitingJoin from '../../components/waiting/WaitingJoin';
 import WaitingStoreSummary from '../../components/waiting/WaitingStoreSummary';
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import useAuthStore from '../../store/useAuthStore';
 import { Typography, Form, Divider } from 'antd';
 import { StarFilled, MessageOutlined, PhoneOutlined } from '../../components/common/icons';
 import { PageContainer, Button, DataState, FavoriteButton, Badge, KakaoMap, Tooltip } from '../../components/common';
 import StoreDetailLoading from '../../components/store/StoreDetailLoading';
+import StoreDetailSectionNav from '../../components/store/StoreDetailSectionNav';
 import StoreIdentityText from '../../components/store/StoreIdentityText';
 import StoreInfoSection from '../../components/store/StoreInfoSection';
 import { ReviewList } from '../../components/review';
@@ -41,11 +42,60 @@ const hasWaitingIntake = store => ['ONSITE', 'REMOTE', 'BOTH'].includes(store.wa
 export const StoreIdentity = ({ store, nearby, canContact, onContact, preview = false }) => {
     const { rating, reviewCount } = normalizeStoreRating(store.rating, store.reviewCount);
     const dialNumber = String(store.phone ?? '').replace(/[^+\d]/g, '');
+    const title = useRef(null);
+    const actionGroup = useRef(null);
+    const summary = useRef(null);
+    useLayoutEffect(() => {
+        const name = title.current;
+        const heading = name.parentElement;
+        const actions = actionGroup.current;
+        const intro = summary.current;
+        const row = actions.parentElement;
+        const view = row.ownerDocument.defaultView;
+        const update = () => {
+            const rowStyle = view.getComputedStyle(row);
+            const nameStyle = view.getComputedStyle(name);
+            const available = row.clientWidth;
+            const actionGap = Number.parseFloat(rowStyle.getPropertyValue('--reserve-store-identity-action-gap')) || 0;
+            const summaryGap = Number.parseFloat(rowStyle.getPropertyValue('--reserve-store-identity-summary-gap')) || 0;
+            const actionWidth = [...actions.children].reduce((width, item) => width + item.offsetWidth, 0);
+            const singleRowWidth = name.offsetWidth + actionGap + actionWidth;
+            const titleWraps = name.offsetHeight > Number.parseFloat(nameStyle.lineHeight) + 1;
+            const split = available > 0 && actions.childElementCount > 1 && (titleWraps || singleRowWidth > available);
+            const width = split ? `calc(${Math.ceil(actions.childElementCount / 2)} * var(--reserve-icon-target-size))` : '';
+            actions.style.setProperty('--reserve-store-identity-actions-width', width);
+            const inset = actions.offsetWidth ? actions.offsetWidth + actionGap : 0;
+            row.style.setProperty('--reserve-store-identity-heading-inset', `${inset}px`);
+            const actionBottom = actions.offsetTop + actions.offsetHeight;
+            row.style.setProperty('--reserve-store-identity-action-bottom', `${Math.max(0, actionBottom)}px`);
+            // 설명이 아이콘 옆에 들어가면 평점 바로 아래에 둔다.
+            const clearance = intro.offsetWidth > available - inset && heading.offsetHeight + summaryGap < actionBottom
+                ? actionBottom - heading.offsetHeight : 0;
+            row.style.setProperty('--reserve-store-identity-summary-clearance', `${clearance}px`);
+        };
+        update();
+        const resize = view.ResizeObserver ? new view.ResizeObserver(update) : null;
+        resize?.observe(row);
+        resize?.observe(name);
+        resize?.observe(actions);
+        resize?.observe(intro);
+        const controls = new view.MutationObserver(update);
+        controls.observe(actions, { childList: true });
+        return () => { resize?.disconnect(); controls.disconnect(); };
+    }, []);
+
     return (
         <div className="reserve-store-identity">
             <div className="reserve-store-identity-title-row">
-                <PageTitle level={1}>{store.name}</PageTitle>
-                <fieldset className="reserve-store-identity-actions" aria-label="가게 빠른 작업" style={{ border: 0, padding: 0, minWidth: 0, marginInline: 0 }}>
+                <div className="reserve-store-identity-heading">
+                    <PageTitle ref={title} level={1}>{store.name}</PageTitle>
+                    <div className="reserve-store-identity-rating">
+                        <StarFilled aria-hidden="true" />
+                        <strong>{rating.toFixed(1)}</strong>
+                        <span>({reviewCount.toLocaleString('ko-KR')})</span>
+                    </div>
+                </div>
+                <fieldset ref={actionGroup} className="reserve-store-identity-actions" aria-label="가게 빠른 작업">
                     <FavoriteButton storeId={preview ? store.id ?? 'preview' : store.id} appearance="plain" preview={preview} inactiveColor={colors.text.primary} />
                     {!preview && hasWaitingIntake(store)
                         && <WaitingStoreSummary store={store} detail />}
@@ -62,15 +112,10 @@ export const StoreIdentity = ({ store, nearby, canContact, onContact, preview = 
                         </a></Tooltip>
                     )}
                 </fieldset>
-            </div>
-            <div className="reserve-store-identity-rating">
-                <StarFilled aria-hidden="true" />
-                <strong>{rating.toFixed(1)}</strong>
-                <span>({reviewCount.toLocaleString('ko-KR')})</span>
-            </div>
-            <div className="reserve-store-identity-summary">
-                <StoreIdentityText category={store.category} nearby={nearby} />
-                {store.description && <><span className="reserve-store-identity-separator" aria-hidden="true">·</span><p className="reserve-store-identity-description">{store.description}</p></>}
+                <div ref={summary} className="reserve-store-identity-summary">
+                    <StoreIdentityText category={store.category} nearby={nearby} />
+                    {store.description && <><span className="reserve-store-identity-separator" aria-hidden="true">·</span><p className="reserve-store-identity-description">{store.description}</p></>}
+                </div>
             </div>
             {store.keywords?.length > 0 && (
                 <div className="reserve-store-identity-tags">
@@ -121,9 +166,10 @@ const StoreImageCarousel = ({ store, storeName, sliderImages, autoplay, wrapperS
         wrapperStyle={wrapperStyle} imageStyle={imageStyle} previewDocument={previewDocument} />;
 };
 
-const StoreReviewSection = ({ sectionRef, isPC, ...reviewListProps }) => (
-    <section ref={sectionRef}>
-        <Title level={3} style={styles.sectionTitle}>리뷰</Title>
+const StoreReviewSection = ({ isPC, sectionId, ...reviewListProps }) => (
+    <section id={sectionId} aria-labelledby={sectionId && `${sectionId}-title`}
+        className={sectionId && 'reserve-store-section-target'} tabIndex={sectionId ? -1 : undefined}>
+        <Title level={3} id={sectionId && `${sectionId}-title`} style={styles.sectionTitle}>리뷰</Title>
         <ReviewList {...reviewListProps} isPC={isPC} />
     </section>
 );
@@ -160,53 +206,65 @@ export const StoreDetailPCLayout = ({ sliderImages, identityProps, panelProps, r
 
 export const StoreDetailMobileLayout = ({ sliderImages, identityProps, panelProps, reviewProps, preview = false, previewDocument, infoContent }) => {
     const { store } = identityProps;
-    const showPanel = !preview || store.reservationEnabled !== false || hasWaitingIntake(store);
+    const canReserve = store.reservationEnabled !== false;
+    const canWait = hasWaitingIntake(store);
+    const bookingLabel = canReserve ? '예약' : canWait ? '웨이팅' : null;
+    const showLocation = !preview && Boolean(store.address || (store.latitude != null && store.longitude != null));
+    const sections = useMemo(() => [
+        { id: 'store-detail-intro', label: '소개' },
+        ...(showLocation ? [{ id: 'store-detail-location', label: '위치' }] : []),
+        ...(bookingLabel ? [{ id: 'store-detail-booking', label: bookingLabel }] : []),
+        { id: 'store-detail-reviews', label: '리뷰' },
+    ], [showLocation, bookingLabel]);
     return (
         <>
-            <section style={{ padding: 0 }}>
+            {!preview && <StoreDetailSectionNav key={store.id} sections={sections} />}
+            <section id={preview ? undefined : 'store-detail-intro'} className="reserve-store-section-target"
+                aria-label={preview ? undefined : '소개'} tabIndex={preview ? undefined : -1}>
                 <StoreImageCarousel store={store} storeName={store.name} sliderImages={sliderImages}
                     autoplay={store.imageAutoplayEnabled !== false} preview={preview} previewDocument={previewDocument}
                     wrapperStyle={styles.mobileImageWrapper} imageStyle={styles.mainImg} />
                 <div>
                     <StoreIdentity {...identityProps} preview={preview} />
                 </div>
-            </section>
-            <div>
                 {infoContent ?? <StoreInfoSection store={store} />}
-                {!preview && <div style={{ marginTop: 16, marginBottom: 8 }}>
-                    <KakaoMap latitude={store.latitude} longitude={store.longitude}
-                        address={store.address} storeName={store.name} height={200} />
-                </div>}
-            </div>
-            {showPanel && <>
+            </section>
+            {showLocation && <section id="store-detail-location" className="reserve-store-section-target"
+                aria-label="위치" tabIndex={-1} style={{ marginTop: 16, marginBottom: 8 }}>
+                <KakaoMap latitude={store.latitude} longitude={store.longitude}
+                    address={store.address} storeName={store.name} height={200} />
+            </section>}
+            {bookingLabel && <>
                 <Divider style={styles.divider} />
-                <section>
-                    {store.reservationEnabled !== false && <ReservationPanel {...panelProps} isPC={false} preview={preview} />}
-                    <WaitingJoin key={store.id} store={store} preview={preview} isPC={false} />
+                <section id={preview ? undefined : 'store-detail-booking'} className="reserve-store-section-target"
+                    aria-label={preview ? undefined : bookingLabel} tabIndex={preview ? undefined : -1}>
+                    {canReserve && <ReservationPanel {...panelProps} isPC={false} preview={preview} />}
+                    {canWait && <WaitingJoin key={store.id} store={store} preview={preview} isPC={false} />}
                 </section>
             </>}
-            {!preview && <><Divider style={styles.divider} /><StoreReviewSection {...reviewProps} isPC={false} /></>}
+            {!preview && <><Divider style={styles.divider} />
+                <StoreReviewSection {...reviewProps} sectionId="store-detail-reviews" isPC={false} /></>}
         </>
     );
 };
 
-const StoreDetail = () => {
+const StoreDetail = ({ onReservationSuccess } = {}) => {
     usePaymentIncompleteNotice();
-    const { id } = useParams();
+    const { id: address } = useParams();
     const [searchParams] = useSearchParams();
-    // /store/abc 처럼 숫자가 아닌 id 는 API 에 보내지 않는다 — 보내면 400 이 와서
-    // "요청을 처리할 수 없습니다 · 다시 불러오기" 라는, 다시 눌러도 낫지 않는 오류로 보였다.
-    const validId = /^\d+$/.test(id ?? '') && Number.isSafeInteger(Number(id)) && Number(id) > 0;
+    const reservationId = searchParams.get('edit');
     const navigate = useNavigate();
     const { message } = useMessage();
     const { isLoggedIn, user, isLoggingOut } = useAuthStore();
     const { pay, paying, paymentDialog } = usePayment();
-    const { store, loading, error, refetch } = useStoreData(validId ? id : null, { reservationId: searchParams.get('edit') });
+    const { store, loading, error, refetch, dataUpdatedAt } = useStoreData(address, { reservationId });
+    // 예약·리뷰·메신저는 공개 주소로 조회한 가게의 내부 번호를 사용해요.
+    const id = store?.id;
     // 사진 순서·메타데이터 변경은 문서·브라우저 힌트보다 새 공개 응답을 우선한다.
     useEffect(() => {
-        if ([401, 403, 404, 410].includes(httpStatusOf(error))) forgetImageHint(id);
+        if ([401, 403, 404, 410].includes(httpStatusOf(error))) forgetImageHint(address);
         else if (store) rememberImageHints(store);
-    }, [store, error, id]);
+    }, [store, error, address]);
     const [form] = Form.useForm();
     const reservationDate = Form.useWatch('reservationDate', form);
     const reservationTime = Form.useWatch('reservationTime', form);
@@ -236,7 +294,7 @@ const StoreDetail = () => {
         refetchReviewEligibility,
         stateOpenWrite,
         stateOpenReviewId,
-        reviewSectionRef,
+        reviewNavigationKey,
         onFinish,
         admissionModalProps,
         reservationChallengeProps,
@@ -248,7 +306,7 @@ const StoreDetail = () => {
         bookingSectionRef,
         editRetrying,
         retryEditLoad,
-    } = useStoreDetailActions({ id, store, isLoggedIn, user, form, pay, message, reservationDate, reservationTime });
+    } = useStoreDetailActions({ id, store, isLoggedIn, user, form, pay, message, reservationDate, reservationTime, onReservationSuccess });
 
     useDocumentTitle(store?.name ?? null, storeDocumentDescription(store));
 
@@ -257,7 +315,7 @@ const StoreDetail = () => {
     const containerSize = isPC ? 'xl' : 'md';
     const paddingTop = isPC ? '32px' : '20px';
 
-    if (loading) return <StoreDetailLoading storeId={id} isPC={isPC} />;
+    if (loading) return <StoreDetailLoading storeId={address} isPC={isPC} />;
     if (!store) return (
         <PageContainer size={containerSize} paddingTop={paddingTop}>
             <StoreNotFound error={error} onRetry={refetch} onGoToList={() => navigate('/stores')} />
@@ -274,21 +332,23 @@ const StoreDetail = () => {
         onContact: isLoggedIn && user?.id != null && !isLoggingOut ? handleStoreContact : undefined };
     const panelProps = {
         store, form, onFinish, paying: paying || reservationSubmitting, reservationEntry, isEditMode, editingReservation,
+        openingObservedAt: dataUpdatedAt,
         editLoadError, editRetrying, onRetryEditLoad: retryEditLoad, bookingSectionRef,
     };
     const reviewProps = {
-        sectionRef: reviewSectionRef,
         storeId: Number(id),
         completedReservation,
         completedReservationError: reviewEligibilityError,
         completedReservationRetrying: reviewEligibilityLoading,
         onCompletedReservationRetry: refetchReviewEligibility,
         autoOpenWrite: stateOpenWrite,
+        reviewNavigationKey,
         focusReviewId: stateOpenReviewId,
     };
 
     return (
-        <PageContainer className="reserve-store-detail" size={containerSize} paddingTop={paddingTop}>
+        <PageContainer className={isPC ? 'reserve-store-detail' : 'reserve-store-detail reserve-store-detail--sectioned'}
+            size={containerSize} paddingTop={paddingTop}>
             <AdmissionModal {...admissionModalProps} />
             {reservationChallengeProps && <ReservationChallengeModal {...reservationChallengeProps} />}
             {paymentDialog}

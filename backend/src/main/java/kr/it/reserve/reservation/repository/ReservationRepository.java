@@ -49,6 +49,11 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     @Query("SELECT r FROM Reservation r WHERE r.id = :id")
     java.util.Optional<Reservation> findByIdForPaymentUpdate(@Param("id") Long id);
 
+    /** 리뷰와 같은 TX에서 방문을 한 번만 소비하며 RR의 이전 조회값으로 중복 작성하지 않는다. */
+    @Modifying(flushAutomatically = true)
+    @Query("UPDATE Reservation r SET r.reviewWritten = true WHERE r.id = :id AND r.reviewWritten = false")
+    int consumeReviewVisit(@Param("id") Long id);
+
     /**
      * 한 예약은 한 광고에만 한 번 귀속한다.
      *
@@ -214,8 +219,13 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
      * 가게 상세 페이지 리뷰 작성 가능 여부 판단용: 해당 회원이 이 가게에서 가장 최근에 COMPLETED된 예약 1건 조회
      * (StoreDetail 진입 시 내 전체 예약을 불러와 클라이언트에서 필터링하던 것을 서버 필터로 대체)
      */
-    java.util.Optional<Reservation> findFirstByMemberIdAndStoreIdAndStatusOrderByIdDesc(
-            Long memberId, Long storeId, Reservation.ReservationStatus status);
+    @Query("""
+            SELECT r FROM Reservation r WHERE r.member.id = :memberId AND r.store.id = :storeId
+              AND r.status = :status AND r.deletedAt IS NULL AND r.reviewWritten = false
+              AND NOT EXISTS (SELECT rv.id FROM Review rv WHERE rv.reservation.id = r.id)
+            ORDER BY r.reservationDate DESC, r.reservationTime DESC, r.id DESC
+            """)
+    List<Reservation> findReviewableVisits(Long memberId, Long storeId, Reservation.ReservationStatus status, Pageable limit);
 
     /**
      * 특정 가게의 예약 내역 조회 (최신순) - member fetch join으로 N+1 방지
@@ -226,9 +236,12 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     /**
      * 회원의 COMPLETED 예약 ID 목록에 해당하는 리뷰 ID를 한 번에 조회
      * (getMyReservations N+1 방지: COMPLETED 예약마다 review SELECT 대신 IN 쿼리 1번)
-     * 반환: [reservationId, reviewId] 쌍의 Object[] 리스트
+     * 숨김 리뷰도 작성 이력에 포함하고 조회할 수 있는 리뷰의 ID만 반환한다.
      */
-    @Query("SELECT rv.reservation.id, rv.id FROM Review rv WHERE rv.reservation.id IN :reservationIds")
+    @Query("""
+            SELECT rv.reservation.id, CASE WHEN rv.deletedAt IS NULL AND rv.moderationHidden = false THEN rv.id ELSE NULL END
+            FROM Review rv WHERE rv.reservation.id IN :reservationIds
+            """)
     List<Object[]> findReviewIdsByReservationIds(@Param("reservationIds") List<Long> reservationIds);
 
     /** 거래 상태는 보존하되 자유 입력 요청사항에 남을 수 있는 개인정보는 탈퇴 시 제거한다. */
@@ -272,21 +285,23 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
      */
     @Query("SELECT r.reservationTime, SUM(r.guestCount) FROM Reservation r " +
            "WHERE r.store.id = :storeId AND r.reservationDate = :date AND r.status IN ('PENDING', 'CONFIRMED') " +
-           "GROUP BY r.reservationTime")
+           "AND (:excludeReservationId IS NULL OR r.id <> :excludeReservationId) GROUP BY r.reservationTime")
     List<Object[]> sumActiveGuestsGroupedByTime(
             @Param("storeId") Long storeId,
-            @Param("date") java.time.LocalDate date
+            @Param("date") java.time.LocalDate date,
+            @Param("excludeReservationId") Long excludeReservationId
     );
 
     /** 달력 한 달의 활성 인원을 날짜·시각별로 묶어 한 번에 조회한다. */
     @Query("SELECT r.reservationDate, r.reservationTime, SUM(r.guestCount) FROM Reservation r " +
            "WHERE r.store.id = :storeId AND r.reservationDate BETWEEN :from AND :to " +
            "AND r.status IN ('PENDING', 'CONFIRMED') " +
-           "GROUP BY r.reservationDate, r.reservationTime")
+           "AND (:excludeReservationId IS NULL OR r.id <> :excludeReservationId) GROUP BY r.reservationDate, r.reservationTime")
     List<Object[]> sumActiveGuestsGroupedByDateAndTime(
             @Param("storeId") Long storeId,
             @Param("from") java.time.LocalDate from,
-            @Param("to") java.time.LocalDate to
+            @Param("to") java.time.LocalDate to,
+            @Param("excludeReservationId") Long excludeReservationId
     );
 
     /**

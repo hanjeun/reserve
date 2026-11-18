@@ -5,8 +5,10 @@ import kr.it.reserve.config.util.CookieUtil;
 import kr.it.reserve.member.entity.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.mock.web.MockHttpServletResponse;
+import java.time.Duration;
 import java.util.Base64;
 import static org.assertj.core.api.Assertions.*;
 
@@ -15,6 +17,73 @@ class LoginPersistenceTest {
         return new JwtSessionFixture(Member.builder().id(1L).role(Role.USER).provider(AuthProvider.LOCAL)
                 .name("합성 회원").email("fixture@example.test").password("synthetic-hash").build());
     }
+    @ParameterizedTest
+    @CsvSource({"USER,true,720,2160", "BUSINESS,true,336,720", "ADMIN,true,336,720",
+            "USER,false,1,720", "BUSINESS,false,1,720", "ADMIN,false,1,720"})
+    void newSessionsUseTheSelectedLifetimeWithoutChangingTheRoleBoundary(
+            Role role, boolean persistent, long idleHours, long absoluteHours) {
+        var fixture = fixture();
+        fixture.member.setRole(role);
+        var issued = fixture.tokens.issueVerifiedSession(fixture.member, null, "PASSKEY", persistent);
+        var row = fixture.row(issued.refreshToken());
+        assertThat(issued.refreshMaxAge()).isEqualTo(Duration.ofHours(idleHours));
+        assertThat(row.getAbsoluteExpiresAt()).isEqualTo(row.getCreatedAt().plusHours(absoluteHours));
+        fixture.setNow(fixture.startedAt.plus(Duration.ofMinutes(35)));
+        var rotated = fixture.service.refresh(issued.refreshToken());
+        assertThat(rotated.refreshMaxAge()).isEqualTo(Duration.ofHours(idleHours));
+        assertThat(rotated.persistent()).isEqualTo(persistent);
+    }
+
+    @Test void rememberedUserMustLogInAgainAtTheOriginalNinetyDayDeadline() {
+        var fixture = fixture();
+        String token = fixture.tokens.issueSession(fixture.member, null, true).refreshToken();
+        for (int day : new int[]{29, 58, 87}) {
+            fixture.setNow(fixture.startedAt.plus(Duration.ofDays(day)));
+            token = fixture.service.refresh(token).refreshToken();
+        }
+        assertThat(fixture.claims(token).getExpiration().toInstant()).isEqualTo(fixture.startedAt.plus(Duration.ofDays(90)));
+        fixture.setNow(fixture.startedAt.plus(Duration.ofDays(90)));
+        String expired = token;
+        assertThatThrownBy(() -> fixture.service.refresh(expired)).isInstanceOf(kr.it.reserve.global.error.AuthException.class);
+        assertThat(fixture.row(expired)).isNull();
+    }
+
+    @Test void restoringAPublicBrowserCookieAfterAnHourCannotRefreshTheSession() {
+        var fixture = fixture();
+        var issued = fixture.tokens.issueSession(fixture.member, null, false);
+        String sid = fixture.tokens.getSessionId(issued.accessToken());
+        fixture.setNow(fixture.startedAt.plus(Duration.ofHours(1)));
+        assertThat(fixture.tokens.isDeviceSessionCurrent(sid, fixture.member.getId())).isFalse();
+        assertThatThrownBy(() -> fixture.service.refresh(issued.refreshToken())).isInstanceOf(kr.it.reserve.global.error.AuthException.class);
+    }
+
+    @Test void previouslyIssuedExplicitPreferenceKeepsItsOriginalWindow() {
+        var fixture = fixture();
+        fixture.properties.setRememberedUserIdleLifetime(Duration.ofDays(14));
+        fixture.properties.setRememberedUserAbsoluteLifetime(Duration.ofDays(30));
+        var existing = fixture.tokens.issueSession(fixture.member, null, true);
+        fixture.properties.setRememberedUserIdleLifetime(Duration.ofDays(30));
+        fixture.properties.setRememberedUserAbsoluteLifetime(Duration.ofDays(90));
+        fixture.setNow(fixture.startedAt.plus(Duration.ofDays(2)));
+        var refreshed = fixture.service.refresh(existing.refreshToken());
+        assertThat(refreshed.refreshMaxAge()).isEqualTo(Duration.ofDays(14));
+        assertThat(fixture.tokens.inspectRefreshToken(refreshed.refreshToken()).absoluteExpiresAt())
+                .isEqualTo(fixture.tokens.inspectRefreshToken(existing.refreshToken()).absoluteExpiresAt());
+    }
+
+    @ParameterizedTest @org.junit.jupiter.params.provider.EnumSource(value = Role.class, names = {"BUSINESS", "ADMIN"})
+    void promotionCannotUseAnOrdinaryMembersExtendedSession(Role role) {
+        var fixture = fixture();
+        var issued = fixture.tokens.issueVerifiedSession(fixture.member, null, "PASSKEY", true);
+        String sid = fixture.tokens.getSessionId(issued.accessToken());
+        fixture.member.setRole(role);
+        assertThatThrownBy(() -> fixture.tokens.verifyAuthentication(issued.accessToken()))
+                .isInstanceOf(kr.it.reserve.global.error.AuthException.class);
+        assertThat(fixture.tokens.isDeviceSessionCurrent(sid, fixture.member.getId())).isFalse();
+        assertThatThrownBy(() -> fixture.service.refresh(issued.refreshToken())).isInstanceOf(kr.it.reserve.global.error.AuthException.class);
+        assertThat(fixture.row(issued.refreshToken())).isNull();
+    }
+
     @ParameterizedTest @ValueSource(booleans = {false, true})
     void signedPreferenceSurvivesRefreshAndThePreviousTokenGraceResponse(boolean persistent) {
         var fixture = fixture();

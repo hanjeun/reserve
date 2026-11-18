@@ -1,18 +1,18 @@
 import PropTypes from 'prop-types';
 import { Typography } from 'antd';
-import DetailInfoRows from '../../components/common/DetailInfoRows';
-import { ShopOutlined, SafetyCertificateOutlined, ClockCircleOutlined, FileTextOutlined, PhoneOutlined, EnvironmentOutlined } from '../../components/common/icons';
 
 export default function ReservationConsentNotice({ details, section }) {
     return <div className="reserve-reservation-consent-notice">
-        {section !== 'conditions' && <><DetailInfoRows rows={[
-            { Icon: ShopOutlined, label: '제공받는 자', value: details.recipient },
-            { Icon: SafetyCertificateOutlined, label: '이용 목적', value: details.purpose },
-            { Icon: FileTextOutlined, label: '제공 항목', value: details.items.join(' · ') },
-            { Icon: ClockCircleOutlined, label: '보유기간', value: details.retention },
-            { Icon: EnvironmentOutlined, label: '가게 주소', value: details.sellerAddress || '가게 안내를 확인해주세요.' },
-            { Icon: PhoneOutlined, label: '가게 연락처', value: details.sellerPhone || '가게 문의를 이용해주세요.' },
-        ]} />
+        {section !== 'conditions' && <><ul style={{ paddingLeft: 20 }}>
+            {[
+                ['제공받는 자', details.recipient],
+                ['이용 목적', details.purpose],
+                ['제공 항목', details.items.join(' · ')],
+                ['보유기간', details.retention],
+                ['가게 주소', details.sellerAddress || '가게 안내를 확인해주세요.'],
+                ['가게 연락처', details.sellerPhone || '가게 문의를 이용해주세요.'],
+            ].map(([label, value]) => <li key={label} style={{ marginBottom: 6 }}><strong>{label}:</strong> {value}</li>)}
+        </ul>
         <Typography.Paragraph>{details.refusal}</Typography.Paragraph></>}
         {section !== 'sharing' && <><Typography.Paragraph>예약금: {Number(details.depositAmount).toLocaleString('ko-KR')}원</Typography.Paragraph>
         <Typography.Paragraph>방문 {details.fullRefundDays}일 전까지 전액 환불, 방문 {details.partialRefundDays}일 전까지 {details.partialRefundRate}% 환불 조건입니다. 관련 법령에서 보장하는 권리가 우선합니다.</Typography.Paragraph>

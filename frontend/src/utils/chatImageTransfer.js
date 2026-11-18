@@ -1,7 +1,8 @@
 import chatService from '../services/chatService';
+import { chatParticipantImageId } from './chatImageCache';
 
 const IMAGE_EXTENSIONS = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' };
-const CHAT_IMAGE_PATH = /^\/api\/(?:v1\/)?(?:chat\/images\/[1-9]\d*|admin\/chat\/reports\/[1-9]\d*\/images\/[1-9]\d*)$/;
+const REPORT_IMAGE_PATH = /^\/api\/(?:v1\/)?admin\/chat\/reports\/[1-9]\d*\/images\/[1-9]\d*$/;
 
 function downloadFilename(originalFilename, contentType, messageId) {
     const extension = IMAGE_EXTENSIONS[contentType];
@@ -34,18 +35,19 @@ function downloadFilename(originalFilename, contentType, messageId) {
 
 /* 미리보기·다운로드 모두 참가자·증거 권한을 확인하는 사진 경로를 사용한다. */
 export async function assertChatImageAccess(url, signal) {
-    if (!/^\/api\/(?:v1\/)?chat\/images\/[1-9]\d*$/.test(url)) throw new Error('사진 주소를 확인할 수 없어요.');
+    if (!chatParticipantImageId(url)) throw new Error('사진 주소를 확인할 수 없어요.');
     await chatService.checkImageAccess(url, signal);
 }
 
 export async function getChatImageBlob(url, signal) {
-    if (typeof url !== 'string' || !CHAT_IMAGE_PATH.test(url)) {
+    if (typeof url !== 'string' || !chatParticipantImageId(url) && !REPORT_IMAGE_PATH.test(url)) {
         const error = new Error('사진 주소를 확인할 수 없어요.');
         error.code = 'CHAT_IMAGE_INVALID';
         throw error;
     }
     const blob = await chatService.getImage(url, signal);
-    if (!(blob instanceof Blob) || !IMAGE_EXTENSIONS[blob.type] || blob.size === 0 || blob.size > 8 * 1024 * 1024) {
+    const limit = url.endsWith('/thumbnail') ? 512 * 1024 : 8 * 1024 * 1024;
+    if (!(blob instanceof Blob) || !IMAGE_EXTENSIONS[blob.type] || blob.size === 0 || blob.size > limit) {
         const error = new Error('사진 응답 형식이 올바르지 않아요.');
         error.code = 'CHAT_IMAGE_INVALID';
         throw error;
@@ -53,9 +55,9 @@ export async function getChatImageBlob(url, signal) {
     return blob;
 }
 
-export async function downloadChatImage(url, signal, isCurrent, originalFilename) {
+export async function downloadChatImage(url, signal, isCurrent, originalFilename, read = getChatImageBlob) {
     if (signal.aborted || !isCurrent()) return;
-    const blob = await getChatImageBlob(url, signal);
+    const blob = await read(url, signal, isCurrent);
     if (signal.aborted || !isCurrent()) return;
     const objectUrl = URL.createObjectURL(blob);
     const link = document.createElement('a');

@@ -1,6 +1,7 @@
 package kr.it.reserve.config.updates;
 
 import kr.it.reserve.config.util.SecurityUtil;
+import kr.it.reserve.global.error.GlobalExceptionHandler;
 import kr.it.reserve.global.ratelimit.RateLimiter;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.Role;
@@ -13,10 +14,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.springframework.mock.web.MockHttpServletResponse;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -24,6 +27,8 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class StreamOAuthContextControllerTest {
     @AfterEach
@@ -44,12 +49,38 @@ class StreamOAuthContextControllerTest {
         when(entities.subscribe(member, original, loginMethod, "verified-device")).thenReturn(emitter);
         when(waiting.subscribe(member, original, loginMethod, "verified-device")).thenReturn(emitter);
 
-        assertThat(new EntityUpdateController(entities).events(new MockHttpServletResponse())).isSameAs(emitter);
+        assertThat(new EntityUpdateController(entities).events().getBody()).isSameAs(emitter);
         assertThat(new CustomerWaitingApiController(mock(CustomerWaitingService.class), waiting,
                 mock(RateLimiter.class), mock(WaitingRetentionService.class)).events().getBody()).isSameAs(emitter);
 
         verify(entities).subscribe(member, original, loginMethod, "verified-device");
         verify(waiting).subscribe(member, original, loginMethod, "verified-device");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void fifthConnectionInTheSameScopeReturns429BeforeStartingAsync(boolean publicStream) throws Exception {
+        var access = mock(UpdateStreamAccess.class);
+        when(access.current(any())).thenReturn(true);
+        var stream = new EntityUpdateStream(access, SseEmitter::new);
+        var mvc = MockMvcBuilders.standaloneSetup(new EntityUpdateController(stream))
+                .setControllerAdvice(new GlobalExceptionHandler()).build();
+        Member member = Member.builder().id(1L).role(Role.USER).termsAgreed(true).build();
+        SecurityContextHolder.getContext().setAuthentication(
+                UsernamePasswordAuthenticationToken.authenticated(member, null, List.of()));
+        String path = publicStream ? "/api/updates/public/events" : "/api/updates/events";
+        try {
+            for (int connection = 0; connection < 4; connection++) {
+                mvc.perform(get(path).accept(MediaType.TEXT_EVENT_STREAM))
+                        .andExpect(status().isOk()).andExpect(request().asyncStarted());
+            }
+            mvc.perform(get(path).accept(MediaType.TEXT_EVENT_STREAM))
+                    .andExpect(status().isTooManyRequests()).andExpect(request().asyncNotStarted())
+                    .andExpect(header().string("Retry-After", "5")).andExpect(header().string("Cache-Control", "no-store"))
+                    .andExpect(content().string(""));
+        } finally {
+            stream.close();
+        }
     }
 
     private static Stream<Arguments> authenticationContexts() {

@@ -91,7 +91,7 @@ logging:
 mail:
   host: smtp.resend.com
   port: 465
-  from: ${MAIL_FROM:reserve@reserve.it.kr}
+  from: ${MAIL_FROM:support@reserve.it.kr}
   from-name: ${MAIL_FROM_NAME:RESERVE}
   admin-notify: ${MAIL_ADMIN_NOTIFY:hanjeun111@gmail.com}
   resend-inbound:

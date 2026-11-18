@@ -20,15 +20,19 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import java.net.URI;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -36,6 +40,11 @@ public class FileStorageService {
 
     private static final Set<String> MANAGED_ROOTS = Set.of("users", "notices", "system");
     private static final String HTTPS_PREFIX = "https://";
+    private static final String CHAT_VARIANT_MARKER = ".with-thumb.bin";
+    private static final String CHAT_THUMB_SUFFIX = ".thumb.bin";
+    private static final int CHAT_THUMB_MAX_BYTES = 512 * 1024 + 28;
+    private static final Pattern CHAT_VARIANT_KEY = Pattern.compile(
+            "(?:[^/]+/)*users/\\d+/chat/\\d+/[0-9a-f-]{36}\\.with-thumb\\.bin");
 
     @Value("${s3.bucket}")
     private String bucket;
@@ -82,8 +91,20 @@ public class FileStorageService {
         StaticCredentialsProvider credentials = StaticCredentialsProvider.create(
                 AwsBasicCredentials.create(accessKey, secretKey));
         Region awsRegion = Region.of(region);
-        this.s3Client = S3Client.builder().region(awsRegion).credentialsProvider(credentials).build();
+        this.s3Client = S3Client.builder().region(awsRegion).credentialsProvider(credentials)
+                .overrideConfiguration(config -> config.apiCallAttemptTimeout(Duration.ofSeconds(30))
+                        .apiCallTimeout(Duration.ofSeconds(60)))
+                .build();
         this.s3Presigner = S3Presigner.builder().region(awsRegion).credentialsProvider(credentials).build();
+    }
+
+    @PreDestroy
+    void closeClients() {
+        try {
+            if (s3Presigner != null) s3Presigner.close();
+        } finally {
+            if (s3Client != null) s3Client.close();
+        }
     }
 
     /**
@@ -116,34 +137,61 @@ public class FileStorageService {
 
     /** 대화 사진 암호문 전용. 일반 이미지 업로드/공개 URL 경로와 섞지 않는다. */
     public String storeEncryptedChatImage(byte[] encrypted, String prefixPath) {
+        return storeEncryptedChatImage(encrypted, null, prefixPath);
+    }
+
+    public String storeEncryptedChatImage(byte[] encrypted, byte[] thumbnail, String prefixPath) {
         if (encrypted == null || encrypted.length == 0
                 || encrypted.length > ImageFileValidator.MAX_FILE_BYTES + 28
+                || (thumbnail != null && (thumbnail.length < 28 || thumbnail.length > CHAT_THUMB_MAX_BYTES))
                 || prefixPath == null || !prefixPath.matches("users/\\d+/chat/\\d+")) {
             throw FileException.invalid("올바른 대화 사진이 아니에요.");
         }
-        String key = withEnvironmentPrefix(prefixPath) + "/" + UUID.randomUUID() + ".bin";
+        String key = withEnvironmentPrefix(prefixPath) + "/" + UUID.randomUUID()
+                + (thumbnail == null ? ".bin" : CHAT_VARIANT_MARKER);
         try {
-            s3Client.putObject(PutObjectRequest.builder().bucket(bucket).key(key)
-                    .contentType("application/octet-stream").cacheControl("no-store")
-                    .contentLength((long) encrypted.length).build(), RequestBody.fromBytes(encrypted));
+            if (thumbnail != null) putChatImage(chatThumbnailKey(key), thumbnail);
+            putChatImage(key, encrypted);
             registerRollbackCleanup(key);
             return key;
         } catch (RuntimeException exception) {
+            if (thumbnail != null) deleteFile(key);
             log.error("Chat image upload failed: errorType={}", exception.getClass().getSimpleName());
             throw FileException.uploadFailed();
         }
     }
 
+    private void putChatImage(String key, byte[] encrypted) {
+        s3Client.putObject(PutObjectRequest.builder().bucket(bucket).key(key)
+                .contentType("application/octet-stream").cacheControl("no-store")
+                .contentLength((long) encrypted.length).build(), RequestBody.fromBytes(encrypted));
+    }
+
     /** 객체를 읽기 전에 현재 환경·발신자·방 경계를 검증하고, 8 MiB + GCM overhead에서 중단한다. */
     public byte[] readEncryptedChatImage(String key, String prefixPath) {
+        requireChatImageKey(key, prefixPath);
+        return chatImageCache.read(key, () -> readChatImageOrigin(key, (int) ImageFileValidator.MAX_FILE_BYTES + 28, null));
+    }
+
+    public byte[] readEncryptedChatThumbnail(String key, String prefixPath, Supplier<byte[]> fromLegacy) {
+        requireChatImageKey(key, prefixPath);
+        String companion = chatThumbnailKey(key);
+        if (companion == null) return chatImageCache.read(key + "#thumbnail", fromLegacy);
+        return chatImageCache.read(companion, () -> readChatImageOrigin(companion, CHAT_THUMB_MAX_BYTES, fromLegacy));
+    }
+
+    private void requireChatImageKey(String key, String prefixPath) {
         if (prefixPath == null || !prefixPath.matches("users/\\d+/chat/\\d+") || !isManagedFileUnderPrefix(key, prefixPath)) {
             throw FileException.invalid("올바른 대화 사진이 아니에요.");
         }
-        return chatImageCache.read(key, () -> readChatImageOrigin(key));
     }
 
-    private byte[] readChatImageOrigin(String key) {
-        int limit = (int) ImageFileValidator.MAX_FILE_BYTES + 28;
+    private static String chatThumbnailKey(String key) {
+        return CHAT_VARIANT_KEY.matcher(key).matches()
+                ? key.substring(0, key.length() - CHAT_VARIANT_MARKER.length()) + CHAT_THUMB_SUFFIX : null;
+    }
+
+    private byte[] readChatImageOrigin(String key, int limit, Supplier<byte[]> ifMissing) {
         if (chatImageOriginRequests != null) chatImageOriginRequests.increment();
         try (var stream = s3Client.getObject(GetObjectRequest.builder().bucket(bucket).key(key).build())) {
             if (stream.response().contentLength() != null && stream.response().contentLength() > limit) {
@@ -157,18 +205,37 @@ public class FileStorageService {
             }
             if (chatImageOriginBytes != null) chatImageOriginBytes.record(bytes.length);
             return bytes;
+        } catch (S3Exception failure) {
+            if (failure.statusCode() == 404 && ifMissing != null) return ifMissing.get();
+            throw chatImageReadFailed(failure);
         } catch (IOException | software.amazon.awssdk.core.exception.SdkException exception) {
-            log.error("Chat image read failed: errorType={}", exception.getClass().getSimpleName());
-            throw new FileException("사진을 불러오지 못했어요.");
+            throw chatImageReadFailed(exception);
         }
+    }
+
+    private static FileException chatImageReadFailed(Exception exception) {
+        log.error("Chat image read failed: errorType={}", exception.getClass().getSimpleName());
+        return new FileException("사진을 불러오지 못했어요.");
     }
 
     /** 피드 암호문 전용. 기존 공개 사진·채팅 사진의 키와 저장 관문은 사용하지 않는다. */
     public String storeEncryptedFeedImage(byte[] encrypted, String prefixPath) {
-        if (encrypted == null || encrypted.length < 28
-                || encrypted.length > ImageFileValidator.MAX_FILE_BYTES + 28
-                || prefixPath == null || !prefixPath.matches("users/\\d+/feed/images")) {
+        if (prefixPath == null || !prefixPath.matches("users/\\d+/feed/images")) {
             throw FileException.invalid("올바른 피드 사진이 아니에요.");
+        }
+        return storeEncryptedMedia(encrypted, prefixPath);
+    }
+
+    public String storeEncryptedReviewImage(byte[] encrypted, String prefixPath) {
+        if (prefixPath == null || !prefixPath.matches("users/\\d+/reviews/images")) {
+            throw FileException.invalid("올바른 리뷰 사진이 아니에요.");
+        }
+        return storeEncryptedMedia(encrypted, prefixPath);
+    }
+
+    private String storeEncryptedMedia(byte[] encrypted, String prefixPath) {
+        if (encrypted == null || encrypted.length < 28 || encrypted.length > ImageFileValidator.MAX_FILE_BYTES + 28) {
+            throw FileException.invalid("올바른 사진이 아니에요.");
         }
         if (localFeedImages != null && localFeedImages.isEnabled()) {
             String key = localFeedImages.store(encrypted, prefixPath);
@@ -183,7 +250,7 @@ public class FileStorageService {
             registerRollbackCleanup(key);
             return key;
         } catch (RuntimeException exception) {
-            log.error("Feed image upload failed: errorType={}", exception.getClass().getSimpleName());
+            log.error("Encrypted image upload failed: errorType={}", exception.getClass().getSimpleName());
             throw FileException.uploadFailed();
         }
     }
@@ -193,6 +260,17 @@ public class FileStorageService {
                 || !isManagedFileUnderPrefix(key, prefixPath)) {
             throw FileException.invalid("올바른 피드 사진이 아니에요.");
         }
+        return readEncryptedMedia(key, prefixPath);
+    }
+
+    public byte[] readEncryptedReviewImage(String key, String prefixPath) {
+        if (prefixPath == null || !prefixPath.matches("users/\\d+/reviews/images") || !isManagedFileUnderPrefix(key, prefixPath)) {
+            throw FileException.invalid("올바른 리뷰 사진이 아니에요.");
+        }
+        return readEncryptedMedia(key, prefixPath);
+    }
+
+    private byte[] readEncryptedMedia(String key, String prefixPath) {
         if (LocalFeedImageStore.isLocalKey(key)) return localFeedImages.read(key, prefixPath);
         int limit = (int) ImageFileValidator.MAX_FILE_BYTES + 28;
         try (var stream = s3Client.getObject(GetObjectRequest.builder().bucket(bucket).key(key).build())) {
@@ -203,7 +281,7 @@ public class FileStorageService {
             if (bytes.length > limit) { stream.abort(); throw FileException.invalid("사진 크기가 허용 범위를 초과했어요."); }
             return bytes;
         } catch (IOException | software.amazon.awssdk.core.exception.SdkException exception) {
-            log.error("Feed image read failed: errorType={}", exception.getClass().getSimpleName());
+            log.error("Encrypted image read failed: errorType={}", exception.getClass().getSimpleName());
             throw new FileException("사진을 불러오지 못했어요.");
         }
     }
@@ -300,10 +378,18 @@ public class FileStorageService {
             return;
         }
 
+        String thumbnail = chatThumbnailKey(key);
+        if (thumbnail != null) deleteObject(thumbnail);
+        chatImageCache.invalidate(key + "#thumbnail");
+        try { deleteObject(key); }
+        finally { chatImageCache.invalidate(key + "#thumbnail"); }
+        log.info("S3 delete success");
+    }
+
+    private void deleteObject(String key) {
         chatImageCache.invalidate(key);
         try { s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build()); }
         finally { chatImageCache.invalidate(key); }
-        log.info("S3 delete success");
     }
 
     /**

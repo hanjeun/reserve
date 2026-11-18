@@ -7,11 +7,12 @@ import PostInteractionBar from './PostInteractionBar';
 import { interactionKeys } from '../../hooks/feedInteractionQueries';
 import useAuthStore from '../../store/useAuthStore';
 
-const fixture = vi.hoisted(() => ({ config: vi.fn(), comments: vi.fn(), create: vi.fn(), reduced: false, profile: null,
+const fixture = vi.hoisted(() => ({ config: vi.fn(), comments: vi.fn(), comment: vi.fn(), create: vi.fn(), reduced: false, profile: null,
     message: { error: vi.fn(), warning: vi.fn(), success: vi.fn() } }));
 vi.mock('../../services/feedInteractionService', () => ({ default: {
     config: (...args) => fixture.config(...args), status: async () => ({ commentCount: 1 }),
     comments: (...args) => fixture.comments(...args),
+    comment: (...args) => fixture.comment(...args),
     createComment: (...args) => fixture.create(...args),
 } }));
 vi.mock('../../hooks/feedQueries', () => ({ useFeedProfile: () => ({ data: fixture.profile, isSuccess: true }) }));
@@ -29,6 +30,7 @@ beforeEach(() => {
     fixture.reduced = false;
     fixture.profile = null; fixture.create.mockReset(); Object.values(fixture.message).forEach(mock => mock.mockClear());
     fixture.comments.mockReset().mockResolvedValue(empty);
+    fixture.comment.mockReset();
     fixture.config.mockReset().mockResolvedValue({ enabled: true });
     useAuthStore.setState({ user: null, isLoggedIn: false, sessionRevision: 0 });
     scroll = vi.fn();
@@ -40,9 +42,9 @@ afterEach(() => { clients.splice(0).forEach(client => client.clear()); vi.unstub
 
 function Harness() {
     const location = useLocation();
-    return <><Link to="/feed/posts/23">게시물 열기</Link>
-        <PostInteractionBar targetId={23} postId={23} />
-        {location.pathname === '/feed/posts/23' && <FeedComments postId={23} />}</>;
+    return <><Link to="/feed/posts/00000000-0000-4000-8000-000000000023">게시물 열기</Link>
+        <PostInteractionBar targetId={23} postPublicId="00000000-0000-4000-8000-000000000023" />
+        {location.pathname === '/feed/posts/00000000-0000-4000-8000-000000000023' && <FeedComments postId={23} postPublicId="00000000-0000-4000-8000-000000000023" />}</>;
 }
 function view(path = '/feed', cached = false, configCached = false) {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity, gcTime: 0 } } });
@@ -55,7 +57,7 @@ function view(path = '/feed', cached = false, configCached = false) {
 
 it('does not hide a failed initial comment policy as a disabled feature', async () => {
     fixture.config.mockRejectedValueOnce({ code: 'ERR_NETWORK' });
-    view('/feed/posts/23');
+    view('/feed/posts/00000000-0000-4000-8000-000000000023');
     expect(await screen.findByRole('alert')).toHaveTextContent('댓글 상태를 불러오지 못했어요.');
     expect(screen.getByRole('alert')).toHaveTextContent('서버에 연결할 수 없어요.');
     expect(fixture.comments).not.toHaveBeenCalled();
@@ -65,7 +67,7 @@ it('collapses failed comment and cached policy reads and recovers both through o
     fixture.comments.mockRejectedValueOnce({ status: 503 });
     let failPolicy;
     fixture.config.mockImplementationOnce(() => new Promise((_, reject) => { failPolicy = reject; }));
-    const client = view('/feed/posts/23', false, true);
+    const client = view('/feed/posts/00000000-0000-4000-8000-000000000023', false, true);
     await screen.findByRole('alert');
     let refresh;
     act(() => { refresh = client.invalidateQueries({ queryKey: interactionKeys.config() }); });
@@ -84,7 +86,7 @@ it('reports a failed save as a message while retaining the comment draft', async
     useAuthStore.setState({ user: { id: 7 }, isLoggedIn: true });
     fixture.profile = { publicId: 'fixture-profile', nickname: '합성 작성자' };
     fixture.create.mockRejectedValue(new Error('댓글을 저장하지 못했어요.'));
-    view('/feed/posts/23'); await screen.findByText('아직 댓글이 없어요.');
+    view('/feed/posts/00000000-0000-4000-8000-000000000023'); await screen.findByText('아직 댓글이 없어요.');
     fireEvent.change(screen.getByLabelText('댓글 내용'), { target: { value: '작성 중인 합성 댓글' } });
     fireEvent.click(screen.getByRole('button', { name: '댓글 남기기' }));
     await waitFor(() => expect(fixture.message.error).toHaveBeenCalledExactlyOnceWith('댓글을 저장하지 못했어요.'));
@@ -106,12 +108,28 @@ it('opens the comments link and waits for the first read before scrolling to the
 });
 
 it('scrolls cached comments once, ignores background reads, and responds to another explicit comment click', async () => {
-    const client = view('/feed/posts/23#comments', true);
+    const client = view('/feed/posts/00000000-0000-4000-8000-000000000023#comments', true);
     await waitFor(() => expect(scroll).toHaveBeenCalledTimes(1));
     await act(async () => client.setQueryData(interactionKeys.comments(23), { pages: [{ ...empty }], pageParams: [0] }));
     expect(scroll).toHaveBeenCalledTimes(1);
     fireEvent.click(await screen.findByRole('link', { name: '댓글 보기' }));
     await waitFor(() => expect(scroll).toHaveBeenCalledTimes(2));
+});
+
+it.each([23, 99])('opens a UUID comment only within its own post (%s)', async postId => {
+    const publicId = '00000000-0000-4000-8000-000000000024';
+    fixture.comment.mockResolvedValue({ id: 24, publicId, postId, state: 'PUBLISHED', content: '바로가기 댓글',
+        author: { publicId: '00000000-0000-4000-8000-000000000007', nickname: '점검 작성자' }, images: [] });
+    const client = view('/feed/posts/00000000-0000-4000-8000-000000000023#comment-' + publicId);
+    await waitFor(() => expect(client.getQueryData(interactionKeys.comment(publicId))).toBeDefined());
+    expect(fixture.comment).toHaveBeenCalledWith(publicId, expect.any(AbortSignal));
+    if (postId === 23) {
+        await screen.findByText('바로가기 댓글');
+        await waitFor(() => expect(scroll).toHaveBeenCalledWith({ block: 'center', behavior: 'auto' }));
+    } else {
+        expect(screen.queryByText('바로가기 댓글')).not.toBeInTheDocument();
+        expect(scroll).not.toHaveBeenCalled();
+    }
 });
 
 it('leaves a normal post visit at the post instead of jumping to its comments', async () => {
@@ -124,7 +142,7 @@ it('leaves a normal post visit at the post instead of jumping to its comments', 
 it('respects reduced motion and also reaches a comment read error without waiting forever', async () => {
     fixture.reduced = true;
     fixture.comments.mockRejectedValue(Object.assign(new Error('offline'), { status: 503 }));
-    view('/feed/posts/23#comments');
+    view('/feed/posts/00000000-0000-4000-8000-000000000023#comments');
     await screen.findByText('댓글을 불러오지 못했어요.');
     await waitFor(() => expect(scroll).toHaveBeenCalledWith({ block: 'start', behavior: 'auto' }));
 });

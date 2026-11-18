@@ -8,6 +8,7 @@ import { useStoreNewsConfig, storeNewsKeys } from '../../hooks/storeNewsQueries'
 import storeNewsService from '../../services/storeNewsService';
 import useAuthStore from '../../store/useAuthStore';
 import { isReadAccessDenied } from '../../hooks/liveUpdateQueries';
+import { canManageStoreNews } from '../../utils/storeNews';
 
 const StoreNewsComposer = lazy(() => import('./StoreNewsComposer'));
 
@@ -20,7 +21,7 @@ export default function StoreNewsEditor({ open, newsId, initialStoreId, onClose,
         session: selection.session + (open ? 1 : 0) } : selection;
     if (selecting) setSelection(current);
     const id = current.id;
-    const business = user?.role === 'BUSINESS';
+    const business = canManageStoreNews(user);
     const config = useStoreNewsConfig(open && business);
     const enabled = business && config.data?.enabled === true;
     const stores = useQuery({ queryKey: storeNewsKeys.stores(), queryFn: ({ signal }) => storeNewsService.stores(signal), enabled: open && enabled });
@@ -32,7 +33,7 @@ export default function StoreNewsEditor({ open, newsId, initialStoreId, onClose,
     }
     const owned = Array.isArray(stores.data) ? stores.data : stores.data?.content || [];
     let body;
-    if (!business) body = <DataState state="empty" title="가게 소식은 사업자 계정에서 작성할 수 있어요." />;
+    if (!business) body = <DataState state="empty" title="가게 소식은 사업자·관리자 계정에서 작성할 수 있어요." />;
     else if (config.isError && !config.data) body = <DataState state="error" title="가게 소식 상태를 불러오지 못했어요." error={config.error} onRetry={config.refetch} retrying={config.isFetching} />;
     else if (config.isSuccess && !enabled) body = <DataState state="empty" kind="news" title="가게 소식 작성을 준비하고 있어요." />;
     else if (stores.isError && !stores.data || id && detail.isError && (!ready || isReadAccessDenied(detail.error))) {

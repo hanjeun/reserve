@@ -58,6 +58,11 @@ const initialValuesFromStore = initialData => {
         partialRefundDays: initialData.partialRefundDays ?? 1,
         partialRefundRate: initialData.partialRefundRate ?? 50,
         bookingDeadlineHours: initialData.bookingDeadlineHours ?? 0,
+        bookingOpeningMode: initialData.bookingOpening ? 'SCHEDULED' : 'IMMEDIATE',
+        bookingOpeningDate: initialData.bookingOpening ? dayjs(initialData.bookingOpening.opensAt).startOf('day') : null,
+        bookingOpeningTime: initialData.bookingOpening ? dayjs(initialData.bookingOpening.opensAt) : null,
+        bookingOpeningPeriod: initialData.bookingOpening
+            ? [dayjs(initialData.bookingOpening.from), dayjs(initialData.bookingOpening.to)] : null,
         paymentTimeoutMinutes: initialData.paymentTimeoutMinutes ?? 30,
         reservationSlotMinutes: initialData.reservationSlotMinutes ?? 30,
         nearbyRadiusKm: initialData.nearbyRadiusKm ?? 3,
@@ -116,6 +121,7 @@ export const useStoreForm = ({
 }) => {
     const navigate = useNavigate();
     const location = useLocation();
+    const resumeDraft = location.state?.storeDraftResume;
     const queryClient = useQueryClient();
     const { message, confirm } = useMessage();
     const user = useAuthStore(state => state.user);
@@ -277,7 +283,9 @@ export const useStoreForm = ({
                 await purgeExpiredStoreDrafts();
                 const draft = await readStoreDraft(draftKey);
                 if (cancelled || !isCurrentDraftSession()) return;
+                const resumeRequested = resumeDraft?.key === draftKey;
                 if (!draft) {
+                    if (resumeRequested) message.info('임시저장한 내용을 찾을 수 없어요.');
                     settled = true;
                     return;
                 }
@@ -285,6 +293,12 @@ export const useStoreForm = ({
                     && draft.baseFingerprint
                     && baseFingerprintRef.current
                     && draft.baseFingerprint !== baseFingerprintRef.current;
+                const baseMatches = mode === 'create' || draft.baseFingerprint === baseFingerprintRef.current;
+                if (resumeRequested && resumeDraft.savedAt === draft.savedAt && baseMatches) {
+                    applyDraft(draft);
+                    settled = true;
+                    return;
+                }
                 const savedLabel = new Intl.DateTimeFormat('ko-KR', {
                     month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
                 }).format(draft.savedAt);
@@ -326,7 +340,7 @@ export const useStoreForm = ({
             // StrictMode의 effect 재실행 중 첫 비동기 조회가 취소됐으면 두 번째 setup이 다시 읽게 한다.
             if (!settled && restoredKeyRef.current === draftKey) restoredKeyRef.current = null;
         };
-    }, [applyDraft, draftKey, form, formReady, initialData, isCurrentDraftSession, mode, navigationKey]);
+    }, [applyDraft, draftKey, form, formReady, initialData, isCurrentDraftSession, message, mode, navigationKey, resumeDraft]);
 
     const persistDraft = useCallback(({ announce = false, automatic = false } = {}) => {
         if (automatic && (!isCurrentDraftSession() || !getStoreDraftAutoSaveEnabled(useAuthStore.getState().user))) {

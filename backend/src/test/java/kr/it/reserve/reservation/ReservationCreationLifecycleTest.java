@@ -14,6 +14,7 @@ import kr.it.reserve.reservation.dto.ReservationSearchDto;
 import kr.it.reserve.reservation.dto.ReservationUpdateRequest;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
+import kr.it.reserve.reservation.service.ReservationNoShowRestriction;
 import kr.it.reserve.reservation.service.ReservationService;
 import kr.it.reserve.reservation.util.QrCheckinTokenProvider;
 import kr.it.reserve.store.entity.Store;
@@ -36,6 +37,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -78,7 +80,7 @@ class ReservationCreationLifecycleTest {
                 mock(EmailService.class),
                 memberRepository,
                 mock(AuditLogService.class),
-                mock(QrCheckinTokenProvider.class), creationGuard(), org.mockito.Mockito.mock(kr.it.reserve.reservation.service.ReservationConsentService.class));
+                mock(QrCheckinTokenProvider.class), creationGuard(), org.mockito.Mockito.mock(kr.it.reserve.reservation.service.ReservationConsentService.class), mock(ReservationNoShowRestriction.class));
 
         Member stalePrincipal = Member.builder().id(1L).email("withdrawn@example.com").build();
         ReservationCreateRequest request = new ReservationCreateRequest(
@@ -110,7 +112,7 @@ class ReservationCreationLifecycleTest {
                 mock(EmailService.class),
                 memberRepository,
                 mock(AuditLogService.class),
-                mock(QrCheckinTokenProvider.class), creationGuard(), org.mockito.Mockito.mock(kr.it.reserve.reservation.service.ReservationConsentService.class));
+                mock(QrCheckinTokenProvider.class), creationGuard(), org.mockito.Mockito.mock(kr.it.reserve.reservation.service.ReservationConsentService.class), mock(ReservationNoShowRestriction.class));
 
         Member activeMember = Member.builder()
                 .id(1L)
@@ -332,11 +334,30 @@ class ReservationCreationLifecycleTest {
         PaymentService payments = mock(PaymentService.class);
         EmailService emails = mock(EmailService.class);
         AuditLogService audits = mock(AuditLogService.class);
+        var noShowRecords = mock(kr.it.reserve.reservation.repository.ReservationNoShowRecordRepository.class);
         Member member = Member.builder().id(1L).email("active@example.com").termsAgreed(true).build();
         ReservationService service = new ReservationService(
                 reservations, stores, mock(HolidayService.class), payments, emails, members,
-                audits, mock(QrCheckinTokenProvider.class), creationGuard(), org.mockito.Mockito.mock(kr.it.reserve.reservation.service.ReservationConsentService.class));
-        return new Fixture(service, reservations, stores, members, payments, emails, audits, member);
+                audits, mock(QrCheckinTokenProvider.class), creationGuard(), org.mockito.Mockito.mock(kr.it.reserve.reservation.service.ReservationConsentService.class),
+                new ReservationNoShowRestriction(noShowRecords, mock(kr.it.reserve.reservation.repository.StoreBookingRestrictionRepository.class), members, stores, audits));
+        return new Fixture(service, reservations, stores, members, payments, emails, audits, member, noShowRecords);
+    }
+
+    @Test
+    void theSharedCreationEntryRejectsRestrictedStoreBeforeAnyReservationOrPaymentWrite() {
+        Fixture fixture = fixture();
+        prepareCreation(fixture, bookableStore());
+        var now = ServiceTime.now();
+        when(fixture.noShowRecords().findConfirmations(eq(1L), eq(10L), any(), any()))
+                .thenReturn(List.of(now.minusDays(1), now.minusDays(2), now.minusDays(3)));
+        var request = new ReservationCreateRequest(10L, ServiceTime.today().plusDays(1), LocalTime.NOON, 1, null, false);
+
+        assertThatThrownBy(() -> fixture.service().createReservation(request, fixture.member()))
+                .isInstanceOfSatisfying(ReservationException.class, error -> {
+                    assertThat(error.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+                    assertThat(error.getMessage()).contains("이 가게의 새 예약이 제한돼요");
+                });
+        verifyNoInteractions(fixture.reservations(), fixture.payments(), fixture.emails(), fixture.audits());
     }
 
     private enum MissingStoreLookup { UPDATE, SEARCH }
@@ -350,5 +371,6 @@ class ReservationCreationLifecycleTest {
     private record Fixture(
             ReservationService service, ReservationRepository reservations, StoreRepository stores,
             MemberRepository members, PaymentService payments, EmailService emails,
-            AuditLogService audits, Member member) { }
+            AuditLogService audits, Member member,
+            kr.it.reserve.reservation.repository.ReservationNoShowRecordRepository noShowRecords) { }
 }

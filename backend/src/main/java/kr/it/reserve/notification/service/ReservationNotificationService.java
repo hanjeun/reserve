@@ -32,13 +32,14 @@ public class ReservationNotificationService implements NotificationSink {
     public static final int PAGE_SIZE = 20;
     private final ReservationNotificationRepository notifications;
     private final EntityUpdates updates;
+    private Clock clock = Clock.systemUTC();
 
     /** 알림은 업무 트랜잭션에서 대기 상태로 저장되고 전달 후에만 받은편지함에 나타난다. */
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public void enqueue(Reservation reservation, NotificationKind kind) {
         String eventKey = UUID.randomUUID().toString();
-        LocalDateTime now = LocalDateTime.now(Clock.systemUTC());
+        LocalDateTime now = LocalDateTime.now(clock);
         Member customer = reservation.getMember();
         notifications.save(ReservationNotification.pending(eventKey, reservation, customer, kind, false, now));
         Member owner = reservation.getStore().getOwner();
@@ -101,7 +102,7 @@ public class ReservationNotificationService implements NotificationSink {
     }
 
     private int markRead(Member member, List<Long> ids) {
-        int changed = notifications.markRead(member.getId(), canManage(member), ids, LocalDateTime.now(Clock.systemUTC()));
+        int changed = notifications.markRead(member.getId(), canManage(member), ids, LocalDateTime.now(clock));
         if (changed > 0) signal(member.getId());
         return changed;
     }

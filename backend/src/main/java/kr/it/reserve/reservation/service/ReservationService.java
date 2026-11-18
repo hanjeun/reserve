@@ -12,6 +12,7 @@ import kr.it.reserve.global.common.ServiceTime;
 import kr.it.reserve.global.common.PageRequests;
 import kr.it.reserve.global.holiday.HolidayService;
 import kr.it.reserve.global.error.ReservationException;
+import kr.it.reserve.reservation.dto.ReservationCompletionResponse;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.payment.service.PaymentService;
@@ -78,6 +79,7 @@ public class ReservationService {
     private final QrCheckinTokenProvider qrCheckinTokenProvider;
     private final ReservationCreationGuard creationGuard;
     private final ReservationConsentService consents;
+    private final ReservationNoShowRestriction noShowRestrictions;
     @PersistenceContext
     private EntityManager reservationEntityManager;
     @Autowired(required = false)
@@ -95,7 +97,8 @@ public class ReservationService {
             MemberRepository memberRepository,
             @Lazy AuditLogService auditLogService,
             QrCheckinTokenProvider qrCheckinTokenProvider,
-            ReservationCreationGuard creationGuard, ReservationConsentService consents) {
+            ReservationCreationGuard creationGuard, ReservationConsentService consents,
+            ReservationNoShowRestriction noShowRestrictions) {
         this.reservationRepository = reservationRepository;
         this.storeRepository = storeRepository;
         this.availability = new ReservationAvailability(reservationRepository, storeRepository, holidayService);
@@ -106,6 +109,7 @@ public class ReservationService {
         this.qrCheckinTokenProvider = qrCheckinTokenProvider;
         this.creationGuard = creationGuard;
         this.consents = consents;
+        this.noShowRestrictions = noShowRestrictions;
     }
 
     @Transactional(isolation = Isolation.READ_COMMITTED, timeout = 30)
@@ -147,6 +151,8 @@ public class ReservationService {
             throw new ReservationException("현재 운영이 중단된 가게예요. 신규 예약을 받지 않아요.", HttpStatus.BAD_REQUEST);
         }
 
+        noShowRestrictions.requireNewReservationAllowed(freshMember.getId(), store.getId(), ServiceTime.now());
+
         // 나중 결제 허용 검증: allowLatePayment=false + 예약금 있으면 즉시 결제 필수
         boolean hasDeposit = store.getNoShowDeposit() != null && store.getNoShowDeposit() > 0;
         if (hasDeposit && !Boolean.TRUE.equals(store.getAllowLatePayment())
@@ -161,7 +167,7 @@ public class ReservationService {
         // 슬롯 검증(날짜/시간/인원 유효성 + 브레이크타임·영업시간·마감·중복·정원) — 생성/수정 공용.
         // 생성이므로 제외할 기존 예약이 없어 excludeReservationId = null.
         validateReservationSlot(store, freshMember,
-                request.getReservationDate(), request.getReservationTime(), request.getGuestCount(), null);
+                request.getReservationDate(), request.getReservationTime(), request.getGuestCount(), null, true);
 
         // 자동 승인 여부에 따라 초기 상태 결정
         // - 예약금 없음 + 자동승인 ON → 즉시 CONFIRMED
@@ -234,15 +240,12 @@ public class ReservationService {
      */
     private void validateReservationSlot(Store store, Member member,
                                          LocalDate date, LocalTime time, Integer guestCount,
-                                         Long excludeReservationId) {
+                                          Long excludeReservationId, boolean changesSlot) {
         if (!store.isReservationEnabled()) {
             throw new ReservationException("현재 이 가게는 예약 접수를 받지 않아요.", HttpStatus.CONFLICT);
         }
         LocalDateTime reservationDateTime = LocalDateTime.of(date, time);
-        // 반드시 KST 기준 "지금"이어야 한다. date·time 은 사용자가 고른 한국 시각이고,
-        //   컨테이너는 UTC 라 인자 없는 now() 는 9시간 뒤처진다.
-        //   그 상태에서는 **이미 지나간 시간대의 예약이 검사를 통과했다**
-        //   (예: 14:00 KST 에 오늘 08:00 예약 → UTC 로는 05:00 < 08:00 이라 미래로 보인다).
+        // 사용자가 고른 한국 시각과 비교하도록 현재 시각도 KST로 맞춘다.
         LocalDateTime now = ServiceTime.now();
 
         if (reservationDateTime.isBefore(now)) {
@@ -258,6 +261,9 @@ public class ReservationService {
                     HttpStatus.BAD_REQUEST);
         }
 
+        if (changesSlot && store.bookingOpeningPending(date, now)) {
+            throw new ReservationException("아직 예약이 열리지 않았어요. 오픈 시각 이후에 신청해주세요.", HttpStatus.CONFLICT);
+        }
         validateBookingWindow(store, date, reservationDateTime, now);
 
         // 브레이크 타임은 SLOT에만 적용한다. 직접 지정한 SESSION 회차와 DAY에는 덧씌우지 않는다.
@@ -289,6 +295,10 @@ public class ReservationService {
     /** 생성·수정·미래 완료 복귀가 같은 중복/정원 정책을 사용한다. 호출자는 가게 행을 잠근다. */
     private void validateActiveReservationCapacity(Store store, Member member,
             LocalDate date, LocalTime time, Integer guestCount, Long excludeReservationId) {
+        if (guestCount == null || guestCount < 1) {
+            throw new ReservationException("예약 인원은 최소 1명 이상이어야 해요.", HttpStatus.BAD_REQUEST);
+        }
+
         // 중복 예약 방지: 가게 정책에 따라 같은 날짜 활성 예약 여부 확인 (수정 시 자기 자신은 제외)
         if (!Boolean.TRUE.equals(store.getAllowDuplicateReservation())) {
             boolean isDuplicate = (excludeReservationId == null)
@@ -297,9 +307,8 @@ public class ReservationService {
                     : reservationRepository.existsActiveReservationByMemberAndStoreAndDateExcluding(
                             member.getId(), store.getId(), date, excludeReservationId);
             if (isDuplicate) {
-                throw new ReservationException(
-                        "이미 해당 날짜에 예약이 존재해요. 같은 날 중복 예약할 수 없어요.",
-                        HttpStatus.CONFLICT
+                throw ReservationException.conflict(ReservationException.Code.RESERVATION_DUPLICATE,
+                        "이미 해당 날짜에 예약이 존재해요. 같은 날 중복 예약할 수 없어요."
                 );
             }
         }
@@ -338,36 +347,42 @@ public class ReservationService {
 
     private void validateSlotCapacity(
             Store store, LocalDate date, LocalTime time, Integer guestCount, Long excludeReservationId) {
+        Integer capacity = store.getMaxCapacityPerSlot();
+        // 정원이 무제한이면 합계를 조회할 필요가 없다.
+        if (capacity == null || capacity <= 0) return;
         int currentGuests = (excludeReservationId == null)
                 ? reservationRepository.sumActiveGuestsBySlot(store.getId(), date, time)
                 : reservationRepository.sumActiveGuestsBySlotExcluding(store.getId(), date, time, excludeReservationId);
-        // null 또는 0 이하 정원은 무제한이다. 조회와 쓰기가 같은 해석을 사용한다.
-        if (store.getMaxCapacityPerSlot() != null && store.getMaxCapacityPerSlot() > 0) {
-            int remaining = store.getMaxCapacityPerSlot() - currentGuests;
-            if (remaining <= 0) {
-                throw new ReservationException(
-                        "해당 시간대 예약이 마감됐어요. (" + currentGuests + "/" + store.getMaxCapacityPerSlot() + "명 마감) 다른 시간대를 선택해주세요.",
-                        HttpStatus.CONFLICT
-                );
-            }
-            if (guestCount > remaining) {
-                throw new ReservationException(
-                        "선택하신 인원(" + guestCount + "명)이 남은 자리(" + remaining + "명)를 초과해요.",
-                        HttpStatus.CONFLICT
-                );
-            }
+        int remaining = capacity - currentGuests;
+        if (remaining <= 0) {
+            throw ReservationException.conflict(ReservationException.Code.RESERVATION_CAPACITY,
+                    "해당 시간대 예약이 마감됐어요. (" + currentGuests + "/" + capacity + "명 마감) 다른 시간대를 선택해주세요.");
+        }
+        if (guestCount > remaining) {
+            throw ReservationException.conflict(ReservationException.Code.RESERVATION_CAPACITY,
+                    "선택하신 인원(" + guestCount + "명)이 남은 자리(" + remaining + "명)를 초과해요.");
         }
     }
 
-    /**
-     * 날짜별 시간대 선택 UI용: 영업시간·브레이크타임과 해당 날짜의 실시간 잔여 인원을 함께 반영해
-     * 슬롯별 예약 가능 여부를 내려준다. (정원 기준 미만 시 모든 시간대 available=true)
-     */
     @Transactional(readOnly = true)
-    public List<SlotAvailabilityResponse> getAvailability(Long storeId, LocalDate date) { return availability.getAvailability(storeId, date); }
+    public List<SlotAvailabilityResponse> getAvailability(Long storeId, LocalDate date) {
+        return getAvailability(storeId, date, null);
+    }
 
     @Transactional(readOnly = true)
-    public List<CalendarDayResponse> getMonthCalendar(Long storeId, YearMonth month) { return availability.getMonthCalendar(storeId, month); }
+    public List<SlotAvailabilityResponse> getAvailability(Long storeId, LocalDate date, Long excludeReservationId) {
+        return availability.getAvailability(storeId, date, excludeReservationId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CalendarDayResponse> getMonthCalendar(Long storeId, YearMonth month) {
+        return getMonthCalendar(storeId, month, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CalendarDayResponse> getMonthCalendar(Long storeId, YearMonth month, Long excludeReservationId) {
+        return availability.getMonthCalendar(storeId, month, excludeReservationId);
+    }
 
     @Transactional(readOnly = true)
     public ReservationResponse getReservation(Long id, Member member) {
@@ -419,10 +434,11 @@ public class ReservationService {
         Integer newGuestCount = request.getGuestCount() != null ? request.getGuestCount() : reservation.getGuestCount();
 
         // 생성과 동일한 검증 — 단, 자기 자신은 정원/중복 계산에서 제외
-        validateReservationSlot(store, member, newDate, newTime, newGuestCount, reservation.getId());
+        boolean changesSlot = !Objects.equals(reservation.getReservationDate(), newDate)
+                || !Objects.equals(reservation.getReservationTime(), newTime);
+        validateReservationSlot(store, member, newDate, newTime, newGuestCount, reservation.getId(), changesSlot);
 
-        boolean detailsChanged = !Objects.equals(reservation.getReservationDate(), newDate)
-                || !Objects.equals(reservation.getReservationTime(), newTime)
+        boolean detailsChanged = changesSlot
                 || !Objects.equals(reservation.getGuestCount(), newGuestCount)
                 || (request.getSpecialRequest() != null && !Objects.equals(reservation.getSpecialRequest(), request.getSpecialRequest()));
         var oldStatus = reservation.getStatus();
@@ -468,6 +484,7 @@ public class ReservationService {
             throw new ReservationException("종료된 예약은 취소할 수 없어요.", HttpStatus.CONFLICT);
         }
         reservation.setStatus(Reservation.ReservationStatus.CANCELLED);
+        reservation.setCancellationActor(Reservation.CancellationActor.CUSTOMER);
         if (updates != null) updates.cancelled(reservation);
 
         // 취소 결정과 미발신 환불 의도를 함께 커밋한다. PG 오류는 이미 커밋한 취소를 되돌리지 않는다.
@@ -590,6 +607,7 @@ public class ReservationService {
 
         // 취소 결정과 미발신 의도를 함께 저장한다. 외부 PG 호출은 커밋 후 실행한다.
         reservation.setStatus(Reservation.ReservationStatus.CANCELLED);
+        reservation.setCancellationActor(Reservation.CancellationActor.STORE);
         if (updates != null) updates.cancelled(reservation);
         reservation.setCancelReason(cancelReason);
 
@@ -664,15 +682,25 @@ public class ReservationService {
         Reservation reservation = findByIdForUpdateOrThrow(id);
         validateStoreOwner(reservation, owner);
 
-        if (Boolean.TRUE.equals(reservation.getAttendanceRefundEnabled()) && reservation.getDepositAmount() != null
-                && reservation.getDepositAmount() > 0) {
+        if (hasAttendanceDeposit(reservation)) {
             throw new ReservationException("보증금 환불 대상 예약은 이용 완료를 되돌릴 수 없어요.", HttpStatus.CONFLICT);
         }
         if (reservation.getStatus() != Reservation.ReservationStatus.COMPLETED) {
             throw new ReservationException("이용완료된 예약만 되돌릴 수 있어요.", HttpStatus.BAD_REQUEST);
         }
         requireWithinUndoWindow(reservation);
+        if (hasReview(id)) {
+            throw new ReservationException("리뷰가 등록된 예약은 이용 완료를 되돌릴 수 없어요.", HttpStatus.CONFLICT);
+        }
 
+        requireCapacityForUpcomingRestore(reservation);
+        reservation.setManualVisitConfirmedAt(null);
+        reservation.setStatus(Reservation.ReservationStatus.CONFIRMED);
+        changed(reservation, EntityUpdates.Operation.UPDATED);
+        log.info("Completion undone: reservationId={}, ownerId={}", id, owner.getId());
+    }
+
+    private void requireCapacityForUpcomingRestore(Reservation reservation) {
         if (!LocalDateTime.of(reservation.getReservationDate(), reservation.getReservationTime()).isBefore(ServiceTime.now())) {
             // 금융 잠금의 ID 조회가 만든 이전 RR snapshot을 재사용하지 않도록 이 TX는 READ_COMMITTED다.
             Store store = storeRepository.findByIdForUpdate(reservation.getStore().getId())
@@ -685,28 +713,41 @@ public class ReservationService {
             validateActiveReservationCapacity(store, reservation.getMember(), reservation.getReservationDate(),
                     reservation.getReservationTime(), reservation.getGuestCount(), reservation.getId());
         }
-
-        reservation.setStatus(Reservation.ReservationStatus.CONFIRMED);
-        changed(reservation, EntityUpdates.Operation.UPDATED);
-        log.info("Completion undone: reservationId={}, ownerId={}", id, owner.getId());
     }
 
     /** 되돌리기는 정해진 시간 안에서만 허용한다. updatedAt과 같은 JVM 시계로 비교하고 한국 시간으로 치환하지 않는다. */
     private void requireWithinUndoWindow(Reservation reservation) {
-        LocalDateTime changedAt = reservation.getUpdatedAt();
-        if (changedAt == null || changedAt.isBefore(LocalDateTime.now(Clock.systemDefaultZone()).minusMinutes(UNDO_WINDOW_MINUTES))) {
+        if (!withinUndoWindow(reservation)) {
             throw new ReservationException(
                     "되돌릴 수 있는 시간이 지났어요. 취소 또는 거절을 사용해주세요.", HttpStatus.BAD_REQUEST);
         }
+    }
+
+    private boolean withinUndoWindow(Reservation reservation) {
+        LocalDateTime changedAt = reservation.getUpdatedAt();
+        return changedAt != null && !changedAt.isBefore(LocalDateTime.now(Clock.systemDefaultZone()).minusMinutes(UNDO_WINDOW_MINUTES));
+    }
+
+    private boolean hasAttendanceDeposit(Reservation reservation) {
+        return Boolean.TRUE.equals(reservation.getAttendanceRefundEnabled()) && reservation.getDepositAmount() != null
+                && reservation.getDepositAmount() > 0;
+    }
+
+    private boolean hasReview(Long id) {
+        return !reservationRepository.findReviewIdsByReservationIds(List.of(id)).isEmpty();
     }
 
     /**
      * 이용완료 처리 (사업자용)
      */
     @Transactional
-    public void completeReservation(Long id, Member owner) {
-        attendance().completeReservation(id, owner);
-        refundDispatch.afterCommit(paymentService.prepareFullRefundAfterAttendance(id));
+    public ReservationCompletionResponse completeReservation(Long id, Member owner) {
+        var result = attendance().completeReservation(id, owner);
+        Long attemptId = paymentService.prepareFullRefundAfterAttendance(id);
+        refundDispatch.afterCommit(attemptId);
+        boolean canUndo = !hasAttendanceDeposit(result.reservation())
+                && (result.changed() || withinUndoWindow(result.reservation())) && !hasReview(id);
+        return new ReservationCompletionResponse(canUndo, attemptId != null);
     }
 
     /**
@@ -715,6 +756,34 @@ public class ReservationService {
     @Transactional
     public void markNoShow(Long id, Member owner) {
         attendance().markNoShow(id, owner);
+    }
+
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public void undoNoShow(Long id, Member owner) {
+        Reservation reservation = findByIdForUpdateOrThrow(id);
+        validateStoreOwner(reservation, owner);
+        if (ReservationAccess.approved(reservation) && !reservation.isDeleted()) return;
+        if (reservation.getStatus() != Reservation.ReservationStatus.NO_SHOW || reservation.isDeleted()) {
+            throw new ReservationException("확정된 노쇼 예약만 되돌릴 수 있어요.", HttpStatus.CONFLICT);
+        }
+        requireCapacityForUpcomingRestore(reservation);
+        var previousStatus = reservation.getNoShowPreviousStatus();
+        reservation.setStatus(previousStatus == Reservation.ReservationStatus.CONFIRMED
+                ? previousStatus : Reservation.ReservationStatus.UNCONFIRMED);
+        reservation.setNoShowPreviousStatus(null);
+        noShowRestrictions.retract(id, ServiceTime.now());
+        auditLogService.recordNoShowUndo(id);
+        changed(reservation, EntityUpdates.Operation.UPDATED);
+    }
+
+    @Transactional
+    public void correctNoShowRestriction(Long reservationId, Member administrator) {
+        if (!administrator.isAdmin()) {
+            throw new ReservationException("관리자만 노쇼 제한을 정정할 수 있어요.", HttpStatus.FORBIDDEN);
+        }
+        if (noShowRestrictions.correct(reservationId, ServiceTime.now())) {
+            auditLogService.recordNoShowRestrictionCorrection(reservationId);
+        }
     }
 
     /**
@@ -741,7 +810,7 @@ public class ReservationService {
         String keyword = search == null ? "" : search.trim().replace("!", "!!").replace("%", "!%").replace("_", "!_");
         Page<Reservation> reservations = reservationRepository.searchForMember(member, keyword, status, pageable);
         Map<Long, Long> reviews = myReservationReviewIds(reservations.getContent());
-        return reservations.map(r -> ReservationResponse.fromEntityWithReviewId(r, reviews.get(r.getId())));
+        return reservations.map(r -> ReservationResponse.fromEntityWithReview(r, reviews.get(r.getId()), reviews.containsKey(r.getId())));
     }
 
     private Map<Long, Long> myReservationReviewIds(List<Reservation> reservations) {
@@ -760,18 +829,25 @@ public class ReservationService {
         return reviewIdByReservationId;
     }
 
-    /**
-     * 가게 상세 페이지 진입 시 호출: 이 회원이 해당 가게에서 리뷰 작성 가능한(가장 최근 COMPLETED) 예약이 있는지 조회
-     * 서버에서 바로 필터링된 1건만 내려보내므로 클라이언트가 내 전체 예약 목록을 불러올 필요가 없음
-     */
+    /** 가게 상세에서 아직 리뷰를 쓰지 않은 가장 최근 방문 한 건만 읽는다. */
     @Transactional(readOnly = true)
     public ReservationResponse getLatestCompletedReservationForStore(Member member, Long storeId) {
-        return reservationRepository
-                .findFirstByMemberIdAndStoreIdAndStatusOrderByIdDesc(member.getId(), storeId, Reservation.ReservationStatus.COMPLETED)
+        if (!member.isTermsAgreed()) return null;
+        return reservationRepository.findReviewableVisits(member.getId(), storeId, Reservation.ReservationStatus.COMPLETED, PageRequest.of(0, 1))
+                .stream().findFirst().map(ReservationResponse::fromEntity).orElse(null);
+    }
+
+    @Transactional(readOnly = true)
+    public ReservationResponse getCompletedReservationForStore(Member member, Long storeId, Long reservationId) {
+        if (reservationId == null) return getLatestCompletedReservationForStore(member, storeId);
+        if (!member.isTermsAgreed()) return null;
+        return reservationRepository.findById(reservationId)
+                .filter(r -> member.getId().equals(r.getMember().getId()) && storeId.equals(r.getStore().getId())
+                        && !r.isDeleted() && r.getStatus() == Reservation.ReservationStatus.COMPLETED)
                 .map(r -> {
-                    Long reviewId = reservationRepository.findReviewIdsByReservationIds(List.of(r.getId())).stream()
-                            .findFirst().map(row -> (Long) row[1]).orElse(null);
-                    return reviewId != null ? ReservationResponse.fromEntityWithReviewId(r, reviewId) : ReservationResponse.fromEntity(r);
+                    var matches = reservationRepository.findReviewIdsByReservationIds(List.of(r.getId()));
+                    Long reviewId = matches.isEmpty() ? null : (Long) matches.getFirst()[1];
+                    return ReservationResponse.fromEntityWithReview(r, reviewId, !matches.isEmpty());
                 })
                 .orElse(null);
     }
@@ -801,8 +877,9 @@ public class ReservationService {
             Reservation.ReservationStatus status, Long storeId, String sort) {
         if (!administrator.isAdmin()) throw new ReservationException("관리자만 조회할 수 있어요.", HttpStatus.FORBIDDEN);
         Pageable pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, 100), reservationManagementSort(sort));
-        return reservationRepository.searchForAdmin(search == null ? "" : search.trim(), status, storeId, pageable)
-                .map(ReservationResponse::fromManagementEntity);
+        var reservations = reservationRepository.searchForAdmin(search == null ? "" : search.trim(), status, storeId, pageable);
+        var correctable = noShowRestrictions.correctableIds(reservations.getContent(), ServiceTime.now());
+        return reservations.map(reservation -> ReservationResponse.fromAdminEntity(reservation, correctable.contains(reservation.getId())));
     }
 
     /** 예약 관리 세 화면의 정렬 계약. 알 수 없는 값은 기존 동작인 최신순으로 되돌린다. */
@@ -839,12 +916,7 @@ public class ReservationService {
         log.info("Reservation removed: id={}, memberId={}", id, member.getId());
     }
 
-    // 내부 도우미 메서드
-
-    /**
-     * unique한 표시용 예약번호 생성 — DB의 unique 제약과 충돌하지 않을 때까지 재시도.
-     * 4자리 랜덤(약 100만 조합)이라 같은 날 충돌 확률은 극히 낮지만, 만약을 대비해 몇 번 재생성한다.
-     */
+    /** DB unique 제약을 확인하며 표시용 예약번호의 충돌을 재시도한다. */
     private String generateUniqueReservationCode(LocalDate reservationDate) {
         for (int attempt = 0; attempt < 10; attempt++) {
             String code = ReservationCodeGenerator.generate(reservationDate);
@@ -858,7 +930,7 @@ public class ReservationService {
 
     private ReservationAttendance attendance() {
         return new ReservationAttendance(reservationRepository, qrCheckinTokenProvider, updates,
-                paymentService::lockReservationForStateChange);
+                paymentService::lockReservationForStateChange, noShowRestrictions);
     }
 
     private void changed(Reservation reservation, EntityUpdates.Operation operation) {

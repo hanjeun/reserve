@@ -19,7 +19,7 @@ vi.mock('../../hooks/useDebounce', () => ({ default: value => value }));
 vi.mock('./SanctionModal', () => ({ default: () => null }));
 vi.mock('../common', () => ({
     Button: () => null, FilterToolbar: () => null, AdminTableSkeleton: () => null,
-    DataTable: ({ columns, dataSource }) => <div data-testid="rating-cell">
+    PagedDataTable: ({ columns, dataSource }) => <div data-testid="rating-cell">
         {columns.find(column => column.key === 'rating').render(dataSource[0].rating, dataSource[0])}
     </div>,
 }));

@@ -85,9 +85,15 @@ class OAuthSecurityEventPersistenceTest {
         tx.executeWithoutResult(status -> entityManager.createNativeQuery(
                 "UPDATE member SET oauth_access_token = 'legacy-token' WHERE member_id = :id").setParameter("id", id).executeUpdate());
         assertThat(members.findById(id).orElseThrow().getOauthAccessToken()).isEqualTo("legacy-token");
+        String storedBeforeNameChange = storedToken(id);
         tx.executeWithoutResult(status -> members.findActiveByIdForUpdate(id).orElseThrow().setName("updated"));
-        assertThat(storedToken(id)).startsWith("reserve-oauth:v1:");
+        assertThat(storedToken(id)).isEqualTo(storedBeforeNameChange);
         assertThat(members.findById(id).orElseThrow().getOauthAccessToken()).isEqualTo("legacy-token");
+
+        String replacement = java.util.UUID.randomUUID().toString().repeat(64).substring(0, 2048);
+        tx.executeWithoutResult(status -> members.findActiveByIdForUpdate(id).orElseThrow().setOauthAccessToken(replacement));
+        assertThat(storedToken(id)).startsWith("reserve-oauth:v1:").hasSizeGreaterThan(replacement.length()).doesNotContain(replacement);
+        assertThat(members.findById(id).orElseThrow().getOauthAccessToken()).isEqualTo(replacement);
     }
 
     @Test

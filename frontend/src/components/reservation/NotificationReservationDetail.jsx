@@ -7,8 +7,10 @@ import DataState from '../common/DataState';
 import LoadingStatus from '../common/LoadingStatus';
 import ReservationDetailModal from './ReservationDetailModal';
 import chatService from '../../services/chatService';
+import useAuthStore from '../../store/useAuthStore';
 
 function NotificationReservationModal({ id, open, onClose }) {
+    const memberId = useAuthStore(state => state.isLoggedIn ? state.user?.id : null);
     const detail = useQuery({
         queryKey: ['notification-reservation', id],
         queryFn: ({ signal }) => chatService.getNotificationReservation(id, signal),
@@ -27,7 +29,8 @@ function NotificationReservationModal({ id, open, onClose }) {
             error={detail.error} compact onRetry={detail.refetch} />;
     }
     return <ReservationDetailModal reservation={placeholder ? null : detail.data}
-        open={open} onClose={onClose} placeholder={placeholder} />;
+        open={open} onClose={onClose} placeholder={placeholder}
+        showPaymentHistory={memberId != null && detail.data?.memberId === memberId} />;
 }
 
 NotificationReservationModal.propTypes = {

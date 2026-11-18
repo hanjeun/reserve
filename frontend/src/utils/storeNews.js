@@ -1,3 +1,6 @@
+export const canManageStoreNews = user => ['BUSINESS', 'ADMIN'].includes(user?.role);
+export const storeNewsManagementPath = user => user?.role === 'ADMIN' ? '/admin?tab=news' : '/business?tab=news';
+
 export const STORE_NEWS_TYPES = [
     { value: 'NEWS', label: '소식' }, { value: 'NOTICE', label: '공지' },
     { value: 'EVENT', label: '행사' }, { value: 'BENEFIT', label: '혜택' },

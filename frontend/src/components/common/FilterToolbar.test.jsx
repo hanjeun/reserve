@@ -82,14 +82,14 @@ describe('FilterToolbar', () => {
         search.value = '가게'; rerender(controls(false));
         expect(input).toHaveValue('가게'); expect(input).toHaveFocus();
     });
-    it('hides refresh only after the server advertises support for this screen', () => {
+    it('keeps manual refresh available alongside a supported live connection', () => {
         const toolbar = <FilterToolbar search={{ value: '카페', onChange: vi.fn() }} onReload={vi.fn()} autoRefreshDomain="WAITING" />;
         const { rerender } = render(<LiveUpdatesContext.Provider value={{ present: true, connected: false, domains: [] }}>{toolbar}</LiveUpdatesContext.Provider>);
         expect(screen.getByRole('button', { name: '새로고침' })).toBeInTheDocument();
         rerender(<LiveUpdatesContext.Provider value={{ present: true, connected: true, domains: ['NEWS'] }}>{toolbar}</LiveUpdatesContext.Provider>);
         expect(screen.getByRole('button', { name: '새로고침' })).toBeInTheDocument();
         rerender(<LiveUpdatesContext.Provider value={{ present: true, connected: true, domains: ['WAITING'] }}>{toolbar}</LiveUpdatesContext.Provider>);
-        expect(screen.queryByRole('button', { name: '새로고침' })).toBeNull();
+        expect(screen.getByRole('button', { name: '새로고침' })).toBeEnabled();
         expect(screen.getByDisplayValue('카페')).toBeEnabled();
     });
 

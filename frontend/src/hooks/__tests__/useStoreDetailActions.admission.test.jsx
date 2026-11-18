@@ -5,9 +5,11 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ create: vi.fn(), recover: vi.fn(), prepare: vi.fn(), getPendingAttempt: vi.fn(),
     enter: vi.fn(), restoreEntry: vi.fn(), complete: vi.fn(), navigate: vi.fn(), requestAttempt: vi.fn(), clearRequest: vi.fn(),
-    update: vi.fn(), getReservation: vi.fn() }));
+    update: vi.fn(), getReservation: vi.fn(), invalidate: vi.fn(), cachedReservations: vi.fn() }));
 vi.mock('react-router-dom', async original => ({ ...(await original()), useNavigate: () => mocks.navigate }));
-vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
+vi.mock('@tanstack/react-query', () => ({ useQuery: () => ({ data: null }), useQueryClient: () => ({
+    invalidateQueries: mocks.invalidate, getQueryCache: () => ({ findAll: mocks.cachedReservations }),
+}) }));
 vi.mock('../../services/reservationService', () => ({ default: { createReservation: mocks.create, recoverReservation: mocks.recover,
     getMyCompletedForStore: () => Promise.resolve(null), updateReservation: mocks.update, getReservation: mocks.getReservation } }));
 vi.mock('../../services/serviceAdmissionService', () => ({ prepareCoreWork: mocks.prepare }));
@@ -18,6 +20,7 @@ vi.mock('../../services/adService', () => ({ default: { recordConversion: vi.fn(
 vi.mock('../../utils/adAttribution', () => ({ consumeAdClickAttribution: () => null }));
 import useStoreDetailActions from '../useStoreDetailActions';
 import { advanceSession, currentSession } from '../../api/sessionScope';
+import useAuthStore from '../../store/useAuthStore';
 
 const attempt = { ticket: '22222222-2222-4222-8222-222222222222', requestId: '11111111-1111-4111-8111-111111111111', expiresAt: Date.now() + 180000 };
 const NORMAL_REQUEST = '33333333-3333-4333-8333-333333333333';
@@ -31,6 +34,7 @@ beforeEach(() => {
     mocks.restoreEntry.mockResolvedValue(null);
     mocks.create.mockResolvedValue({ id: 20, depositAmount: 0 }); mocks.recover.mockResolvedValue(notSubmitted);
     mocks.prepare.mockResolvedValue(true); mocks.requestAttempt.mockResolvedValue({ requestId: NORMAL_REQUEST, reused: false });
+    mocks.cachedReservations.mockReturnValue([]);
     message = { warning: vi.fn(), error: vi.fn(), info: vi.fn(), success: vi.fn() };
 });
 function hook(initialProps = {}, path = '/store/10') {
@@ -38,6 +42,117 @@ function hook(initialProps = {}, path = '/store/10') {
     return renderHook(props => useStoreDetailActions({ id: '10', store: { id: 10 }, isLoggedIn: true, user: { id: 1, role: 'USER' },
         form: { setFields: vi.fn(), setFieldsValue: vi.fn() }, pay: vi.fn(), message, ...props }), { wrapper, initialProps });
 }
+
+const requiredChallenge = () => Object.assign(new Error('예약 확인이 필요해요.'), { status: 428,
+    data: { code: 'RESERVATION_CHALLENGE_REQUIRED', action: 'reservation_submit', siteKey: 'test-site', requestId: NORMAL_REQUEST } });
+
+it('retries the same reservation once with the proof after additional confirmation', async () => {
+    mocks.create.mockRejectedValueOnce(requiredChallenge());
+    const { result } = hook();
+    let pending;
+    await act(async () => { pending = result.current.onFinish(values()); });
+    await waitFor(() => expect(result.current.reservationChallengeProps?.open).toBe(true));
+    expect(mocks.create).toHaveBeenCalledOnce();
+    const original = mocks.create.mock.calls[0][0];
+    expect(original.requestId).toBe(NORMAL_REQUEST);
+
+    await act(async () => {
+        result.current.reservationChallengeProps.onToken('sample-proof');
+        await pending;
+    });
+    expect(mocks.create).toHaveBeenCalledTimes(2);
+    expect(mocks.create).toHaveBeenLastCalledWith(original, {
+        headers: { 'X-Reserve-Turnstile': 'sample-proof' }, signal: expect.any(AbortSignal),
+    });
+    expect(result.current.reservationChallengeProps.open).toBe(false);
+});
+
+it('cancels an open confirmation when the member session changes and ignores a late token', async () => {
+    mocks.create.mockRejectedValueOnce(requiredChallenge());
+    const { result } = hook();
+    let pending;
+    await act(async () => { pending = result.current.onFinish(values()); });
+    await waitFor(() => expect(result.current.reservationChallengeProps?.open).toBe(true));
+    const lateToken = result.current.reservationChallengeProps.onToken;
+    await act(async () => {
+        advanceSession();
+        lateToken('sample-proof');
+        await pending;
+    });
+    expect(mocks.create).toHaveBeenCalledOnce();
+    expect(result.current.reservationChallengeProps.open).toBe(false);
+});
+
+it('ignores a confirmation response arriving after leaving the booking page', async () => {
+    let respond;
+    mocks.create.mockImplementationOnce(() => new Promise((_, reject) => { respond = reject; }));
+    const view = hook();
+    let pending;
+    await act(async () => { pending = view.result.current.onFinish(values()); });
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
+    view.unmount();
+    await act(async () => { respond(requiredChallenge()); await pending; });
+    expect(mocks.create).toHaveBeenCalledOnce();
+    expect(message.error).not.toHaveBeenCalled();
+});
+
+it.each([
+    ['RESERVATION_CAPACITY', date => ({ queryKey: ['reservations', 'availability', 10, date, undefined], exact: true })],
+    ['RESERVATION_NOTICE_CHANGED', () => ({ queryKey: ['reservation-consent', 1, useAuthStore.getState().sessionRevision, 10], exact: true })],
+    ['RESERVATION_DUPLICATE', () => ({ queryKey: ['reservations', 'my'], refetchType: 'none' })],
+])('refreshes only the reads affected by %s without restarting admission', async (code, expected) => {
+    mocks.getPendingAttempt.mockResolvedValueOnce(attempt);
+    mocks.create.mockRejectedValueOnce(Object.assign(new Error('예약 내용을 확인해주세요.'), { status: 409, data: { code } }));
+    const selected = values();
+    const { result } = hook();
+
+    await act(async () => { await result.current.onFinish(selected); });
+
+    expect(mocks.create).toHaveBeenCalledOnce();
+    expect(mocks.enter).not.toHaveBeenCalled();
+    expect(mocks.invalidate).toHaveBeenCalledExactlyOnceWith(expected(selected.reservationDate.format('YYYY-MM-DD')));
+    expect(message.error).toHaveBeenCalledExactlyOnceWith('예약 내용을 확인해주세요.');
+});
+
+function cacheConfirmedReservation(selected) {
+    const session = `${useAuthStore.getState().sessionRevision}:1`;
+    mocks.cachedReservations.mockReturnValue([{ queryKey: ['reservations', 'my', {}, session], state: {
+        status: 'success', fetchStatus: 'idle', dataUpdatedAt: Date.now(),
+        data: { content: [{ id: 45, storeId: 10, reservationDate: selected.reservationDate.format('YYYY-MM-DD'), status: 'CONFIRMED' }] },
+    } }]);
+}
+
+it('shows a fresh cached duplicate before any request and lets a second submit check the server', async () => {
+    const selected = values();
+    cacheConfirmedReservation(selected);
+    mocks.requestAttempt.mockResolvedValueOnce(null);
+    const { result } = hook({ store: { id: 10, allowDuplicateReservation: false } });
+
+    await act(async () => { await result.current.onFinish(selected); });
+    expect(mocks.requestAttempt).toHaveBeenCalledWith('1:USER:10', expect.any(Object), null, { reuseOnly: true });
+    expect(mocks.getPendingAttempt).toHaveBeenCalledWith(expect.any(Object), { storedTicketOnly: true });
+    expect(message.info).toHaveBeenCalledWith(expect.stringContaining('이미 예약'));
+    expect(mocks.prepare).not.toHaveBeenCalled();
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.recover).not.toHaveBeenCalled();
+
+    await act(async () => { await result.current.onFinish(selected); });
+    expect(mocks.create).toHaveBeenCalledOnce();
+});
+
+it('recovers an existing matching request even when its reservation is in the cache', async () => {
+    const selected = values();
+    cacheConfirmedReservation(selected);
+    mocks.requestAttempt.mockResolvedValueOnce({ requestId: NORMAL_REQUEST, reused: true });
+    mocks.recover.mockResolvedValueOnce(reserved({ id: 45, depositAmount: 0 }));
+    const { result } = hook({ store: { id: 10, allowDuplicateReservation: false } });
+
+    await act(async () => { await result.current.onFinish(selected); });
+
+    expect(mocks.recover).toHaveBeenCalledOnce();
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(message.info).not.toHaveBeenCalledWith(expect.stringContaining('이미 예약'));
+});
 
 it.each([{ success: false, cancelled: true }, { success: false }, { success: false, redirected: true },
     { success: false, interrupted: true }])('결제를 마치지 못한 같은 신청은 기존 예약의 결제만 재시도해요 (%j)', async outcome => {
@@ -129,7 +244,7 @@ it.each([null, {}, { outcome: 'RESERVED', reservation: null }, { outcome: 'CLOSE
         expect(mocks.create).not.toHaveBeenCalled();
         expect(mocks.prepare).not.toHaveBeenCalled();
         expect(mocks.clearRequest).not.toHaveBeenCalled();
-        expect(message.error).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining('이전 예약 상태') }));
+        expect(message.error).toHaveBeenCalledExactlyOnceWith('이전 예약 상태를 확인하지 못했어요. 내 예약에서 확인해주세요.');
     });
 
 it('일반 404는 종료된 신청으로 간주하지 않고 한국어로 안내해요', async () => {
@@ -139,7 +254,7 @@ it('일반 404는 종료된 신청으로 간주하지 않고 한국어로 안내
     await act(async () => { await result.current.onFinish(values()); });
     expect(mocks.create).not.toHaveBeenCalled();
     expect(mocks.clearRequest).not.toHaveBeenCalled();
-    expect(message.error).toHaveBeenCalledWith(expect.objectContaining({ content: '이전 예약 상태를 확인하지 못했어요. 내 예약에서 확인해주세요.' }));
+    expect(message.error).toHaveBeenCalledExactlyOnceWith('이전 예약 상태를 확인하지 못했어요. 내 예약에서 확인해주세요.');
 });
 
 it('재예약 결과를 기다리는 중 연속 클릭해도 새 신청은 한 번만 전송해요', async () => {
@@ -221,7 +336,9 @@ it('recovers a committed result with the original key before asking Redis for ad
     expect(mocks.recover).toHaveBeenCalledWith(expect.objectContaining({ admissionTicket: attempt.ticket, requestId: attempt.requestId }), { signal: expect.any(AbortSignal) });
     expect(mocks.create).not.toHaveBeenCalled(); expect(mocks.prepare).not.toHaveBeenCalled();
     expect(mocks.enter).not.toHaveBeenCalled(); expect(mocks.complete).toHaveBeenCalledWith(attempt);
-    expect(mocks.navigate).toHaveBeenCalledWith('/my-reservations');
+    expect(mocks.navigate).toHaveBeenCalledWith('/my-reservations', { state: {
+        reservationCompletion: { memberId: 1, sessionRevision: expect.any(Number), text: '예약을 신청했어요.' },
+    } });
 });
 it('does not replace a conflicting committed request with a new key', async () => {
     mocks.getPendingAttempt.mockResolvedValue(attempt);
@@ -307,7 +424,9 @@ it('recovers a reused normal key without common admission or any new reservation
     expect(mocks.recover).toHaveBeenCalledWith(expect.objectContaining({ requestId: NORMAL_REQUEST }), { signal: expect.any(AbortSignal) });
     expect(mocks.prepare).not.toHaveBeenCalled(); expect(mocks.enter).not.toHaveBeenCalled();
     expect(mocks.create).not.toHaveBeenCalled(); expect(mocks.clearRequest).toHaveBeenCalledWith('1:USER:10', NORMAL_REQUEST);
-    expect(mocks.navigate).toHaveBeenCalledWith('/my-reservations');
+    expect(mocks.navigate).toHaveBeenCalledWith('/my-reservations', { state: {
+        reservationCompletion: { memberId: 1, sessionRevision: expect.any(Number), text: '예약을 신청했어요.' },
+    } });
 });
 
 it('uses the existing normal key after a missing result and common admission confirmation', async () => {
@@ -335,7 +454,37 @@ it('creates a fresh normal reservation only after common admission without a res
     expect(mocks.recover).not.toHaveBeenCalled(); expect(mocks.requestAttempt).toHaveBeenCalledOnce();
     expect(mocks.prepare.mock.invocationCallOrder[0]).toBeLessThan(mocks.create.mock.invocationCallOrder[0]);
     expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ requestId: NORMAL_REQUEST }));
-    expect(mocks.navigate).toHaveBeenCalledWith('/my-reservations');
+    expect(mocks.navigate).toHaveBeenCalledWith('/my-reservations', { state: {
+        reservationCompletion: { memberId: 1, sessionRevision: expect.any(Number), text: '예약을 신청했어요.' },
+    } });
+});
+
+it.each([
+    ['CONFIRMED', 0, '예약이 완료됐어요.'],
+    ['PENDING', 0, '예약을 신청했어요. 가게의 승인을 기다려주세요.'],
+    ['PENDING', 10000, '예약을 신청했어요. 예약금 10,000원을 나중에 결제해주세요.'],
+])('hands off the booking result without opening a toast or payment window (%s, %s)', async (status, depositAmount, text) => {
+    mocks.create.mockResolvedValue({ id: 20, depositAmount, status });
+    const onReservationSuccess = vi.fn();
+    const pay = vi.fn();
+    const { result } = hook({ onReservationSuccess, pay, store: { id: 10, allowLatePayment: true } });
+    await act(async () => { await result.current.onFinish(values()); });
+    expect(onReservationSuccess).toHaveBeenCalledExactlyOnceWith(text);
+    expect(mocks.navigate).not.toHaveBeenCalled();
+    expect(message.success).not.toHaveBeenCalled();
+    expect(pay).not.toHaveBeenCalled();
+});
+
+it('keeps the request key and never reports success without a reservation id', async () => {
+    mocks.create.mockResolvedValue({ status: 'CONFIRMED' });
+    const onReservationSuccess = vi.fn();
+    const { result } = hook({ onReservationSuccess });
+    await act(async () => { await result.current.onFinish(values()); });
+    expect(message.error).toHaveBeenCalledExactlyOnceWith('예약 결과를 확인하지 못했어요. 내 예약에서 확인해주세요.');
+    expect(onReservationSuccess).not.toHaveBeenCalled();
+    expect(mocks.navigate).not.toHaveBeenCalled();
+    expect(mocks.complete).not.toHaveBeenCalled();
+    expect(mocks.clearRequest).not.toHaveBeenCalled();
 });
 
 it('keeps a campaign key after missing recovery and waits for common capacity before the original POST', async () => {
@@ -388,20 +537,24 @@ it('preserves the original campaign key if admission is no longer configured aft
 it('recovers the committed campaign key after a lost response even if the campaign is later disabled', async () => {
     mocks.getPendingAttempt.mockResolvedValueOnce(attempt).mockResolvedValue(null);
     mocks.recover.mockResolvedValueOnce(notSubmitted).mockResolvedValueOnce(reserved({ id: 23, depositAmount: 0 }));
-    mocks.create.mockRejectedValueOnce(new Error('응답을 받지 못했어요.'));
+    mocks.create.mockRejectedValueOnce(Object.assign(new Error('응답을 받지 못했어요.'), { isResponseUnconfirmed: true }));
     mocks.requestAttempt.mockImplementation(async (_scope, _payload, submitted) => ({ requestId: submitted ?? attempt.requestId, reused: submitted == null }));
     const { result } = hook();
     const selected = values();
     await act(async () => { await result.current.onFinish(selected); });
     expect(mocks.create).toHaveBeenCalledOnce();
     expect(mocks.requestAttempt).toHaveBeenCalledWith('1:USER:10', expect.any(Object), attempt.requestId);
+    expect(message.warning).toHaveBeenCalledExactlyOnceWith('예약 신청 결과를 확인하지 못했어요. 내 예약에서 먼저 확인해주세요.');
+    expect(mocks.clearRequest).not.toHaveBeenCalled();
     await act(async () => { await result.current.onFinish(selected); });
     expect(mocks.recover.mock.calls.map(([data]) => data.requestId)).toEqual([attempt.requestId, attempt.requestId]);
     expect(mocks.create).toHaveBeenCalledOnce();
     expect(mocks.prepare).toHaveBeenCalledOnce();
     expect(mocks.enter).not.toHaveBeenCalled();
     expect(mocks.complete).toHaveBeenCalledWith({ requestId: attempt.requestId });
-    expect(mocks.navigate).toHaveBeenCalledWith('/my-reservations');
+    expect(mocks.navigate).toHaveBeenCalledWith('/my-reservations', { state: {
+        reservationCompletion: { memberId: 1, sessionRevision: expect.any(Number), text: '예약을 신청했어요.' },
+    } });
 });
 
 it.each([401, 409, 503])('does not write or enter a queue after a failed read-only recovery (%s)', async status => {

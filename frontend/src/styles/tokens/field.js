@@ -10,6 +10,7 @@ import { fontSize, fontWeight } from './typography';
 export const field = {
     /** 입력칸 높이. AntD size="large" 와 커스텀 자리표시자가 공유한다. */
     height: heights.input,          // '54px'
+    paddingInline: '11px',
     /** 입력칸 모서리. AntD borderRadius 토큰과 같은 값이어야 한다. */
     radius: radius.lg,              // '14px'
     /** 채움형 배경. 비활성일 때는 한 단계 진하게. */
@@ -17,13 +18,13 @@ export const field = {
     bgDisabled: colors.gray[100],
     /** 자리표시자 글자색 — AntD colorTextPlaceholder 와 같은 값. */
     placeholderColor: colors.text.placeholder,
+    /* 선택 전에도 읽어야 하는 날짜·시간 안내는 비활성 글자와 구분해요. */
+    selectionHintColor: colors.text.secondary,
     /* 날짜·시간 자리표시자는 측정한 같은 높이의 줄 상자를 사용한다. */
     textStyle: { fontSize: fontSize.lg, fontWeight: fontWeight.regular, lineHeight: 1.5,
         fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums' },
     /**
-     * 접미 아이콘 크기(px).
-     * AntD 기본값을 그냥 두면 커스텀 자리표시자와 1~2px 어긋나는데,
-     * 두 칸이 나란히 놓이므로 그 차이가 눈에 띈다("디자인이 미묘하게 다르다"의 정체).
+     * AntD 선택 입력과 커스텀 입력의 접미 아이콘 크기를 맞춘다.
      */
     iconSize: 16,
     /*

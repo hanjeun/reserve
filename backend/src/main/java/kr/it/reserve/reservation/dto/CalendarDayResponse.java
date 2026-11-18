@@ -39,6 +39,8 @@ public class CalendarDayResponse {
         CLOSED,
         /** 운영 기간(openDate~closeDate) 밖. 팝업스토어·시즌 영업. */
         OUT_OF_PERIOD,
+        /** 지정한 예약 오픈 시각 전이에요. */
+        NOT_OPEN_YET,
         /** {@code maxAdvanceBookingDays} 를 넘는 먼 미래. */
         TOO_FAR,
         /** 열려 있지만 고를 수 있는 시각이 없다 — 정원이 다 찼거나 마감 시간이 지났다. */

@@ -11,7 +11,7 @@ import { storeNewsKeys } from '../../hooks/storeNewsQueries';
 import storeNewsService from '../../services/storeNewsService';
 
 vi.mock('../../services/benefitService', () => ({ default: { getList: vi.fn(), getDetail: vi.fn() } }));
-const item = { id: 1, storeId: 12, storeName: '가게 이름', title: '신메뉴 안내', excerpt: '가게의 새 소식', content: '<img src=x onerror="window.hacked=true">\n<script>alert(1)</script>', mainImageUrl: 'https://tracker.example/photo.png', createdAt: '2026-09-13T10:00:00' };
+const item = { id: 1, publicId: '00000000-0000-4000-8000-000000000001', storeId: 12, storePublicId: '00000000-0000-4000-8000-000000000012', storeName: '가게 이름', title: '신메뉴 안내', excerpt: '가게의 새 소식', content: '<img src=x onerror="window.hacked=true">\n<script>alert(1)</script>', mainImageUrl: 'https://tracker.example/photo.png', createdAt: '2026-09-13T10:00:00' };
 const StoreRouteProbe = () => {
     const location = useLocation();
     return <output data-testid="store-route">{location.pathname}{location.search}</output>;
@@ -25,6 +25,24 @@ const renderPage = (path = '/benefits') => {
 
 describe('public store news and benefit guidance', () => {
     beforeEach(() => { vi.clearAllMocks(); window.scrollTo = vi.fn(); });
+    it('소식 기간이 바뀌면 기존 행을 가리고 결과 자리에서만 조회를 기다린다', async () => {
+        let complete;
+        benefitService.getList.mockResolvedValueOnce({ content: [item] })
+            .mockImplementationOnce(() => new Promise(resolve => { complete = resolve; }));
+        renderPage();
+        await screen.findByRole('link', { name: '가게 이름 · 신메뉴 안내 소식 보기' });
+        const period = screen.getByRole('button', { name: '가게 소식 기간' });
+        fireEvent.click(period);
+        fireEvent.click(await screen.findByRole('menuitemradio', { name: '전체 기간' }));
+        await waitFor(() => expect(complete).toBeTypeOf('function'));
+        expect(screen.getByRole('button', { name: '가게 소식 기간' })).toBe(period);
+        expect(period).toHaveFocus();
+        expect(screen.queryByText('신메뉴 안내')).toBeNull();
+        expect(document.querySelector('.reserve-benefit-row--skeleton')).toBeInTheDocument();
+        await act(async () => complete({ content: [{ ...item, title: '전체 기간 소식' }] }));
+        expect(await screen.findByText('전체 기간 소식')).toBeInTheDocument();
+    });
+
     it('hides a cached list failure after approval is disabled while retaining policy retry feedback', async () => {
         benefitService.getList.mockResolvedValue({ content: [item], page: { totalElements: 1 } });
         const { client, unmount } = renderPage();
@@ -118,10 +136,10 @@ describe('public store news and benefit guidance', () => {
         expect(loading).toBeInTheDocument();
         expect(loading.parentElement.querySelectorAll('.reserve-benefit-row--skeleton')).toHaveLength(6);
         const link = await screen.findByRole('link', { name: '가게 이름 · 신메뉴 안내 소식 보기' });
-        expect(link).toHaveAttribute('href', '/benefits/1');
+        expect(link).toHaveAttribute('href', '/benefits/00000000-0000-4000-8000-000000000001');
         fireEvent.click(link);
         expect(await screen.findByRole('heading', { name: '신메뉴 안내' })).toBeInTheDocument();
-        expect(screen.getByRole('link', { name: '가게 보기' })).toHaveAttribute('href', '/store/12');
+        expect(screen.getByRole('link', { name: '가게 보기' })).toHaveAttribute('href', '/store/00000000-0000-4000-8000-000000000012');
         expect(document.querySelector('.reserve-benefit-detail-content').textContent).toBe(item.content);
         expect(document.querySelector('.reserve-benefit-detail-content script, .reserve-benefit-detail-content img')).toBeNull();
         expect(screen.getByRole('img', { name: '가게 사진이 등록되지 않았어요' })).toHaveAttribute('src', BENEFIT_IMAGE_FALLBACK);

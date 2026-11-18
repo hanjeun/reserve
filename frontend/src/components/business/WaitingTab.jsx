@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Card, DataState, FilterMenu, FilterToolbar, FormField, FormInput, FormModal } from '../common';
-import ListingContent from '../common/ListingContent';
+import { AnimatedListingContent } from '../common/AnimatedContent';
 import StoreListViewToggle from '../store/StoreListViewToggle';
 import { useMyStores, useQueryParamsState } from '../../hooks';
 import useViewModeParam from '../../hooks/useViewModeParam';
@@ -15,7 +15,9 @@ import WaitingQrModal from '../waiting/WaitingQrModal';
 import WaitingDetailModal from '../waiting/WaitingDetailModal';
 import { WaitingTabSkeleton } from '../waiting/WaitingSkeleton';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
+import useListSelectionMotion from '../../hooks/useListSelectionMotion';
 import useLiveUpdatesStatus from '../../hooks/useLiveUpdatesStatus';
+import { WorkspaceActivityContext } from '../layout/workspaceActivity';
 import { isBlockingListReadError, isReadAccessDenied } from '../../hooks/liveUpdateQueries';
 
 const QUERY_DEFAULTS = Object.freeze({ waitingStore: '', waitingSearch: '', waitingStatus: 'ACTIVE' });
@@ -75,6 +77,7 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
     revision, view, onViewChange, search, onSearchChange, status, onStatusChange }) {
     const storeId = store?.id;
     const live = useLiveUpdatesStatus();
+    const activeWorkspace = useContext(WorkspaceActivityContext);
     const listRef = useRef(null);
     const queryClient = useQueryClient();
     const { message, confirm } = useMessage();
@@ -91,9 +94,9 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
     const clientRequestId = useRef(null);
     const queryKey = ['waiting', revision, storeId];
     const board = useQuery({ queryKey, queryFn: ({ signal }) => waitingService.getBoard(storeId, signal),
-        enabled: Boolean(storeId) && (!storesError || stores.length > 0), retry: false, staleTime: 10_000,
-        refetchInterval: live.connected && live.domains.includes('WAITING') ? false : 30_000,
-        refetchIntervalInBackground: false, refetchOnWindowFocus: !live.present });
+        enabled: activeWorkspace && Boolean(storeId) && (!storesError || stores.length > 0), retry: false, staleTime: 10_000,
+        refetchInterval: live.present ? false : 30_000,
+        refetchIntervalInBackground: false, refetchOnWindowFocus: !live.present, refetchOnReconnect: false });
     const accessLost = isReadAccessDenied(board.error) || isReadAccessDenied(storesError);
     const [previousAccessLost, setPreviousAccessLost] = useState(accessLost);
     if (previousAccessLost !== accessLost) {
@@ -189,6 +192,10 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
         .toLocaleLowerCase('ko-KR').includes(keyword);
     const visibleEntries = entries.filter(entry => matches(entry)
         && (status === 'ALL' || (status === 'ACTIVE' ? isActive(entry) : entry.status === status)));
+    useListSelectionMotion(listRef, {
+        selection: JSON.stringify([keyword, status]), view: `${storeId}:${view}`,
+        ids: visibleEntries.map(entry => entry.id), ready: !storesLoading && !board.isLoading && !blockingError,
+    });
     const entryClass = `reserve-waiting-entries reserve-waiting-entries--${view}${view === 'cards' ? ' rsv-store-grid' : ''}`;
     const busy = pending !== null || Boolean(storesError) || accessLost;
     const paused = board.data?.waitingPaused === true;
@@ -247,10 +254,10 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
         </div>
         <FilterToolbar search={{ value: search, onChange: onSearchChange, placeholder: '이름, 대기번호로 검색' }}
             onReload={store ? refresh : refetchStores} loading={storesLoading || board.isFetching} autoRefreshDomain="WAITING" />
-        <ListingContent notice={<>
+        <AnimatedListingContent motionKey={view} notice={<>
             {storesError && !board.error && stores.length > 0 && <DataState compact state="error" kind="store" subject="가게 목록 갱신" error={storesError} onRetry={refetchStores} />}
             {notice}
-        </>}>{content}</ListingContent>
+        </>}>{content}</AnimatedListingContent>
         {!accessLost && <WaitingQrModal open={qrOpen} storeId={storeId} onClose={() => setQrOpen(false)} />}
         {!accessLost && <WaitingDetailModal detail={detail} open={Boolean(detail)} onClose={() => setDetailId(null)} />}
         {!accessLost && <FormModal title="대기 접수" open={open} mobileSize="content" width={440}
@@ -277,7 +284,7 @@ WaitingBoard.propTypes = { store: PropTypes.object, stores: PropTypes.array.isRe
 export default function WaitingTab() {
     const { stores, loading, error, refetch } = useMyStores();
     const revision = useAuthStore(state => state.sessionRevision);
-    const [{ waitingStore, waitingSearch, waitingStatus }, setParams] = useQueryParamsState(QUERY_DEFAULTS);
+    const [{ waitingStore, waitingSearch, waitingStatus }, setParams] = useQueryParamsState(QUERY_DEFAULTS, { privateKeys: ['waitingSearch'] });
     const [searchParams] = useSearchParams();
     const [view, setView] = useViewModeParam(searchParams, 'list');
     const store = stores.find(item => String(item.id) === waitingStore) ?? stores[0] ?? null;

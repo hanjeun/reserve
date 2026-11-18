@@ -14,11 +14,13 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.UUID;
 
-/** 로컬 프로필의 피드 암호문만 저장한다. 공개 URL과 기존 S3 객체는 이 저장소로 옮기지 않는다. */
+/** 로컬 프로필에서 피드·리뷰 사진의 암호문을 저장한다. */
 @Component
 public class LocalFeedImageStore {
     private static final String NAMESPACE = "local-feed/";
-    private static final String KEY_PATTERN = "local-feed/users/\\d+/feed/images/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.bin";
+    private static final String PREFIX_PATTERN = "users/\\d+/(feed|reviews)/images";
+    private static final String KEY_PATTERN = NAMESPACE + PREFIX_PATTERN
+            + "/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.bin";
     private static final int LIMIT = (int) ImageFileValidator.MAX_FILE_BYTES + 28;
     private final boolean enabled;
     private final Path root;
@@ -51,12 +53,12 @@ public class LocalFeedImageStore {
     public boolean owns(String key) { return enabled && isLocalKey(key); }
 
     public boolean underPrefix(String key, String prefix) {
-        return owns(key) && prefix != null && prefix.matches("users/\\d+/feed/images")
+        return owns(key) && prefix != null && prefix.matches(PREFIX_PATTERN)
                 && key.startsWith(NAMESPACE + prefix + "/");
     }
 
     public String store(byte[] encrypted, String prefix) {
-        if (!enabled || prefix == null || !prefix.matches("users/\\d+/feed/images")
+        if (!enabled || prefix == null || !prefix.matches(PREFIX_PATTERN)
                 || encrypted == null || encrypted.length < 28 || encrypted.length > LIMIT) {
             throw FileException.invalid("올바른 로컬 피드 사진이 아니에요.");
         }

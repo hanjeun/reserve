@@ -43,7 +43,7 @@ for (const count of [101, 201]) {
         if (isMobile) await expect(totalCount).toBeHidden();
         else await expect(totalCount).toBeVisible();
         await expect(page.locator('.reserve-tap-card')).toHaveCount(15);
-        await page.getByRole('navigation', { name: '예약 목록 페이지' }).getByTitle('2', { exact: true }).click();
+        await page.getByRole('navigation', { name: '예약 목록 페이지' }).getByText('2', { exact: true }).click();
         await expect.poll(() => requests.at(-1)?.page).toBe('1');
         await expect(page.locator('.reserve-tap-card')).toHaveCount(15);
         await page.getByPlaceholder('가게명, 예약자로 검색').fill('백번째밖예약자');

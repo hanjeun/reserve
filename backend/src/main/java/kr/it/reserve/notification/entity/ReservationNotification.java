@@ -14,6 +14,7 @@ import org.hibernate.type.SqlTypes;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 
 @Entity
 @Getter
@@ -87,18 +88,23 @@ public class ReservationNotification {
         item.storeName = reservation.getStore().getName();
         item.reservationDate = reservation.getReservationDate();
         item.reservationTime = reservation.getReservationTime();
-        item.createdAt = now;
-        item.nextAttemptAt = now;
+        item.createdAt = storedTime(now);
+        item.nextAttemptAt = item.createdAt;
         return item;
     }
 
     public void deliver(LocalDateTime now) {
-        deliveredAt = now;
+        deliveredAt = storedTime(now);
         nextAttemptAt = null;
     }
 
     public void defer(LocalDateTime now) {
         attempts = Math.min(attempts + 1, 6);
-        nextAttemptAt = now.plusSeconds(Math.min(300, 5L << attempts));
+        nextAttemptAt = storedTime(now.plusSeconds(Math.min(300, 5L << attempts)));
+    }
+
+    private static LocalDateTime storedTime(LocalDateTime now) {
+        // timestamp(6)의 올림으로 같은 시각의 due 조회에서 빠지지 않도록 저장 전에 절삭한다.
+        return now.truncatedTo(ChronoUnit.MICROS);
     }
 }

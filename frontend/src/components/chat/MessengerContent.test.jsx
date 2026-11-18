@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { Profiler } from 'react';
+import process from 'node:process';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -10,6 +11,12 @@ import { chatService } from '../../services';
 import storeService from '../../services/storeService';
 import useAuthStore from '../../store/useAuthStore';
 import useMessengerStore, { messengerIdentityOf } from '../../store/useMessengerStore';
+
+const { profileMessages } = vi.hoisted(() => ({ profileMessages: vi.fn() }));
+vi.mock('./ChatBubbleList', async importOriginal => {
+    const { default: ChatBubbleList } = await importOriginal();
+    return { default: props => <Profiler id="말풍선 목록" onRender={profileMessages}><ChatBubbleList {...props} /></Profiler> };
+});
 
 vi.mock('../../services/storeService', () => ({ default: { getStores: vi.fn() } }));
 
@@ -39,6 +46,7 @@ vi.mock('../../services', () => ({
         markRead: vi.fn(),
         setBlocked: vi.fn(),
         setHidden: vi.fn(),
+        leave: vi.fn(),
         reportConversation: vi.fn(),
     },
 }));
@@ -47,6 +55,8 @@ const page = (content = []) => ({
     content,
     page: { number: 0, totalPages: 1, totalElements: content.length },
 });
+
+const profileLongChats = process.env.RESERVE_CHAT_PROFILE === 'true';
 
 const finishThreadAnimation = thread => {
     const animationName = thread.closest('.reserve-messenger').classList.contains('is-returning-to-list')
@@ -119,24 +129,84 @@ describe('MessengerContent', () => {
         vi.restoreAllMocks();
     });
 
-    it('opens the same notification thread from the header after hiding the row and restores it from hidden conversations', async () => {
+    it.each(profileLongChats ? [50, 200, 500] : [50])(
+        'keeps %i loaded messages out of draft updates and sends the current text', async count => {
+            const createdAt = new Date().toISOString();
+            chatService.getSupport.mockResolvedValue({ roomId: 1, type: 'SUPPORT', viewerRole: 'MEMBER', canSend: true,
+                messages: Array.from({ length: count }, (_, i) => ({ id: i + 1, senderRole: 'ADMIN', content: `이전 ${i + 1}`, createdAt })) });
+            chatService.sendSupport.mockResolvedValue({ id: count + 1, senderRole: 'MEMBER', content: '보낼 메시지 8', createdAt });
+            renderMessenger();
+            await screen.findByText(`이전 ${count}`);
+            const input = screen.getByRole('textbox');
+            const mount = profileMessages.mock.calls.find(([, phase]) => phase === 'mount')?.[2];
+            expect(mount).toBeDefined();
+            profileMessages.mockClear();
+
+            for (let i = 1; i <= 8; i += 1) fireEvent.change(input, { target: { value: `보낼 메시지 ${i}` } });
+            const updates = profileMessages.mock.calls.map(([, , duration]) => duration).toSorted((a, b) => a - b);
+            if (profileLongChats) {
+                console.info(`Chat profile: ${count} messages, mount ${mount.toFixed(1)} ms, ${updates.length} list updates while typing, median ${(updates[Math.floor(updates.length / 2)] ?? 0).toFixed(1)} ms`);
+            }
+            expect(updates).toHaveLength(0);
+
+            fireEvent.click(screen.getByRole('button', { name: '보내기', exact: true }));
+            await waitFor(() => expect(chatService.sendSupport).toHaveBeenCalledTimes(1));
+            expect(chatService.sendSupport.mock.calls[0][0]).toBe('보낼 메시지 8');
+            expect(input).toHaveValue('');
+        },
+    );
+
+    it.skipIf(!profileLongChats)('keeps the scroll anchor when 50 earlier messages are prepended to a long thread', async () => {
+        const createdAt = new Date().toISOString();
+        const messagesFrom = (start, count) => Array.from({ length: count }, (_, i) => ({
+            id: start + i, senderRole: 'ADMIN', content: `이전 ${start + i}`, createdAt,
+        }));
+        chatService.getSupport.mockResolvedValue({ roomId: 1, type: 'SUPPORT', viewerRole: 'MEMBER', canSend: true,
+            hasOlderMessages: true, nextBeforeId: 51, messages: messagesFrom(51, 450) });
+        chatService.getHistory.mockResolvedValue({ messages: messagesFrom(1, 50), hasMore: false });
+        const { container } = renderMessenger();
+        await screen.findByText('이전 500');
+        const body = container.querySelector('.reserve-messenger-thread-body');
+        Object.defineProperty(body, 'scrollHeight', { get: () => body.querySelectorAll('[data-message-id]').length * 36 });
+        body.scrollTop = 180;
+        profileMessages.mockClear();
+
+        fireEvent.click(screen.getByRole('button', { name: '이전 메시지 보기' }));
+        await screen.findByText('이전 1');
+        expect(chatService.getHistory).toHaveBeenCalledExactlyOnceWith(1, 51, 50);
+        expect(body.scrollTop).toBe(180 + 50 * 36);
+        expect(body.querySelectorAll('[data-message-id]')).toHaveLength(500);
+        const total = profileMessages.mock.calls.reduce((sum, [, , duration]) => sum + duration, 0);
+        console.info(`Chat profile: prepend 50 to 450 messages, ${profileMessages.mock.calls.length} list updates, ${total.toFixed(1)} ms total`);
+    }, 20_000);
+
+    it('slides the notification row out and restores it with the same bell control', async () => {
         useMessengerStore.getState().showConversations();
         const { container } = renderMessenger({ surface: 'panel' });
         const notificationRow = /^RESERVE 알림\s*예약 상태와 일정 안내/;
         expect(screen.getByRole('button', { name: notificationRow })).toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'RESERVE 알림 대화 메뉴' }));
-        fireEvent.click(screen.getByRole('button', { name: 'RESERVE 알림 숨기기' }));
-        await waitFor(() => expect(screen.queryByRole('button', { name: notificationRow })).not.toBeInTheDocument());
+        fireEvent.click(screen.getByRole('button', { name: '알림 대화 숨기기' }));
+        const shortcut = screen.getByRole('button', { name: '알림 대화 표시하기' });
+        const rowMotion = document.getElementById(shortcut.getAttribute('aria-controls'));
+        expect(rowMotion).toHaveAttribute('data-closing', 'true');
+        expect(rowMotion).toHaveAttribute('inert');
+        expect(screen.queryByRole('button', { name: notificationRow })).not.toBeInTheDocument();
+        expect(localStorage.getItem('reserve:notification-conversation-hidden:v1:7')).toBe('true');
         expect(chatService.readReservationNotifications).not.toHaveBeenCalled();
         expect(chatService.setHidden).not.toHaveBeenCalled();
-        const shortcut = screen.getByRole('button', { name: '알림 보기' });
+        await waitFor(() => expect(rowMotion).toHaveAttribute('hidden'));
         fireEvent.click(shortcut);
+        expect(screen.getByRole('button', { name: '알림 대화 숨기기' })).toBe(shortcut);
+        expect(chatService.getReservationNotifications).not.toHaveBeenCalled();
+        const restoredRow = screen.getByRole('button', { name: notificationRow });
+        fireEvent.click(restoredRow);
         const thread = container.querySelector('.reserve-messenger-thread');
         expect(await screen.findByRole('region', { name: 'RESERVE 알림' })).toBeInTheDocument();
         finishThreadAnimation(thread);
         fireEvent.click(screen.getByRole('button', { name: '대화 목록으로 돌아가기' }));
         finishThreadAnimation(thread);
-        await waitFor(() => expect(screen.getByRole('button', { name: '알림 보기' })).toHaveFocus());
+        await waitFor(() => expect(screen.getByRole('button', { name: notificationRow })).toHaveFocus());
+        fireEvent.click(screen.getByRole('button', { name: '알림 대화 숨기기' }));
         fireEvent.click(screen.getByRole('button', { name: '숨긴 대화 보기' }));
         expect(screen.getByRole('button', { name: notificationRow })).toBeInTheDocument();
         expect(screen.queryByText('숨긴 대화가 없어요.')).not.toBeInTheDocument();
@@ -147,6 +217,38 @@ describe('MessengerContent', () => {
         expect(chatService.getSupport).not.toHaveBeenCalled();
     });
 
+    it('filters customer, received, and unread conversations without fetching unrelated pages', async () => {
+        useAuthStore.setState({ user: { id: 7, role: 'BUSINESS', name: '사장님' }, isLoggedIn: true });
+        useMessengerStore.setState({ sessionIdentity: messengerIdentityOf(useAuthStore.getState()) });
+        useMessengerStore.getState().showConversations();
+        const mine = page([{ roomId: 31, storeId: 21, type: 'STORE', viewerRole: 'MEMBER', storeName: '내 예약 공방', unread: 0 }]);
+        mine.page.totalPages = 2;
+        chatService.listConversations.mockResolvedValue(mine);
+        chatService.listStoreInbox.mockResolvedValue(page([
+            { roomId: 77, storeId: 42, type: 'STORE', viewerRole: 'OWNER', counterpartName: '답변 기다리는 손님', unread: 2 },
+            { roomId: 78, storeId: 42, type: 'STORE', viewerRole: 'OWNER', counterpartName: '이미 읽은 손님', unread: 0 },
+        ]));
+        renderMessenger({ surface: 'panel' });
+        const inquiry = { name: /내 예약 공방(?! 대화 메뉴)/ };
+        const unread = { name: /답변 기다리는 손님(?! 대화 메뉴)/ };
+        const read = { name: /이미 읽은 손님(?! 대화 메뉴)/ };
+        await screen.findByRole('button', inquiry);
+        await screen.findByRole('button', read);
+        const filters = within(screen.getByRole('radiogroup', { name: '대화 목록 필터' }));
+        fireEvent.click(filters.getByRole('radio', { name: '내 문의' }));
+        expect(screen.getByRole('button', inquiry)).toBeInTheDocument();
+        expect(screen.queryByRole('button', unread)).toBeNull();
+        fireEvent.click(filters.getByRole('radio', { name: '받은 문의' }));
+        expect(screen.getByRole('button', read)).toBeInTheDocument();
+        expect(screen.queryByRole('button', inquiry)).toBeNull();
+        fireEvent.click(filters.getByRole('radio', { name: '안 읽음' }));
+        expect(filters.getByRole('radio', { name: '안 읽음' })).toBeChecked();
+        expect(screen.getByRole('button', unread)).toBeInTheDocument();
+        expect(screen.queryByRole('button', read)).toBeNull();
+        expect(screen.queryByRole('button', { name: '대화 더 보기' })).toBeNull();
+        expect(chatService.listConversations).toHaveBeenCalledExactlyOnceWith(0);
+    });
+
     it('uses the existing server visibility action for a member conversation without opening the room', async () => {
         useMessengerStore.getState().showConversations();
         chatService.listConversations.mockImplementation((pageNumber, hidden) => Promise.resolve(page(hidden ? [] : [
@@ -154,7 +256,7 @@ describe('MessengerContent', () => {
         ])));
         renderMessenger({ surface: 'panel' });
         fireEvent.click(await screen.findByRole('button', { name: '테스트 공방 대화 메뉴' }));
-        fireEvent.click(screen.getByRole('button', { name: '테스트 공방 숨기기' }));
+        fireEvent.click(await screen.findByRole('menuitem', { name: '숨기기' }));
         await waitFor(() => expect(chatService.setHidden).toHaveBeenCalledExactlyOnceWith(31, 'MEMBER', true));
         expect(chatService.getStore).not.toHaveBeenCalled();
         expect(chatService.getSupport).not.toHaveBeenCalled();

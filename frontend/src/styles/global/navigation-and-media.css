@@ -1,3 +1,34 @@
+/* 노출된 선택 칩과 패널 탭은 같은 테두리로 선택 상태를 표시한다. */
+.reserve-segmented-btn,
+.reserve-pill-tabs .ant-tabs-tab,
+.reserve-route-panel-tab,
+.reserve-search-keywords button {
+    box-sizing: border-box;
+    min-height: 44px;
+    padding: 9px 15px;
+    border: 1px solid var(--c-gray-300);
+    border-radius: 999px;
+    background-color: var(--c-bg-paper);
+    color: var(--c-text-primary);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 22px;
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+.reserve-segmented-btn--active,
+.reserve-pill-tabs .ant-tabs-tab-active,
+.reserve-route-panel-tab.is-active {
+    border-color: var(--c-text-primary);
+}
+@media (hover: hover) and (pointer: fine) {
+    .reserve-segmented-btn:hover:not(:disabled),
+    .reserve-pill-tabs .ant-tabs-tab:hover:not(.ant-tabs-tab-disabled),
+    .reserve-search-keywords button:hover:not(:disabled) {
+        background-color: var(--c-hover-surface);
+    }
+}
+
 /* 패널 탭 탐색 */
 .reserve-pill-tabs .ant-tabs-nav::before {
     border-bottom: none !important;
@@ -7,56 +38,33 @@
 }
 /* 탭 간격은 AntD가 크기 계산에 포함하는 tabBarGutter로 전달한다. */
 .reserve-pill-tabs .ant-tabs-tab {
-    padding: 8px 18px !important;
-    border-radius: 10px !important;
-    background-color: transparent !important;
-    transition: background-color 0.2s ease !important;
-}
-.reserve-pill-tabs .ant-tabs-tab:hover:not(.ant-tabs-tab-active) {
-    background-color: var(--c-gray-100, #f2f4f6) !important;
+    padding: 9px 15px !important;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 .reserve-pill-tabs .ant-tabs-tab .ant-tabs-tab-btn {
-    color: var(--c-text-tertiary, #8b95a1) !important;
+    color: inherit !important;
     font-weight: 500;
-    transition: color 0.2s ease;
-}
-.reserve-pill-tabs .ant-tabs-tab:hover .ant-tabs-tab-btn {
-    color: var(--c-text-primary, #1a1f27) !important;
-}
-.reserve-pill-tabs .ant-tabs-tab:focus-within .ant-tabs-tab-btn,
-.reserve-pill-tabs .ant-tabs-tab .ant-tabs-tab-btn:focus,
-.reserve-pill-tabs .ant-tabs-tab .ant-tabs-tab-btn:focus-visible {
-    color: var(--c-text-primary, #1a1f27) !important;
     text-shadow: none !important;
 }
-.reserve-pill-tabs .ant-tabs-tab-active {
-    background-color: var(--c-gray-200, #e5e8eb) !important;
-}
-.reserve-pill-tabs .ant-tabs-tab-active:hover {
-    background-color: var(--c-gray-200, #e5e8eb) !important;
+.reserve-pill-tabs .ant-tabs-tab:not(.ant-tabs-tab-disabled) .ant-tabs-tab-btn {
+    color: var(--c-text-primary) !important;
 }
 .reserve-pill-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
-    color: var(--c-text-primary, #1a1f27) !important;
-    font-weight: 600 !important;
+    font-weight: 600;
 }
-/* QR 시트를 여는 순간 선택 면도 함께 바뀐다. 배경 전환이 남으면 직전 탭과 QR 탭이
-   짧게 동시에 선택된 것처럼 보여 파트너 패널에서만 면 전환을 즉시 처리한다. */
+.reserve-pill-tabs .ant-tabs-tab-disabled {
+    color: var(--c-text-disabled);
+}
+/* QR 시트와 선택 표시가 동시에 바뀌도록 사업자 탭의 배경 전환을 생략한다. */
 .reserve-business-tabs .ant-tabs-tab {
     transition: none !important;
 }
-@media (max-width: 768px) {
-    /* 모바일 탭의 좌우 여백을 줄이되 실제로 넘친 탭의 탐색 안내는 유지한다. */
-    .reserve-pill-tabs .ant-tabs-tab {
-        padding: 7px 10px !important;
-    }
-}
-/* 탭 더보기의 최대 높이는 항목 수 대신 뷰포트에 맞추고 데스크톱 상한을 둔다.
-   AntD가 주입하는 기본 높이 규칙보다 우선하도록 important를 사용한다. */
+/* AntD 기본 높이를 덮어 긴 탭 메뉴가 뷰포트를 넘지 않게 한다. */
 .ant-tabs-dropdown .ant-tabs-dropdown-menu {
     max-height: min(70vh, 560px) !important;
 }
 
-/* 더보기(∨) 버튼도 우리 톤으로 — 기본 AntD 파란 혹 테두리 없이 회색 계열 */
+/* 탭 더보기도 공통 도구의 중립색과 눌림 상태를 사용한다. */
 .reserve-pill-tabs .ant-tabs-nav-more {
     color: var(--c-text-tertiary, #8b95a1) !important;
     background: transparent !important;
@@ -89,21 +97,11 @@
 
 .reserve-segmented-btn {
     appearance: none;
-    -webkit-appearance: none;
-    border: none;
     cursor: pointer;
-    background-color: transparent;
-    border-radius: 10px;
-    padding: 10px 16px;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--c-text-tertiary, #8b95a1);
-    font-family: inherit;
-    transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
     white-space: nowrap;
 }
-/* span 뼈대도 실제 button의 normal 줄 높이를 사용해 뒤 도구줄을 밀지 않는다. */
-.reserve-segmented--skeleton .reserve-segmented-btn { line-height: normal; }
+.reserve-segmented-btn--active { font-weight: 600; }
+.reserve-segmented-btn:focus-visible { outline-offset: -4px; }
 /* 359px 이하에서만 페이지 좌우 여백을 줄인다. 인라인 컨테이너 여백보다 우선하도록 지정한다. */
 @media (max-width: 359px) {
     .reserve-page-container {
@@ -136,6 +134,14 @@
     border-radius: 999px !important;
     background: rgba(0, 0, 0, 0.28) !important;
     backdrop-filter: blur(6px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+.reserve-store-gallery[data-photo-dots-visible] .slick-dots,
+.reserve-carousel .slick-dots:has(button:focus-visible) {
+    opacity: 1;
+    pointer-events: auto;
 }
 .reserve-carousel .slick-dots li {
     margin: 0 3px !important;
@@ -156,15 +162,18 @@
     border-radius: 999px !important;
     background: #fff !important;
 }
-/* AntD의 3px 진행 레이어가 6px 표시점 위를 덮으면 다크 모드에서 반쪽이 검게 보인다.
-   이 캐러셀은 버튼 자체의 원/알약으로 현재 사진을 표시하므로 중복 레이어를 그리지 않는다. */
+.reserve-carousel .slick-dots li button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+/* 현재 사진은 버튼 모양으로 표시하므로 AntD의 진행 레이어를 중복해서 그리지 않는다. */
 .reserve-carousel .slick-dots li::after { display: none !important; }
-/* 점이 하나뿐이면(사진 1장) 캡슐 자체가 의미 없다 — 감춘다. */
+/* 사진이 한 장이면 탐색 표시를 생략한다. */
 .reserve-carousel .slick-dots li:only-child { display: none !important; }
-/* 슬라이드 이미지는 블록으로 두고 미리보기의 모서리 잘림을 유지한다. */
-/* 캐러셀 클래스는 안쪽 슬라이더에 붙는다. 실제 잘림 영역인 slick-list에 모서리를 지정한다. */.reserve-carousel {
-    /* 값의 출처는 styles/tokens/spacing.js 의 radius.xl. CSS 쪽에서 참조할 변수가 없어
-       여기 한 곳에만 적는다 — 래퍼(mobileImageWrapper/pcImageWrapper)와 같은 값이어야 한다. */
+@media (prefers-reduced-motion: reduce) {
+    .reserve-carousel .slick-dots,
+    .reserve-carousel .slick-dots li button { transition: none !important; }
+}
+/* 실제 잘림 영역인 slick-list와 바깥 래퍼의 모서리를 맞춘다. */
+.reserve-carousel {
+    /* 래퍼가 사용하는 tokens/spacing.js의 radius.xl과 함께 유지한다. */
     --carousel-radius: 16px;
 }
 .reserve-carousel .slick-list {
@@ -174,11 +183,9 @@
     border-radius: var(--carousel-radius) !important;
     overflow: hidden !important;
 }
-/* 넘길 때 이미지가 "치지직" 거리는 것 — transform 으로 큰 이미지를 옮기는 동안
-   GPU 레이어가 없으면 매 프레임 리페인트가 일어나 가장자리에 티어링처럼 보인다.
-   트랙을 합성 레이어로 승격시키고 뒷면 렌더링을 끈다. */
 .reserve-store-action-panel { scroll-margin-top: 104px; }
 .reserve-store-gallery { touch-action: pan-y pinch-zoom; }
+/* 슬라이드 이동 중 가장자리 깜빡임을 줄이도록 합성 레이어를 유지한다. */
 .reserve-carousel .slick-track {
     will-change: transform;
     backface-visibility: hidden;
@@ -194,12 +201,10 @@
     -webkit-user-select: none;
 }
 .reserve-carousel .slick-slide > div { line-height: 0 !important; font-size: 0 !important; }
-/* 화면 밖 슬라이드를 visibility 로 숨기지 않는다 — 넘어가는 동안 옆 슬라이드와 무한 루프용 복제 슬라이드가
-   함께 보여야 한다. 숨기면 마지막 → 처음으로 넘어갈 때 빈 칸이 지나가며 하얗게 깜빡인다. */
+/* 순환 전환에 필요한 화면 밖 슬라이드는 표시하고 포인터 입력만 차단한다. */
 .reserve-carousel .slick-slide[aria-hidden='true'] * { pointer-events: none; }
 
-/* 좌·우 화살표 — AntD 기본 화살표(::after 삼각형)를 지우고 얇은 꺾쇠를 직접 그린다.
-   톤은 프리뷰(닫기·화살표)와 같은 값을 쓴다. */
+/* AntD 기본 화살표와 공통 꺾쇠가 겹치지 않게 한다. */
 .reserve-carousel .slick-prev::after,
 .reserve-carousel .slick-next::after { display: none !important; }
 .reserve-carousel .slick-prev,
@@ -231,14 +236,11 @@
     transition: all 0.2s ease !important;
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3)) !important;
 }
-/* 닫힘 상태에도 각도를 명시한다 — `transform: none` 은 행렬 보간이라 방향이 뒤집힌다
-   (docs/technical/design-system.md 회전 규칙). */
 .reserve-carousel .slick-prev::before { transform: rotate(-135deg) !important; margin-left: 6px !important; }
 .reserve-carousel .slick-next::before { transform: rotate(45deg) !important; margin-right: 6px !important; }
 .reserve-carousel .slick-prev { left: 10px !important; }
 .reserve-carousel .slick-next { right: 10px !important; }
-/* 모바일에서는 화살표를 숨긴다 — Carousel 은 `draggable` 이 켜져 있어 스와이프로 넘어간다.
-   (이미지 프리뷰와 다른 점이다. rc-image 쪽은 스와이프가 없어서 화살표를 남겨뒀다.) */
+/* 모바일 캐러셀은 스와이프로 탐색하므로 화살표를 숨긴다. */
 @media (max-width: 768px) {
     .reserve-carousel .slick-arrow { display: none !important; }
 }
@@ -339,22 +341,3 @@
 }
 
 /* 그리드의 최대 폭 경계는 공통 breakpoints 값보다 1px 작게 둔다. */
-.rsv-fav-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 24px;
-}
-@media (max-width: 1079px) { .rsv-fav-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 815px)  { .rsv-fav-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 551px)  { .rsv-fav-grid { grid-template-columns: 1fr; } }
-
-/* 내 가게도 StoreList/MyFavorites와 같은 4→3→2→1열 경계를 쓴다.
-   페이지 내부 <style>에 두면 해당 컴포넌트가 렌더될 때만 정책이 생기므로 전역 관문으로 이동했다. */
-.rsv-mystore-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 24px;
-}
-@media (max-width: 1079px) { .rsv-mystore-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 815px)  { .rsv-mystore-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 551px)  { .rsv-mystore-grid { grid-template-columns: 1fr; } }

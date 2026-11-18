@@ -2,6 +2,7 @@ import React from 'react';
 import dayjs from 'dayjs';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const navigate = vi.hoisted(() => vi.fn());
@@ -16,7 +17,6 @@ vi.mock('react-router-dom', async (importOriginal) => ({
     ...(await importOriginal()),
     useNavigate: () => navigate,
 }));
-vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock('../../services/reservationService', () => ({ default: reservationService }));
 vi.mock('../../services/adService', () => ({ default: { recordConversion: vi.fn() } }));
 vi.mock('../../utils/adAttribution', () => ({ consumeAdClickAttribution: vi.fn() }));
@@ -32,8 +32,9 @@ const httpError = (status) => Object.assign(new Error('요청에 실패했어요
 
 function renderEditHook(message) {
     const form = { setFieldsValue: vi.fn() };
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const wrapper = ({ children }) => (
-        <MemoryRouter initialEntries={['/store/12?edit=91']}>{children}</MemoryRouter>
+        <MemoryRouter initialEntries={['/store/12?edit=91']}><QueryClientProvider client={client}>{children}</QueryClientProvider></MemoryRouter>
     );
     return renderHook(props => useStoreDetailActions({
         id: '12', store: { id: 12 }, isLoggedIn: true, user: { id: 7 }, form, pay: vi.fn(), message, ...props,
@@ -134,7 +135,9 @@ describe('useStoreDetailActions edit lookup', () => {
         reservationService.getReservation.mockResolvedValue(editable);
         reservationService.getMyCompletedForStore.mockResolvedValue({ id: 19, reviewId: 5 });
         const { result, rerender } = renderEditHook(message);
-        await waitFor(() => expect(result.current.completedReservation).toEqual({ reservationId: 19, reviewId: 5 }));
+        await waitFor(() => expect(result.current.completedReservation).toEqual({
+            reservationId: 19, reviewId: 5, reviewWritten: false, reservationDate: null,
+        }));
         expect(result.current.editingReservation).toEqual(editable);
         const newEdit = new Promise(() => {});
         reservationService.getReservation.mockReturnValueOnce(newEdit);
@@ -148,7 +151,7 @@ describe('useStoreDetailActions edit lookup', () => {
         expect(result.current.completedReservation).toBeNull();
     });
 
-    it('ignores a stale review response and exposes retry loading without retaining old eligibility', async () => {
+    it('ignores a previous account response and clears eligibility when the current refresh fails', async () => {
         reservationService.getReservation.mockResolvedValue(editable);
         let resolveOld;
         let resolveNew;
@@ -161,12 +164,13 @@ describe('useStoreDetailActions edit lookup', () => {
         expect(result.current.completedReservation).toBeNull();
         expect(result.current.reviewEligibilityLoading).toBe(true);
         await act(async () => { resolveNew({ id: 29 }); });
-        expect(result.current.completedReservation).toEqual({ reservationId: 29, reviewId: null });
+        await waitFor(() => expect(result.current.completedReservation).toEqual({
+            reservationId: 29, reviewId: null, reviewWritten: false, reservationDate: null,
+        }));
         reservationService.getMyCompletedForStore.mockRejectedValueOnce(new Error('offline'));
         act(() => { result.current.refetchReviewEligibility(); });
-        expect(result.current.reviewEligibilityLoading).toBe(true);
-        expect(result.current.completedReservation).toBeNull();
         await waitFor(() => expect(result.current.reviewEligibilityError).toBeInstanceOf(Error));
+        expect(result.current.completedReservation).toBeNull();
         expect(result.current.reviewEligibilityLoading).toBe(false);
     });
 });

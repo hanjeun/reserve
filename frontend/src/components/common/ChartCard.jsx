@@ -1,9 +1,10 @@
-import React, { useId } from 'react';
+import React, { useId, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Typography } from 'antd';
 import { colors, radius, shadows, fontSize, fontWeight } from '../../styles/tokens';
 import SkeletonText from './SkeletonText';
 import { RightOutlined } from './icons';
+import CollapsibleContent from './CollapsibleContent';
 
 const { Text } = Typography;
 
@@ -19,6 +20,8 @@ const ChartCard = ({
     tableRows = [],
 }) => {
     const titleId = useId();
+    const tableId = useId();
+    const [tableOpen, setTableOpen] = useState(false);
     const hasTable = tableColumns.length > 0 && tableRows.length > 0;
 
     return (
@@ -34,12 +37,13 @@ const ChartCard = ({
                 {children}
             </div>
             {hasTable && (
-                <details className="reserve-chart-details" style={styles.details}>
-                    <summary className="reserve-chart-summary" style={styles.detailsSummary}>
+                <div className="reserve-chart-details" style={styles.details}>
+                    <button type="button" className="reserve-chart-summary" style={styles.detailsSummary} aria-expanded={tableOpen}
+                        aria-controls={tableId} onClick={() => setTableOpen(open => !open)}>
                         <RightOutlined className="reserve-chart-chevron" aria-hidden="true" />
                         <SkeletonText loading={loading}>데이터 표 보기</SkeletonText>
-                    </summary>
-                    <div style={styles.tableScroller}>
+                    </button>
+                    <CollapsibleContent id={tableId} open={tableOpen}><div style={styles.tableScroller}>
                         <table style={styles.table}>
                             <caption style={styles.caption}><SkeletonText loading={loading}>{title} 원본 데이터</SkeletonText></caption>
                             <thead>
@@ -61,8 +65,8 @@ const ChartCard = ({
                                 ))}
                             </tbody>
                         </table>
-                    </div>
-                </details>
+                    </div></CollapsibleContent>
+                </div>
             )}
         </section>
     );

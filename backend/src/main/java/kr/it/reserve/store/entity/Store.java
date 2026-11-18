@@ -1,7 +1,7 @@
 package kr.it.reserve.store.entity;
 
-import jakarta.persistence.*;
 import kr.it.reserve.member.entity.Member;
+import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Entity
@@ -29,7 +30,7 @@ import java.util.stream.Collectors;
     @Index(name = "idx_store_deleted_status", columnList = "deleted_at, status, created_at"),
     // findByOwnerAndDeletedAtIsNullOrderByCreatedAtDesc — 내 가게 목록
     @Index(name = "idx_store_owner", columnList = "owner_id, deleted_at, created_at")
-})
+}, uniqueConstraints = @UniqueConstraint(name = "uk_store_public_id", columnNames = "public_id"))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -42,6 +43,15 @@ public class Store {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "store_id")
     private Long id;
+
+    @Setter(AccessLevel.NONE)
+    @Column(name = "public_id", length = 36, updatable = false)
+    private String publicId;
+
+    @PrePersist
+    private void assignPublicId() {
+        if (publicId == null) publicId = UUID.randomUUID().toString();
+    }
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id")
@@ -141,23 +151,11 @@ public class Store {
     @Column(name = "booking_type", length = 20)
     private BookingType bookingType;
 
-    /**
-     * {@link BookingType#SESSION} 전용 — 사장님이 직접 나열한 회차 시각. 예: {@code "11:00,14:00,17:00"}
-     *
-     * <p>별도 테이블이 아니라 CSV 인 이유 — 회차는 하루 3~10개, 순서가 있고, 검색 대상이 아니다.
-     * {@code closedDays} 가 같은 방식이고 잘 돌고 있다. <b>회차마다 정원이 달라지면</b> 그때
-     * 테이블로 올린다 — 미리 만들면 조인과 라이프사이클만 늘어난다.
-     */
+    /** {@link BookingType#SESSION}의 순서 있는 회차 시각을 CSV로 보관하며 회차별 정원은 지원하지 않는다. */
     @Column(name = "session_times", length = 500)
     private String sessionTimes;
 
-    /**
-     * 운영 시작일 — 이 날짜 <b>이전</b>은 예약을 받지 않는다. {@code null} = 시작일 제한 없음.
-     *
-     * <p>팝업스토어·기간 한정 클래스처럼 <b>영업 자체에 기간이 있는</b> 가게를 위한 것이다.
-     * 휴무일({@link #closedDays}·{@link #closedDates})로는 표현할 수 없다 —
-     * 휴무는 "여는 가게가 그날만 쉰다"이고, 이건 "그 기간 밖에는 가게가 존재하지 않는다"이다.
-     */
+    /** 휴무일과 별도로 적용하는 운영 시작일. 이전 날짜는 예약을 받지 않으며 {@code null}은 시작일 제한이 없다. */
     @Column(name = "open_date")
     private LocalDate openDate;
 
@@ -165,14 +163,16 @@ public class Store {
     @Column(name = "close_date")
     private LocalDate closeDate;
 
-    /**
-     * 오늘부터 며칠 뒤까지 예약을 받을지. {@code null} = 제한 없음.
-     *
-     * <p>그 전까지 미래 날짜 제한이 아예 없어 <b>1년 뒤 예약도 들어왔다.</b>
-     * 가게 입장에서 그렇게 먼 예약은 운영 계획을 세울 수 없고, 이용자도 잊어버린다.
-     */
+    /** 오늘부터 예약 가능한 미래 일수. {@code null}은 제한이 없음을 뜻한다. */
     @Column(name = "max_advance_booking_days")
     private Integer maxAdvanceBookingDays;
+
+    @Embedded
+    private BookingOpening bookingOpening;
+
+    public boolean bookingOpeningPending(LocalDate visitDate, LocalDateTime now) {
+        return bookingOpening != null && bookingOpening.pendingOn(visitDate, now);
+    }
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)
@@ -396,22 +396,14 @@ public class Store {
                 : dates.stream().map(LocalDate::toString).collect(Collectors.joining(","));
     }
 
-    /**
-     * 그 날짜에 문을 닫는가 — 정기 휴무 요일이거나 임시 휴무일이면 {@code true}.
-     *
-     * <p>예약 검증·가능시간 조회·달력 표시가 <b>모두 이 한 메서드를 지나게</b> 한다.
-     * 세 곳에 같은 판정을 복사해두면 한 곳만 고쳐지는 일이 반드시 생긴다.
-     */
+    /** 정기·임시 휴무를 함께 판정하며 예약 검증·가능 시간·달력에 같은 기준을 적용한다. */
     public boolean isClosedOn(LocalDate date) {
         if (date == null) return false;
         return getClosedDayList().contains(date.getDayOfWeek().getValue())
                 || getClosedDateList().contains(date);
     }
 
-    /**
-     * 예약 방식. <b>화면은 이 값 하나만 고르고 나머지는 따라온다</b> —
-     * 체크박스를 여러 개 주면 사장님이 조합을 만들지 못한다.
-     */
+    /** 입력 항목과 예약 검증의 기준이 되는 단일 예약 방식. */
     public enum BookingType {
         /** 영업시간을 예약 단위로 쪼갠다. 식당·미용실·병원. <b>기본값이자 기존 동작.</b> */
         SLOT,

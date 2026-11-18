@@ -1,6 +1,7 @@
 package kr.it.reserve.waiting.service;
 
 import kr.it.reserve.config.updates.EntityUpdates;
+
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.waiting.entity.WaitingEntry;
 import kr.it.reserve.waiting.entity.WaitingStatus;

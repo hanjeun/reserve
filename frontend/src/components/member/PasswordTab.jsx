@@ -3,9 +3,11 @@ import PropTypes from 'prop-types';
 import { Typography, Form } from 'antd';
 import { FormInput } from '../../components/common';
 import LoginMethodFormActions from './LoginMethodFormActions';
+import LoginSecurityPanelHeading from './LoginSecurityPanelHeading';
 import { useMessage } from '../../hooks';
 import { memberService } from '../../services';
 import { handleApiError } from '../../utils/errorHandler';
+import { loginMethodRecoveryText, runLoginMethodMutation } from '../../utils/loginMethodRecovery';
 import { VALIDATION_RULES } from '../../utils/validation';
 import useAuthStore from '../../store/useAuthStore';
 import { useNavigate } from 'react-router-dom';
@@ -16,7 +18,7 @@ import useSensitiveAccountAction from '../../hooks/useSensitiveAccountAction';
 import { reportLoginMethodFormError } from './loginMethodFeedback';
 
 const { Text } = Typography;
-const PasswordTab = ({ onBusyChange, onCancel }) => {
+const PasswordTab = ({ onBusyChange, onCancel, onUnconfirmed }) => {
     const { message } = useMessage();
     const navigate = useNavigate();
     const sensitive = useSensitiveAccountAction();
@@ -38,12 +40,12 @@ const PasswordTab = ({ onBusyChange, onCancel }) => {
         setLoading(true);
         onBusyChange?.(true, operation);
         try {
-            await sensitive.run('CHANGE', currentPassword, () => memberService.changePassword({
-                currentPassword,
-                newPassword,
-                newPasswordConfirm: confirmPassword,
-            }, memberId));
-            if (!current()) return;
+            const complete = await sensitive.run('CHANGE', currentPassword, () => runLoginMethodMutation(
+                { id: memberId, revision }, 'EMAIL',
+                () => memberService.changePassword({ currentPassword, newPassword, newPasswordConfirm: confirmPassword }, memberId),
+                onUnconfirmed ?? (() => { if (current()) message.warning(loginMethodRecoveryText('EMAIL')); }),
+            ));
+            if (!complete || !current()) return;
             useAuthStore.getState().logout();
             message.success('비밀번호가 변경됐어요. 다시 로그인해주세요.');
             // 비밀번호 변경 → 다시 로그인: 흐름이 이어지는 이동(오른쪽에서)
@@ -61,6 +63,7 @@ const PasswordTab = ({ onBusyChange, onCancel }) => {
         {sensitive.panel}
         <Form style={sensitive.confirming ? { display: 'none' } : undefined} form={form} aria-label="비밀번호 변경" layout="vertical" onFinish={onFinish} requiredMark={false} size="large" disabled={loading}
             onFinishFailed={failure => reportLoginMethodFormError(failure, form, message)}>
+            <LoginSecurityPanelHeading onClose={onCancel} disabled={loading}><Text strong>비밀번호 변경</Text></LoginSecurityPanelHeading>
             <div style={styles.securityNotice}>
                 <Text style={{ fontSize: fontSize.xs, color: colors.text.secondary }}>
                     영문과 숫자를 포함해 8~64자로 입력해주세요
@@ -84,10 +87,10 @@ const PasswordTab = ({ onBusyChange, onCancel }) => {
             ]}>
                 <FormInput type="password" placeholder="새 비밀번호 확인" />
             </Form.Item>
-            <LoginMethodFormActions submitLabel="변경" busy={loading} onCancel={onCancel} />
+            <LoginMethodFormActions submitLabel="변경" busy={loading} />
         </Form>
     </>);
 };
 
 export default PasswordTab;
-PasswordTab.propTypes = { onBusyChange: PropTypes.func, onCancel: PropTypes.func };
+PasswordTab.propTypes = { onBusyChange: PropTypes.func, onCancel: PropTypes.func, onUnconfirmed: PropTypes.func };

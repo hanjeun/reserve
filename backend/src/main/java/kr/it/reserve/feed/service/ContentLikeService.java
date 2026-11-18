@@ -1,14 +1,14 @@
 package kr.it.reserve.feed.service;
 
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.LockModeType;
 import kr.it.reserve.config.updates.EntityUpdates;
+
 import kr.it.reserve.feed.*;
 import kr.it.reserve.feed.dto.FeedInteractionDto;
 import kr.it.reserve.feed.entity.*;
-import kr.it.reserve.feed.news.service.StoreNewsService;
 import kr.it.reserve.feed.repository.*;
+import kr.it.reserve.feed.news.service.StoreNewsService;
 import kr.it.reserve.global.common.PageRequests;
+import kr.it.reserve.global.persistence.CurrentLockedState;
 import kr.it.reserve.promotion.StoreNewsPolicy;
 import kr.it.reserve.promotion.entity.Promotion;
 import kr.it.reserve.promotion.repository.PromotionRepository;
@@ -17,11 +17,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.Set;
+import jakarta.persistence.EntityManager;
 
 @Service @RequiredArgsConstructor @Transactional(readOnly = true)
 public class ContentLikeService {
@@ -100,7 +100,7 @@ public class ContentLikeService {
             var candidate = comments.findById(id).orElseThrow(FeedException::missing);
             if (lock) posts.findForUpdate(candidate.getPost().getId()).orElseThrow(FeedException::missing);
             var comment = lock ? comments.findForUpdate(id).orElseThrow(FeedException::missing) : candidate;
-            if (lock) entityManager.refresh(comment, LockModeType.PESSIMISTIC_WRITE);
+            if (lock) CurrentLockedState.refresh(entityManager, comment);
             return new Target(null, null, comment);
         }
         if (!"POST".equals(type)) throw FeedException.invalid("좋아요 대상을 다시 확인해주세요.");

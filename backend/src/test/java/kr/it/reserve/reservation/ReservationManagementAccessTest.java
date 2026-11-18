@@ -7,6 +7,7 @@ import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.payment.service.PaymentService;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
+import kr.it.reserve.reservation.service.ReservationNoShowRestriction;
 import kr.it.reserve.reservation.service.ReservationService;
 import kr.it.reserve.store.entity.Store;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,7 @@ class ReservationManagementAccessTest {
     @Mock ReservationRepository repository;
     @Mock PaymentService payments;
     @Mock AuditLogService audits;
+    @Mock ReservationNoShowRestriction restrictions;
     @InjectMocks ReservationService service;
 
     @ParameterizedTest

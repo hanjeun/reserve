@@ -10,7 +10,7 @@ const { Text } = Typography;
 /** 가게 목록과 동일한 보기·필터 메뉴를 예약 목록의 데이터와 문구에 맞춰 사용한다. */
 export default function ReservationListingToolbar({ view, onViewChange, status, onStatusChange,
     statusOptions, sort, onSortChange, sortOptions, store, onStoreChange, storeOptions,
-    count, disabled, initialLoading = false, storeDisabled = false, storeLoading = false, label = '예약 목록 필터',
+    count, disabled, initialLoading = false, storeDisabled = false, storeLoading = false, sortLoading, label = '예약 목록 필터',
     statusAriaLabel = '예약 상태', sortAriaLabel = '예약 정렬' }) {
     const firstLoading = useInitialLoading(initialLoading);
     if (firstLoading) return <ListingControlsSkeleton count={count} className="reserve-reservation-filters" filters={[
@@ -35,7 +35,7 @@ export default function ReservationListingToolbar({ view, onViewChange, status, 
                     onChange={onStatusChange} disabled={disabled} />
                 <FilterMenu appearance="plain"
                     className="reserve-explore-sort-filter reserve-reservation-sort-filter" aria-label={sortAriaLabel}
-                    value={sort} options={sortOptions} onChange={onSortChange} disabled={disabled} />
+                    value={sort} options={sortOptions} onChange={onSortChange} disabled={disabled} loading={sortLoading} />
             </div>
         </div>
     );
@@ -58,6 +58,7 @@ ReservationListingToolbar.propTypes = {
     initialLoading: PropTypes.bool,
     storeDisabled: PropTypes.bool,
     storeLoading: PropTypes.bool,
+    sortLoading: PropTypes.bool,
     label: PropTypes.string,
     statusAriaLabel: PropTypes.string,
     sortAriaLabel: PropTypes.string,

@@ -2,11 +2,12 @@ import React from 'react';
 import { Typography, Flex, Divider } from 'antd';
 import {
     UserOutlined, CalendarOutlined, ClockCircleOutlined, TeamOutlined, MailOutlined, DollarOutlined,
-    CheckCircleOutlined,
+    CheckCircleOutlined, FileTextOutlined,
 } from '../common/icons';
 import ReservationStatusBadge from './ReservationStatusBadge';
 import CopyableText from '../common/CopyableText';
 import ResponsiveModal from '../common/ResponsiveModal';
+import TextLink from '../common/TextLink';
 import { formatTime, formatCurrency } from '../../utils';
 import { colors, fontSize } from '../../styles/tokens';
 
@@ -15,7 +16,7 @@ const { Text } = Typography;
 /*
  * 손님·사업자가 같은 읽기 전용 예약 상세를 사용하며 실행 도구는 각 화면이 담당한다.
  */
-const ReservationDetailModal = ({ reservation, open, onClose, tools, placeholder }) => {
+const ReservationDetailModal = ({ reservation, open, onClose, tools, placeholder, showPaymentHistory = false }) => {
     // 닫힘 중에도 마지막 예약 내용을 유지해 모달이 일찍 사라지지 않게 한다.
 
     const [cached, setCached] = React.useState(reservation);
@@ -27,8 +28,8 @@ const ReservationDetailModal = ({ reservation, open, onClose, tools, placeholder
     if (!displayed) return null;
 
     const {
-        storeName, reservationCode, memberName, memberEmail, reservationDate, reservationTime,
-        guestCount, depositAmount, status, specialRequest, rejectionReason, cancelReason, checkedInAt, personalInfoHidden,
+        id, storeName, reservationCode, memberName, memberEmail, reservationDate, reservationTime,
+        guestCount, depositAmount, status, specialRequest, rejectionReason, cancelReason, checkedInAt, manualVisitConfirmedAt, personalInfoHidden,
     } = displayed;
 
     // 거절·취소는 각각의 사유 필드와 라벨을 사용한다.
@@ -60,7 +61,7 @@ const ReservationDetailModal = ({ reservation, open, onClose, tools, placeholder
                 <div style={styles.detailRow}>
                     <MailOutlined style={styles.detailIcon} />
                     <Text style={styles.detailLabel}>이메일</Text>
-                    <CopyableText value={memberEmail} label="이메일" style={styles.detailValue} />
+                    <CopyableText value={memberEmail} label="이메일" style={styles.detailValue} wrap />
                 </div>
             )}
             <div style={styles.detailRow}>
@@ -83,12 +84,20 @@ const ReservationDetailModal = ({ reservation, open, onClose, tools, placeholder
                 <Text style={styles.detailLabel}>금액</Text>
                 <Text style={styles.detailValue} strong>{formatCurrency(depositAmount)}</Text>
             </div>
-            {checkedInAt && (
+            {showPaymentHistory && id != null && depositAmount > 0 && (
+                <div style={styles.detailRow}>
+                    <FileTextOutlined style={styles.detailIcon} aria-hidden="true" />
+                    <Text style={styles.detailLabel}>결제 내역</Text>
+                    <TextLink to={`/payment/result?reservation_id=${id}`} aria-label="결제 내역 보기"
+                        style={{ fontSize: fontSize.sm }}>보기</TextLink>
+                </div>
+            )}
+            {(checkedInAt || manualVisitConfirmedAt) && (
                 <div style={styles.detailRow}>
                     <CheckCircleOutlined style={{ ...styles.detailIcon, color: colors.success.main }} />
-                    <Text style={styles.detailLabel}>체크인</Text>
+                    <Text style={styles.detailLabel}>{checkedInAt ? '체크인' : '방문 확인'}</Text>
                     <Text style={styles.detailValue}>
-                        {checkedInAt.substring(0, 16).replace('T', ' ')}
+                        {(checkedInAt || manualVisitConfirmedAt).substring(0, 16).replace('T', ' ')}
                     </Text>
                 </div>
             )}
@@ -115,10 +124,9 @@ const ReservationDetailModal = ({ reservation, open, onClose, tools, placeholder
 
 const styles = {
     detailRow:   { display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0' },
-    detailIcon:  { fontSize: 13, color: colors.text.tertiary, width: 16 },
-    // whiteSpace: nowrap 필수 — 고정 폭(50px)이라 폭이 모자라면 "예약자"가 글자 단위로 접힌다.
-    detailLabel: { fontSize: fontSize.sm, color: colors.text.tertiary, width: 50, flexShrink: 0, whiteSpace: 'nowrap' },
-    detailValue: { fontSize: fontSize.sm, color: colors.text.primary },
+    detailIcon:  { fontSize: 13, color: colors.text.tertiary, width: 16, flexShrink: 0 },
+    detailLabel: { fontSize: fontSize.sm, color: colors.text.tertiary, width: '5em', flexShrink: 0, whiteSpace: 'nowrap' },
+    detailValue: { fontSize: fontSize.sm, color: colors.text.primary, minWidth: 0 },
 };
 
 export default ReservationDetailModal;

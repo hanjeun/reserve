@@ -36,15 +36,20 @@ describe('DataState', () => {
         expect(container.querySelector('.anticon-shop')).toBeTruthy();
     });
 
-    it('maps a recoverable offline failure to one accessible neutral state and retry', () => {
+    it.each([false, true])('uses the server illustration and one retry for a connection failure (compact=%s)', compact => {
         const retry = vi.fn();
         const { container } = render(<DataState state="error" kind="reservation" subject="예약 목록"
-            error={new Error('서버에 연결할 수 없어요.')} onRetry={retry} compact />);
+            error={new Error('서버에 연결할 수 없어요.')} onRetry={retry} compact={compact} />);
 
         expect(screen.getByRole('alert')).toHaveTextContent('예약 목록을 불러오지 못했어요');
-        expect(container.querySelector('.anticon-cloud-server')).toBeTruthy();
+        const picture = container.querySelector('img');
+        expect(picture).toHaveAttribute('src', expect.stringContaining('server-unavailable-512.webp'));
+        expect(picture).toHaveAttribute('alt', '');
+        expect(container.querySelector('.anticon-cloud-server')).toBeNull();
         fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
         expect(retry).toHaveBeenCalledOnce();
+        fireEvent.error(picture);
+        expect(container.querySelector('.reserve-state-illustration__fallback')).toHaveAttribute('data-embedded', 'server-unavailable');
     });
 
     it('shows restricted access for a permission failure without exposing a server message', () => {

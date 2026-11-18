@@ -6,12 +6,16 @@ RUN apk add --no-cache amazon-corretto-21=21.0.13.0.11-r0 && \
     apk upgrade --no-cache
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
-    mkdir -p /var/log/reserve && chown -R appuser:appgroup /var/log/reserve
+    mkdir -p /var/log/reserve /opt/reserve/compat && \
+    chown -R appuser:appgroup /var/log/reserve /opt/reserve/compat
 
 USER appuser
 
 ARG JAR_FILE=build/libs/*.jar
 COPY ${JAR_FILE} app.jar
+COPY --chown=appuser:appgroup tools/VerifyReleaseCompatibility.java /opt/reserve/compat/VerifyReleaseCompatibility.java
+RUN javac -d /opt/reserve/compat /opt/reserve/compat/VerifyReleaseCompatibility.java && \
+    java -Xmx96m -cp /opt/reserve/compat VerifyReleaseCompatibility /app.jar
 # 호환 표시에 필요한 클래스와 스키마가 JAR에 포함됐는지 검사한다.
 RUN for REQUIRED_CLASS in \
     META-INF/orm.xml \

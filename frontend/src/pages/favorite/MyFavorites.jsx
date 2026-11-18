@@ -3,7 +3,7 @@ import { useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { DataState, FilterMenu, FilterToolbar, PageContainer, StoreCardSkeleton } from '../../components/common';
-import ListingContent from '../../components/common/ListingContent';
+import AnimatedContent, { AnimatedListingContent } from '../../components/common/AnimatedContent';
 import TextLink from '../../components/common/TextLink';
 import LikedContentList from '../../components/feed/LikedContentList';
 import { useFeedInteractions } from '../../hooks/feedInteractionQueries';
@@ -62,6 +62,7 @@ const MyFavorites = () => {
     // FavoriteDto → StoreCard가 기대하는 store 형태로 변환
     const toStoreShape = (fav) => ({
         id:          fav.storeId,
+        publicId:    fav.storePublicId,
         name:        fav.storeName,
         category:    fav.storeCategory,
         mainImageUrl: fav.storeMainImageUrl,
@@ -131,13 +132,14 @@ const MyFavorites = () => {
                         onChange={value => setSearchParams(previous => { const next = new URLSearchParams(previous); next.set('kind', value); return next; })} />}
                 </div> : undefined} />
 
-            {/* 컨텐츠 — 상태별 분기는 위 renderContent 주석 참고 */}
+            {/* 콘텐츠 상태에 따라 목록과 조회 안내를 표시한다. */}
             {showStores && <section ref={listRef} className="reserve-liked-section reserve-liked-section--listing" aria-label="좋아요한 가게">{hasContentLikes && <h2>가게</h2>}
-                <ListingContent notice={error && !blockingError && <DataState state="error" kind="favorite" subject="즐겨찾기 목록" error={error}
+                <AnimatedListingContent motionKey={view} ready={!loading} notice={error && !blockingError && <DataState state="error" kind="favorite" subject="즐겨찾기 목록" error={error}
                     title="최신 즐겨찾기를 확인하지 못해 이전 목록을 보여드리고 있어요."
-                    onRetry={refetch} retrying={isFetching} compact />}>{renderContent()}</ListingContent></section>}
+                    onRetry={refetch} retrying={isFetching} compact />}>{renderContent()}</AnimatedListingContent></section>}
             {hasContentLikes && kind !== 'stores' && <section className="reserve-liked-section" aria-label="좋아요한 게시물과 소식">
-                {kind === 'all' && <h2>게시물 · 가게 소식 · 댓글</h2>}<LikedContentList view={view} type={kind === 'posts' ? 'POST' : kind === 'news' ? 'NEWS' : kind === 'comments' ? 'COMMENT' : 'ALL'} />
+                {kind === 'all' && <h2>게시물 · 가게 소식 · 댓글</h2>}
+                <AnimatedContent motionKey={view}><LikedContentList view={view} type={kind === 'posts' ? 'POST' : kind === 'news' ? 'NEWS' : kind === 'comments' ? 'COMMENT' : 'ALL'} /></AnimatedContent>
             </section>}
         </PageContainer>
     );

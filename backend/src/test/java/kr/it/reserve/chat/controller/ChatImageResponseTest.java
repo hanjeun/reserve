@@ -1,5 +1,6 @@
 package kr.it.reserve.chat.controller;
 
+import kr.it.reserve.config.ApiVersionConfiguration;
 import kr.it.reserve.chat.service.ChatImageService;
 import kr.it.reserve.chat.service.ChatImageFilename;
 import kr.it.reserve.config.util.SecurityUtil;
@@ -7,6 +8,7 @@ import kr.it.reserve.global.ratelimit.RateLimiter;
 import kr.it.reserve.member.entity.Member;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import org.junit.jupiter.api.Test;
@@ -24,6 +26,26 @@ class ChatImageResponseTest {
             mvc.perform(head("/api/chat/images/33")).andExpect(status().isNoContent())
                     .andExpect(header().string("Cache-Control", "no-store")).andExpect(content().bytes(new byte[0]));
             verify(images).assertReadable(member, 33L);
+            verify(images, never()).read(any(), any());
+        }
+    }
+
+    @Test void thumbnailUsesThePrivateImageResponseAndPermissionOnlyHead() throws Exception {
+        var images = mock(ChatImageService.class);
+        var member = Member.builder().id(1L).build();
+        var bytes = new byte[]{1, 2};
+        when(images.thumbnail(member, 33L)).thenReturn(new ChatImageService.ImageContent(bytes, "image/jpeg"));
+        try (var security = mockStatic(SecurityUtil.class)) {
+            security.when(() -> SecurityUtil.getCurrentMember("로그인이 필요해요.")).thenReturn(member);
+            var mvc = MockMvcBuilders.standaloneSetup(new ChatImageController(images, mock(RateLimiter.class)))
+                    .setCustomHandlerMapping(new ApiVersionConfiguration()::getRequestMappingHandlerMapping).build();
+            mvc.perform(head("/api/v1/chat/images/33/thumbnail")).andExpect(status().isNoContent())
+                    .andExpect(header().string("Cache-Control", "no-store")).andExpect(content().bytes(new byte[0]));
+            verify(images).assertReadable(member, 33L);
+            verify(images, never()).thumbnail(any(), any());
+            mvc.perform(get("/api/chat/images/33/thumbnail")).andExpect(status().isOk())
+                    .andExpect(header().string("Cache-Control", "no-store"))
+                    .andExpect(content().contentType("image/jpeg")).andExpect(content().bytes(bytes));
             verify(images, never()).read(any(), any());
         }
     }

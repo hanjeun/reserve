@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Typography, Switch } from 'antd';
 import { DesktopOutlined, SunOutlined, MoonOutlined } from '../../components/common/icons';
 import { SegmentedControl, FormSelect } from '../../components/common';
+import useSeasonEffectPreference from '../common/seasonal-preview/useSeasonEffectPreference';
 import useTheme, { FONT_OPTIONS, ACCENT_OPTIONS } from '../../hooks/useTheme';
 import useStoreDraftPreferences from '../../hooks/useStoreDraftPreferences';
 import { useMessage } from '../../hooks';
@@ -13,6 +14,11 @@ import { colors, fontSize } from '../../styles/tokens';
 import styles from './myPageStyles';
 
 const { Text } = Typography;
+
+const toggleResult = checked => checked ? '켰어요.' : '껐어요.';
+const preferenceNoticeKey = setting => `account-preference:${setting}`;
+const showSaved = (message, setting, content) => message.success({ key: preferenceNoticeKey(setting), content });
+
 const NotificationSection = ({ user }) => {
     const { message } = useMessage();
     const sessionRevision = useAuthStore(state => state.sessionRevision);
@@ -25,35 +31,32 @@ const NotificationSection = ({ user }) => {
     const marketingAgreed = user?.marketingAgreed ?? false;
     const [marketingLoading, setMarketingLoading] = useState(false);
 
-    const handleNotiToggle = async (checked) => {
-        setNotiLoading(true);
+    const isCurrentAccount = auth => user?.id != null && auth.sessionRevision === sessionRevision
+        && auth.user?.id === user.id && auth.user?.role === user.role;
+
+    const savePreference = async (field, checked, save, setLoading, notice) => {
+        if (!isCurrentAccount(useAuthStore.getState())) return;
+        setLoading(true);
         try {
-            await memberService.updateMember({ emailNotificationEnabled: checked });
+            await save(checked);
             const auth = useAuthStore.getState();
-            if (auth.sessionRevision !== sessionRevision || auth.user?.id !== user?.id || auth.user?.role !== user?.role) return;
-            auth.updateUser({ ...auth.user, emailNotificationEnabled: checked });
-            message.success(checked ? '메일 알림에 동의했어요' : '메일 알림 동의를 철회했어요');
+            if (!isCurrentAccount(auth)) return;
+            auth.updateUser({ ...auth.user, [field]: checked });
+            showSaved(message, field, notice);
         } catch (err) {
-            handleApiError(err, message, '설정 변경에 실패했어요');
+            if (isCurrentAccount(useAuthStore.getState())) {
+                handleApiError(err, { error: content => message.error({ key: preferenceNoticeKey(field), content }) },
+                    '설정을 변경하지 못했어요.');
+            }
         } finally {
-            setNotiLoading(false);
+            setLoading(false);
         }
     };
 
-    const handleMarketingToggle = async (checked) => {
-        setMarketingLoading(true);
-        try {
-            await memberService.updateMarketingConsent(checked);
-            const auth = useAuthStore.getState();
-            if (auth.sessionRevision !== sessionRevision || auth.user?.id !== user?.id || auth.user?.role !== user?.role) return;
-            auth.updateUser({ ...auth.user, marketingAgreed: checked });
-            message.success(checked ? '마케팅 수신에 동의했어요' : '마케팅 수신 동의를 철회했어요');
-        } catch (err) {
-            handleApiError(err, message, '설정 변경에 실패했어요');
-        } finally {
-            setMarketingLoading(false);
-        }
-    };
+    const handleNotiToggle = checked => savePreference('emailNotificationEnabled', checked,
+        value => memberService.updateMember({ emailNotificationEnabled: value }), setNotiLoading, `예약 알림 메일을 ${toggleResult(checked)}`);
+    const handleMarketingToggle = checked => savePreference('marketingAgreed', checked, memberService.updateMarketingConsent,
+        setMarketingLoading, checked ? '이메일 마케팅 수신에 동의했어요.' : '이메일 마케팅 수신 동의를 철회했어요.');
 
     return (
         <div style={styles.notificationSection}>
@@ -65,7 +68,7 @@ const NotificationSection = ({ user }) => {
                     <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block' }}>예약 알림 메일</Text>
                     <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>예약 승인/거절 시 이메일로 알림 받기</Text>
                 </div>
-                <Switch size="small" checked={notiEnabled} loading={notiLoading} onChange={handleNotiToggle} />
+                <Switch size="small" aria-label="예약 알림 메일" checked={notiEnabled} loading={notiLoading} onChange={handleNotiToggle} />
             </div>
 
             {/* 구분선 */}
@@ -77,7 +80,7 @@ const NotificationSection = ({ user }) => {
                     <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block' }}>이메일 마케팅 수신</Text>
                     <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>프로모션·신기능 안내 메일 받기 (선택 동의)</Text>
                 </div>
-                <Switch size="small" checked={marketingAgreed} loading={marketingLoading} onChange={handleMarketingToggle} />
+                <Switch size="small" aria-label="이메일 마케팅 수신" checked={marketingAgreed} loading={marketingLoading} onChange={handleMarketingToggle} />
             </div>
         </div>
     );
@@ -85,6 +88,10 @@ const NotificationSection = ({ user }) => {
 
 const StoreDraftSection = ({ user }) => {
     const { autoSaveEnabled, setAutoSaveEnabled } = useStoreDraftPreferences(user);
+    const { message } = useMessage();
+    const handleToggle = checked => {
+        if (setAutoSaveEnabled(checked)) showSaved(message, 'storeDraft', `가게 자동 임시저장을 ${toggleResult(checked)}`);
+    };
     return (
         <div style={styles.notificationSection}>
             <Text strong style={styles.sectionTitle}>가게 작성 설정</Text>
@@ -92,7 +99,7 @@ const StoreDraftSection = ({ user }) => {
                 <div>
                     <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block' }}>자동 임시저장</Text>
                 </div>
-                <Switch size="small" aria-label="가게 자동 임시저장" checked={autoSaveEnabled} onChange={setAutoSaveEnabled} />
+                <Switch size="small" aria-label="가게 자동 임시저장" checked={autoSaveEnabled} onChange={handleToggle} />
             </div>
         </div>
     );
@@ -104,6 +111,12 @@ const StoreDraftSection = ({ user }) => {
  */
 const AppearanceSection = () => {
     const { theme, setTheme, font, setFont, accent, setAccent, resolvedTheme } = useTheme();
+    const [seasonEffectEnabled, setSeasonEffectEnabled] = useSeasonEffectPreference();
+    const { message } = useMessage();
+    const handleSeasonEffectToggle = checked => {
+        setSeasonEffectEnabled(checked);
+        showSaved(message, 'seasonEffect', `계절 효과를 ${toggleResult(checked)}`);
+    };
 
     return (
         <div style={styles.notificationSection}>
@@ -182,6 +195,16 @@ const AppearanceSection = () => {
                         }))}
                     />
                 </div>
+            </div>
+
+            <div style={{ borderTop: `1px solid ${colors.border.light}`, margin: '4px 0' }} />
+
+            <div style={styles.notifRow}>
+                <div>
+                    <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block' }}>계절 효과</Text>
+                    <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>이 브라우저의 홈 화면에 적용돼요</Text>
+                </div>
+                <Switch size="small" aria-label="계절 효과" checked={seasonEffectEnabled} onChange={handleSeasonEffectToggle} />
             </div>
         </div>
     );

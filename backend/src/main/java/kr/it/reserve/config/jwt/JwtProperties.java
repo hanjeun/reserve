@@ -24,6 +24,9 @@ public class JwtProperties {
     private TokenConfig refreshToken = new TokenConfig();
     /** 갱신해도 절대 만료 시각은 늘어나지 않는다. */
     private Duration absoluteSessionLifetime = Duration.ofDays(30);
+    private Duration rememberedUserIdleLifetime = Duration.ofDays(30);
+    private Duration rememberedUserAbsoluteLifetime = Duration.ofDays(90);
+    private Duration browserSessionIdleLifetime = Duration.ofHours(1);
     private String accessAudience;
     private String refreshAudience;
     private String activeKeyId;
@@ -47,9 +50,15 @@ public class JwtProperties {
         }
         getAccessTokenExpiration();
         getRefreshTokenExpiration();
-        if (absoluteSessionLifetime == null || absoluteSessionLifetime.getSeconds() < 1 || absoluteSessionLifetime.getNano() != 0
-                || absoluteSessionLifetime.compareTo(Duration.ofDays(365)) > 0) {
+        if (!validLifetime(absoluteSessionLifetime)) {
             throw new IllegalStateException("Absolute session lifetime must be positive and at most 365 days");
+        }
+        if (!validLifetime(rememberedUserIdleLifetime) || !validLifetime(rememberedUserAbsoluteLifetime)
+                || rememberedUserIdleLifetime.compareTo(rememberedUserAbsoluteLifetime) > 0) {
+            throw new IllegalStateException("Invalid remembered user session lifetimes");
+        }
+        if (!validLifetime(browserSessionIdleLifetime) || browserSessionIdleLifetime.compareTo(getAccessTokenExpiration()) <= 0) {
+            throw new IllegalStateException("Browser session idle lifetime must allow refresh after access token expiry");
         }
         if (getAccessAudience().isBlank() || getRefreshAudience().isBlank()
                 || getAccessAudience().equals(getRefreshAudience())) {
@@ -94,6 +103,20 @@ public class JwtProperties {
 
     public Duration getRefreshTokenExpiration() {
         return refreshToken.getExpirationDuration();
+    }
+
+    public record SessionLifetime(Duration idle, Duration absolute) { }
+
+    public SessionLifetime sessionLifetime(boolean ordinaryMember, Boolean persistent) {
+        if (ordinaryMember && Boolean.TRUE.equals(persistent))
+            return new SessionLifetime(rememberedUserIdleLifetime, rememberedUserAbsoluteLifetime);
+        Duration idle = Boolean.FALSE.equals(persistent) ? browserSessionIdleLifetime : getRefreshTokenExpiration();
+        return new SessionLifetime(idle, absoluteSessionLifetime);
+    }
+
+    private static boolean validLifetime(Duration lifetime) {
+        return lifetime != null && lifetime.getSeconds() >= 1 && lifetime.getNano() == 0
+                && lifetime.compareTo(Duration.ofDays(365)) <= 0;
     }
 
     public String getAccessAudience() { return accessAudience == null ? issuer + ":access" : accessAudience; }

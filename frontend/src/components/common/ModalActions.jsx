@@ -6,9 +6,10 @@ export const ModalActionGroup = ({ children }) => <div className="reserve-modal-
 ModalActionGroup.propTypes = { children: PropTypes.node };
 
 /* 모달 결정 버튼은 높이·여백을 공유하고 너비는 문구에 맞춘다. */
-const ModalActions = ({ onCancel, onConfirm, cancelText = '취소', confirmText = '확인', loading = false, disabled = false, cancelDisabled = false }) => (
+const ModalActions = ({ onCancel, onConfirm, cancelText = '취소', confirmText = '확인', loading = false, disabled = false, cancelDisabled = false, extraAction }) => (
     <ModalActionGroup>
         <Button variant="outline" size="sm" onClick={onCancel} disabled={cancelDisabled}>{cancelText}</Button>
+        {extraAction}
         <Button variant="primary" size="sm" onClick={onConfirm} loading={loading} disabled={disabled}>{confirmText}</Button>
     </ModalActionGroup>
 );
@@ -21,6 +22,7 @@ ModalActions.propTypes = {
     loading: PropTypes.bool,
     disabled: PropTypes.bool,
     cancelDisabled: PropTypes.bool,
+    extraAction: PropTypes.node,
 };
 
 export default ModalActions;

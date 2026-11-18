@@ -24,6 +24,7 @@ const waitingService = {
     }).then(normalizeListPage),
     join: (storeId, body, signal) => api.post(API_ENDPOINTS.WAITING.JOIN(storeId), body, { signal }),
     cancel: (entryId, signal) => api.post(API_ENDPOINTS.WAITING.CANCEL(entryId), undefined, { signal }),
+    remove: (entryId, signal) => api.delete(API_ENDPOINTS.WAITING.REMOVE(entryId), { signal }),
     getEntryQr: (entryId, signal) => api.get(API_ENDPOINTS.WAITING.ENTRY_QR(entryId), { signal }),
     getOnsiteQr: (storeId, signal) => api.get(API_ENDPOINTS.WAITING.ONSITE_QR(storeId), { signal }),
     checkInByQr: token => api.post(API_ENDPOINTS.WAITING.CHECKIN, { token }),

@@ -28,19 +28,11 @@ public class PwnedPasswordChecker {
     private static final String API_URL = "https://api.pwnedpasswords.com/range/";
     private static final int PREFIX_LENGTH = 5;
 
-    /**
-     * 운영에서는 켜둔다. <b>테스트 프로파일에서는 꺼야 한다</b> —
-     * 켜두면 단위 테스트가 외부 네트워크에 의존하게 되고, 오프라인 CI에서 매번 3초씩 기다린다.
-     * ({@code src/test/resources/application.yml} 에서 false)
-     */
+    /** 운영의 보조 검증은 유지하고, 시험에서는 외부 네트워크 의존을 막기 위해 비활성화한다. */
     @Value("${security.pwned-password.enabled:true}")
     private boolean enabled;
 
-    /**
-     * 유출 횟수가 이 값 이상이면 거부한다. 기본 1 = <b>한 번이라도 유출된 적 있으면 거부</b>.
-     * 유출 코퍼스에 한 번이라도 등장한 비밀번호는 이미 공격자 워드리스트에 들어 있다고 봐야 한다.
-     * 사용자 반발이 크면 값을 올릴 수 있게 열어뒀지만, 올릴수록 방어력이 급격히 떨어진다.
-     */
+    /** 기본값 1은 한 번이라도 유출된 비밀번호를 거부하며, 값을 높이면 거부 범위가 줄어든다. */
     @Value("${security.pwned-password.threshold:1}")
     private int threshold;
 

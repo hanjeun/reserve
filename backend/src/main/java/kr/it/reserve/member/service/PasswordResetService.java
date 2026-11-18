@@ -19,7 +19,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Locale;
 import java.util.Optional;
 
 @Slf4j
@@ -28,6 +31,7 @@ import java.util.Optional;
 public class PasswordResetService {
 
     private static final int EXPIRES_MINUTES = 5;
+    private static final String INVALID_CODE_MESSAGE = "인증 코드를 확인하지 못했어요. 코드를 다시 확인하거나 새로 요청해주세요.";
     private static final SecureRandom CODE_RANDOM = new SecureRandom();
 
     private final MemberRepository memberRepository;
@@ -37,96 +41,50 @@ public class PasswordResetService {
     private final PwnedPasswordChecker pwnedPasswordChecker;
     private final RefreshTokenRepository refreshTokenRepository;
 
-    /**
-     * 비밀번호 재설정 코드 발송
-     * @return true = 실제 발송됨, false = 미가입/OAuth 계정 (프론트에서 안내 메시지용)
-     */
+    /** 이메일 로그인이 활성인 회원에게만 코드를 발급한다. */
     @Transactional
     public boolean sendResetCode(String email) {
-        var memberOpt = memberRepository.findActiveByEmailForUpdate(email);
+        var memberOpt = findResettableMember(email);
         if (memberOpt.isEmpty()) {
             log.info("Password reset request not deliverable");
             return false;
         }
-        var member = memberOpt.get();
-        if (member.getPassword() == null) {
-            // OAuth 전용 계정 (Google/Naver/Kakao) → 로컬 비밀번호 없음
-            log.info("Password reset request not deliverable");
-            return false;
-        }
 
-        tokenRepository.deleteByEmail(email);
+        Member member = memberOpt.get();
+        String registeredEmail = member.getEmail();
+        tokenRepository.deleteByEmail(registeredEmail);
         String code = generateCode();
         PasswordResetToken token = PasswordResetToken.builder()
-                .email(email)
+                .email(registeredEmail)
                 .token("HASHED")
                 .tokenHash(passwordEncoder.encode(code))
                 .expiresAt(LocalDateTime.now(Clock.systemDefaultZone()).plusMinutes(EXPIRES_MINUTES))
                 .build();
         tokenRepository.save(token);
-        emailService.sendPasswordResetEmail(email, code);
+        emailService.sendPasswordResetEmail(registeredEmail, code);
         log.info("Password reset code queued: memberId={}", member.getId());
         return true;
     }
 
     /** 실패 횟수 증가가 예외로 롤백되지 않도록 noRollbackFor를 유지한다. */
     @Transactional(noRollbackFor = BusinessException.class)
-    public void verifyCode(String email, String code) {
-        PasswordResetToken token = findLatestTokenForUpdate(email)
-                .orElseThrow(() -> new MemberException("인증 코드가 존재하지 않아요. 코드를 재발송해주세요.", HttpStatus.BAD_REQUEST));
-
-        if (token.isExpired()) {
-            throw new MemberException("인증 시간이 만료됐어요. 코드를 재발송해주세요.", HttpStatus.BAD_REQUEST);
-        }
-        requireAttemptsLeft(token);
-
-        if (!matchesCode(token, code)) {
-            token.recordFailedAttempt();
-            log.warn("Password reset code mismatch: attempt={}/{}",
-                    token.getAttemptCount(), PasswordResetToken.MAX_VERIFY_ATTEMPTS);
-            throw new MemberException("인증 코드가 일치하지 않아요.", HttpStatus.BAD_REQUEST);
-        }
+    public Instant verifyCode(String email, String code) {
+        PasswordResetToken token = requireValidCode(email, code, findResettableMember(email));
         token.markVerified();
-    }
-
-    /**
-     * 시도 횟수가 남았는지 확인. 소진됐으면 코드가 맞든 틀리든 거부한다.
-     *
-     * <p>메시지를 "재발송해주세요"로 두는 건 의도적이다 — 남은 횟수를 숫자로 알려주면
-     * 공격자가 언제 리셋되는지 계산할 수 있고, 정상 사용자에게는 다음에 할 행동만 알려주면 된다.
-     */
-    private void requireAttemptsLeft(PasswordResetToken token) {
-        if (token.isAttemptExhausted()) {
-            log.warn("Password reset code attempts exhausted");
-            throw new MemberException(
-                    "인증 시도 횟수를 초과했어요. 코드를 재발송해주세요.", HttpStatus.BAD_REQUEST);
-        }
+        return token.getExpiresAt().atZone(ZoneId.systemDefault()).toInstant();
     }
 
     /** 코드 검증을 건너뛰는 우회를 막기 위해 재설정 경로에도 대조 횟수 제한을 적용한다. 실패 횟수는 롤백하지 않는다. */
     @Transactional(noRollbackFor = BusinessException.class)
     public void resetPassword(String email, String code, String newPassword) {
-        // 재발송과 같은 member → token 순서를 지켜 잠금 순환과 중복 소비를 막는다.
-        var memberOpt = memberRepository.findActiveByEmailForUpdate(email);
-        PasswordResetToken token = findLatestTokenForUpdate(email)
-                .orElseThrow(() -> new MemberException("인증 코드가 존재하지 않아요.", HttpStatus.BAD_REQUEST));
-
-        if (token.isExpired()) {
-            throw new MemberException("인증 시간이 만료됐어요. 다시 시도해주세요.", HttpStatus.BAD_REQUEST);
-        }
-        requireAttemptsLeft(token);
-
-        if (!matchesCode(token, code)) {
-            token.recordFailedAttempt();
-            log.warn("Password reset code mismatch on reset: attempt={}/{}",
-                    token.getAttemptCount(), PasswordResetToken.MAX_VERIFY_ATTEMPTS);
-            throw new MemberException("잘못된 접근이에요.", HttpStatus.BAD_REQUEST);
-        }
+        // 재발송·검증과 같은 member → token 잠금 순서로 중복 소비를 막는다.
+        var memberOpt = findResettableMember(email);
+        PasswordResetToken token = requireValidCode(email, code, memberOpt);
         if (!token.isVerified()) {
-            throw new MemberException("코드 인증을 먼저 완료해주세요.", HttpStatus.BAD_REQUEST);
+            throw new InvalidCode();
         }
 
-        Member member = memberOpt.orElseThrow(MemberException::notFound);
+        Member member = memberOpt.orElseThrow();
 
         String policyViolation = PasswordPolicy.violation(newPassword);
         if (policyViolation != null) {
@@ -143,9 +101,10 @@ public class PasswordResetService {
         }
 
         member.setPassword(passwordEncoder.encode(newPassword));
+        member.setSecurityContactEmail(member.getEmail());
         member.rotateAuthVersion();
         refreshTokenRepository.deleteByMemberId(member.getId());
-        tokenRepository.deleteByEmail(email);
+        tokenRepository.deleteByEmail(member.getEmail());
         log.info("Password reset completed: memberId={}", member.getId());
     }
 
@@ -155,14 +114,37 @@ public class PasswordResetService {
                 .flatMap(tokenRepository::findByIdForUpdate);
     }
 
-    private boolean matchesCode(PasswordResetToken token, String code) {
-        if (code == null || !code.matches("\\d{6}")) {
-            return false;
+    private Optional<Member> findResettableMember(String email) {
+        // DB 정렬 규칙에서 같은 값으로 취급하는 다른 주소로는 발급하거나 검증하지 않는다.
+        return memberRepository.findActiveByEmailForUpdate(email)
+                .filter(member -> !member.isAccountProtected() && member.getPassword() != null
+                        && member.getEmail().toLowerCase(Locale.ROOT).equals(email));
+    }
+
+    private PasswordResetToken requireValidCode(String email, String code, Optional<Member> member) {
+        String registeredEmail = member.map(Member::getEmail).orElse(email);
+        PasswordResetToken token = findLatestTokenForUpdate(registeredEmail).orElse(null);
+        boolean usable = member.isPresent() && token != null && !token.isExpired() && !token.isAttemptExhausted();
+        String hash = usable ? token.getTokenHash() : null;
+        boolean formatted = code != null && code.matches("[0-9]{6}");
+
+        // 코드가 없거나 사용할 수 없어도 대조 비용과 실패 응답을 맞춘다.
+        boolean hashMatches = passwordEncoder.matches(formatted ? code : "000000",
+                hash != null ? hash : PasswordPolicy.DUMMY_BCRYPT_HASH);
+        if (usable) {
+            boolean matches = hash != null ? hashMatches : token.getToken().equals(code);
+            if (formatted && matches) {
+                return token;
+            }
+            token.recordFailedAttempt();
         }
-        if (token.getTokenHash() != null) {
-            return passwordEncoder.matches(code, token.getTokenHash());
+        throw new InvalidCode();
+    }
+
+    public static final class InvalidCode extends MemberException {
+        private InvalidCode() {
+            super(INVALID_CODE_MESSAGE, HttpStatus.BAD_REQUEST);
         }
-        return code.equals(token.getToken());
     }
 
     private String generateCode() {

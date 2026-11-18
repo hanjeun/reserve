@@ -50,6 +50,15 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void reservationConflictKeepsTheMessageAndReturnsTheReasonInData() throws Exception {
+        mvc.perform(get("/error-probe/reservation"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("해당 시간대 예약이 마감됐어요."))
+                .andExpect(jsonPath("$.data.code").value("RESERVATION_CAPACITY"));
+    }
+
+    @Test
     void closedEventStreamDoesNotTryToWriteAJsonErrorIntoTheEventResponse() throws Exception {
         mvc.perform(get("/error-probe/closed-stream"))
                 .andExpect(result -> org.assertj.core.api.Assertions.assertThat(result.getResponse().isCommitted()).isTrue())
@@ -70,6 +79,11 @@ class GlobalExceptionHandlerTest {
 
         @GetMapping("/error-probe/failure")
         void fail() { throw new IllegalStateException("private-error"); }
+
+        @GetMapping("/error-probe/reservation")
+        void reservation() {
+            throw ReservationException.conflict(ReservationException.Code.RESERVATION_CAPACITY, "해당 시간대 예약이 마감됐어요.");
+        }
 
         @GetMapping("/error-probe/closed-stream")
         void closedStream(HttpServletResponse response) throws java.io.IOException {

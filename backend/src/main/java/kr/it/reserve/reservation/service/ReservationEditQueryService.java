@@ -17,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.UUID;
+import java.util.function.Predicate;
 
 /** 비상 입장 중에도 기존 예약 수정 조회만 허용하고 공개 탐색 조회는 열지 않는다. */
 @Service
@@ -28,24 +30,29 @@ public class ReservationEditQueryService {
     private final StoreService storeService;
 
     public StoreResponse getEditStore(Long id, Long expectedStoreId, Member member) {
-        return storeService.getStore(editableStore(id, expectedStoreId, member).getId());
+        return storeService.getStore(editableStore(id, member, store -> store.getId().equals(expectedStoreId)).getId());
+    }
+
+    public StoreResponse getEditStoreByPublicId(Long id, UUID expectedPublicId, Member member) {
+        return storeService.getStore(editableStore(id, member,
+                store -> expectedPublicId.toString().equals(store.getPublicId())).getId());
     }
 
     public List<SlotAvailabilityResponse> getEditAvailability(Long id, Long expectedStoreId, LocalDate date, Member member) {
-        return reservationService.getAvailability(editableStore(id, expectedStoreId, member).getId(), date);
+        return reservationService.getAvailability(editableStore(id, member, store -> store.getId().equals(expectedStoreId)).getId(), date, id);
     }
 
     public List<CalendarDayResponse> getEditCalendar(Long id, Long expectedStoreId, YearMonth month, Member member) {
-        return reservationService.getMonthCalendar(editableStore(id, expectedStoreId, member).getId(), month);
+        return reservationService.getMonthCalendar(editableStore(id, member, store -> store.getId().equals(expectedStoreId)).getId(), month, id);
     }
 
-    private Store editableStore(Long id, Long expectedStoreId, Member member) {
+    private Store editableStore(Long id, Member member, Predicate<Store> matches) {
         Reservation reservation = reservations.findById(id)
                 .filter(row -> !row.isDeleted())
                 .orElseThrow(() -> new ReservationException("예약을 찾을 수 없어요.", HttpStatus.NOT_FOUND));
         ReservationAccess.editable(reservation, member);
         Store store = reservation.getStore();
-        if (!store.getId().equals(expectedStoreId)) {
+        if (!matches.test(store)) {
             throw new ReservationException("이 가게의 예약이 아니에요.", HttpStatus.BAD_REQUEST);
         }
         if (store.isDeleted() || store.isSuspended()) {

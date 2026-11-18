@@ -1,16 +1,20 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { App as AntApp } from 'antd';
+import { App as AntApp, ConfigProvider } from 'antd';
 import { expect, it, vi } from 'vitest';
 import ConversationRowActions from './ConversationRowActions';
 
 function setup(props = {}) {
     const onVisibilityChange = vi.fn().mockResolvedValue(undefined);
     const onSelect = vi.fn();
-    render(<AntApp><ConversationRowActions title="가게 문의" onVisibilityChange={onVisibilityChange} {...props}>
-        <button className="reserve-messenger-row" onClick={onSelect}>대화 열기</button>
-    </ConversationRowActions></AntApp>);
+    render(<ConfigProvider theme={{ token: { motion: false } }}>
+        <AntApp><ConversationRowActions title="가게 문의" onVisibilityChange={onVisibilityChange} {...props}>
+            <button className="reserve-messenger-row" onClick={onSelect}>대화 열기</button>
+        </ConversationRowActions></AntApp>
+    </ConfigProvider>);
     const row = screen.getByRole('button', { name: '대화 열기' });
-    return { row, root: row.closest('.reserve-messenger-row-actions'), onSelect, onVisibilityChange };
+    const root = row.closest('.reserve-messenger-row-actions');
+    Object.defineProperty(root, 'clientWidth', { value: 360 });
+    return { row, root, onSelect, onVisibilityChange };
 }
 function pointer(target, type, x, y, extra = {}) {
     const event = new Event(type, { bubbles: true, cancelable: true });
@@ -19,38 +23,80 @@ function pointer(target, type, x, y, extra = {}) {
     return fireEvent(target, event);
 }
 
-it.each([[-70, 'left'], [70, 'right']])('reveals a reversible action after a horizontal swipe of %s without opening or hiding the conversation', async (distance, side) => {
-    const { row, root, onSelect, onVisibilityChange } = setup();
-    pointer(row, 'pointerdown', 150, 100);
-    pointer(row, 'pointermove', 150 + distance, 101);
-    pointer(row, 'pointerup', 150 + distance, 101);
-    fireEvent.click(row, { detail: 1 });
-    expect(root).toHaveAttribute('data-reveal', side);
-    expect(onSelect).not.toHaveBeenCalled();
-    expect(onVisibilityChange).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: '가게 문의 숨기기' }));
-    await waitFor(() => expect(onVisibilityChange).toHaveBeenCalledExactlyOnceWith(true));
-    await waitFor(() => expect(root).not.toHaveAttribute('data-reveal'));
-});
+it.each([['touch', -70, 'left'], ['touch', 70, 'right'], ['mouse', -70, 'left'], ['mouse', 70, 'right']])(
+    'reveals the matching action after a %s drag of %s', async (pointerType, distance, side) => {
+        const onLeave = vi.fn();
+        const { row, root, onSelect, onVisibilityChange } = setup({ onLeave });
+        pointer(row, 'pointerdown', 150, 100, { pointerType, button: 0 });
+        pointer(row, 'pointermove', 150 + distance, 101, { pointerType });
+        if (pointerType === 'touch') pointer(row, 'lostpointercapture', 150 + distance, 101);
+        expect(root).toHaveAttribute('data-dragging', 'true');
+        expect(root.style.getPropertyValue('--reserve-messenger-row-drag-offset')).toBe(`${distance}px`);
+        expect(screen.queryByRole('button', { name: '가게 문의 숨기기' })).not.toBeInTheDocument();
+        pointer(root, 'pointerup', 150 + distance, 101, { pointerType });
+        fireEvent.click(row, { detail: 1 });
+        expect(root).toHaveAttribute('data-reveal', side);
+        expect(root).not.toHaveAttribute('data-dragging');
+        expect(onSelect).not.toHaveBeenCalled();
+        expect(onVisibilityChange).not.toHaveBeenCalled();
+        expect(onLeave).not.toHaveBeenCalled();
+        expect(screen.getByRole('button', { name: side === 'left' ? '가게 문의 숨기기' : '가게 문의 채팅방 나가기' })).toBeVisible();
+        expect(screen.queryByRole('button', { name: side === 'left' ? '가게 문의 채팅방 나가기' : '가게 문의 숨기기' })).toBeNull();
+        if (side === 'left') {
+            fireEvent.click(screen.getByRole('button', { name: '가게 문의 숨기기' }));
+            await waitFor(() => expect(onVisibilityChange).toHaveBeenCalledExactlyOnceWith(true));
+        }
+    });
 
-it('leaves vertical scrolling and mouse dragging alone', () => {
-    const { row, root, onVisibilityChange } = setup();
-    pointer(row, 'pointerdown', 150, 100);
-    expect(pointer(row, 'pointermove', 153, 150)).toBe(true);
-    pointer(row, 'pointermove', 230, 170);
-    pointer(row, 'pointerup', 230, 170);
-    pointer(row, 'pointerdown', 150, 100, { pointerType: 'mouse' });
-    pointer(row, 'pointermove', 50, 100, { pointerType: 'mouse' });
-    pointer(row, 'pointerup', 50, 100, { pointerType: 'mouse' });
+it.each([[245, '채팅방에서 나갈까요?', '나가기'], [-245, '대화를 목록에서 숨길까요?', '숨기기']])(
+    'requires an explicit decision after a full swipe of %s', async (distance, heading, label) => {
+        const onLeave = vi.fn().mockResolvedValue(undefined);
+        const { row, root, onVisibilityChange } = setup({ onLeave });
+        const drag = () => {
+            pointer(row, 'pointerdown', 275, 100);
+            pointer(row, 'pointermove', 275 + distance, 100);
+            expect(screen.queryByRole('dialog')).toBeNull();
+            pointer(root, 'pointerup', 275 + distance, 100);
+        };
+        drag();
+        await waitFor(() => expect(screen.getByRole('dialog', { name: heading })).toBeVisible());
+        expect(onLeave).not.toHaveBeenCalled();
+        expect(onVisibilityChange).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: '취소' }));
+        await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+        expect(onLeave).not.toHaveBeenCalled();
+        expect(onVisibilityChange).not.toHaveBeenCalled();
+        drag();
+        fireEvent.click(await screen.findByRole('button', { name: label, exact: true }));
+        await waitFor(() => expect(distance > 0 ? onLeave : onVisibilityChange).toHaveBeenCalledOnce());
+    });
+
+it('keeps the system notification action on the visibility side', () => {
+    const { row, root } = setup();
+    pointer(row, 'pointerdown', 70, 100);
+    pointer(row, 'pointermove', 315, 100);
+    pointer(root, 'pointerup', 315, 100);
     expect(root).not.toHaveAttribute('data-reveal');
+    expect(screen.queryByRole('button', { name: /나가기/ })).toBeNull();
+});
+
+it.each(['touch', 'mouse'])('leaves vertical %s movement alone and keeps a click available', pointerType => {
+    const { row, root, onSelect, onVisibilityChange } = setup();
+    pointer(row, 'pointerdown', 150, 100, { pointerType, button: 0 });
+    expect(pointer(row, 'pointermove', 153, 150, { pointerType })).toBe(true);
+    pointer(row, 'pointermove', 230, 170, { pointerType });
+    pointer(row, 'pointerup', 230, 170, { pointerType });
+    fireEvent.click(row, { detail: 1 });
+    expect(root).not.toHaveAttribute('data-reveal');
+    expect(onSelect).toHaveBeenCalledOnce();
     expect(onVisibilityChange).not.toHaveBeenCalled();
 });
 
-it.each(['pointercancel', 'second pointer'])('cancels a revealed gesture after %s without changing data', kind => {
+it.each(['pointercancel', 'lostpointercapture', 'second pointer'])('cancels a revealed gesture after %s without changing data', kind => {
     const { row, root, onVisibilityChange } = setup();
     pointer(row, 'pointerdown', 150, 100);
     pointer(row, 'pointermove', 60, 100);
-    if (kind === 'pointercancel') pointer(row, kind, 60, 100);
+    if (kind !== 'second pointer') pointer(root, kind, 60, 100);
     else pointer(row, 'pointerdown', 190, 120, { pointerId: 2, isPrimary: false });
     pointer(row, 'pointerup', 60, 100);
     expect(root).not.toHaveAttribute('data-reveal');

@@ -1,0 +1,71 @@
+.reserve-discovery-home:has(> .reserve-season-preview) {
+    position: relative;
+    isolation: isolate;
+}
+.reserve-season-preview-host { display: contents; }
+.reserve-season-preview {
+    position: absolute;
+    inset: 0;
+    max-block-size: 100svh;
+    pointer-events: none;
+}
+.reserve-season-preview-paint {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+}
+.reserve-season-particles {
+    position: absolute;
+    inset: 0;
+}
+.reserve-season-particles > span {
+    position: absolute;
+    inset-block-start: -20px;
+    inline-size: var(--season-size);
+    block-size: calc(var(--season-size) * .62);
+    border-radius: 70% 35% 65% 45%;
+    background: var(--season-color);
+    animation: reserve-season-fall var(--season-duration) linear var(--season-delay) infinite;
+}
+.reserve-season-particles--spring {
+    --season-color: #da92ad;
+}
+.reserve-season-particles--spring > :nth-child(3n) {
+    --season-color: #e2acc5;
+}
+.reserve-season-particles--autumn {
+    --season-color: #cb884d;
+}
+.reserve-season-particles--autumn > span {
+    border-radius: 82% 6% 82% 6%;
+}
+.reserve-season-particles--autumn > :nth-child(3n) {
+    --season-color: #b66e52;
+}
+.reserve-season-particles--summer > span {
+    inset-block-start: var(--season-height);
+    inline-size: calc(var(--season-size) * .5);
+    block-size: calc(var(--season-size) * .5);
+    border-radius: 50%;
+    --season-color: #b2a459;
+    animation-name: reserve-season-glint;
+    animation-timing-function: ease-in-out;
+}
+@keyframes reserve-season-fall {
+    from { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg); }
+    15%, 75% { opacity: .56; }
+    to { opacity: 0; transform: translate3d(var(--season-drift), calc(100svh + 20px), 0) rotate(var(--season-turn)); }
+}
+@keyframes reserve-season-glint {
+    from { opacity: 0; transform: translate3d(0, 0, 0); }
+    45% { opacity: .5; }
+    to { opacity: 0; transform: translate3d(var(--season-drift), -30px, 0); }
+}
+@media (max-width: 575px) {
+    .reserve-season-particles > :nth-child(n+13) { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .reserve-season-preview-paint { display: none; }
+    .reserve-season-particles > span { animation: none; }
+}

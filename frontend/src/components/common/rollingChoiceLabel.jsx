@@ -20,5 +20,8 @@ function optionOrder(value, { options, children, fieldNames } = {}) {
 // 복합 라벨은 마크업을 유지하고 일반 라벨만 필드 전환을 공유한다.
 export function renderRollingChoiceLabel({ value, label }, choices) {
     if (!['string', 'number'].includes(typeof label)) return label;
-    return <RollingFieldValue value={value} order={optionOrder(value, choices)}>{label}</RollingFieldValue>;
+    const order = optionOrder(value, choices);
+    // 메뉴에 있는 빈 문자열도 실제 선택값으로 전환한다.
+    const motionValue = typeof value === 'string' && (value !== '' || order !== undefined) ? `option:${value}` : value;
+    return <RollingFieldValue value={motionValue} order={order}>{label}</RollingFieldValue>;
 }

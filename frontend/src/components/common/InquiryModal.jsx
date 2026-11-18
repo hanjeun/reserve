@@ -128,7 +128,7 @@ const InquiryModal = ({ open, onClose }) => {
             <FormField label="문의 유형">
                 {/* columns={4} — 8개가 항상 4+4로 대칭이 된다.
                     wrap(flex)은 왼쪽부터 채우는 방식이라 폭에 따라 5+3처럼 갈라졌다. */}
-                <SegmentedGrid value={category} onChange={setCategory} options={CATEGORY_OPTIONS} columns={4} />
+                <SegmentedGrid aria-label="문의 유형" value={category} onChange={setCategory} options={CATEGORY_OPTIONS} columns={4} />
             </FormField>
             <FormField label="제목" error={errors.title}>
                 <FormInput placeholder="문의 제목을 입력하세요" value={title}

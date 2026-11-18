@@ -180,7 +180,9 @@ describe('MessengerShell accessibility', () => {
 
     it('preserves the closed-launcher unread recovery interval at 60 seconds', async () => {
         const { client } = renderShell();
-        await screen.findByRole('button', { name: '메시지, 읽지 않은 메시지 2개 열기' });
+        const launcher = await screen.findByRole('button', { name: '메시지, 읽지 않은 메시지 2개 열기' });
+        expect(launcher.querySelector('.reserve-messenger-launcher-mark')).toHaveAttribute('fill', 'currentColor');
+        expect(launcher.querySelector('img')).toBeNull();
         const query = client.getQueryCache().find({ queryKey: chatKeys.unread() });
         expect(query.options.refetchInterval(query)).toBe(60000);
     });

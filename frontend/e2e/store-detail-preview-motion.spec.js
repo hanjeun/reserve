@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 const store = {
-    id: 81, name: '미리보기 검증 가게', category: '카페', description: '사진 확인',
+    id: 81, publicId: '00000000-0000-4000-8000-000000000081', name: '미리보기 검증 가게', category: '카페', description: '사진 확인',
     ownerId: 8, mainImageUrl: 'https://reserve-image.test/photo.svg',
     detailImageUrls: ['https://reserve-image.test/photo.svg'],
     reservationSlotMinutes: 30, openTime: '09:00', closeTime: '18:00',
@@ -21,25 +21,36 @@ async function mockStorePreview(page, { authenticated = false, storeOverrides = 
             ? { json: { success: true, data: { id: 41, name: '레이아웃 확인 사용자', email: 'layout@example.test', role: 'USER', termsAgreed: true } } }
             : { status: 401, json: { success: false, message: '로그인이 필요합니다.' } });
         if (path === '/api/auth/refresh') return route.fulfill({ status: 401, json: { success: false, message: '로그인이 필요합니다.' } });
-        return route.fulfill({ json: { success: true, data: path === '/api/stores/81' ? responseStore : [] } });
+        return route.fulfill({ json: { success: true, data: path === '/api/stores/00000000-0000-4000-8000-000000000081' ? responseStore : [] } });
     });
 }
 
-test('disabled detail photo autoplay stays still while manual navigation remains available', async ({ page }) => {
+test('detail photo dots appear for manual navigation and fade after inactivity', async ({ page }) => {
     await page.clock.install();
     await mockStorePreview(page, { storeOverrides: {
         imageAutoplayEnabled: false,
         detailImageUrls: ['https://reserve-image.test/photo.svg', 'https://reserve-image.test/photo.svg#second'],
     } });
-    await page.goto('/store/81');
+    await page.goto('/store/00000000-0000-4000-8000-000000000081');
     const activePhoto = page.locator('.reserve-carousel .slick-active img').first();
+    const dots = page.locator('.reserve-carousel .slick-dots');
     await expect(activePhoto).toBeVisible();
     await expect(activePhoto).toHaveAttribute('alt', `${store.name} 사진 1`);
+    await activePhoto.hover();
+    await expect(dots).toHaveCSS('opacity', '0');
     await page.clock.fastForward(10_000);
     await expect(activePhoto).toHaveAttribute('alt', `${store.name} 사진 1`);
-    await page.clock.resume();
-    await page.locator('.reserve-carousel .slick-dots li').nth(1).getByRole('button').click();
+    const gallery = page.getByRole('group', { name: `${store.name} 사진` });
+    await gallery.focus();
+    await page.keyboard.press('ArrowRight');
     await expect(activePhoto).toHaveAttribute('alt', `${store.name} 사진 2`);
+    await expect(dots).toHaveCSS('opacity', '1');
+    await page.clock.fastForward(2_000);
+    await expect(dots).toHaveCSS('opacity', '0');
+    await dots.getByRole('button', { name: '사진 1 보기' }).focus();
+    await expect(dots).toHaveCSS('opacity', '1');
+    await page.keyboard.press('Enter');
+    await expect(activePhoto).toHaveAttribute('alt', `${store.name} 사진 1`);
 });
 
 test('first store-detail photo preview animates its entrance after a fresh navigation', async ({ page }) => {
@@ -47,7 +58,7 @@ test('first store-detail photo preview animates its entrance after a fresh navig
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await mockStorePreview(page);
 
-    await page.goto('/store/81');
+    await page.goto('/store/00000000-0000-4000-8000-000000000081');
     const photo = page.locator('.reserve-carousel .slick-active .ant-image img').first();
     await expect(photo).toBeVisible();
     await expect(photo).toHaveJSProperty('complete', true);
@@ -116,7 +127,7 @@ test('first store-detail photo preview animates its entrance after a fresh navig
 test('first-open motion survives a lost appear-active class', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await mockStorePreview(page);
-    await page.goto('/store/81');
+    await page.goto('/store/00000000-0000-4000-8000-000000000081');
     const photo = page.locator('.reserve-carousel .slick-active .ant-image').first();
     await expect(photo).toBeVisible();
     await page.evaluate(() => {
@@ -149,13 +160,19 @@ test('first-open motion survives a lost appear-active class', async ({ page }) =
     }), JSON.stringify(result)).toBe(true);
 });
 
-for (const authenticated of [false, true]) test(`store quick actions respect authentication and share one title row (${authenticated})`, async ({ page }) => {
+for (const { authenticated, waiting, longTitle, rows } of [
+    { authenticated: false, waiting: false, longTitle: true, rows: [1] },
+    { authenticated: true, waiting: true, longTitle: false, rows: [4] },
+    { authenticated: true, waiting: true, longTitle: true, rows: [2, 2] },
+    { authenticated: true, waiting: false, longTitle: true, rows: [2, 1] },
+]) test(`store quick actions use ${rows.join('/')} positions (${authenticated})`, async ({ page }) => {
     await mockStorePreview(page, {
         authenticated,
         storeOverrides: {
-            name: '아주 긴 이름을 가진 예약 가게 레이아웃 확인점',
+            name: longTitle ? '아주 긴 이름을 가진 예약 가게 레이아웃 확인점' : '가게',
             description: '가게 소개가 길어져도 제목 옆의 빠른 작업 아이콘과 겹치지 않아야 합니다. '.repeat(4),
             phone: '02-1234-5678',
+            waitingIntakeMode: waiting ? 'REMOTE' : 'OFF',
             depositAmount: 0,
             bookingDeadlineHours: 1,
             paymentDeadlineHours: 1,
@@ -163,15 +180,22 @@ for (const authenticated of [false, true]) test(`store quick actions respect aut
             maxCapacity: 10,
         },
     });
-    await page.goto('/store/81');
+    await page.goto('/store/00000000-0000-4000-8000-000000000081');
 
     const titleRow = page.locator('.reserve-store-identity-title-row');
     const actions = titleRow.locator('.reserve-store-identity-actions');
-    const actionItems = actions.locator('.reserve-favorite-button, .reserve-store-contact-action');
-    await expect(actionItems).toHaveCount(authenticated ? 3 : 1);
+    const actionItems = actions.locator('.reserve-favorite-button, .reserve-info-hint-trigger, .reserve-store-contact-action');
+    await expect(actionItems).toHaveCount(rows.reduce((total, count) => total + count, 0));
     await expect(actions.locator('.reserve-favorite-button')).toHaveCount(authenticated ? 1 : 0);
     await expect(actions.getByRole('button', { name: '가게에 채팅 문의하기' })).toHaveCount(authenticated ? 1 : 0);
-    await expect(actions).toHaveCSS('flex-direction', 'row');
+    await expect.poll(() => actionItems.evaluateAll(items => {
+        const groups = new Map();
+        for (const item of items) {
+            const { top } = item.getBoundingClientRect();
+            groups.set(top, (groups.get(top) ?? 0) + 1);
+        }
+        return [...groups.values()];
+    })).toEqual(rows);
     for (const item of await actionItems.all()) {
         const box = await item.boundingBox();
         expect(box.width).toBeCloseTo(44, 0);

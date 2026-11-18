@@ -2,6 +2,7 @@ const DOMAINS = new Set(['NEWS', 'WAITING', 'FEED', 'COMMENT', 'LIKE', 'NOTIFICA
 const OPERATIONS = new Set(['CREATED', 'UPDATED', 'DELETED', 'INVALIDATED']);
 const same = (a, b) => a != null && b != null && String(a) === String(b);
 const affected = (value, id) => !id || same(value, id);
+const detailAffected = (query, keyId, id) => affected(keyId, id) || same(query.state?.data?.id, id);
 const forStore = (params, id) => !id || !params?.storeId || params.storeId === 'ALL' || same(params.storeId, id);
 
 /* 이벤트는 식별자만 전달하며 정본 데이터·폼의 동시성 버전으로 사용하지 않는다. */
@@ -23,6 +24,7 @@ export function parseLiveUpdate(raw) {
 
 const feedRead = key => key[0] === 'feed' && ['posts', 'post', 'author', 'regions'].includes(key[1]);
 const feedOwn = key => key[0] === 'feed' && key[1] === 'me' && key[2] === 'posts';
+const profileReviews = key => key[0] === 'feed' && key[1] === 'author' && key[3] === 'reviews';
 const interaction = (key, kind) => key[0] === 'feed' && key[1] === 'interactions' && key[2] === kind;
 const storeRead = key => key[0] === 'stores' && ['list', 'detail', 'my', 'regions'].includes(key[1]) && !key.includes('edit');
 const reservationRead = key => key[0] === 'reservations' && ['my', 'manage'].includes(key[1]);
@@ -33,9 +35,9 @@ export function liveUpdateMatches(query, event) {
     const { domain, entityId: id, parentId, storeId } = event;
     if (domain === 'NEWS') {
         if (event.targetType) return interaction(key, 'status') && key[3] === 'NEWS' && affected(key[4], id)
-            || key[0] === 'public-promotions' && (key[1] === 'list' || key[1] === 'detail' && affected(key[2], id))
+            || key[0] === 'public-promotions' && (key[1] === 'list' || key[1] === 'detail' && detailAffected(query, key[2], id))
             || key[0] === 'feed' && key[1] === 'posts';
-        if (key[0] === 'public-promotions') return key[1] === 'list' || key[1] === 'detail' && affected(key[2], id);
+        if (key[0] === 'public-promotions') return key[1] === 'list' || key[1] === 'detail' && detailAffected(query, key[2], id);
         if (key[0] === 'store-news') {
             if (['application', 'detail'].includes(key[1])) return affected(key[2], id);
             return ['applications', 'me'].includes(key[1]) && forStore(key[2], storeId);
@@ -46,9 +48,10 @@ export function liveUpdateMatches(query, event) {
     if (domain === 'WAITING') return key[0] === 'waiting-stores'
         || key[0] === 'waiting' && (key[2] === 'my' || affected(key[2], storeId || id));
     if (domain === 'FEED') {
+        if (id === 0 && key[0] === 'reviews') return true;
         if (!event.targetType && (interaction(key, 'mine') || interaction(key, 'notifications')
             || interaction(key, 'comments') && affected(key[3], id))) return true;
-        if (feedRead(key)) return key[1] !== 'post' || affected(key[2], id);
+        if (feedRead(key)) return key[1] !== 'post' || detailAffected(query, key[2], id);
         if (feedOwn(key)) return true;
         return interaction(key, 'status') && key[3] === 'POST' && affected(key[4], id);
     }
@@ -56,10 +59,10 @@ export function liveUpdateMatches(query, event) {
         if (!event.targetType && interaction(key, 'notifications')) return true;
         if (interaction(key, 'comments')) return affected(key[3], parentId);
         if (interaction(key, 'replies')) return true; // 답글의 부모가 현재 페이지 밖으로 이동했을 수 있다.
-        if (interaction(key, 'comment')) return affected(key[3], id);
+        if (interaction(key, 'comment')) return detailAffected(query, key[3], id);
         if (interaction(key, 'status')) return key[3] === 'COMMENT' && affected(key[4], id)
             || key[3] === 'POST' && affected(key[4], parentId);
-        return feedRead(key) && (key[1] !== 'post' || affected(key[2], parentId))
+        return feedRead(key) && (key[1] !== 'post' || detailAffected(query, key[2], parentId))
             || interaction(key, 'mine');
     }
     if (domain === 'LIKE') return interaction(key, 'mine')
@@ -67,15 +70,16 @@ export function liveUpdateMatches(query, event) {
     if (domain === 'NOTIFICATION') return interaction(key, 'notifications');
     if (domain === 'SYSTEM_NOTIFICATION') return systemNotificationRead(key);
     if (domain === 'STORE') {
-        if (storeRead(key)) return key[1] !== 'detail' || affected(key[2], id);
-        return key[0] === 'waiting-stores' || key[0] === 'favorites' && key[1] === 'my'
+        if (storeRead(key)) return key[1] !== 'detail' || detailAffected(query, key[2], id);
+        return profileReviews(key) || key[0] === 'waiting-stores' || key[0] === 'favorites' && key[1] === 'my'
             || key[0] === 'store-news' && key[1] === 'stores';
     }
-    if (domain === 'REVIEW') return key[0] === 'reviews' && affected(key[2], storeId || parentId)
-        || storeRead(key) && (key[1] !== 'detail' || affected(key[2], storeId || parentId));
+    if (domain === 'REVIEW') return profileReviews(key) || key[0] === 'reviews' && affected(key[2], storeId || parentId)
+        || storeRead(key) && (key[1] !== 'detail' || detailAffected(query, key[2], storeId || parentId));
     if (domain === 'FAVORITE') return key[0] === 'favorites' && (key[1] === 'my' || affected(key[2], storeId || id))
         || key[0] === 'feed' && key[1] === 'posts' && (key[2]?.favoriteOnly || key[2]?.view === 'favorites');
-    if (domain === 'RESERVATION') return reservationRead(key) && (key[1] !== 'manage' || forStore(key[2], storeId));
+    if (domain === 'RESERVATION') return reservationRead(key) && (key[1] !== 'manage'
+        || forStore(key[2] === 'owned' ? key[3] : key[2], storeId));
     return false;
 }
 
@@ -135,16 +139,50 @@ export function nextNewsBoundary(client, now) {
 
 export const isListQueryLoading = query => query.isPending || query.isPlaceholderData;
 
+const isAuditRead = query => query.queryKey[0] === 'store-news'
+    && ['applications', 'application'].includes(query.queryKey[1]);
+
+/* 신호가 끊겨도 기존 확인 주기를 지키며 방금 끝난 조회와 중복하지 않는다. */
+export function liveReadInterval(query, { connected = false, domains = [] } = {}) {
+    if (!isLiveReadQuery(query) || isAuditRead(query)) return null;
+    const key = query.queryKey;
+    if (systemNotificationRead(key) && key[1] === 'unread') return null;
+    if (key[0] === 'waiting' || key[0] === 'waiting-stores') {
+        if (connected && domains.includes('WAITING')) return 60_000;
+        return key[0] === 'waiting' && key[2] === 'my' ? 15_000 : 30_000;
+    }
+    if (connected && domains.includes('STORE') && key[0] === 'stores'
+        && ['list', 'regions'].includes(key[1])) return 180_000;
+    if (key[0] === 'reservations' && key[1] === 'my'
+        && !(connected && domains.includes('RESERVATION'))
+        && query.state.data?.content?.some(item => item.status === 'PENDING')) return 10_000;
+    if (key[0] === 'feed' && key[1] === 'interactions' && key[2] === 'notifications' && key[3] === 'count'
+        && !(connected && domains.includes('NOTIFICATION'))) return 30_000;
+    return 60_000;
+}
+
+const periodicReady = query => query.isActive() && query.state.fetchStatus === 'idle'
+    && !isReadAccessDenied(query.state.error);
+const lastReadAt = query => Math.max(query.state.dataUpdatedAt || 0, query.state.errorUpdatedAt || 0);
+
+export function nextLiveRefreshDelay(client, live, now = Date.now()) {
+    let delay = Infinity;
+    for (const query of client.getQueryCache().findAll()) {
+        const interval = liveReadInterval(query, live);
+        if (interval != null && periodicReady(query)) delay = Math.min(delay, lastReadAt(query) + interval - now);
+    }
+    return Number.isFinite(delay) ? Math.max(250, delay) : null;
+}
+
 /* 진행 중인 조회 뒤에 이벤트가 도착하면 완료 뒤 한 번 더 조회한다. */
-export function createLiveQueryRefresh(client, current) {
+export function createLiveQueryRefresh(client, current, live = () => ({})) {
     const following = new Map();
     return (events = [], all = false, { periodic = false } = {}) => {
         if (!current()) return;
         const matches = query => {
-            const auditRead = query.queryKey[0] === 'store-news'
-                && ['applications', 'application'].includes(query.queryKey[1]);
-            const badgeRead = query.queryKey[0] === 'chat' && query.queryKey[1] === 'unread';
-            return isLiveReadQuery(query) && (all && (!periodic || !auditRead && !badgeRead)
+            const interval = liveReadInterval(query, live());
+            const due = interval != null && periodicReady(query) && Date.now() - lastReadAt(query) >= interval;
+            return isLiveReadQuery(query) && (all && (!periodic || due)
                 || events.some(event => liveUpdateMatches(query, event)));
         };
         const queries = client.getQueryCache().findAll({ predicate: matches });

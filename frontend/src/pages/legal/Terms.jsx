@@ -88,7 +88,7 @@ const Terms = () => {
             </Section>
 
             <Section title="제9조 (문의)">
-                <Paragraph>서비스 이용 관련 문의: reserve@reserve.it.kr</Paragraph>
+                <Paragraph>서비스 이용 관련 문의: support@reserve.it.kr</Paragraph>
             </Section>
         </PageContainer>
     );

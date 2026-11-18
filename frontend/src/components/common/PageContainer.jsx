@@ -33,9 +33,7 @@ const PageContainer = ({
         padding: `${paddingTop} ${paddingX} ${paddingBottom}`,
         backgroundColor,
         textAlign: center ? 'center' : 'left',
-        // 헤더 높이를 뺀 최소 높이. 단위는 svh — dvh는 모바일에서 주소창이 접힐 때 값이 커져서
-        // minHeight가 함께 늘어나고, 그만큼 콘텐츠 아래로 빈 여백이 벌어진다(FaqSection에서 겪은 것과 같은 문제).
-        // 홈 섹션들도 전부 svh 기준이라 단위를 통일한다. 헤더 높이는 heights.header 토큰에서 가져온다(하드코딩 금지).
+        // 모바일 주소창이 접혀도 최소 높이가 늘어나지 않도록 svh를 사용한다.
         minHeight: `calc(100svh - ${heights.header})`,
         ...style,
     };

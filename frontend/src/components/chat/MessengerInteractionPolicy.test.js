@@ -27,7 +27,8 @@ const iconHover = "):hover:not(:disabled):not([aria-disabled='true'])::before";
 describe('messenger interaction roles', () => {
     it('shares enlarge hints without painting a rectangular background over transparent chat photos', () => {
         expect(declarations('.reserve-photo-preview-trigger .ant-image-cover', null, previewCss)['pointer-events']).toBe('none');
-        expect(declarations('.reserve-chat-photo.reserve-photo-preview-trigger .ant-image-cover', null, previewCss).background).toBe('transparent');
+        expect(declarations('.reserve-chat-photo').background).toBe('transparent');
+        expect(declarations('.reserve-chat-photo:hover .reserve-chat-photo-image', '(hover: hover) and (pointer: fine)').filter).toBe('brightness(0.9)');
         expect(declarations('.reserve-photo-preview-trigger:not(:focus-visible) .ant-image-cover',
             '(hover: none), (pointer: coarse)', previewCss).opacity).toBe('0');
         expect(declarations('.reserve-photo-preview-trigger .ant-image-cover',

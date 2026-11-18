@@ -25,17 +25,37 @@
 |---|---|
 | backend/src/main/java/kr/it/reserve | 엔티티와 저장 규칙 |
 | [scripts/sql](../../scripts/sql) | 개별 구조 변경 SQL |
+| [store-public-id.sql](../../scripts/sql/store-public-id.sql) | 가게의 고유 공개 UUID와 기존 행 채우기 |
+| [feed-public-ids.sql](../../scripts/sql/feed-public-ids.sql) | 피드 게시물·댓글과 가게 소식의 고유 공개 UUID |
 | [VerifyDatabaseSchema.java](../../scripts/java/kr/it/reserve/tools/VerifyDatabaseSchema.java) | 스키마 확인 도구 |
 | [login-methods.sql](../../backend/src/main/resources/db/manual/login-methods.sql) | 기존 회원을 보존하는 로그인 수단 관리와 검증 요청 |
 | [jwt-session.sql](../../backend/src/main/resources/db/manual/jwt-session.sql) | 원문 토큰을 저장하지 않는 기기별 로그인 세션 |
 | [reservation-admission.sql](../../backend/src/main/resources/db/manual/reservation-admission.sql) | 같은 요청의 예약 결과를 복구하는 멱등성 기록 |
+| [reservation-no-show-record.sql](../../backend/src/main/resources/db/manual/reservation-no-show-record.sql) | 같은 가게의 반복 노쇼 제한과 관리자 정정 기록 |
+| [reservation-no-show-management.sql](../../backend/src/main/resources/db/manual/reservation-no-show-management.sql) | 수동 방문 확인 시각, 노쇼 복구 상태, 가게별 수동 예약 제한 |
+| [reservation-cancellation-actor.sql](../../backend/src/main/resources/db/manual/reservation-cancellation-actor.sql) | 예약 취소 주체와 과거 내역의 미확인 상태 |
+| [store-booking-opening.sql](../../backend/src/main/resources/db/manual/store-booking-opening.sql) | 예약 오픈 일시와 적용할 방문일 범위 |
 | [reservation-notifications.sql](../../backend/src/main/resources/db/manual/reservation-notifications.sql) | 예약 알림 발송 대기·전달·회원별 읽음 기록 |
-| [mfa-completion-settlement.sql](../../backend/src/main/resources/db/manual/mfa-completion-settlement.sql) | MFA·예약 종료 기준·방문 보증금·TEST 가상 정산 |
-| [reservation-consent.sql](../../backend/src/main/resources/db/manual/reservation-consent.sql) | 예약 안내·동의의 버전과 거래 증거 |
-| [reservation-retention.sql](../../backend/src/main/resources/db/manual/reservation-retention.sql) | 예약 증거의 사건별 파기 보류와 해제 이력 |
+| [chat-conversation-leave.sql](../../backend/src/main/resources/db/manual/chat-conversation-leave.sql) | 채팅 나가기의 참가자별 목록 상태 |
 | [inquiry-inbound-email.sql](../../backend/src/main/resources/db/manual/inquiry-inbound-email.sql) | 지원 이메일 발신 주소 길이와 Resend의 수신 식별자 고유 제약 |
 | [inquiry-trash.sql](../../backend/src/main/resources/db/manual/inquiry-trash.sql) | 받은 문의 휴지통 이동 시각 |
 | [support-mail-photos.sql](../../backend/src/main/resources/db/manual/support-mail-photos.sql) | 받은 문의·보낸 메일의 비공개 사진과 영구 삭제 연동 |
+| [account-protection.sql](../../backend/src/main/resources/db/manual/account-protection.sql) | 계정 보호·검증된 연락처·대상별 관리자 MFA 요청 |
+| [mfa-completion-settlement.sql](../../backend/src/main/resources/db/manual/mfa-completion-settlement.sql) | MFA·예약 종료 기준·방문 보증금·TEST 가상 정산 |
+| [reservation-consent.sql](../../backend/src/main/resources/db/manual/reservation-consent.sql) | 예약 안내·동의의 버전과 거래 증거 |
+| [reservation-retention.sql](../../backend/src/main/resources/db/manual/reservation-retention.sql) | 예약 증거의 사건별 파기 보류와 해제 이력 |
+| [waiting-customer-hidden.sql](../../backend/src/main/resources/db/manual/waiting-customer-hidden.sql) | 취소된 웨이팅을 고객의 조회에서만 숨기는 시각 |
+| [review-photos.sql](../../backend/src/main/resources/db/manual/review-photos.sql) | 리뷰 사진의 참조와 원본 비율 |
+| [review-moderation.sql](../../backend/src/main/resources/db/manual/review-moderation.sql) | 리뷰 숨김과 가게 답변 |
+| [service-report.sql](../../backend/src/main/resources/db/manual/service-report.sql) | 리뷰·예약 신고 사건과 접수·처리·이의 내역 |
+| [review-interactions.sql](../../backend/src/main/resources/db/manual/review-interactions.sql) | 리뷰별 닉네임, 좋아요·댓글 저장 |
+| [reservation-review-written.sql](../../backend/src/main/resources/db/manual/reservation-review-written.sql) | 예약당 리뷰 한 건을 유지하기 위한 작성 여부와 기존 리뷰 반영 |
+| [unified-profile-visibility.sql](../../backend/src/main/resources/db/manual/unified-profile-visibility.sql) | 프로필 공개 범위 설정과 공개 활동 조회 |
+
+리뷰에 별칭을 저장하기 시작한 환경의 복구 이미지도 `author_alias`에 따른 작성자 정보와 프로필 활동 공개 범위를 적용해야 해요.
+기존 v11 라벨만으로는 이 계약을 확인할 수 없어요. 활성·후보·복구 이미지 모두 필수 [실제 JAR 검사](../../backend/tools/VerifyReleaseCompatibility.java)의 `review-profile-once-v1` 계약을 통과해야 해요. 예전 이미지에 라벨만 붙이는 방식은 허용하지 않아요.
+
+리뷰를 삭제해도 예약의 작성 여부는 유지해요. 새 앱을 기동하기 전에 컬럼을 추가하고 기존 리뷰와 연결된 예약에 작성 여부를 채워요. 복구 버전도 이 값을 읽고 기록해야 해요.
 
 새 로그인 세션을 사용하는 버전은 기존 로그인 정보를 다시 사용하지 않아요. 적용 후 한 번 다시 로그인해야 하며, 복구 이미지도 새 세션과 예약 요청 기록을 이해하는 버전이어야 해요. SQL 파일의 준비와 실제 운영 적용은 별도예요.
 
@@ -45,6 +65,14 @@
 
 v11 DDL을 준비한 뒤 `RESERVE_VERIFY_V11_SCHEMA=1`로 읽기 전용 점검 도구의 추가 검사를 실행해요. 제한된 백업 역할에서 MFA·완료·결제 확인 컬럼과 동의·파기 보류 표의 타입·인덱스·외래 키를 확인해요. 실제 릴리스 JAR의 제한 계정 validate와 앱 계정 권한 확인은 별도로 유지해요.
 
+리뷰·프로필 DDL을 준비한 뒤에는 `RESERVE_VERIFY_REVIEW_PROFILE_SCHEMA=1`로 같은 읽기 전용 도구의 검사를 선택해요. 제한된 백업 역할과 읽기 전용 트랜잭션에서 `review.author_alias`·`feed_profile.profile_visibility`·`reservation.review_written` 타입·기본값과 기존 리뷰의 작성 이력 backfill을 확인해요. 실제 후보·복구 JAR 검사와 제한 계정 validate도 각각 필요해요. 이미 물리적으로 삭제된 과거 리뷰의 작성 이력은 이 backfill만으로 복원할 수 없어요.
+
 예약 가림·동의·파기는 기본 비활성이에요. 검증과 활성화 승인 후 `RESERVE_RESERVATION_RETENTION_ENABLED`로 가림을 켜고, 동의는 `RESERVE_RESERVATION_CONSENT_ENABLED`와 승인된 보유기간 안내인 `RESERVE_RESERVATION_CONSENT_RECIPIENT_RETENTION`을 함께 설정해요. 자동 파기는 `RESERVE_RESERVATION_RETENTION_PURGE_ENABLED`로 별도 활성화해요. 가림이 꺼진 상태에서 동의나 파기만 켜는 배포는 거부해요.
 
+내 웨이팅 삭제를 제공하는 앱은 기동 전에 `waiting_entry.customer_hidden_at`이 NULL을 허용하는 `DATETIME(6)`인지 확인해요. 기존 접수는 값을 채우지 않으며, 구버전은 이 컬럼을 사용하지 않아요.
+
+계정 보호를 제공하기 전에 회원의 추가 컬럼, 복구 링크 해시 고유 제약과 MFA 요청의 대상 회원·인증 버전 컬럼을 준비해요. 기존 행의 보안 연락처는 확인 증거 없이 채우지 않아요. 보호가 시작되거나 복구 후 MFA가 필수가 된 계정이 있으면, 해당 상태를 검사하는 버전으로만 인증 기능을 되돌려요.
+
 스키마 확인 결과와 실제 운영 적용은 구분해요.
+
+공개 주소를 사용하는 앱을 기동하기 전에 가게·피드 게시물·댓글·가게 소식의 공개 UUID 컬럼과 고유 인덱스를 준비해요. 숫자 기본키와 외래 키는 내부 참조에 사용해요. 공개 ID 컬럼은 구버전의 쓰기 호환성을 위해 NULL을 허용해요. 구버전 쓰기가 끝나면 두 SQL을 다시 실행해 빠진 값만 채우고 각 누락 건수가 0인지 확인해요. 공개 상세 주소와 댓글 바로가기는 UUID를 사용해요. 기존 숫자 상세 주소는 404로 처리하므로 숫자 주소가 들어간 공유 링크와 현장 웨이팅 QR은 다시 발급해요.

@@ -313,6 +313,10 @@
     width: auto !important;
     text-align: left !important;
 }
+.reserve-reservation-summary-card-payment-note {
+    grid-column: 1 / -1;
+    justify-self: end;
+}
 .reserve-reservation-card-action {
     width: 100% !important;
     min-height: 24px;

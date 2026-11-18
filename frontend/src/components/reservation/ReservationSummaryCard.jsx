@@ -51,13 +51,17 @@ export default function ReservationSummaryCard({ reservation, onOpenDetail, acti
     const paymentState = useReservationPaymentState(reservation);
     const availableActions = React.Children.toArray(filterReservationActions(actions, paymentState.expired));
     const notice = reservationActionNotice(reservation, paymentState.expired, availableActions.length > 0);
+    const actionNotice = notice && (
+        <span role="status" className="reserve-reservation-action-notice">
+            <ClockCircleOutlined aria-hidden="true" />{notice}
+        </span>
+    );
 
     return <ReservationSummaryCardLayout itemKey={'reservation:' + reservation.id} storeName={storeName} imageUrl={storeMainImageUrl}
         onOpenDetail={onOpenDetail} detailLabel={storeName + ' 예약 상세 보기'}
         titleAccessory={specialRequest && <FileTextOutlined className="reserve-reservation-summary-card-request" title="요청사항 있음" />}
         statusLabel={<ReservationStatusBadge status={status} unpaid={unpaid} />} reference={reservationCode || '예약번호 없음'}
-        actions={availableActions} extraNote={extraNote}
-        actionNotice={notice && <span role="status" className="reserve-reservation-action-notice"><ClockCircleOutlined aria-hidden="true" />{notice}</span>}>
+        actions={availableActions} extraNote={extraNote} actionNotice={paymentState.expired ? null : actionNotice}>
         <div className="reserve-reservation-summary-card-meta reserve-reservation-summary-card-party">
             {showMemberInfo && (memberName || reservation.personalInfoHidden) && <>
                 <span>{reservation.personalInfoHidden ? '조회 기간 만료' : memberName}</span><span aria-hidden="true">·</span>
@@ -71,6 +75,9 @@ export default function ReservationSummaryCard({ reservation, onOpenDetail, acti
             <PaymentCountdown reservation={reservation} state={paymentState} className="reserve-reservation-summary-card-timeout" />
             <strong className="reserve-reservation-summary-card-price">{formatCurrency(depositAmount)}</strong>
         </span>
+        {paymentState.expired && actionNotice && (
+            <div className="reserve-reservation-summary-card-note reserve-reservation-summary-card-payment-note">{actionNotice}</div>
+        )}
     </ReservationSummaryCardLayout>;
 }
 

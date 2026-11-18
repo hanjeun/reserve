@@ -17,7 +17,7 @@ test('backend evidence covers its code and test executor, not unrelated frontend
     assert.throws(() => evidenceInputPaths('../outside'), /Unknown test component/);
 });
 test('CLI rejects unsupported modes and path-like components before executing tools or writing files', async () => {
-    await assert.rejects(main('unsupported', 'frontend'), /Expected restore or record/);
+    await assert.rejects(main('unsupported', 'frontend'), /Expected restore, record or key/);
     for (const component of ['../outside', resolve('outside'), String.raw`C:\outside`, 'frontend/../outside', '__proto__', 'constructor', '', undefined]) {
         await assert.rejects(main('record', component), /Unknown test component/);
         assert.throws(() => evidenceKey(component, entries, runtime), /Unknown test component/);

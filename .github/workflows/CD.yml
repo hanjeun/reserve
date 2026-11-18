@@ -104,52 +104,36 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "marketing-release-$SOURCE_SHA" --dir marketing/dist
+      - name: Pack release staging files
+        id: bundle
+        env:
+          RESERVE_DOMAIN_SPLIT: ${{ vars.RESERVE_DOMAIN_SPLIT || 'false' }}
+        run: |
+          set -euo pipefail
+          test -f frontend/dist/index.html
+          test "$(tr -d '\r\n' < frontend/dist/release-id.txt)" = "$SOURCE_SHA"
+          paths=(frontend/dist nginx/default.conf scripts/domain-release.sh scripts/preserve-frontend-assets.sh)
+          if [ "$RESERVE_DOMAIN_SPLIT" = true ]; then
+            test -f marketing/dist/index.html
+            test "$(tr -d '\r\n' < marketing/dist/release-id.txt)" = "$SOURCE_SHA"
+            paths+=(marketing/dist)
+          fi
+          tar -czf reserve-stage.tar.gz -- "${paths[@]}"
+          digest=$(sha256sum reserve-stage.tar.gz)
+          printf 'digest=%s\n' "${digest%% *}" >> "$GITHUB_OUTPUT"
       - name: Require current main before server access
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/verify-cd-source.mjs current
-      - name: Stage marketing files
-        if: vars.RESERVE_DOMAIN_SPLIT == 'true'
-        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345
-        with:
-          host: ${{ secrets.RESERVE_SERVER_IP }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
-          source: "marketing/dist/*"
-          target: "/home/ubuntu/reserve-marketing-${{ needs.verify-source.outputs.sha }}"
-          strip_components: 2
-      - name: Stage domain release helper
-        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345
-        with:
-          host: ${{ secrets.RESERVE_SERVER_IP }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
-          source: "scripts/domain-release.sh"
-          target: "/home/ubuntu"
-          strip_components: 1
-      - name: Deploy frontend to EC2
+      - name: Upload release staging bundle to EC2
         uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
         with:
           host: ${{ secrets.RESERVE_SERVER_IP }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
-          source: "frontend/dist/*"
-          target: "/home/ubuntu/reserve-frontend-${{ needs.verify-source.outputs.sha }}"
-          strip_components: 2
-
-      - name: Deploy nginx config
-        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
-        with:
-          host: ${{ secrets.RESERVE_SERVER_IP }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
-          source: "nginx/default.conf,scripts/preserve-frontend-assets.sh"
-          target: "/home/ubuntu/"
-          strip_components: 1
+          source: reserve-stage.tar.gz
+          target: /home/ubuntu/reserve-stage-${{ needs.verify-source.outputs.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
 
       # SHA별 정적 파일과 nginx 템플릿만 staging한다. live 전환은 새 백엔드가
       # 정상 기동한 뒤 deploy-backend 잡에서 한 번의 nginx reload로 수행한다.
@@ -158,12 +142,15 @@ jobs:
         env:
           FRONTEND_RELEASE: ${{ needs.verify-source.outputs.sha }}
           RESERVE_DOMAIN_SPLIT: ${{ vars.RESERVE_DOMAIN_SPLIT || 'false' }}
+          STAGING_SHA256: ${{ steps.bundle.outputs.digest }}
+          STAGING_RUN_ID: ${{ github.run_id }}
+          STAGING_ATTEMPT: ${{ github.run_attempt }}
         with:
           host: ${{ secrets.RESERVE_SERVER_IP }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
-          envs: FRONTEND_RELEASE,RESERVE_DOMAIN_SPLIT
+          envs: FRONTEND_RELEASE,RESERVE_DOMAIN_SPLIT,STAGING_SHA256,STAGING_RUN_ID,STAGING_ATTEMPT
           script: |
             bash -Eeuo pipefail <<'RESERVE_STAGE'
             case "$FRONTEND_RELEASE" in
@@ -173,11 +160,25 @@ jobs:
               echo "Frontend release id must be a full commit SHA"
               exit 1
             fi
+            if ! [[ "$STAGING_SHA256" =~ ^[0-9a-f]{64}$ && "$STAGING_RUN_ID" =~ ^[0-9]+$ && "$STAGING_ATTEMPT" =~ ^[0-9]+$ ]]; then
+              echo "Invalid staging bundle identity"
+              exit 1
+            fi
+            BUNDLE_DIR="/home/ubuntu/reserve-stage-$FRONTEND_RELEASE-$STAGING_RUN_ID-$STAGING_ATTEMPT"
+            test -d "$BUNDLE_DIR"
+            test ! -L "$BUNDLE_DIR"
+            trap 'rm -rf -- "$BUNDLE_DIR"' EXIT
+            (
+              cd "$BUNDLE_DIR"
+              printf '%s  reserve-stage.tar.gz\n' "$STAGING_SHA256" | sha256sum --strict --check
+            )
+            EXTRACTED=$(mktemp -d "$BUNDLE_DIR/files.XXXXXX")
+            tar -xzf "$BUNDLE_DIR/reserve-stage.tar.gz" -C "$EXTRACTED"
 
             RELEASE_ROOT=/usr/share/nginx/html/releases
             RELEASE_DIR="$RELEASE_ROOT/$FRONTEND_RELEASE"
             INCOMING_DIR="$RELEASE_ROOT/.incoming-$FRONTEND_RELEASE"
-            UPLOAD_DIR="/home/ubuntu/reserve-frontend-$FRONTEND_RELEASE"
+            UPLOAD_DIR="$EXTRACTED/frontend/dist"
             NGINX_TEMPLATE="/home/ubuntu/default-$FRONTEND_RELEASE.conf"
 
             test -f "$UPLOAD_DIR/index.html"
@@ -196,25 +197,19 @@ jobs:
               sudo mkdir -p "$INCOMING_DIR"
               sudo cp -a "$UPLOAD_DIR/." "$INCOMING_DIR/"
               test -f "$INCOMING_DIR/index.html"
-              sudo bash /home/ubuntu/preserve-frontend-assets.sh "$INCOMING_DIR" "$RELEASE_ROOT" /usr/share/nginx/html/current
+              sudo bash "$EXTRACTED/scripts/preserve-frontend-assets.sh" "$INCOMING_DIR" "$RELEASE_ROOT" /usr/share/nginx/html/current
               sudo chown -R nginx:nginx "$INCOMING_DIR" 2>/dev/null || true
               sudo mv "$INCOMING_DIR" "$RELEASE_DIR"
             fi
             # 빌드에 포함된 식별자를 검증하며 기존 릴리스의 식별자는 바꾸지 않는다.
             test "$(tr -d '\r\n' < "$RELEASE_DIR/release-id.txt")" = "$FRONTEND_RELEASE"
             if [ "$RESERVE_DOMAIN_SPLIT" = true ]; then
-              sudo bash /home/ubuntu/domain-release.sh stage "$FRONTEND_RELEASE"
+              sudo bash "$EXTRACTED/scripts/domain-release.sh" stage "$FRONTEND_RELEASE" "$EXTRACTED/marketing/dist"
             fi
 
             # 다른 SHA의 설정과 섞이지 않도록 후보 파일명을 배포 SHA에 고정한다.
-            test -f /home/ubuntu/default.conf
-            install -m 0644 /home/ubuntu/default.conf "$NGINX_TEMPLATE"
-            rm -f /home/ubuntu/default.conf
-
-            case "$UPLOAD_DIR" in
-              /home/ubuntu/reserve-frontend-*) sudo rm -rf -- "$UPLOAD_DIR" ;;
-              *) echo "Unexpected upload directory"; exit 1 ;;
-            esac
+            install -m 0644 "$EXTRACTED/nginx/default.conf" "$NGINX_TEMPLATE"
+            install -m 0644 "$EXTRACTED/scripts/domain-release.sh" /home/ubuntu/domain-release.sh
 
             echo "Frontend staged at $RELEASE_DIR; live configuration is unchanged"
             RESERVE_STAGE

@@ -161,11 +161,17 @@ jobs:
             backend/build/test-results/test/
           retention-days: 7
 
-  test-frontend:
+  test-frontend-core:
     permissions:
       contents: read
       actions: read
+      pull-requests: read
     runs-on: ubuntu-latest
+    outputs:
+      key: ${{ steps.evidence.outputs.key }}
+      reused: ${{ steps.evidence.outputs.reused }}
+      origin_run: ${{ steps.evidence.outputs.origin_run }}
+      executed_at: ${{ steps.evidence.outputs.executed_at }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Setup Node.js
@@ -174,6 +180,20 @@ jobs:
           node-version-file: frontend/.nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+      - name: Verify main release title
+        if: >-
+          (github.event_name == 'pull_request' && github.base_ref == 'main') ||
+          (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            title=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq '.title')
+          else
+            title=$(git show -s --format=%s "$GITHUB_SHA")
+          fi
+          node scripts/verify-release-title.mjs "$title"
       - name: Restore verified frontend test evidence
         id: evidence
         env:
@@ -227,43 +247,99 @@ jobs:
         if: steps.evidence.outputs.reused != 'true'
         working-directory: frontend
         run: npm run test:run
+
+  test-frontend-browser:
+    needs: test-frontend-core
+    if: needs.test-frontend-core.outputs.reused == 'false'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [chromium, mobile-chromium]
+    outputs:
+      pc_key: ${{ matrix.project == 'chromium' && steps.identity.outputs.key || '' }}
+      mobile_key: ${{ matrix.project == 'mobile-chromium' && steps.identity.outputs.key || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Identify browser test inputs
+        id: identity
+        env:
+          CI_TEST_CONFIG_REVISION: ${{ vars.CI_TEST_CONFIG_REVISION }}
+        run: node scripts/ci-evidence.mjs key frontend
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
       - name: Install Playwright Chromium
-        if: steps.evidence.outputs.reused != 'true'
         working-directory: frontend
         run: npx --no-install playwright install --with-deps chromium
-      - name: Test PC browser (Chromium)
-        id: browser_pc
-        if: steps.evidence.outputs.reused != 'true'
+      - name: Test browser
         working-directory: frontend
-        run: npm run test:e2e -- --project=chromium --output=test-results/pc
-      - name: Test mobile browser (Pixel 7 Chromium)
-        id: browser_mobile
-        if: "!cancelled() && steps.evidence.outputs.reused != 'true' && (success() || (failure() && steps.browser_pc.outcome == 'failure'))"
-        working-directory: frontend
-        run: npm run test:e2e -- --project=mobile-chromium --output=test-results/mobile
+        env:
+          PLAYWRIGHT_PROJECT: ${{ matrix.project }}
+        run: npm run test:e2e -- --project="$PLAYWRIGHT_PROJECT" --output=test-results
+      - name: Upload browser evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: frontend-browser-failures-${{ matrix.project }}
+          path: frontend/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  test-frontend:
+    needs: [test-frontend-core, test-frontend-browser]
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require frontend test results
+        env:
+          CORE_RESULT: ${{ needs.test-frontend-core.result }}
+          BROWSER_RESULT: ${{ needs.test-frontend-browser.result }}
+          EVIDENCE_REUSED: ${{ needs.test-frontend-core.outputs.reused }}
+          EVIDENCE_KEY: ${{ needs.test-frontend-core.outputs.key }}
+        run: |
+          test "$CORE_RESULT" = success
+          test -n "$EVIDENCE_KEY"
+          if [ "$EVIDENCE_REUSED" = true ]; then
+            test "$BROWSER_RESULT" = skipped
+          else
+            test "$EVIDENCE_REUSED" = false
+            test "$BROWSER_RESULT" = success
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: frontend/.nvmrc
+      # 서로 다른 실행기 이미지에서 테스트한 결과를 하나의 재사용 증거로 기록하지 않는다.
       - name: Record successful frontend test evidence
         id: record
+        if: >-
+          needs.test-frontend-core.outputs.reused == 'true' ||
+          (needs.test-frontend-browser.outputs.pc_key == needs.test-frontend-core.outputs.key &&
+           needs.test-frontend-browser.outputs.mobile_key == needs.test-frontend-core.outputs.key)
         env:
-          EVIDENCE_ORIGIN: ${{ steps.evidence.outputs.origin_run }}
-          EVIDENCE_EXECUTED_AT: ${{ steps.evidence.outputs.executed_at }}
+          EVIDENCE_ORIGIN: ${{ needs.test-frontend-core.outputs.origin_run }}
+          EVIDENCE_EXECUTED_AT: ${{ needs.test-frontend-core.outputs.executed_at }}
+          EVIDENCE_EXPECTED_KEY: ${{ needs.test-frontend-core.outputs.key }}
           CI_TEST_CONFIG_REVISION: ${{ vars.CI_TEST_CONFIG_REVISION }}
         run: node scripts/ci-evidence.mjs record frontend
       - name: Upload successful frontend test evidence
+        if: steps.record.outputs.key != ''
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ci-evidence-frontend-${{ steps.record.outputs.key }}
           overwrite: true
           path: .ci-evidence/frontend/evidence.json
           retention-days: 7
-      - name: Upload browser evidence on failure
-        if: failure()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: frontend-browser-failures
-          path: frontend/test-results/
-          if-no-files-found: ignore
-          retention-days: 7
-
   build-backend:
     permissions:
       contents: read
@@ -473,7 +549,7 @@ jobs:
   dispatch-cd:
     needs: [test-backend, test-frontend, build-backend, build-frontend]
     if: >-
-      always() && !cancelled() && github.repository == 'hanjeun/reserve' &&
+      success() && github.repository == 'hanjeun/reserve' &&
       github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 2

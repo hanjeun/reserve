@@ -34,7 +34,7 @@ test('forged success cannot confirm a READY payment or issue a new payment reque
     await page.getByRole('button', { name: '내 예약', exact: true }).click();
     await expect(page).toHaveURL(url => url.pathname === '/my-reservations');
     await expect.poll(() => Object.fromEntries(new URL(page.url()).searchParams))
-        .toEqual({ view: 'list', tab: 'reservation', status: 'all', sort: 'recent' });
+        .toEqual({ view: 'list', tab: 'reservation', status: 'all', sort: 'recent', page: '1' });
     expect(requests.every(request => request.method === 'GET' && request.path === '/api/payment/status')).toBe(true);
 });
 

@@ -89,7 +89,7 @@ test('first card press does not zoom its photo on touch, while desktop hover and
     } finally {
         await page.mouse.up();
     }
-    await expect(page).toHaveURL(/\/store\/81$/);
+    await expect(page).toHaveURL(/\/store\/00000000-0000-4000-8000-000000000081$/);
     await expect(page.getByRole('heading', { name: store.name, exact: true })).toBeVisible();
 });
 
@@ -98,6 +98,7 @@ test('gallery slide corners stay rounded during movement and original preview re
     await page.goto('/store/00000000-0000-4000-8000-000000000081');
     const gallery = page.locator('.reserve-store-gallery');
     await expect(gallery.locator('.slick-active .ant-image-img').first()).toBeVisible();
+    await gallery.focus();
     const sampling = gallery.evaluate(element => new Promise(resolve => {
         const frames = [];
         const sample = () => {
@@ -112,7 +113,7 @@ test('gallery slide corners stay rounded during movement and original preview re
         };
         requestAnimationFrame(sample);
     }));
-    await gallery.locator('.slick-dots li:not(.slick-active) button').first().click();
+    await page.keyboard.press('ArrowRight');
     const frames = await sampling;
     expect(frames.some(frame => frame.images.length >= 2), JSON.stringify(frames)).toBe(true);
     expect(new Set(frames.map(frame => frame.track)).size).toBeGreaterThan(1);

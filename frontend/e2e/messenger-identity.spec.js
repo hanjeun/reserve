@@ -88,7 +88,7 @@ test('chat uses compact thumbnails and opens the original after loading', async 
     const tiles = group.getByRole('button', { name: '사진 크게 보기' });
     await expect(tiles).toHaveCount(2);
     expect(uploads.map(upload => upload.content)).toEqual([captionText, '']);
-    expect(uploads[0].clientMessageId).toMatch(/^photos_[a-f0-9-]{32,36}_0$/);
+    expect(uploads[0].clientMessageId).toMatch(/^attachments_[a-f0-9-]{32,36}_0$/);
     expect(uploads[1].clientMessageId).toBe(uploads[0].clientMessageId.slice(0, -1) + '1');
     expect(thumbnails).toHaveLength(2);
     expect(originals).toEqual([]);
@@ -591,7 +591,9 @@ test('photo-only messages use multipart upload and an authenticated preview', as
     await supportConversation(page).click();
     await expect(page.getByRole('button', { name: '사진 첨부' })).toBeEnabled();
     await page.getByLabel('첨부할 사진 선택').setInputFiles({ name: 'test.png', mimeType: 'image/png', buffer: png });
-    await expect(page.getByRole('button', { name: '첨부 사진 크게 보기' }).getByAltText('첨부 사진')).toBeVisible();
+    const draft = page.locator('.reserve-chat-draft-photo');
+    await expect(draft.getByAltText('첨부 사진')).toBeVisible();
+    await expect(draft.getByRole('button', { name: '첨부 사진 크게 보기' })).toBeAttached();
     await page.getByRole('button', { name: '보내기', exact: true }).click();
     const photo = page.getByAltText('대화에 첨부한 사진');
     await expect(photo).toBeVisible();

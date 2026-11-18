@@ -218,7 +218,7 @@ test('feed detail, profile and notifications return through the shared back cont
     await expect(page).toHaveURL(origin);
 
     await page.emulateMedia({ reducedMotion: 'no-preference' });
-    const avatar = page.getByRole('link', { name: `${profile.nickname}의 피드 프로필`, exact: true });
+    const avatar = page.getByRole('link', { name: `${profile.nickname}의 프로필`, exact: true });
     await avatar.hover();
     await page.mouse.down();
     await expect(avatar.locator(':scope > div')).toHaveCSS('scale', '0.96');

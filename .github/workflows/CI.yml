@@ -168,6 +168,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      pull-requests: read
     runs-on: ubuntu-latest
     outputs:
       key: ${{ steps.evidence.outputs.key }}
@@ -181,30 +182,6 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: frontend/.nvmrc
-      - name: Restore verified frontend test evidence
-        id: evidence
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          CI_FORCE_TESTS: ${{ github.event_name == 'workflow_dispatch' || vars.CI_FORCE_TESTS == 'true' }}
-          CI_TEST_CONFIG_REVISION: ${{ vars.CI_TEST_CONFIG_REVISION }}
-        run: node scripts/ci-evidence.mjs restore frontend
-
-  test-frontend-core:
-    needs: prepare-frontend-tests
-    permissions:
-      contents: read
-      pull-requests: read
-    runs-on: ubuntu-latest
-    outputs:
-      key: ${{ steps.identity.outputs.key }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Setup Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: frontend/.nvmrc
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
       - name: Verify main release title
         if: >-
           (github.event_name == 'pull_request' && github.base_ref == 'main') ||
@@ -219,6 +196,29 @@ jobs:
             title=$(git show -s --format=%s "$GITHUB_SHA")
           fi
           node scripts/verify-release-title.mjs "$title"
+      - name: Restore verified frontend test evidence
+        id: evidence
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CI_FORCE_TESTS: ${{ github.event_name == 'workflow_dispatch' || vars.CI_FORCE_TESTS == 'true' }}
+          CI_TEST_CONFIG_REVISION: ${{ vars.CI_TEST_CONFIG_REVISION }}
+        run: node scripts/ci-evidence.mjs restore frontend
+
+  test-frontend-core:
+    needs: prepare-frontend-tests
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    outputs:
+      key: ${{ steps.identity.outputs.key }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
       - name: Identify unit test inputs
         id: identity
         if: needs.prepare-frontend-tests.outputs.reused == 'false'

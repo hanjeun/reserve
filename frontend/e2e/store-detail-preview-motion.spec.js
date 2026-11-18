@@ -207,8 +207,12 @@ for (const { authenticated, waiting, longTitle, rows } of [
     });
     expect(contactStyle).toEqual({ borderWidth: '0px', borderRadius: '50%', background: 'rgba(0, 0, 0, 0)' });
 
-    const titleBox = await titleRow.boundingBox();
+    const titleBox = await titleRow.locator('.reserve-store-identity-heading').boundingBox();
+    const actionBox = await actions.boundingBox();
     const summaryBox = await page.locator('.reserve-store-identity-summary').boundingBox();
     expect(summaryBox.y).toBeGreaterThanOrEqual(titleBox.y + titleBox.height - 1);
+    if (summaryBox.x + summaryBox.width > actionBox.x + 1) {
+        expect(summaryBox.y).toBeGreaterThanOrEqual(actionBox.y + actionBox.height - 1);
+    }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
 });

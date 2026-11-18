@@ -96,14 +96,20 @@ for (const [mode, scheme] of [['light', 'dark'], ['dark', 'light'], ['system', '
         await page.goto('/store/00000000-0000-4000-8000-000000000081');
         await expect(page.locator('.reserve-store-gallery img').first()).toHaveJSProperty('naturalWidth', 800);
         await expect(page.locator('html')).toHaveAttribute('data-theme', mode === 'system' ? scheme : mode);
-        const indicators = page.locator('.reserve-carousel .slick-dots');
+        const gallery = page.locator('.reserve-store-gallery');
+        const indicators = gallery.locator('.slick-dots');
+        await gallery.focus();
         for (let step = 0; step < 2; step += 1) {
             const active = indicators.locator('li.slick-active');
+            await expect(active.locator('button')).toHaveAttribute('aria-label', `사진 ${step + 1} 보기`);
             await expect(active.locator('button')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
             await expect(active.locator('button')).toHaveCSS('height', '6px');
             await expect.poll(() => active.evaluate(element => getComputedStyle(element, '::after').display)).toBe('none');
             await expect(active.locator('button')).toHaveCSS('border-radius', '999px');
-            await indicators.locator('li:not(.slick-active) button').click();
+            if (step === 0) {
+                await page.keyboard.press('ArrowRight');
+                await expect(gallery).toHaveAttribute('data-photo-dots-visible', '');
+            }
         }
         expect(requests.writes).toBe(0);
     });

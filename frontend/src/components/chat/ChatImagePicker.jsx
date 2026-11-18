@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { DeleteOutlined, EyeOutlined, FileTextOutlined, PaperClipOutlined } from '../common/icons';
 import { animation } from '../../styles/tokens';
@@ -66,9 +66,16 @@ export default function ChatImagePicker({ file, onChange, disabled, enabled, onF
     const revision = draftScope ?? sessionRevision;
     const input = useRef(null);
     const attach = useRef(null);
+    const restoreAttachFocus = useRef(false);
     const selecting = useRef(false);
     const [error, setError] = useState('');
     const selectedFiles = files ?? (file ? [file] : EMPTY_FILES);
+    const limitReached = Boolean(files && files.length >= maxFiles);
+    useLayoutEffect(() => {
+        if (!restoreAttachFocus.current || disabled || limitReached) return;
+        restoreAttachFocus.current = false;
+        attach.current?.focus({ preventScroll: true });
+    }, [disabled, limitReached, selectedFiles.length]);
     const [retained, setRetained] = useState(() => ({ revision, files: selectedFiles,
         entries: selectedFiles.map((image, key) => ({ file: image, key })), next: selectedFiles.length }));
     if (revision !== retained.revision) {
@@ -84,7 +91,7 @@ export default function ChatImagePicker({ file, onChange, disabled, enabled, onF
     const select = async event => {
         const selected = Array.from(event.target.files || []);
         event.target.value = '';
-        if (!selected.length || disabled || selecting.current) return;
+        if (!selected.length || disabled || limitReached || selecting.current) return;
         if (onStageFiles) { onStageFiles(selected); return; }
         if (files && selected.length + files.length > maxFiles) { setError(`사진은 ${maxFiles}장까지 첨부할 수 있어요.`); return; }
         const types = accept.split(',').map(type => type.trim());
@@ -101,10 +108,10 @@ export default function ChatImagePicker({ file, onChange, disabled, enabled, onF
     const attachmentLabel = allowDocuments ? '파일' : '사진';
     const control = <>
         <input ref={input} type="file" accept={allowDocuments ? accept + ',' + CHAT_DOCUMENT_ACCEPT : accept}
-            multiple={Boolean(onStageFiles || onFilesChange)} onChange={select} disabled={disabled}
+            multiple={Boolean(onStageFiles || onFilesChange)} onChange={select} disabled={disabled || limitReached}
             hidden aria-label={`첨부할 ${attachmentLabel} 선택`} />
         <button ref={attach} type="button" className="reserve-chat-tool" aria-label={`${attachmentLabel} 첨부`}
-            disabled={disabled || !onStageFiles && Boolean(files && files.length >= maxFiles)}
+            disabled={disabled || limitReached}
             onClick={() => input.current?.click()}><PaperClipOutlined aria-hidden="true" /></button>
     </>;
     const previews = retained.entries.length || error ? <>
@@ -113,7 +120,7 @@ export default function ChatImagePicker({ file, onChange, disabled, enabled, onF
                 itemKey={entry.key} onExited={retire} file={entry.file} active={selectedFiles.includes(entry.file)} disabled={disabled}
                 label={files ? `${chatAttachmentKind(entry.file) === 'document' ? '첨부 파일' : '첨부 사진'} 제거: ${entry.file.name}` : '첨부 사진 제거'}
                 onRemove={event => {
-                    if (event.currentTarget === document.activeElement) attach.current?.focus({ preventScroll: true });
+                    if (event.currentTarget === document.activeElement) restoreAttachFocus.current = true;
                     setError('');
                     if (onRemoveFile) onRemoveFile(entry.file);
                     else onChange(null);

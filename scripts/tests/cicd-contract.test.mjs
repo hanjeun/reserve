@@ -534,9 +534,9 @@ test('PR labels share existing CI events without metadata-only runs or weaker bu
     assert.equal(labels.steps[0].env, undefined);
     assert.doesNotMatch(labels.steps[0].with.script, /\$\{\{|(?:^|[^\w.])(?:require|exec|fetch)\(/);
     assert.equal(labels.concurrency.group, 'pr-labels-${{ github.event.pull_request.number }}');
-    for (const job of [backend, frontend, backendTests, frontendTests, frontendCoreTests, frontendBrowserTests]) {
+    for (const job of [backend, frontend, backendTests, frontendTests, prepareFrontendTests, frontendCoreTests, frontendBrowserTests]) {
         assert.ok(!Object.hasOwn(job.permissions || {}, 'issues'));
-        assert.equal(job.permissions?.['pull-requests'], job === frontendCoreTests ? 'read' : undefined);
+        assert.equal(job.permissions?.['pull-requests'], job === prepareFrontendTests ? 'read' : undefined);
         assert.ok(![].concat(job.needs || []).includes('label-pr'));
     }
 });
@@ -717,8 +717,9 @@ test('unit and both browser checks run in parallel and gate the frontend build',
 });
 
 test('main PRs and main push commits must use the release title for the packaged version', () => {
-    const title = frontendCoreTests.steps.find(entry => entry.name === 'Verify main release title');
-    assert.ok(frontendCoreTests.steps.indexOf(title) < frontendCoreTests.steps.indexOf(step(frontendCoreTests, 'evidence')));
+    const title = prepareFrontendTests.steps.find(entry => entry.name === 'Verify main release title');
+    assert.ok(prepareFrontendTests.steps.indexOf(title) < prepareFrontendTests.steps.indexOf(step(prepareFrontendTests, 'evidence')));
+    assert.equal(prepareFrontendTests.permissions['pull-requests'], 'read');
     const needsTitle = new Function('github', `return ${title.if}`);
     assert.equal(needsTitle({ event_name: 'pull_request', base_ref: 'main' }), true);
     assert.equal(needsTitle({ event_name: 'push', ref: 'refs/heads/main' }), true);

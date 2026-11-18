@@ -50,6 +50,7 @@ async function setup(page, role) {
             data = {
                 ...values,
                 id: 7,
+                publicId: '00000000-0000-4000-8000-000000000007',
                 revision: 0,
                 state: values.draft ? 'DRAFT' : 'PUBLISHED',
                 benefitState: values.benefitRequested ? 'PENDING' : 'NONE',
@@ -65,6 +66,7 @@ async function setup(page, role) {
             data = {
                 ...values,
                 id: 8,
+                publicId: '00000000-0000-4000-8000-000000000008',
                 revision: 0,
                 state: values.draft ? 'DRAFT' : 'PUBLISHED',
                 author: state.profile,
@@ -177,12 +179,12 @@ test('an ordinary member chooses a public profile and publishes a photo without 
     const state = await setup(page, 'USER');
     await page.goto('/feed');
     await page.getByRole('button', { name: '새 글 작성', exact: true }).click();
-    const publicProfile = page.getByRole('dialog', { name: '처음 글쓰기 · 공개 닉네임' });
+    const publicProfile = page.getByRole('dialog', { name: '프로필 만들기' });
     await publicProfile.getByRole('textbox', { name: '공개 닉네임' }).fill(profile.nickname);
-    await publicProfile.getByRole('checkbox', { name: '계정의 프로필 사진을 피드에 공개해요.' }).uncheck();
-    await expect(publicProfile.getByRole('checkbox')).not.toBeChecked();
+    await publicProfile.getByRole('combobox', { name: '프로필 공개 범위' }).click();
+    await page.getByText('전체 공개', { exact: true }).last().click();
     await publicProfile.getByRole('button', { name: '저장하고 작성하기', exact: true }).click();
-    expect(state.profile).toMatchObject({ nickname: profile.nickname, useAccountAvatar: false });
+    expect(state.profile).toMatchObject({ nickname: profile.nickname, visibility: 'PUBLIC' });
     const editor = page.getByRole('dialog', { name: /피드 글쓰기|게시물 미리보기/ });
     await editor.getByRole('textbox', { name: '게시물 글' }).fill('회원 모두가 나누는 일상이에요.');
     await editor

@@ -170,6 +170,7 @@ describe('MessengerContent', () => {
         expect(group.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         expect([...group.querySelectorAll('button[aria-label*="제거"]')].map(button => button.getAttribute('aria-label')))
             .toEqual(['첨부 사진 제거: photo.png', '첨부 파일 제거: note.txt', '첨부 파일 제거: guide.pdf']);
+        expect(attach).toBeDisabled();
         fireEvent.drop(body, { dataTransfer: { files: [new File(['extra'], 'extra.txt', { type: 'text/plain' })] } });
         expect(screen.getByText('첨부는 3개까지 할 수 있어요.')).toBeInTheDocument();
         expect(chatService.sendImage).not.toHaveBeenCalled();
@@ -181,6 +182,7 @@ describe('MessengerContent', () => {
         expect(chatService.sendFile.mock.calls[0].slice(0, 3)).toEqual([1, note, '']);
         const firstFileId = chatService.sendFile.mock.calls[0][3];
         await waitFor(() => expect(screen.getByRole('button', { name: '첨부 파일 제거: guide.pdf' })).toBeEnabled());
+        expect(attach).toBeEnabled();
         await waitFor(() => expect(screen.queryByRole('button', { name: '첨부 사진 제거: photo.png' })).toBeNull());
         expect(input).toHaveValue('');
         fireEvent.click(screen.getByRole('button', { name: '보내기', exact: true }));

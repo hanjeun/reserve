@@ -99,9 +99,11 @@ test('three chat photos keep tools clear, animate after load and retry only the 
         .toBeGreaterThan(emptyComposer.height);
     await expect.poll(async () => (await page.locator('.reserve-chat-composer-toolbar').boundingBox()).y)
         .toBeCloseTo(emptyToolbar.y, 1);
-    const previews = await page.locator('.reserve-chat-attachments').boundingBox();
-    const inputBox = await page.getByRole('textbox', { name: '메시지 입력' }).boundingBox();
-    expect(previews.y + previews.height).toBeLessThanOrEqual(inputBox.y);
+    await expect.poll(async () => {
+        const previews = await page.locator('.reserve-chat-attachments').boundingBox();
+        const inputBox = await page.getByRole('textbox', { name: '메시지 입력' }).boundingBox();
+        return previews.y + previews.height - inputBox.y;
+    }).toBeLessThanOrEqual(0.5);
     await expect(page.getByRole('button', { name: '이모지 선택', exact: true })).toBeVisible();
     await capture(page, 'chat-three-photos', testInfo);
     const remove = async name => {

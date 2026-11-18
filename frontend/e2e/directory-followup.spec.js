@@ -224,7 +224,8 @@ test('feed detail, profile and notifications return through the shared back cont
     await expect(avatar.locator(':scope > div')).toHaveCSS('scale', '0.96');
     await page.mouse.up();
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await expect(page.getByRole('heading', { name: '피드 프로필', exact: true })).toBeVisible();
+    await expect(page).toHaveURL(url => url.pathname === `/feed/u/${profile.publicId}`);
+    await expect(page.getByRole('heading', { name: '프로필', level: 1, exact: true })).toBeVisible();
     await expect(page.locator('.reserve-feed-profile')).toContainText(profile.nickname);
     await capture(page, 'feed-profile-back', info);
     await page.locator('.reserve-feed-heading').getByRole('button', { name: '이전 화면으로 돌아가기' }).click();

@@ -97,8 +97,15 @@ test('gallery slide corners stay rounded during movement and original preview re
     await mockUiApi(page);
     await page.goto('/store/00000000-0000-4000-8000-000000000081');
     const gallery = page.locator('.reserve-store-gallery');
-    await expect(gallery.locator('.slick-active .ant-image-img').first()).toBeVisible();
-    await gallery.focus();
+    const activePhoto = gallery.locator('.slick-active .ant-image-img').first();
+    await expect(activePhoto).toBeVisible();
+    const firstAlt = await activePhoto.getAttribute('alt');
+    await gallery.press('ArrowRight');
+    await expect(activePhoto).not.toHaveAttribute('alt', firstAlt);
+    await expect(activePhoto).toHaveJSProperty('naturalWidth', 800);
+    await gallery.press('ArrowLeft');
+    await expect(activePhoto).toHaveAttribute('alt', firstAlt);
+    await expect.poll(() => gallery.locator('.slick-track').evaluate(node => node.getAnimations().length)).toBe(0);
     const sampling = gallery.evaluate(element => new Promise(resolve => {
         const frames = [];
         const sample = () => {
@@ -113,7 +120,7 @@ test('gallery slide corners stay rounded during movement and original preview re
         };
         requestAnimationFrame(sample);
     }));
-    await page.keyboard.press('ArrowRight');
+    await gallery.press('ArrowRight');
     const frames = await sampling;
     expect(frames.some(frame => frame.images.length >= 2), JSON.stringify(frames)).toBe(true);
     expect(new Set(frames.map(frame => frame.track)).size).toBeGreaterThan(1);

@@ -19,10 +19,11 @@ function block(source, marker) {
     }
     throw new Error(`Unclosed nginx contract: ${marker}`);
 }
-const headers = `add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+const responseHeaders = (framing = 'DENY') => `add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     add_header X-Content-Type-Options "nosniff" always;
-    add_header X-Frame-Options "DENY" always;
+    add_header X-Frame-Options "${framing}" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;`;
+const headers = responseHeaders();
 
 /** 새 호스트의 인증서 발급 전에 HTTP-01 경로를 준비하며 기존 호스트 설정은 유지한다. */
 export function domainSplitHttpNginx(source) {
@@ -108,6 +109,13 @@ server {
     }
     location ^~ /images/ { root /usr/share/nginx/html/legacy-domain.current; try_files $uri =404; }
     location ^~ /icons/ { root /usr/share/nginx/html/legacy-domain.current; try_files $uri =404; }
+    location ^~ /service-preview/ {
+        ${responseHeaders('SAMEORIGIN')}
+        add_header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'" always;
+        add_header X-Robots-Tag "noindex, nofollow" always;
+        add_header Cache-Control "no-cache";
+        try_files $uri $uri/ =404;
+    }
     # QR 프래그먼트와 쿼리 선택값을 리다이렉트에서도 보존한다.
     location ~ ^/(stores|store|waiting|benefits|feed|my-page|my-stores|my-favorites|my-reservations|business|admin|messages|payment|search|signup|forgot-password|terms|privacy|content-sources|operation-guide|guide)(/|$) {
         if ($request_method !~ ^(GET|HEAD)$) { return 405; }

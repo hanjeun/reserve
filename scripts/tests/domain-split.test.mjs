@@ -58,6 +58,23 @@ test('CLI uses a reviewed source without replacing it, including on invalid argu
     }
 });
 
+test('only the marketing service preview accepts same-origin framing', () => {
+    const candidate = domainSplitNginx(installed);
+    const marketing = candidate.split(/(?=^server\s*\{)/m).find(part =>
+        /listen 443 ssl/.test(part) && part.includes('root /usr/share/nginx/html/marketing/current;'));
+    const preview = marketing.match(/location \^~ \/service-preview\/ \{([^{}]+)\}/)?.[1];
+    assert.ok(preview);
+    assert.equal(candidate.match(/X-Frame-Options "SAMEORIGIN"/g)?.length, 1);
+    assert.match(preview, /X-Frame-Options "SAMEORIGIN" always;/);
+    assert.match(preview, /Content-Security-Policy "default-src 'none';[^"\n]*connect-src 'none';[^"\n]*form-action 'none'; frame-ancestors 'self'" always;/);
+    assert.match(preview, /Strict-Transport-Security "max-age=31536000; includeSubDomains" always;/);
+    assert.match(preview, /X-Content-Type-Options "nosniff" always;/);
+    assert.match(preview, /try_files \$uri \$uri\/ =404;/);
+    assert.doesNotMatch(preview, /proxy_pass|X-Frame-Options "DENY"/);
+    assert.match(marketing, /X-Frame-Options "DENY" always;/);
+    assert.match(marketing, /frame-ancestors 'none'/);
+});
+
 test('CSP aliases share the exact collector before generic API routing on both hosts', () => {
     for (const input of [installed, installed.replace(/ {4}# 내부 재매핑[^\n]*\n {4}location = \/api\/v1\/csp-reports \{[^\n]*\n/, '')]) {
         const candidate = domainSplitNginx(input);

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 운영 큐와 스키마만 조회하며 실제 결제·재처리·삭제·보정은 수행하지 않는다.
-# 해당 DDL 준비 후 WAITING_SIGNUP·AUTH_ADMISSION·V11 스키마 검사를 명시적으로 선택한다.
+# 해당 DDL 준비 후 WAITING_SIGNUP·AUTH_ADMISSION·V11·REVIEW_PROFILE 검사를 명시적으로 선택한다.
 # 추가 SQL 검사는 실제 릴리스 JAR의 Hibernate validate를 대체하지 않는다.
 
 set -euo pipefail
@@ -33,7 +33,10 @@ AUTH_ADMISSION_SCHEMA="${RESERVE_VERIFY_AUTH_ADMISSION_SCHEMA:-0}"
 V11_SCHEMA="${RESERVE_VERIFY_V11_SCHEMA:-0}"
 [[ "$V11_SCHEMA" = "0" || "$V11_SCHEMA" = "1" ]] \
     || die "RESERVE_VERIFY_V11_SCHEMA must be 0 or 1"
-if [[ "$AUTH_ADMISSION_SCHEMA" = "1" || "$V11_SCHEMA" = "1" ]]; then
+REVIEW_PROFILE_SCHEMA="${RESERVE_VERIFY_REVIEW_PROFILE_SCHEMA:-0}"
+[[ "$REVIEW_PROFILE_SCHEMA" = "0" || "$REVIEW_PROFILE_SCHEMA" = "1" ]] \
+    || die "RESERVE_VERIFY_REVIEW_PROFILE_SCHEMA must be 0 or 1"
+if [[ "$AUTH_ADMISSION_SCHEMA" = "1" || "$V11_SCHEMA" = "1" || "$REVIEW_PROFILE_SCHEMA" = "1" ]]; then
     [[ "$DB_USER" = "reserve_backup" ]] || die "auth/admission checks require the configured backup role"
 fi
 
@@ -44,7 +47,7 @@ docker inspect "$MYSQL_CONTAINER" >/dev/null 2>&1 \
 
 mysql_query() {
     local query=$1
-    if [[ "$AUTH_ADMISSION_SCHEMA" = "1" || "$V11_SCHEMA" = "1" ]]; then
+    if [[ "$AUTH_ADMISSION_SCHEMA" = "1" || "$V11_SCHEMA" = "1" || "$REVIEW_PROFILE_SCHEMA" = "1" ]]; then
         query="START TRANSACTION READ ONLY; ${query} ROLLBACK;"
     fi
     MYSQL_PWD="$DB_PASSWORD" docker exec -e MYSQL_PWD "$MYSQL_CONTAINER" \
@@ -132,7 +135,7 @@ ATTENTION=0
 
 note "schema=${DB_NAME}, container=${MYSQL_CONTAINER}"
 
-if [[ "$AUTH_ADMISSION_SCHEMA" = "1" || "$V11_SCHEMA" = "1" ]]; then
+if [[ "$AUTH_ADMISSION_SCHEMA" = "1" || "$V11_SCHEMA" = "1" || "$REVIEW_PROFILE_SCHEMA" = "1" ]]; then
     AUTHENTICATED_BACKUP_ROLE="$(mysql_query "SELECT IF(SUBSTRING_INDEX(CURRENT_USER(),'@',1) = 'reserve_backup', 1, 0);")"
     [[ "$AUTHENTICATED_BACKUP_ROLE" = "1" ]] || die "authenticated backup role differs; refusing auth/admission checks"
 fi
@@ -331,6 +334,15 @@ if [[ "$V11_SCHEMA" = "1" ]]; then
     require_index_contract reservation_retention_hold idx_reservation_retention_hold 1 'reservation_id,released_at'
     require_foreign_key_contract reservation_retention_hold fk_reservation_retention_hold reservation_id reservation reservation_id RESTRICT
     note "v11/JDBC schema: contract matches; actual release JAR validation and restricted app grants are still required"
+fi
+
+if [[ "$REVIEW_PROFILE_SCHEMA" = "1" ]]; then
+    require_column_contract review author_alias 'varchar(30)' YES '<NULL>'
+    require_column_contract feed_profile profile_visibility 'varchar(16)' YES '<NULL>'
+    require_column_contract reservation review_written 'tinyint(1)' NO 0
+    UNMARKED_REVIEW_VISITS="$(mysql_query "SELECT COUNT(*) FROM reservation r JOIN review v ON v.reservation_id = r.reservation_id WHERE r.review_written = FALSE;")"
+    [[ "$UNMARKED_REVIEW_VISITS" = "0" ]] || die "existing reviews require reservation.review_written backfill before cutover"
+    note "review/profile schema: contract and written-visit backfill match; actual candidate and recovery JAR checks are still required"
 fi
 
 NON_INNODB="$(mysql_query "SELECT CONCAT(table_name, ':', engine) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN ('payment','reservation','payment_webhook_inbox','payment_reconciliation_issue','file_deletion_task','oauth_unlink_task','marketing_consent_history','refresh_token') AND engine <> 'InnoDB';")"

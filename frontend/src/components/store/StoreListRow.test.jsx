@@ -18,6 +18,7 @@ vi.mock('../../services/adService', () => ({ default: { recordImpression: vi.fn(
 
 const store = {
     id: 12,
+    publicId: '00000000-0000-4000-8000-000000000012',
     name: '예약 식당',
     description: '계절 재료로 준비하는 한 끼',
     category: '한식',
@@ -59,7 +60,7 @@ describe('StoreListRow', () => {
         const article = screen.getByRole('article');
         const link = screen.getByRole('link', { name: '예약 식당 상세 보기' });
         expect(article).toHaveClass('reserve-store-list-row');
-        expect(link).toHaveAttribute('href', '/store/12');
+        expect(link).toHaveAttribute('href', '/store/00000000-0000-4000-8000-000000000012');
         expect(link).toHaveClass('reserve-store-list-row-link');
         const image = screen.getByRole('img', { name: '예약 식당 대표 이미지' });
         expect(image.parentElement).toHaveClass('reserve-store-list-row-image');
@@ -96,7 +97,7 @@ describe('StoreListRow', () => {
         expect(favoriteToggle).toHaveBeenCalledOnce();
         expect(screen.getByRole('status', { name: '현재 경로' })).toHaveTextContent('/stores');
         await user.click(link);
-        expect(screen.getByRole('status', { name: '현재 경로' })).toHaveTextContent('/store/12');
+        expect(screen.getByRole('status', { name: '현재 경로' })).toHaveTextContent('/store/00000000-0000-4000-8000-000000000012');
     });
 
     it('offers distinct keyboard targets for details and favorites', async () => {
@@ -125,7 +126,7 @@ describe('StoreListRow', () => {
 
     it('does not invent a description and uses neutral name/category fallbacks', () => {
         const { container } = renderRow({ store: { id: 'draft' } });
-        expect(screen.getByRole('link', { name: '가게 상세 보기' })).toHaveAttribute('href', '/store/draft');
+        expect(screen.queryByRole('link', { name: '가게 상세 보기' })).not.toBeInTheDocument();
         expect(screen.getByText('기타')).toBeInTheDocument();
         expect(screen.getByText('0.0')).toBeInTheDocument();
         expect(screen.getByText('(0)')).toBeInTheDocument();
@@ -185,7 +186,7 @@ describe('StoreListRow', () => {
         const { rerender } = renderRow(props);
         // 화면에는 AD, 화면 낭독기에는 '광고' (AdMark)
         const adMark = screen.getByText('AD').parentElement;
-        expect(adMark).toHaveClass('reserve-ad-mark', 'reserve-store-identity-text-ad');
+        expect(adMark).toHaveClass('reserve-ad-mark');
         expect(screen.getByText('광고')).toHaveClass('reserve-sr-only');
         expect(screen.getByText('우리동네')).toBeInTheDocument();
         expect(adMark.parentElement).toHaveClass('reserve-store-identity-text');

@@ -3,7 +3,18 @@
 .reserve-login-setup-icon > svg { transform: rotate(0deg); transition: transform 0.2s ease; }
 .reserve-login-setup-icon.is-open > svg { transform: rotate(45deg); }
 .reserve-login-security-surface { margin: 8px 0 12px; padding: 16px; border: 1px solid var(--c-text-primary); border-radius: 12px; background: var(--c-bg-paper); }
+.reserve-login-panel-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 44px; margin-bottom: 8px; }
+.reserve-login-panel-heading > :first-child { min-width: 0; overflow-wrap: anywhere; }
+.reserve-login-panel-heading > .reserve-icon-tool-wrapper { justify-self: end; }
 @media (prefers-reduced-motion: reduce) { .reserve-login-setup-icon > svg { transition: none; } }
+.reserve-login-proof-options { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.reserve-login-proof-single { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 104px; }
+.reserve-login-proof-copy { min-width: 0; }
+.reserve-login-proof-options > .reserve-social-login[data-provider='naver'],
+.reserve-login-proof-single > .reserve-social-login[data-provider='naver'] { position: relative; top: -4px; }
+.reserve-login-proof-options--multiple { display: flex; flex-wrap: wrap; }
+.reserve-login-proof-options--multiple > :first-child { flex: 1 1 12ch; }
+.reserve-login-proof-options--multiple > .reserve-mfa-management-actions { min-width: 0; margin-inline-start: auto; }
 .reserve-mfa-alternatives, .reserve-auth-secondary-actions { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 16px; margin-top: 24px; }
 .reserve-mfa-alternatives > button { min-height: 32px; }
 .reserve-mfa-management-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
@@ -12,11 +23,20 @@
 .reserve-mfa-credential-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .reserve-mfa-credential-heading > span { min-width: 0; overflow-wrap: anywhere; }
 .reserve-mfa-credential-tools { display: flex; align-items: center; gap: 4px; }
+.reserve-registered-devices { padding: 0; margin: 0; list-style: none; }
+.reserve-device-session-state::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-inline-end: 6px; }
+.reserve-device-session-state[data-state="ACTIVE"]::before { background: var(--c-success); }
+.reserve-device-session-state[data-state="SIGNED_OUT"]::before { background: var(--c-error); }
+.reserve-device-session-state[data-state="UNKNOWN"]::before { background: var(--c-warning); }
 .reserve-mfa-verification-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
 .reserve-mfa-verification-actions > .reserve-mfa-alternatives { justify-content: flex-end; margin-top: 0; }
 .reserve-mfa-flow--settings .reserve-auth-secondary-actions { justify-content: flex-end; gap: 8px; margin-top: 8px; }
 .reserve-login-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .reserve-login-actions > button { min-width: 0; }
+.reserve-login-actions > button:only-child { grid-column: 1 / -1; }
+.reserve-login-help { text-align: center; word-break: keep-all; }
+a.reserve-text-link.reserve-auth-accent-link { color: var(--c-primary); font-weight: 600; }
+a.reserve-text-link.reserve-auth-accent-link:is(:hover, :focus-visible, :active) { color: var(--c-primary-solid); }
 #account-security, #login-security, .reserve-login-security-panel, .reserve-login-security-surface, .reserve-mfa-flow { scroll-margin-top: 96px; }
 #login-security[tabindex="-1"]:focus, .reserve-login-security-panel[tabindex="-1"]:focus, .reserve-login-security-surface[tabindex="-1"]:focus, .reserve-mfa-flow[tabindex="-1"]:focus { outline: none; }
 .reserve-mfa-flow { width: 100%; text-align: left; word-break: keep-all; }

@@ -6,11 +6,12 @@ export function installMarketingScroll(document, motion) {
     let locked = false;
     let direction = 0;
     let distance = 0;
-    let touch;
+    let touchPoint;
 
     const headerHeight = () => document.querySelector('.marketing-header')?.getBoundingClientRect().height ?? 64;
     const maximum = () => Math.max(0, root.scrollHeight - view.innerHeight);
     const clamp = value => Math.max(0, Math.min(maximum(), value));
+    const heroReady = hero => hero.querySelector('[data-hero-handoff][data-present="true"] [data-marketing-section-title]')?.dataset.typingState === 'complete';
     const cancel = () => {
         if (frame != null) view.cancelAnimationFrame(frame);
         frame = undefined;
@@ -21,7 +22,7 @@ export function installMarketingScroll(document, motion) {
         view.clearTimeout(quietTimer);
         quietTimer = view.setTimeout(resetGesture, 160);
     };
-    const settle = () => { cancel(); view.clearTimeout(quietTimer); resetGesture(); touch = undefined; };
+    const settle = () => { cancel(); view.clearTimeout(quietTimer); resetGesture(); };
     const scrollTo = (target, duration = 420) => {
         cancel();
         const end = clamp(target);
@@ -48,15 +49,26 @@ export function installMarketingScroll(document, motion) {
         const available = view.innerHeight - headerHeight();
         const scenes = [...document.querySelectorAll('.marketing-scene, footer')]
             .filter(node => node.getClientRects().length)
-            .map(node => ({ start: clamp(node.getBoundingClientRect().top + view.scrollY - headerHeight()), height: node.getBoundingClientRect().height }));
+            .map(node => ({ node, start: clamp(node.getBoundingClientRect().top + view.scrollY - headerHeight()), height: node.getBoundingClientRect().height }));
         const index = scenes.findLastIndex(scene => scene.start <= position + 8);
         const current = scenes[index];
         if (!current) return undefined;
+        if (nextDirection > 0 && current.node.hasAttribute('data-hero-story') && heroReady(current.node)) return scenes[index + 1]?.start;
+        if (current.node.hasAttribute('data-hero-story')) {
+            if (nextDirection < 0 && position > current.start + 8) return current.start;
+            if (nextDirection > 0 && position < current.start + current.height - available - 8) return undefined;
+        }
         if (nextDirection > 0) {
-            if (current.height > available + 2 && position < current.start + current.height - available - 8) return undefined;
+            if (current.height > available + 2 && position < current.start + current.height - available - 8) {
+                const screen = current.node.querySelector('[data-marketing-scroll-stop]');
+                if (!screen || screen.getBoundingClientRect().height > available) return undefined;
+                const bounds = screen.getBoundingClientRect();
+                const stop = clamp(bounds.top + view.scrollY + bounds.height / 2 - headerHeight() - available / 2);
+                return stop > position + 8 ? stop : scenes[index + 1]?.start;
+            }
             return scenes[index + 1]?.start;
         }
-        if (position > current.start + 8) return current.height > available + 2 ? undefined : current.start;
+        if (position > current.start + 8) return current.height > available + 2 && !current.node.querySelector('[data-marketing-scroll-stop]') ? undefined : current.start;
         return scenes[index - 1]?.start;
     };
     const nativeScroll = (target, nextDirection) => {
@@ -68,20 +80,55 @@ export function installMarketingScroll(document, motion) {
         }
         return false;
     };
+    const typingPending = () => {
+        if (motion.matches || document.hidden) return false;
+        const header = headerHeight();
+        return [...document.querySelectorAll('[data-marketing-section-title][data-typing-state]')].some(heading => {
+            if (!['pending', 'typing'].includes(heading.dataset.typingState) || heading.closest('[inert]') || !heading.getClientRects().length) return false;
+            if (view.getComputedStyle(heading).visibility === 'hidden') return false;
+            const bounds = heading.getBoundingClientRect();
+            return bounds.height > 0 && Math.max(0, Math.min(bounds.bottom, view.innerHeight) - Math.max(bounds.top, header)) / bounds.height >= 0.6;
+        });
+    };
+    const heroLanding = delta => {
+        if (delta <= 0) return undefined;
+        for (const hero of document.querySelectorAll('[data-hero-story]')) {
+            if (!hero.getClientRects().length) continue;
+            if (heroReady(hero)) continue;
+            const bounds = hero.getBoundingClientRect();
+            if (bounds.top > headerHeight() + 1 || bounds.bottom < view.innerHeight - 1) continue;
+            const end = clamp(bounds.bottom + view.scrollY - view.innerHeight);
+            if (view.scrollY < end - 1) return end;
+        }
+        return undefined;
+    };
+    const heroPending = () => !motion.matches && !document.hidden && [...document.querySelectorAll('[data-hero-story]')].some(hero => {
+        if (!['playing', 'preparing', 'transition'].includes(hero.dataset.playbackState) || !hero.getClientRects().length) return false;
+        const bounds = hero.getBoundingClientRect();
+        return bounds.top <= headerHeight() && bounds.bottom <= view.innerHeight + 2 && bounds.bottom >= headerHeight();
+    });
+    const forwardPending = () => typingPending() || heroPending();
+    const holdForward = event => {
+        event.preventDefault();
+        direction = 1; distance = 0; locked = true; afterQuiet();
+    };
     const wheel = event => {
         if (motion.matches || event.defaultPrevented || event.ctrlKey || event.metaKey || event.shiftKey
             || Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
         const nextDirection = Math.sign(event.deltaY);
         if (nativeScroll(event.target, nextDirection)) return;
+        if (nextDirection > 0 && forwardPending()) { holdForward(event); return; }
         if (direction && direction !== nextDirection) settle();
         if ((locked || frame != null) && direction === nextDirection) {
             event.preventDefault(); afterQuiet(); return;
         }
-        const target = stepTarget(nextDirection);
+        const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? view.innerHeight : 1);
+        // 첫 전진 입력은 예약 장면의 전환 지점에 정착해요.
+        const target = heroLanding(delta) ?? stepTarget(nextDirection);
         if (target == null) return;
         event.preventDefault();
         direction = nextDirection;
-        distance += event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? view.innerHeight : 1);
+        distance += delta;
         afterQuiet();
         if (Math.abs(distance) < 24) return;
         locked = true;
@@ -94,37 +141,48 @@ export function installMarketingScroll(document, motion) {
         const top = control.hasAttribute('data-scroll-top');
         const section = top ? null : document.getElementById(control.dataset.scrollTarget);
         if (!top && !section) return;
+        const hero = section?.closest('[data-hero-story]');
+        const embedded = hero && section !== hero && !motion.matches;
+        const target = embedded ? hero.getBoundingClientRect().bottom + view.scrollY - view.innerHeight
+            : section?.getBoundingClientRect().top + view.scrollY - headerHeight();
+        if (!top && target > view.scrollY + 1 && forwardPending()) { holdForward(event); return; }
         event.preventDefault();
         settle();
-        scrollTo(top ? 0 : section.getBoundingClientRect().top + view.scrollY - headerHeight());
+        scrollTo(top ? 0 : target);
     };
     const touchStart = event => {
         settle();
-        if (motion.matches || event.touches.length !== 1) return;
-        const point = event.touches[0];
-        touch = { x: point.clientX, y: point.clientY, scroll: view.scrollY, target: event.target };
+        const touch = event.touches.length === 1 ? event.touches[0] : null;
+        touchPoint = touch ? { x: touch.clientX, y: touch.clientY } : null;
     };
-    const touchEnd = event => {
-        const start = touch;
-        touch = undefined;
-        const point = event.changedTouches[0];
-        if (!start || !point || motion.matches) return;
-        const delta = start.y - point.clientY;
-        if (Math.abs(delta) < 48 || Math.abs(delta) <= Math.abs(start.x - point.clientX)) return;
-        const nextDirection = Math.sign(delta);
-        if (nativeScroll(start.target, nextDirection)) return;
-        const target = stepTarget(nextDirection, start.scroll);
-        if (target != null) scrollTo(target);
+    const touchMove = event => {
+        const touch = event.touches.length === 1 ? event.touches[0] : null;
+        if (!touch || !touchPoint) { touchPoint = null; return; }
+        const delta = touchPoint.y - touch.clientY, sideways = touchPoint.x - touch.clientX;
+        touchPoint = { x: touch.clientX, y: touch.clientY };
+        if (!motion.matches && event.cancelable && delta > 0 && Math.abs(delta) > Math.abs(sideways)
+            && !nativeScroll(event.target, 1) && forwardPending()) event.preventDefault();
     };
+    const touchEnd = () => { touchPoint = null; };
+    const touchCancel = () => { touchEnd(); settle(); };
     const keydown = event => {
+        const forward = ['ArrowDown', 'PageDown', ' '].includes(event.key) && !event.shiftKey;
+        const activatesControl = event.key === ' ' && event.target.closest?.('button, a, summary, [role="button"]');
+        if (!motion.matches && !event.defaultPrevented && !event.ctrlKey && !event.metaKey && !event.altKey
+            && forward && !activatesControl && !nativeScroll(event.target, 1)) {
+            if (forwardPending()) { holdForward(event); return; }
+            const landing = heroLanding(event.key === 'ArrowDown' ? 40 : view.innerHeight * 0.9);
+            if (landing != null) { event.preventDefault(); settle(); scrollTo(landing); return; }
+        }
         if (['Escape', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) settle();
     };
     document.addEventListener('wheel', wheel, { passive: false });
     document.addEventListener('click', click);
     document.addEventListener('keydown', keydown);
     document.addEventListener('touchstart', touchStart, { passive: true });
+    document.addEventListener('touchmove', touchMove, { passive: false });
     document.addEventListener('touchend', touchEnd, { passive: true });
-    document.addEventListener('touchcancel', settle);
+    document.addEventListener('touchcancel', touchCancel);
     motion.addEventListener('change', settle);
     view.addEventListener('resize', settle);
     view.addEventListener('pagehide', settle);
@@ -134,8 +192,9 @@ export function installMarketingScroll(document, motion) {
         document.removeEventListener('click', click);
         document.removeEventListener('keydown', keydown);
         document.removeEventListener('touchstart', touchStart);
+        document.removeEventListener('touchmove', touchMove);
         document.removeEventListener('touchend', touchEnd);
-        document.removeEventListener('touchcancel', settle);
+        document.removeEventListener('touchcancel', touchCancel);
         motion.removeEventListener('change', settle);
         view.removeEventListener('resize', settle);
         view.removeEventListener('pagehide', settle);

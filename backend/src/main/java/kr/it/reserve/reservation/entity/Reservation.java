@@ -80,6 +80,13 @@ public class Reservation {
     @Column(name = "cancel_reason", length = 500)
     private String cancelReason;
 
+    @Enumerated(EnumType.STRING)
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.VARCHAR)
+    @Column(name = "cancellation_actor", length = 12)
+    private CancellationActor cancellationActor;
+
+    public enum CancellationActor { CUSTOMER, STORE, SYSTEM }
+
     // 결제 정보 (양방향 관계)
     @OneToOne(mappedBy = "reservation", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Payment payment;
@@ -112,6 +119,20 @@ public class Reservation {
     /** 실제 방문 QR 체크인 시각(KST 벽시계). 승인 상태와 분리해 출석 사실만 기록하며 값이 없으면 미체크인이다. */
     @Column(name = "checked_in_at")
     private LocalDateTime checkedInAt;
+
+    @Column(name = "manual_visit_confirmed_at")
+    private LocalDateTime manualVisitConfirmedAt;
+
+    @Column(name = "review_written", nullable = false)
+    private boolean reviewWritten;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "no_show_previous_status", length = 20)
+    private ReservationStatus noShowPreviousStatus;
+
+    public boolean hasAttendanceConfirmation() {
+        return checkedInAt != null || manualVisitConfirmedAt != null;
+    }
 
     /**
      * 이 예약으로 한 번만 귀속한 배너 광고 ID.

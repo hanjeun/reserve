@@ -38,6 +38,83 @@ class TokenServiceRefreshRotationTest {
     }
     private TokenProvider.IssuedSession issue() { return fixture.issue(null); }
 
+    private TokenProvider.IssuedSession socialSession(Role role, boolean persistent) {
+        member = Member.builder().id(1L).email("social@example.test").role(role).provider(AuthProvider.NAVER)
+                .providerId("social-fixture").termsAgreed(true).build();
+        fixture = new JwtSessionFixture(member);
+        var at = LocalDateTime.ofInstant(fixture.startedAt, ZoneOffset.UTC);
+        return fixture.tokens.issueVerifiedSession(member, at, "OAUTH_MFA", persistent);
+    }
+
+    @Test void socialConsentExtendsTheSameDeviceAndRecoversThePreviousBrowserToken() {
+        var shortLogin = socialSession(Role.USER, false);
+        var row = fixture.row(shortLogin.refreshToken());
+        var sid = row.getSessionId();
+        var choice = fixture.service.rememberOffer(shortLogin.refreshToken(), member, sid);
+        assertThat(choice).isNotBlank();
+        var promoted = fixture.service.rememberLogin(shortLogin.refreshToken(), member, sid, choice);
+        assertThat(promoted.persistent()).isTrue();
+        assertThat(fixture.tokens.getSessionId(promoted.accessToken())).isEqualTo(sid);
+        assertThat(fixture.tokens.getLoginMethod(promoted.accessToken())).isEqualTo("OAUTH_MFA");
+        assertThat(row.getAbsoluteExpiresAt()).isEqualTo(row.getCreatedAt().plus(fixture.properties.sessionLifetime(true, true).absolute()));
+        assertThat(fixture.service.refresh(shortLogin.refreshToken()).refreshToken()).isEqualTo(promoted.refreshToken());
+        assertThat(fixture.service.rememberLogin(promoted.refreshToken(), member, sid, choice).refreshToken()).isEqualTo(promoted.refreshToken());
+        assertThat(fixture.service.rememberOffer(promoted.refreshToken(), member, sid)).isNull();
+        fixture.service.revoke(shortLogin.refreshToken());
+        assertThat(fixture.devices).isEmpty();
+    }
+
+    @Test void promotedAdminKeepsTheAdministrativeLifetimeAndPersistentGraceWhenAbsoluteExpiryMatches() {
+        var shortLogin = socialSession(Role.ADMIN, false);
+        var row = fixture.row(shortLogin.refreshToken());
+        var choice = fixture.service.rememberOffer(shortLogin.refreshToken(), member, row.getSessionId());
+        var promoted = fixture.service.rememberLogin(shortLogin.refreshToken(), member, row.getSessionId(), choice);
+        var policy = fixture.properties.sessionLifetime(false, true);
+        assertThat(promoted.refreshMaxAge()).isEqualTo(policy.idle());
+        assertThat(row.getAbsoluteExpiresAt()).isEqualTo(row.getCreatedAt().plus(policy.absolute()));
+        assertThat(fixture.service.refresh(shortLogin.refreshToken()).persistent()).isTrue();
+    }
+
+    @Test void rememberOfferCannotBeUsedForAnotherDeviceOrAfterItsWindow() {
+        var first = socialSession(Role.USER, false);
+        var sid = fixture.tokens.getSessionId(first.accessToken());
+        var choice = fixture.service.rememberOffer(first.refreshToken(), member, sid);
+        var other = fixture.tokens.issueSession(member, LocalDateTime.ofInstant(fixture.startedAt, ZoneOffset.UTC), false);
+        var otherSid = fixture.tokens.getSessionId(other.accessToken());
+        assertThatThrownBy(() -> fixture.service.rememberLogin(other.refreshToken(), member, otherSid, choice)).isInstanceOf(AuthException.class);
+        fixture.setNow(fixture.startedAt.plusSeconds(601));
+        assertThat(fixture.service.rememberOffer(first.refreshToken(), member, sid)).isNull();
+        assertThatThrownBy(() -> fixture.service.rememberLogin(first.refreshToken(), member, sid, choice)).isInstanceOf(AuthException.class);
+        assertThat(fixture.devices).hasSize(2);
+    }
+
+    @Test void passkeyConsentPreservesTheVerifiedSessionAndItsExpirationWindow() {
+        member.setTermsAgreed(true);
+        var browser = fixture.tokens.issueVerifiedSession(member, null, "PASSKEY", false);
+        var sid = fixture.tokens.getSessionId(browser.accessToken());
+        var choice = fixture.service.rememberOffer(browser.refreshToken(), member, sid);
+        assertThat(choice).isNotBlank();
+        var promoted = fixture.service.rememberLogin(browser.refreshToken(), member, sid, choice);
+        assertThat(promoted.persistent()).isTrue();
+        assertThat(fixture.tokens.getSessionId(promoted.accessToken())).isEqualTo(sid);
+        assertThat(fixture.tokens.getLoginMethod(promoted.accessToken())).isEqualTo("PASSKEY");
+        assertThat(fixture.service.rememberOffer(promoted.refreshToken(), member, sid)).isNull();
+
+        fixture.setNow(fixture.startedAt.plusSeconds(601));
+        assertThatThrownBy(() -> fixture.service.rememberLogin(promoted.refreshToken(), member, sid, choice))
+                .isInstanceOf(AuthException.class);
+    }
+
+    @Test void passwordLoginWithOrWithoutMfaHasNoRememberChoiceAfterLogin() {
+        member.setTermsAgreed(true);
+        var password = fixture.tokens.issueSession(member, null, false);
+        var verified = fixture.tokens.issueVerifiedSession(member, null, "PASSWORD_MFA", false);
+        for (var session : List.of(password, verified)) {
+            assertThat(fixture.service.rememberOffer(session.refreshToken(), member, fixture.tokens.getSessionId(session.accessToken())))
+                    .isNull();
+        }
+    }
+
     @Test void rotatesSameDeviceWithoutStoringARawBearer() {
         var first = issue();
         RefreshToken row = fixture.row(first.refreshToken());

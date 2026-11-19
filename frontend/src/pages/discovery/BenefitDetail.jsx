@@ -15,6 +15,7 @@ import useStoreNewsEvents from '../../hooks/useStoreNewsEvents';
 import { httpStatusOf, isMissingRequestError } from '../../utils/listErrorMessage';
 import useAuthStore from '../../store/useAuthStore';
 import { saveRedirect } from '../../utils/redirect';
+import { benefitPath, normalizePublicId } from '../../utils/publicAddress';
 
 const FeedReportModal = lazy(() => import('../../components/feed/FeedReportModal'));
 
@@ -26,11 +27,17 @@ export default function BenefitDetail() {
     const [reportMounted, setReportMounted] = useState(false);
     const config = useStoreNewsConfig();
     useStoreNewsEvents(config.data?.benefitEventsEnabled === true && config.data?.enabled === true);
-    const validId = /^\d+$/.test(id ?? '') && Number.isSafeInteger(Number(id)) && Number(id) > 0;
+    const publicId = normalizePublicId(id);
     const { data: item, isPending, isError, error, isFetching, refetch } = useQuery({
-        queryKey: benefitKeys.detail(id),
-        queryFn: ({ signal }) => benefitService.getDetail(id, signal),
-        enabled: validId,
+        queryKey: benefitKeys.detail(publicId),
+        queryFn: async ({ signal }) => {
+            const data = await benefitService.getDetail(publicId, signal);
+            if (normalizePublicId(data?.publicId) !== publicId || !Number.isSafeInteger(data?.id) || data.id <= 0) {
+                throw new Error('가게 소식 주소를 확인하지 못했어요.');
+            }
+            return data;
+        },
+        enabled: Boolean(publicId),
         retry: (count, failure) => {
             const status = httpStatusOf(failure);
             if (status >= 400 && status < 500 && status !== 408 && status !== 429) return false;
@@ -38,11 +45,11 @@ export default function BenefitDetail() {
         },
         staleTime: 60000,
     });
-    const missing = !validId || isMissingRequestError(error);
+    const missing = !publicId || isMissingRequestError(error);
     useDocumentTitle(!missing && item?.title ? `${item.title} · 가게 소식` : '가게 소식');
     const report = () => {
         if (user) { setReportMounted(true); setReportOpen(true); return; }
-        const pathname = `/benefits/${id}`;
+        const pathname = benefitPath(publicId);
         saveRedirect(pathname);
         navigate('/login', { state: { from: { pathname } } });
     };
@@ -53,7 +60,7 @@ export default function BenefitDetail() {
         title="가게 소식을 불러오지 못했어요." onRetry={refetch} retrying={isFetching} /></section>;
     return <><BenefitDetailContent item={item}
         notice={isError && <DataState compact state="error" title="최신 내용을 확인하지 못했어요. 현재 내용은 유지했어요." error={error} onRetry={refetch} retrying={isFetching} />}
-        actions={<><PostInteractionBar type="NEWS" targetId={Number(id)} />
+        actions={<><PostInteractionBar type="NEWS" targetId={item.id} />
             {config.data?.enabled && <IconTool label="소식 신고" icon={<InterfaceIcon name="report" />} onClick={report} />}</>} />
-        <Suspense fallback={null}>{reportMounted && <FeedReportModal newsId={reportOpen ? Number(id) : null} onClose={() => setReportOpen(false)} />}</Suspense></>;
+        <Suspense fallback={null}>{reportMounted && <FeedReportModal newsId={reportOpen ? item.id : null} onClose={() => setReportOpen(false)} />}</Suspense></>;
 }

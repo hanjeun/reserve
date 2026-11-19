@@ -1,7 +1,10 @@
 import { Suspense, lazy } from 'react';
+import { readFileSync } from 'node:fs';
+import postcss from 'postcss';
 import { act, render as renderUi, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { feedKeys } from '../../hooks/feedQueries';
+import { ADMIN_WORKSPACE_GROUPS, BUSINESS_WORKSPACE_GROUPS } from '../../constants/workspaces';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import RouteLoadingSkeleton, { RouteSkeletonPreview } from './RouteLoadingSkeleton';
@@ -38,6 +41,10 @@ describe('route chunk loading patterns', () => {
     beforeAll(async () => {
         expect((await preloadRouteSkeletons())?.default).toBe(RouteSkeletonPages);
         expect((await preloadRouteSkeletons('discovery'))?.default).toBe(DiscoveryRouteSkeleton);
+        const feed = await preloadRouteSkeletons('feed');
+        expect(feed?.default).toBeTypeOf('function');
+        expect(feed?.default).not.toBe(RouteSkeletonPages);
+        expect(await preloadRouteSkeletons('feed-detail')).toBe(feed);
     });
     afterEach(() => { setWidth(originalWidth); clients.splice(0).forEach(client => client.clear()); });
 
@@ -174,7 +181,11 @@ describe('route chunk loading patterns', () => {
     it('lets the reservation search bone shrink and keeps the refresh in the real refresh slot', () => {
         const { container } = render(<RouteSkeletonPreview pathname="/my-reservations" />);
         const row = container.querySelector('.reserve-filter-toolbar-secondary');
-        expect(row.firstElementChild).toHaveStyle({ flexShrink: '1', minWidth: '0px', maxWidth: '480px' });
+        expect(row.firstElementChild).toHaveClass('reserve-list-search');
+        const css = postcss.parse(readFileSync('src/styles/global/store-listing-toolbar.css', 'utf8'));
+        const rule = css.nodes.find(node => node.type === 'rule' && node.selector === '.reserve-list-search');
+        expect(Object.fromEntries(rule.nodes.filter(node => node.type === 'decl').map(node => [node.prop, node.value])))
+            .toMatchObject({ flex: '1 1 0', 'min-width': '0', 'max-width': '480px' });
         expect(row.querySelector('.reserve-filter-toolbar-refresh > .reserve-icon-tool .reserve-skeleton-block')).toHaveStyle({ width: '32px', height: '32px', borderRadius: '10px' });
         // 골격에서도 실제 보기 도구의 44px 자리를 유지한다.
         expect(container.querySelector('.reserve-explore-filters').firstElementChild).toHaveClass('reserve-icon-tool');
@@ -277,7 +288,10 @@ describe('route chunk loading patterns', () => {
     it('draws the admin workspace menu, search toolbar and verification table', () => {
         const { container } = render(<RouteSkeletonPreview pathname="/admin" />);
         expect(container.querySelector('h1')).toHaveTextContent('인증 대기');
-        expect(container.querySelectorAll('.reserve-workspace-sider nav .reserve-workspace-menu-placeholder')).toHaveLength(15);
+        expect(container.querySelectorAll('.reserve-workspace-sider nav .reserve-workspace-menu-placeholder'))
+            .toHaveLength(ADMIN_WORKSPACE_GROUPS.flatMap(group => group.items).length);
+        expect(container.querySelector('.reserve-workspace-sider')).toHaveTextContent('내 가게 소식');
+        expect(container.querySelector('.reserve-workspace-sider')).toHaveTextContent('신고 관리');
         expect(container.querySelector('.reserve-workspace button,.reserve-workspace a')).toBeNull();
         expect(container.querySelectorAll('.reserve-workspace-menu-group')).toHaveLength(4);
         expect(container.querySelector('.reserve-filter-toolbar')).toBeInTheDocument();
@@ -287,7 +301,10 @@ describe('route chunk loading patterns', () => {
     it('draws the partner functions including settlement and the selected reservations or statistics body', () => {
         const { container, rerender } = render(<RouteSkeletonPreview pathname="/business" />);
         expect(container.querySelector('h1')).toHaveTextContent('예약 관리');
-        expect(container.querySelectorAll('.reserve-workspace-sider nav .reserve-workspace-menu-placeholder')).toHaveLength(8);
+        expect(container.querySelectorAll('.reserve-workspace-sider nav .reserve-workspace-menu-placeholder'))
+            .toHaveLength(BUSINESS_WORKSPACE_GROUPS.flatMap(group => group.items).length);
+        expect(container.querySelector('.reserve-workspace-sider')).toHaveTextContent('노쇼 관리');
+        expect(container.querySelector('.reserve-workspace-sider')).toHaveTextContent('고객 관리');
         expect(container.querySelector('.reserve-workspace-sider')).toHaveTextContent('TEST 가상 정산');
         expect(container.querySelector('.reserve-workspace button,.reserve-workspace a')).toBeNull();
         expect(container.querySelector('.reserve-explore-filters')).toBeInTheDocument();
@@ -302,6 +319,15 @@ describe('route chunk loading patterns', () => {
             expect(statistics).toHaveTextContent(label);
         }
         expect(statistics.querySelector('button,input,select,a,textarea')).toBeNull();
+    });
+
+    it.each(['/business', '/admin'])('draws the selected news photo or list skeleton at %s', pathname => {
+        const { container, rerender } = render(<RouteSkeletonPreview pathname={pathname} search="?tab=news&view=cards" />);
+        expect(container.querySelector('.reserve-store-news-management .rsv-mystore-grid')).toBeInTheDocument();
+        expect(container.querySelectorAll('.reserve-store-card-skeleton-info')).toHaveLength(3);
+        rerender(<RouteSkeletonPreview pathname={pathname} search="?tab=news&view=list" />);
+        expect(container.querySelectorAll('.reserve-store-list-row-skeleton .reserve-store-list-row-image')).toHaveLength(3);
+        expect(container.querySelector('.rsv-mystore-grid')).toBeNull();
     });
 
     it('mirrors the mobile messenger home, a store thread, and stays blank on PC', () => {

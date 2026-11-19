@@ -104,52 +104,36 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "marketing-release-$SOURCE_SHA" --dir marketing/dist
+      - name: Pack release staging files
+        id: bundle
+        env:
+          RESERVE_DOMAIN_SPLIT: ${{ vars.RESERVE_DOMAIN_SPLIT || 'false' }}
+        run: |
+          set -euo pipefail
+          test -f frontend/dist/index.html
+          test "$(tr -d '\r\n' < frontend/dist/release-id.txt)" = "$SOURCE_SHA"
+          paths=(frontend/dist nginx/default.conf scripts/domain-release.sh scripts/preserve-frontend-assets.sh)
+          if [ "$RESERVE_DOMAIN_SPLIT" = true ]; then
+            test -f marketing/dist/index.html
+            test "$(tr -d '\r\n' < marketing/dist/release-id.txt)" = "$SOURCE_SHA"
+            paths+=(marketing/dist)
+          fi
+          tar -czf reserve-stage.tar.gz -- "${paths[@]}"
+          digest=$(sha256sum reserve-stage.tar.gz)
+          printf 'digest=%s\n' "${digest%% *}" >> "$GITHUB_OUTPUT"
       - name: Require current main before server access
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/verify-cd-source.mjs current
-      - name: Stage marketing files
-        if: vars.RESERVE_DOMAIN_SPLIT == 'true'
-        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345
-        with:
-          host: ${{ secrets.RESERVE_SERVER_IP }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
-          source: "marketing/dist/*"
-          target: "/home/ubuntu/reserve-marketing-${{ needs.verify-source.outputs.sha }}"
-          strip_components: 2
-      - name: Stage domain release helper
-        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345
-        with:
-          host: ${{ secrets.RESERVE_SERVER_IP }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
-          source: "scripts/domain-release.sh"
-          target: "/home/ubuntu"
-          strip_components: 1
-      - name: Deploy frontend to EC2
+      - name: Upload release staging bundle to EC2
         uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
         with:
           host: ${{ secrets.RESERVE_SERVER_IP }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
-          source: "frontend/dist/*"
-          target: "/home/ubuntu/reserve-frontend-${{ needs.verify-source.outputs.sha }}"
-          strip_components: 2
-
-      - name: Deploy nginx config
-        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
-        with:
-          host: ${{ secrets.RESERVE_SERVER_IP }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
-          source: "nginx/default.conf,scripts/preserve-frontend-assets.sh"
-          target: "/home/ubuntu/"
-          strip_components: 1
+          source: reserve-stage.tar.gz
+          target: /home/ubuntu/reserve-stage-${{ needs.verify-source.outputs.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
 
       # SHA별 정적 파일과 nginx 템플릿만 staging한다. live 전환은 새 백엔드가
       # 정상 기동한 뒤 deploy-backend 잡에서 한 번의 nginx reload로 수행한다.
@@ -158,12 +142,15 @@ jobs:
         env:
           FRONTEND_RELEASE: ${{ needs.verify-source.outputs.sha }}
           RESERVE_DOMAIN_SPLIT: ${{ vars.RESERVE_DOMAIN_SPLIT || 'false' }}
+          STAGING_SHA256: ${{ steps.bundle.outputs.digest }}
+          STAGING_RUN_ID: ${{ github.run_id }}
+          STAGING_ATTEMPT: ${{ github.run_attempt }}
         with:
           host: ${{ secrets.RESERVE_SERVER_IP }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
-          envs: FRONTEND_RELEASE,RESERVE_DOMAIN_SPLIT
+          envs: FRONTEND_RELEASE,RESERVE_DOMAIN_SPLIT,STAGING_SHA256,STAGING_RUN_ID,STAGING_ATTEMPT
           script: |
             bash -Eeuo pipefail <<'RESERVE_STAGE'
             case "$FRONTEND_RELEASE" in
@@ -173,11 +160,25 @@ jobs:
               echo "Frontend release id must be a full commit SHA"
               exit 1
             fi
+            if ! [[ "$STAGING_SHA256" =~ ^[0-9a-f]{64}$ && "$STAGING_RUN_ID" =~ ^[0-9]+$ && "$STAGING_ATTEMPT" =~ ^[0-9]+$ ]]; then
+              echo "Invalid staging bundle identity"
+              exit 1
+            fi
+            BUNDLE_DIR="/home/ubuntu/reserve-stage-$FRONTEND_RELEASE-$STAGING_RUN_ID-$STAGING_ATTEMPT"
+            test -d "$BUNDLE_DIR"
+            test ! -L "$BUNDLE_DIR"
+            trap 'rm -rf -- "$BUNDLE_DIR"' EXIT
+            (
+              cd "$BUNDLE_DIR"
+              printf '%s  reserve-stage.tar.gz\n' "$STAGING_SHA256" | sha256sum --strict --check
+            )
+            EXTRACTED=$(mktemp -d "$BUNDLE_DIR/files.XXXXXX")
+            tar -xzf "$BUNDLE_DIR/reserve-stage.tar.gz" -C "$EXTRACTED"
 
             RELEASE_ROOT=/usr/share/nginx/html/releases
             RELEASE_DIR="$RELEASE_ROOT/$FRONTEND_RELEASE"
             INCOMING_DIR="$RELEASE_ROOT/.incoming-$FRONTEND_RELEASE"
-            UPLOAD_DIR="/home/ubuntu/reserve-frontend-$FRONTEND_RELEASE"
+            UPLOAD_DIR="$EXTRACTED/frontend/dist"
             NGINX_TEMPLATE="/home/ubuntu/default-$FRONTEND_RELEASE.conf"
 
             test -f "$UPLOAD_DIR/index.html"
@@ -196,25 +197,19 @@ jobs:
               sudo mkdir -p "$INCOMING_DIR"
               sudo cp -a "$UPLOAD_DIR/." "$INCOMING_DIR/"
               test -f "$INCOMING_DIR/index.html"
-              sudo bash /home/ubuntu/preserve-frontend-assets.sh "$INCOMING_DIR" "$RELEASE_ROOT" /usr/share/nginx/html/current
+              sudo bash "$EXTRACTED/scripts/preserve-frontend-assets.sh" "$INCOMING_DIR" "$RELEASE_ROOT" /usr/share/nginx/html/current
               sudo chown -R nginx:nginx "$INCOMING_DIR" 2>/dev/null || true
               sudo mv "$INCOMING_DIR" "$RELEASE_DIR"
             fi
             # 빌드에 포함된 식별자를 검증하며 기존 릴리스의 식별자는 바꾸지 않는다.
             test "$(tr -d '\r\n' < "$RELEASE_DIR/release-id.txt")" = "$FRONTEND_RELEASE"
             if [ "$RESERVE_DOMAIN_SPLIT" = true ]; then
-              sudo bash /home/ubuntu/domain-release.sh stage "$FRONTEND_RELEASE"
+              sudo bash "$EXTRACTED/scripts/domain-release.sh" stage "$FRONTEND_RELEASE" "$EXTRACTED/marketing/dist"
             fi
 
             # 다른 SHA의 설정과 섞이지 않도록 후보 파일명을 배포 SHA에 고정한다.
-            test -f /home/ubuntu/default.conf
-            install -m 0644 /home/ubuntu/default.conf "$NGINX_TEMPLATE"
-            rm -f /home/ubuntu/default.conf
-
-            case "$UPLOAD_DIR" in
-              /home/ubuntu/reserve-frontend-*) sudo rm -rf -- "$UPLOAD_DIR" ;;
-              *) echo "Unexpected upload directory"; exit 1 ;;
-            esac
+            install -m 0644 "$EXTRACTED/nginx/default.conf" "$NGINX_TEMPLATE"
+            install -m 0644 "$EXTRACTED/scripts/domain-release.sh" /home/ubuntu/domain-release.sh
 
             echo "Frontend staged at $RELEASE_DIR; live configuration is unchanged"
             RESERVE_STAGE
@@ -306,7 +301,7 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
-          source: "scripts/check-deployment-memory.sh,scripts/check-auth-limits-image.sh,scripts/prepare-ip-protection.py,scripts/redis-app.rules"
+          source: "scripts/check-deployment-memory.sh,scripts/check-auth-limits-image.sh,scripts/check-release-compatibility-image.sh,scripts/prepare-ip-protection.py,scripts/redis-app.rules"
           target: "/home/ubuntu/"
 
       - name: Recheck source CI before target startup
@@ -337,6 +332,10 @@ jobs:
           KAKAO_CLIENT_ID: ${{ secrets.KAKAO_CLIENT_ID }}
           KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_INBOUND_ENABLED: ${{ vars.RESEND_INBOUND_ENABLED || 'false' }}
+          RESEND_INBOUND_ADDRESS: ${{ vars.RESEND_INBOUND_ADDRESS }}
+          RESEND_INBOUND_WEBHOOK_SECRET: ${{ vars.RESEND_INBOUND_ENABLED == 'true' && secrets.RESEND_INBOUND_WEBHOOK_SECRET || '' }}
+          RESEND_INBOUND_API_KEY: ${{ vars.RESEND_INBOUND_ENABLED == 'true' && secrets.RESEND_INBOUND_API_KEY || '' }}
           PORTONE_V2_SECRET: ${{ secrets.PORTONE_V2_SECRET }}
           PORTONE_STORE_ID: ${{ secrets.PORTONE_STORE_ID }}
           PORTONE_WEBHOOK_SECRET: ${{ secrets.PORTONE_WEBHOOK_SECRET }}
@@ -381,6 +380,11 @@ jobs:
           RESERVE_RESERVATION_RETENTION_PURGE_ENABLED: ${{ vars.RESERVE_RESERVATION_RETENTION_PURGE_ENABLED || 'false' }}
           RESERVE_RESERVATION_CONSENT_ENABLED: ${{ vars.RESERVE_RESERVATION_CONSENT_ENABLED || 'false' }}
           RESERVE_RESERVATION_CONSENT_RECIPIENT_RETENTION: ${{ vars.RESERVE_RESERVATION_CONSENT_RECIPIENT_RETENTION }}
+          RESERVE_RESERVATION_SHARED_LIMITS_ENABLED: ${{ vars.RESERVE_RESERVATION_SHARED_LIMITS_ENABLED || 'false' }}
+          RESERVE_RESERVATION_TURNSTILE_ENABLED: ${{ vars.RESERVE_RESERVATION_TURNSTILE_ENABLED || 'false' }}
+          RESERVE_RESERVATION_TURNSTILE_SITE_KEY: ${{ vars.RESERVE_RESERVATION_TURNSTILE_SITE_KEY }}
+          RESERVE_RESERVATION_TURNSTILE_SECRET_KEY: ${{ vars.RESERVE_RESERVATION_TURNSTILE_ENABLED == 'true' && secrets.RESERVE_RESERVATION_TURNSTILE_SECRET_KEY || '' }}
+          RESERVE_RESERVATION_TURNSTILE_HOSTNAME: ${{ vars.RESERVE_RESERVATION_TURNSTILE_HOSTNAME }}
           RESERVE_SERVICE_ADMISSION_ENABLED: ${{ vars.RESERVE_SERVICE_ADMISSION_ENABLED || 'false' }}
           RESERVE_SERVICE_ADMISSION_CAPACITY: ${{ vars.RESERVE_SERVICE_ADMISSION_CAPACITY || '20' }}
           RESERVE_SERVICE_ADMISSION_SESSION_SECONDS: ${{ vars.RESERVE_SERVICE_ADMISSION_SESSION_SECONDS || '900' }}
@@ -394,7 +398,7 @@ jobs:
           host: ${{ secrets.RESERVE_SERVER_IP }}
           key: ${{ secrets.EC2_SSH_KEY }}
           fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
-          envs: RESERVE_SECURITY_AUTH_LIMITS_ENABLED,RESERVE_SECURITY_AUTH_LIMITS_FINGERPRINT_KEY,RESERVE_SECURITY_AUTH_LIMITS_EPOCH,RESERVE_SECURITY_IP_PROTECTION_ENABLED,RESERVE_SECURITY_IP_PROTECTION_FINGERPRINT_KEY,RESERVE_SECURITY_IP_PROTECTION_TRUSTED_PROXIES,RESERVE_MFA_ENABLED,RESERVE_MFA_RP_ID,RESERVE_MFA_ORIGINS,RESERVE_MFA_ENCRYPTION_KEY,RESERVE_RESERVATION_AUTO_COMPLETION_ENABLED,RESERVE_SETTLEMENT_TEST_ENABLED,RESERVE_RESERVATION_RETENTION_ENABLED,RESERVE_RESERVATION_RETENTION_PURGE_ENABLED,RESERVE_RESERVATION_CONSENT_ENABLED,RESERVE_RESERVATION_CONSENT_RECIPIENT_RETENTION,RESERVE_IMAGE_REFERENCE,IMAGE_TAG,DOCKERHUB_USERNAME,JWT_SECRET_KEY,OAUTH_UNLINK_ENCRYPTION_KEY,OAUTH_PROVIDER_TOKEN_ENCRYPTION_ENABLED,OAUTH_PROVIDER_TOKEN_ENCRYPTION_KEY,OAUTH_SECURITY_EVENTS_GOOGLE_ENABLED,OAUTH_SECURITY_EVENTS_KAKAO_ENABLED,OAUTH_SECURITY_EVENTS_NAVER_ENABLED,KAKAO_APP_ID,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,RESEND_API_KEY,PORTONE_V2_SECRET,PORTONE_STORE_ID,PORTONE_WEBHOOK_SECRET,QR_TOKEN_SECRET,DB_APP_PASSWORD,MAIL_FROM,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,S3_BUCKET_NAME,CLOUDFRONT_DOMAIN,SENTRY_DSN,KAKAO_REST_API_KEY,HOLIDAY_API_KEY,TOURISM_API_SERVICE_KEY,CHAT_IMAGE_ENCRYPTION_KEY,FEED_ENABLED,FEED_INTERACTIONS_ENABLED,STORE_NEWS_ENABLED,RESERVE_DOMAIN_SPLIT,FEED_IMAGE_ENCRYPTION_KEY,CHAT_RETENTION_ENABLED,CHAT_RETENTION_NOTICE_PUBLISHED_AT,CHAT_RETENTION_ACCESS_AUDIT_YEARS,WAITING_RETENTION_ENABLED,WAITING_RETENTION_NOTICE_PUBLISHED_AT,WAITING_CUSTOMER_RETENTION_NOTICE_PUBLISHED_AT,RESERVE_REDIS_ENABLED,RESERVE_REDIS_HOST,RESERVE_REDIS_PORT,RESERVE_REDIS_PASSWORD,RESERVE_REDIS_USERNAME,RESERVE_SERVICE_ADMISSION_ENABLED,RESERVE_SERVICE_ADMISSION_CAPACITY,RESERVE_SERVICE_ADMISSION_SESSION_SECONDS,RESERVE_SERVICE_ADMISSION_MAX_SESSION_SECONDS,RESERVE_SERVICE_ADMISSION_HEARTBEAT_TIMEOUT_SECONDS,RESERVE_SERVICE_ADMISSION_MAX_WAITING,RESERVE_SERVICE_ADMISSION_EPOCH,RESERVE_SERVICE_ADMISSION_AUTOMATIC_ENABLED
+          envs: RESERVE_SECURITY_AUTH_LIMITS_ENABLED,RESERVE_SECURITY_AUTH_LIMITS_FINGERPRINT_KEY,RESERVE_SECURITY_AUTH_LIMITS_EPOCH,RESERVE_SECURITY_IP_PROTECTION_ENABLED,RESERVE_SECURITY_IP_PROTECTION_FINGERPRINT_KEY,RESERVE_SECURITY_IP_PROTECTION_TRUSTED_PROXIES,RESERVE_MFA_ENABLED,RESERVE_MFA_RP_ID,RESERVE_MFA_ORIGINS,RESERVE_MFA_ENCRYPTION_KEY,RESERVE_RESERVATION_AUTO_COMPLETION_ENABLED,RESERVE_SETTLEMENT_TEST_ENABLED,RESERVE_RESERVATION_RETENTION_ENABLED,RESERVE_RESERVATION_RETENTION_PURGE_ENABLED,RESERVE_RESERVATION_CONSENT_ENABLED,RESERVE_RESERVATION_CONSENT_RECIPIENT_RETENTION,RESERVE_RESERVATION_SHARED_LIMITS_ENABLED,RESERVE_RESERVATION_TURNSTILE_ENABLED,RESERVE_RESERVATION_TURNSTILE_SITE_KEY,RESERVE_RESERVATION_TURNSTILE_SECRET_KEY,RESERVE_RESERVATION_TURNSTILE_HOSTNAME,RESERVE_IMAGE_REFERENCE,IMAGE_TAG,DOCKERHUB_USERNAME,JWT_SECRET_KEY,OAUTH_UNLINK_ENCRYPTION_KEY,OAUTH_PROVIDER_TOKEN_ENCRYPTION_ENABLED,OAUTH_PROVIDER_TOKEN_ENCRYPTION_KEY,OAUTH_SECURITY_EVENTS_GOOGLE_ENABLED,OAUTH_SECURITY_EVENTS_KAKAO_ENABLED,OAUTH_SECURITY_EVENTS_NAVER_ENABLED,KAKAO_APP_ID,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,RESEND_API_KEY,RESEND_INBOUND_ENABLED,RESEND_INBOUND_ADDRESS,RESEND_INBOUND_WEBHOOK_SECRET,RESEND_INBOUND_API_KEY,PORTONE_V2_SECRET,PORTONE_STORE_ID,PORTONE_WEBHOOK_SECRET,QR_TOKEN_SECRET,DB_APP_PASSWORD,MAIL_FROM,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,S3_BUCKET_NAME,CLOUDFRONT_DOMAIN,SENTRY_DSN,KAKAO_REST_API_KEY,HOLIDAY_API_KEY,TOURISM_API_SERVICE_KEY,CHAT_IMAGE_ENCRYPTION_KEY,FEED_ENABLED,FEED_INTERACTIONS_ENABLED,STORE_NEWS_ENABLED,RESERVE_DOMAIN_SPLIT,FEED_IMAGE_ENCRYPTION_KEY,CHAT_RETENTION_ENABLED,CHAT_RETENTION_NOTICE_PUBLISHED_AT,CHAT_RETENTION_ACCESS_AUDIT_YEARS,WAITING_RETENTION_ENABLED,WAITING_RETENTION_NOTICE_PUBLISHED_AT,WAITING_CUSTOMER_RETENTION_NOTICE_PUBLISHED_AT,RESERVE_REDIS_ENABLED,RESERVE_REDIS_HOST,RESERVE_REDIS_PORT,RESERVE_REDIS_PASSWORD,RESERVE_REDIS_USERNAME,RESERVE_SERVICE_ADMISSION_ENABLED,RESERVE_SERVICE_ADMISSION_CAPACITY,RESERVE_SERVICE_ADMISSION_SESSION_SECONDS,RESERVE_SERVICE_ADMISSION_MAX_SESSION_SECONDS,RESERVE_SERVICE_ADMISSION_HEARTBEAT_TIMEOUT_SECONDS,RESERVE_SERVICE_ADMISSION_MAX_WAITING,RESERVE_SERVICE_ADMISSION_EPOCH,RESERVE_SERVICE_ADMISSION_AUTOMATIC_ENABLED
           script: |
             set -e
             # latest가 가리키는 이미지가 바뀌어도 같은 입력을 유지하도록 SHA 태그를 명시한다.
@@ -486,6 +490,39 @@ jobs:
             esac
             export APP_FRONTEND_URL APP_PUBLIC_URL APP_LEGACY_FRONTEND_URL
             export APP_MARKETING_URL=https://reserve.it.kr
+            case "$RESEND_INBOUND_ENABLED" in
+              true)
+                : "${RESEND_INBOUND_ADDRESS:?A support email address is required for Resend receiving}"
+                : "${RESEND_INBOUND_WEBHOOK_SECRET:?A webhook signing secret is required for Resend receiving}"
+                : "${RESEND_INBOUND_API_KEY:?An inbound API key is required for Resend receiving}"
+                ;;
+              false) ;;
+              *) echo 'Invalid Resend inbound flag'; exit 1 ;;
+            esac
+            case "$RESERVE_RESERVATION_SHARED_LIMITS_ENABLED" in
+              true)
+                [ "$RESERVE_REDIS_ENABLED" = true ] && [ "$RESERVE_REDIS_USERNAME" = reserve_app ] || {
+                  echo 'Shared reservation limits require the restricted Redis application user'; exit 1;
+                }
+                ;;
+              false) ;;
+              *) echo 'Invalid shared reservation limits flag'; exit 1 ;;
+            esac
+            case "$RESERVE_RESERVATION_TURNSTILE_ENABLED" in
+              true)
+                : "${RESERVE_RESERVATION_TURNSTILE_SITE_KEY:?Turnstile site key is required}"
+                : "${RESERVE_RESERVATION_TURNSTILE_SECRET_KEY:?Turnstile secret is required}"
+                [ "$RESERVE_RESERVATION_TURNSTILE_HOSTNAME" = "${APP_FRONTEND_URL#https://}" ] || {
+                  echo 'Turnstile hostname must match the deployed app'; exit 1;
+                }
+                case "$RESERVE_RESERVATION_TURNSTILE_SITE_KEY:$RESERVE_RESERVATION_TURNSTILE_SECRET_KEY" in
+                  [123]x00000000000000000000??:*|*:[123]x0000000000000000000000000000000AA)
+                    echo 'Turnstile test keys cannot be used for production'; exit 1 ;;
+                esac
+                ;;
+              false) ;;
+              *) echo 'Invalid reservation Turnstile flag'; exit 1 ;;
+            esac
             case "$RESERVE_IMAGE_REFERENCE" in
               "$DOCKERHUB_USERNAME/reserve@sha256:"*) ;;
               *) echo 'Immutable deployment image is required'; exit 1 ;;
@@ -493,8 +530,10 @@ jobs:
             sudo docker pull "$RESERVE_IMAGE_REFERENCE"
             CURRENT_IMAGE=$(sudo docker inspect --format '{{.Image}}' "${{ env.CURRENT_UPSTREAM }}")
             sudo bash /home/ubuntu/scripts/check-auth-limits-image.sh "$RESERVE_SECURITY_AUTH_LIMITS_ENABLED" "$RESERVE_IMAGE_REFERENCE" "$CURRENT_IMAGE"
+            sudo bash /home/ubuntu/scripts/check-release-compatibility-image.sh "$RESERVE_IMAGE_REFERENCE" "$CURRENT_IMAGE"
             sudo python3 /home/ubuntu/scripts/prepare-ip-protection.py check-network
-            if [ "$RESERVE_SECURITY_IP_PROTECTION_ENABLED" = true ] || [ "$RESERVE_SECURITY_AUTH_LIMITS_ENABLED" = true ]; then
+            if [ "$RESERVE_SECURITY_IP_PROTECTION_ENABLED" = true ] || [ "$RESERVE_SECURITY_AUTH_LIMITS_ENABLED" = true ] ||
+               [ "$RESERVE_RESERVATION_SHARED_LIMITS_ENABLED" = true ]; then
               sudo --preserve-env=RESERVE_SECURITY_AUTH_LIMITS_ENABLED python3 /home/ubuntu/scripts/prepare-ip-protection.py check-redis
             fi
             if [ "$RESERVE_SECURITY_AUTH_LIMITS_ENABLED" = true ]; then
@@ -637,6 +676,7 @@ jobs:
             for COMPATIBLE_UPSTREAM in "$CURRENT_UPSTREAM" "$TARGET_UPSTREAM"; do
               COMPATIBLE_IMAGE=$(sudo docker inspect --format '{{.Image}}' "$COMPATIBLE_UPSTREAM")
               sudo bash /home/ubuntu/scripts/check-auth-limits-image.sh "$RESERVE_SECURITY_AUTH_LIMITS_ENABLED" "$COMPATIBLE_IMAGE"
+              sudo bash /home/ubuntu/scripts/check-release-compatibility-image.sh "$COMPATIBLE_IMAGE"
               SCHEMA_COMPAT=$(sudo docker image inspect --format '{{index .Config.Labels "reserve.schema-compat"}}' "$COMPATIBLE_IMAGE")
               FEATURE_COMPAT=$(sudo docker image inspect --format '{{index .Config.Labels "reserve.feature-compat"}}' "$COMPATIBLE_IMAGE")
               if [ "$SCHEMA_COMPAT" != 'v280-mfa-completion-settlement-v1' ] || [ "$FEATURE_COMPAT" != 'waiting-signup-hidden-feed-oauth-login-session-admission-mfa-completion-test-settlement-v11' ]; then

@@ -65,7 +65,9 @@ class EntityUpdateProducerBoundaryTest {
         Member owner = EntityUpdateStreamTest.member(2, Role.BUSINESS);
         Store store = Store.builder().id(7L).owner(owner).build();
         Reservation reservation = Reservation.builder().id(17L).member(customer).store(store).build();
-        new ReservationUpdates(updates).changed(reservation, EntityUpdates.Operation.UPDATED);
+        var notifications = mock(ReservationUpdates.NotificationSink.class);
+        new ReservationUpdates(updates, notifications).changed(reservation, EntityUpdates.Operation.UPDATED);
+        verifyNoInteractions(notifications);
         assertThat(changes).hasSize(1);
         assertThat(changes.getFirst().members()).isEqualTo(Set.of(1L, 2L));
         assertThat(changes.getFirst().publiclyVisible()).isFalse();

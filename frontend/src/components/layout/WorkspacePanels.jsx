@@ -7,11 +7,16 @@ import AnimatedContent from '../common/AnimatedContent';
 export default function WorkspacePanels({ activeKey, items, keepMounted = false }) {
     const [visited, setVisited] = useState([activeKey]);
     if (keepMounted && !visited.includes(activeKey)) setVisited([...visited, activeKey]);
-    return items.filter(item => item.key === activeKey || keepMounted && visited.includes(item.key)).map(item =>
+    const panels = items.filter(item => item.key === activeKey || keepMounted && visited.includes(item.key)).map(item =>
         <section key={item.key} hidden={item.key !== activeKey} inert={item.key !== activeKey || undefined}
             aria-label={item.label} data-workspace-panel={item.key}>
-            <WorkspaceActivityContext.Provider value={item.key === activeKey}><AnimatedContent motionKey={activeKey} ready={item.key === activeKey}>{item.children}</AnimatedContent></WorkspaceActivityContext.Provider>
+            <WorkspaceActivityContext.Provider value={item.key === activeKey}>
+                {keepMounted ? <AnimatedContent motionKey={activeKey} ready={item.key === activeKey} animateOnMount={item.key !== visited[0]}>
+                    {item.children}
+                </AnimatedContent> : item.children}
+            </WorkspaceActivityContext.Provider>
         </section>);
+    return keepMounted ? panels : <AnimatedContent motionKey={activeKey}>{panels}</AnimatedContent>;
 }
 WorkspacePanels.propTypes = {
     activeKey: PropTypes.string.isRequired,

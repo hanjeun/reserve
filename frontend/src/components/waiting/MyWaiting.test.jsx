@@ -7,7 +7,8 @@ import waitingService from '../../services/waitingService';
 import { normalizeListQueryParams } from '../../utils/listQueryParams';
 
 const auth = vi.hoisted(() => ({ isLoggedIn: true, sessionRevision: 1, user: { id: 7 } }));
-vi.mock('../../services/waitingService', () => ({ default: { getMine: vi.fn() } }));
+const feedback = vi.hoisted(() => ({ confirm: vi.fn(), success: vi.fn(), error: vi.fn(), warning: vi.fn() }));
+vi.mock('../../services/waitingService', () => ({ default: { getMine: vi.fn(), remove: vi.fn() } }));
 vi.mock('../../store/useAuthStore', () => {
     const read = () => auth;
     const hook = selector => selector ? selector(read()) : read();
@@ -15,11 +16,12 @@ vi.mock('../../store/useAuthStore', () => {
     hook.subscribe = () => () => {};
     return { default: hook };
 });
-vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: {}, confirm: vi.fn() }) }));
+vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: feedback, confirm: feedback.confirm }) }));
 vi.mock('./WaitingQrModal', () => ({ default: ({ open, entryId }) => open ? <div role="dialog">입장 QR {entryId}</div> : null }));
 const clients = new Set();
 afterEach(() => {
-    vi.unstubAllGlobals(); waitingService.getMine.mockReset();
+    vi.unstubAllGlobals(); waitingService.getMine.mockReset(); waitingService.remove.mockReset();
+    Object.values(feedback).forEach(mock => mock.mockReset());
     clients.forEach(client => client.clear()); clients.clear();
     Object.assign(auth, { isLoggedIn: true, sessionRevision: 1, user: { id: 7 } });
 });
@@ -33,7 +35,7 @@ function LocationProbe() {
         })}>페이지 9로 이동</button></>;
 }
 const pageWith = (name, total = 1, status = 'WAITING') => ({ content: [{
-    entry: { id: 12, storeId: 31, entryNumber: 4, partySize: 2, status }, storeName: name, teamsAhead: 3,
+    entry: { id: 12, storeId: 31, entryNumber: 4, partySize: 2, status }, storeName: name, storeImageUrl: 'https://images.example.test/fixture-waiting.jpg', teamsAhead: 3,
 }], page: { totalElements: total } });
 const deferred = () => {
     let resolve;
@@ -105,6 +107,50 @@ it('reuses the reservation toolbar with an adjacent server count and only recent
     expect(currentParams().get('view')).toBe('cards');
 });
 
+it.each([['list', '.reserve-reservation-row'], ['cards', '.reserve-reservation-summary-card']])(
+    'shows waiting in the same reservation layout with the store image (%s)', async (view, selector) => {
+        waitingService.getMine.mockResolvedValue(pageWith('사진이 있는 가게'));
+        showMine('/my-reservations?tab=waiting&view=' + view);
+        const button = await screen.findByRole('button', { name: '사진이 있는 가게 4번 웨이팅 상세 보기' });
+        const item = button.closest(selector);
+        expect(item).not.toBeNull();
+        expect(item.querySelector('img')).toHaveAttribute('src', 'https://images.example.test/fixture-waiting.jpg');
+        expect(within(item).getByText('내 앞에 3팀이 있어요.')).toBeInTheDocument();
+        expect(within(item).getByText('대기 중')).not.toHaveClass('reserve-waiting-status');
+        expect(within(item).getByRole('button', { name: '취소' })).toHaveClass('reserve-btn--ghost-sm-danger');
+        expect(within(item).queryByRole('button', { name: '삭제' })).toBeNull();
+        expect(item).not.toHaveTextContent('0원');
+    },
+);
+
+it.each(['list', 'cards'])('removes a cancelled waiting from my history after confirmation (%s)', async view => {
+    waitingService.getMine.mockResolvedValueOnce(pageWith('취소한 가게', 1, 'CANCELLED'))
+        .mockResolvedValue({ content: [], page: { totalElements: 0 } });
+    waitingService.remove.mockResolvedValue(null);
+    showMine('/my-reservations?tab=waiting&view=' + view);
+    const button = await screen.findByRole('button', { name: '삭제' });
+    expect(button).toHaveClass('reserve-btn--ghost-sm');
+    fireEvent.click(button);
+    const confirmation = feedback.confirm.mock.lastCall[0];
+    expect(confirmation.content).toContain('가게의 접수 기록은 남아요.');
+    expect(waitingService.remove).not.toHaveBeenCalled();
+    await act(async () => { await confirmation.onOk(); });
+    expect(waitingService.remove).toHaveBeenCalledExactlyOnceWith(12, expect.any(AbortSignal));
+    expect(screen.queryByText('취소한 가게')).toBeNull();
+    expect(screen.queryByRole('button', { name: '삭제' })).toBeNull();
+    expect(feedback.success).toHaveBeenCalledWith('내 웨이팅에서 삭제했어요.');
+});
+
+it('discards an open waiting deletion confirmation when the account changes', async () => {
+    waitingService.getMine.mockResolvedValue(pageWith('취소한 가게', 1, 'CANCELLED'));
+    showMine();
+    fireEvent.click(await screen.findByRole('button', { name: '삭제' }));
+    const confirmation = feedback.confirm.mock.lastCall[0];
+    Object.assign(auth, { sessionRevision: 2, user: { id: 8 } });
+    await act(async () => { await confirmation.onOk(); });
+    expect(waitingService.remove).not.toHaveBeenCalled();
+});
+
 it('keeps the focused search field while only pending results become skeletons', async () => {
     const request = deferred();
     waitingService.getMine.mockResolvedValueOnce(pageWith('이전 내 웨이팅', 60)).mockReturnValue(request.promise);
@@ -112,9 +158,13 @@ it('keeps the focused search field while only pending results become skeletons',
     await screen.findByText('이전 내 웨이팅');
     const input = screen.getByPlaceholderText('가게명, 대기번호로 검색'); input.focus();
     fireEvent.change(input, { target: { value: '새 가게' } });
+    expect(screen.getByText('이전 내 웨이팅')).toBeInTheDocument();
+    expect(waitingService.getMine).toHaveBeenCalledTimes(1);
+    fireEvent.submit(input.closest('form'));
     expect(screen.getByRole('status', { name: '내 웨이팅 목록을 불러오는 중' })).toBeInTheDocument();
     expect(screen.queryByText('이전 내 웨이팅')).toBeNull();
     await waitFor(() => expect(waitingService.getMine).toHaveBeenCalledWith(0, expect.anything(), { keyword: '새 가게', status: 'ALL', sort: 'recent' }));
+    expect(waitingService.getMine).toHaveBeenCalledTimes(2);
     expect(screen.getByPlaceholderText('가게명, 대기번호로 검색')).toBe(input);
     expect(input).toHaveFocus(); expect(input).toBeEnabled();
     expect(screen.queryByText('이전 내 웨이팅')).toBeNull();
@@ -173,6 +223,8 @@ it.each([
     const toolbar = screen.getByLabelText('내 웨이팅 목록 필터');
     const search = screen.getByPlaceholderText('가게명, 대기번호로 검색');
     const params = currentParams().toString();
+    fireEvent.change(search, { target: { value: '유지할검색' } });
+    expect(currentParams().has('waitingKeyword')).toBe(false);
     if (hasRows && status !== 503) {
         fireEvent.click(trigger);
         expect(await screen.findByRole('dialog')).toHaveTextContent('기존 개인 웨이팅');
@@ -253,6 +305,8 @@ it('keeps search focus after a failed initial request instead of replacing the t
     showMine();
     const input = await screen.findByPlaceholderText('가게명, 대기번호로 검색'); input.focus();
     fireEvent.change(input, { target: { value: '다시 검색' } });
+    expect(waitingService.getMine).toHaveBeenCalledTimes(1);
+    fireEvent.submit(input.closest('form'));
     await waitFor(() => expect(waitingService.getMine).toHaveBeenCalledWith(0, expect.anything(), { keyword: '다시 검색', status: 'ALL', sort: 'recent' }));
     expect(screen.getByPlaceholderText('가게명, 대기번호로 검색')).toBe(input);
     expect(input).toHaveFocus(); expect(input).toBeEnabled();
@@ -281,6 +335,7 @@ it('normalizes waiting keys independently while preserving the existing reservat
 
 it('opens a waiting detail, updates its status from the own list and removes it across an account boundary', async () => {
     const own = pageWith('내 접수 가게');
+    own.content[0].storePublicId = '00000000-0000-4000-8000-000000000031';
     Object.assign(own.content[0].entry, {
         businessDate: '2026-10-10', createdAt: '2026-10-10T01:30:00Z', displayName: '내 이름',
     });
@@ -290,7 +345,7 @@ it('opens a waiting detail, updates its status from the own list and removes it 
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('내 이름')).toBeInTheDocument();
     expect(within(dialog).getByText('내 앞에 3팀이 있어요.')).toBeInTheDocument();
-    expect(within(dialog).getByRole('link', { name: '가게 상세 보기' })).toHaveAttribute('href', '/store/31');
+    expect(within(dialog).getByRole('link', { name: '가게 상세 보기' })).toHaveAttribute('href', '/store/00000000-0000-4000-8000-000000000031');
     expect(dialog).toHaveTextContent('2026-10-10');
     expect(dialog).toHaveTextContent('10:30');
     await act(async () => view.client.setQueriesData({ queryKey: ['waiting', 1, 'my', 7] }, {

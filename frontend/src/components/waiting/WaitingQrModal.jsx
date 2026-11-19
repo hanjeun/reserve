@@ -4,9 +4,11 @@ import { useQuery } from '@tanstack/react-query';
 import { QRCodeSVG } from 'qrcode.react';
 import useAuthStore from '../../store/useAuthStore';
 import waitingService from '../../services/waitingService';
-import { Button, DataState, ModalLoading } from '../common';
+import { DataState, ModalLoading } from '../common';
+import UnderlinedTextButton from '../common/UnderlinedTextButton';
 import ResponsiveModal from '../common/ResponsiveModal';
 import { appUrl } from '../../config/siteUrls';
+import { storeDetailPath } from '../../utils/storePublicAddress';
 
 export default function WaitingQrModal({ open, onClose, entryId, storeId }) {
     const revision = useAuthStore(state => state.sessionRevision);
@@ -16,6 +18,7 @@ export default function WaitingQrModal({ open, onClose, entryId, storeId }) {
     const qr = useQuery({ queryKey: ['waitingQr', revision, onsite ? 'onsite' : 'entry', storeId ?? entryId],
         queryFn: async ({ signal }) => {
             const token = await (onsite ? waitingService.getOnsiteQr(storeId, signal) : waitingService.getEntryQr(entryId, signal));
+            if (onsite && !storeDetailPath({ publicId: token?.storePublicId })) throw new Error('가게 주소를 확인하지 못했어요.');
             if (!token?.token || !(new Date(token.expiresAt).getTime() > Date.now())) throw new Error('QR 유효 시간이 지났어요. 새 QR을 불러와주세요.');
             return token;
         },
@@ -28,7 +31,7 @@ export default function WaitingQrModal({ open, onClose, entryId, storeId }) {
     }, [qr.data]);
     const valid = qr.data?.token && qr.data.token !== expiredToken;
     const value = valid ? onsite
-        ? appUrl(`/store/${storeId}#waiting-token=${encodeURIComponent(qr.data.token)}`) : qr.data.token : null;
+        ? appUrl(`${storeDetailPath({ publicId: qr.data.storePublicId })}#waiting-token=${encodeURIComponent(qr.data.token)}`) : qr.data.token : null;
     return <ResponsiveModal title={onsite ? '현장 웨이팅 접수 QR' : '웨이팅 입장 QR'} open={open} onCancel={onClose}
         footer={null} width={340} mobileSize="content" centered>
         <div className="reserve-waiting-qr">
@@ -38,7 +41,7 @@ export default function WaitingQrModal({ open, onClose, entryId, storeId }) {
                     : <DataState state="error" subject="웨이팅 QR" error={qr.error} compact
                         title="QR을 다시 불러와주세요." onRetry={qr.refetch} retrying={qr.isFetching} />}
             <p>{onsite ? '도착한 손님이 휴대폰으로 스캔해 접수할 수 있어요.' : '호출 후 직원에게 이 QR을 보여주세요.'}</p>
-            <Button variant="outline" size="sm" loading={qr.isFetching} onClick={() => qr.refetch()}>새 QR 보기</Button>
+            <UnderlinedTextButton loading={qr.isFetching} onClick={() => qr.refetch()}>새 QR 보기</UnderlinedTextButton>
         </div>
     </ResponsiveModal>;
 }

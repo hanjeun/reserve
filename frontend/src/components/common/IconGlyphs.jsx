@@ -7,6 +7,7 @@ export function ArrowRightGlyph() { return <path d="M4 12h16m-7-7 7 7-7 7" />; }
 export function AuditGlyph() { return <><rect x="5" y="4" width="14" height="17" rx="3" /><rect x="9" y="2" width="6" height="4" rx="1.5" /><path d="m8 13 3 3 5-6" /></>; }
 export function ChartGlyph() { return <><path d="M4 3v18h17M8 16v-5M13 16V7M18 16V4" /></>; }
 export function BellGlyph() { return <><path d="M6 9a6 6 0 0 1 12 0c0 6 2 6 2 8H4c0-2 2-2 2-8ZM10 21h4" /></>; }
+export function BellOffGlyph() { return <path d="M3 3l18 18M10 21h4M6 9c0 6-2 6-2 8h13M9.6 3.5A6 6 0 0 1 18 9c0 2 .2 3.4.5 4.4" />; }
 export function CalendarGlyph() { return <><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M7 3v4M17 3v4M3 11h18M8 15h2M14 15h2" /></>; }
 export function CameraGlyph() { return <><path d="M8 5 9.5 3h5L16 5h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h3Z" /><circle cx="12" cy="13" r="4" /></>; }
 export function CheckCircleGlyph() { return <><circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" /></>; }
@@ -59,7 +60,7 @@ export function PartitionGlyph() { return <><rect x="8" y="2" width="8" height="
 export function PauseGlyph() { return <><circle cx="12" cy="12" r="9" /><path d="M9 8v8M15 8v8" /></>; }
 export function PhoneGlyph() { return <path d="m8 3 2 5-3 2a16 16 0 0 0 7 7l2-3 5 2v3a2 2 0 0 1-2 2A18 18 0 0 1 3 5a2 2 0 0 1 2-2h3Z" />; }
 export function PictureGlyph() { return <><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8" cy="8" r="1.5" /><path d="m3 17 5-5 4 4 4-6 5 6" /></>; }
-export function PlusGlyph() { return <path d="M12 4v16M4 12h16" />; }
+export function PlusGlyph() { return <><path d="M12 4v16" /><path d="M4 12h16" /></>; }
 export function ProfileGlyph() { return <><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8" cy="9" r="2" /><path d="M5 16a3 3 0 0 1 6 0M14 8h4M14 12h4M14 16h4" /></>; }
 export function QrGlyph() { return <><rect x="3" y="3" width="6" height="6" rx="1" /><rect x="15" y="3" width="6" height="6" rx="1" /><rect x="3" y="15" width="6" height="6" rx="1" /><path d="M15 15h3v3h3v3h-6v-3M3 12h3M12 3v3M9 12h6M12 9v6M12 18v3M21 12v3" /></>; }
 export function BookGlyph() { return <><path d="M12 5v16M12 5C9 3 5 3 2 4v15c3-1 7-1 10 2 3-3 7-3 10-2V4c-3-1-7-1-10 1Z" /></>; }

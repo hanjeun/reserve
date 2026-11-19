@@ -4,7 +4,7 @@ import { ArrowLeftOutlined, MenuOutlined, SearchOutlined, LockOutlined, UserOutl
 import { Link, useLocation, useNavigationType } from 'react-router-dom';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import useGoBack from '../../hooks/useGoBack';
-import { requestAuthenticationBack } from '../../utils/authenticationNavigation';
+import { requestAuthenticationBack, requestAuthenticationHome } from '../../utils/authenticationNavigation';
 import useWorkspaceNavigate from '../../hooks/useWorkspaceNavigate';
 import useWorkspaceAction from '../../hooks/useWorkspaceAction';
 import useExitAnimation from '../../hooks/useExitAnimation';
@@ -15,14 +15,21 @@ import { requestMessengerRouteClose } from '../chat/messengerRouteTransition';
 import { requestRegistrationStepBack } from '../../utils/storeRegistrationNavigation';
 import { useDocumentEntry, useSkeletonShown } from './loadingPresentation';
 import { colors, heights, radius } from '../../styles/tokens';
-import { WorkspaceMenuContext } from './workspaceMenu';
+import { WorkspaceMenuContext, isWorkspacePath } from './workspaceMenu';
 import { SEARCH_MOTION_DURATION_MS } from './searchTransition';
 
 const HeaderAccountMenu = lazy(() => import('./HeaderAccountMenu'));
 const HEADER_ACTION_MOTION_MS = 180;
 
+function takeLinkClick(event) {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+    event.preventDefault();
+    return true;
+}
+
 function HeaderControlSlot({ kind, leaving, skipEntry = false, children }) {
-    const [animateEntry] = useState(() => !skipEntry);
+    const [entering, setEntering] = useState(() => !skipEntry && !leaving);
+    if (entering && (skipEntry || leaving)) setEntering(false);
     const slotRef = useRef(null);
     useLayoutEffect(() => {
         const slot = slotRef.current;
@@ -35,9 +42,13 @@ function HeaderControlSlot({ kind, leaving, skipEntry = false, children }) {
         else slot.removeAttribute('aria-hidden');
     }, [leaving]);
     return <span ref={slotRef} className={`reserve-header-control-slot reserve-header-${kind}-slot`
-        + (animateEntry && !skipEntry ? ' reserve-header-control-slot--entering' : '')
+        + (entering ? ' reserve-header-control-slot--entering' : '')
         + (leaving ? ' reserve-header-control-slot--leaving' : '')}
-        >{children}</span>;
+        onAnimationEnd={event => {
+            if (event.target === event.currentTarget && event.animationName === 'reserve-header-back-enter') setEntering(false);
+        }}>
+        {children}
+    </span>;
 }
 HeaderControlSlot.propTypes = {
     kind: PropTypes.oneOf(['back', 'workspace-menu']).isRequired,
@@ -54,14 +65,15 @@ const Header = ({ restoreControls = false }) => {
     const location = useLocation();
     const navigationType = useNavigationType();
     const reducedMotion = useReducedMotion();
-    const { isLoggedIn } = useAuthStore();
+    const skipControlEntry = skeletonShown || documentEntry || restoreControls || reducedMotion;
+    const isLoggedIn = useAuthStore(state => state.isLoggedIn);
     const currentPath = location.pathname.replace(/\/$/, '') || '/';
     const workspaceControls = useContext(WorkspaceMenuContext);
     const workspaceMenu = workspaceControls?.control;
-    const showWorkspaceMenu = isLoggedIn && /^\/(admin|business)$/.test(currentPath);
+    const showWorkspaceMenu = isLoggedIn && isWorkspacePath(currentPath);
     const menu = workspaceMenu?.pathname.replace(/\/$/, '') === currentPath ? workspaceMenu : null;
     const menuAction = menu?.mobile ? (menu.expanded ? '닫기' : '열기') : (menu?.expanded ? '접기' : '펼치기');
-    const menuLabel = `${menu?.title || (currentPath === '/admin' ? '관리자 패널' : '사업자 파트너 패널')} 메뉴 ${menuAction}`;
+    const menuLabel = menu ? `${menu.title} 메뉴 ${menuAction}` : '메뉴';
     const isDiscoveryRoot = isDiscoveryRootPath(location.pathname, location.search);
     const showBack = !isDiscoveryRoot;
     const goBack = useGoBack(currentPath === '/stores' || currentPath.startsWith('/store/') ? '/stores' : '/');
@@ -127,22 +139,24 @@ const Header = ({ restoreControls = false }) => {
     };
 
     const handleSearchEntry = event => {
-        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-        event.preventDefault();
-        void requestAction(() => runHeaderNavigation('search', () => navigate(searchTarget, { state: { searchEntry: true } })));
+        if (!takeLinkClick(event)) return;
+        void requestAction(() => runHeaderNavigation('search', () => navigate(searchTarget, {
+            state: {
+                searchEntry: true,
+                searchOrigin: { key: navigationLocationRef.current.location.key, left: window.scrollX, top: window.scrollY },
+            },
+        })));
     };
 
     const handleAccountEntry = (event, target) => {
-        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-        event.preventDefault();
+        if (!takeLinkClick(event)) return;
         void navigate(target);
     };
 
     // 로고 자체는 정적으로 두고 목적지의 진입 모션만 사용한다.
 
-    const handleLogoClick = (e) => {
-        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-        e.preventDefault();
+    const handleLogoClick = event => {
+        if (!takeLinkClick(event)) return;
         if (location.pathname === '/') {
             window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' });
             return;
@@ -150,6 +164,7 @@ const Header = ({ restoreControls = false }) => {
         // 메시지 화면에서는 뒤로가기 버튼과 같이 닫힘 애니메이션을 먼저 재생하고 홈으로 간다.
         // 메시지 화면을 떠나는 이동에는 페이지 전환 슬라이드가 걸리지 않아 두 애니메이션이 겹치지 않는다.
         if (currentPath === '/messages' && requestMessengerRouteClose('/')) return;
+        if (currentPath === '/login' && requestAuthenticationHome()) return;
         navigate('/', { state: { reserveRouteMotion: 'from-left', reserveHomeEntry: true } });
     };
 
@@ -159,7 +174,7 @@ const Header = ({ restoreControls = false }) => {
             style={{ ...(isDiscoveryRoot ? { ...styles.header, boxShadow: 'none' } : styles.header), '--reserve-search-motion-duration': `${SEARCH_MOTION_DURATION_MS}ms` }}>
             <div className="reserve-header-inner" style={styles.inner}>
                 <div className="reserve-header-brand">
-                    {renderWorkspaceMenu && <HeaderControlSlot kind="workspace-menu" leaving={workspaceLeaving} skipEntry={skeletonShown || documentEntry || restoreControls}>
+                    {renderWorkspaceMenu && <HeaderControlSlot kind="workspace-menu" leaving={workspaceLeaving} skipEntry={skipControlEntry}>
                     <Tooltip title={menuLabel} disabled={workspaceLeaving || searchLeaving || menu?.mobile && menu.expanded}><button type="button" id={menu?.buttonId} className="reserve-header-workspace-menu"
                         onClick={menu?.toggle} disabled={!menu || workspaceLeaving}
                         data-input-modality={workspaceControls?.inputModality}
@@ -169,7 +184,7 @@ const Header = ({ restoreControls = false }) => {
                         <MenuOutlined aria-hidden="true" />
                     </button></Tooltip></HeaderControlSlot>}
                     {renderBack && (
-                        <HeaderControlSlot kind="back" leaving={backLeaving} skipEntry={skeletonShown || documentEntry || restoreControls}>
+                        <HeaderControlSlot kind="back" leaving={backLeaving} skipEntry={skipControlEntry}>
                         <button type="button" className={'reserve-header-back' + (backLeaving ? ' reserve-header-back--leaving' : '')}
                             onClick={handleBack} aria-label="이전 화면으로 돌아가기" disabled={backLeaving}
                             >
@@ -223,9 +238,7 @@ HeaderPlaceholder.propTypes = { discoveryRoot: PropTypes.bool, workspace: PropTy
 
 const styles = {
     header: {
-        // 반투명 + blur(스크롤 시 콘텐츠가 비쳐 보이는 유리 효과)라 불투명 토큰을 그대로 쓸 수 없다.
-        // theme.css가 라이트/다크에서 각각 흰색·어두운색 반투명 값을 넣어준다.
-        // 폴백은 기존 값과 동일한 rgba(255,255,255,0.9) — 변수를 못 읽어도 라이트 모드는 그대로다.
+        // 배경이 비치는 헤더는 불투명 토큰 대신 테마 전용 색을 사용한다.
         backgroundColor: 'var(--c-header-bg, rgba(255, 255, 255, 0.9))',
         backdropFilter: 'blur(20px)',
         display: 'flex',

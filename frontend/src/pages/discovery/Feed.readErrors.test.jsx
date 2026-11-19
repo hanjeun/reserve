@@ -7,19 +7,25 @@ import FeedAuthor from './FeedAuthor';
 import FeedDetail from './FeedDetail';
 import FeedNotifications from './FeedNotifications';
 
-const state = vi.hoisted(() => ({ config: {}, profile: {}, list: {}, author: {}, post: {} }));
+const state = vi.hoisted(() => ({ config: {}, profile: {}, list: {}, author: {}, post: {}, activities: {}, activityReads: new Map() }));
 vi.mock('@tanstack/react-query', () => ({
-    useQuery: ({ queryKey: key }) => key[1] === 'config' || key[2] === 'config' ? state.config
-        : key[1] === 'me' && key[2] === 'profile' ? state.profile
-            : key[1] === 'author' && key[3] !== 'posts' ? state.author
-                : key[1] === 'post' ? state.post : state.list,
+    useQuery: ({ queryKey: key, enabled }) => {
+        if (key[1] === 'config' || key[2] === 'config') return state.config;
+        if (key[1] === 'me' && key[2] === 'profile') return state.profile;
+        if (key[1] === 'post') return state.post;
+        if (key[1] === 'author') {
+            if (key.length === 3) return state.author;
+            state.activityReads.set(key[3], enabled);
+            return state.activities[key[3]] ?? state.list;
+        }
+        return state.list;
+    },
     keepPreviousData: data => data,
     useQueryClient: () => ({ invalidateQueries: vi.fn() }),
     useMutation: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock('../../store/useAuthStore', () => ({ default: selector => selector({ user: { id: 7 } }) }));
 vi.mock('../../hooks/useDocumentTitle', () => ({ default: () => {} }));
-vi.mock('../../hooks/useListQueryNormalization', () => ({ default: () => {} }));
 vi.mock('../../hooks/useListRefreshAnchor', () => ({ default: () => {} }));
 vi.mock('../../hooks/useGoBack', () => ({ default: () => vi.fn() }));
 vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: { error: vi.fn() } }) }));
@@ -33,6 +39,7 @@ vi.mock('../../components/common', async () => ({
     PageTitle: ({ children }) => <h1>{children}</h1>,
     FilterMenu: () => null,
     Avatar: () => null,
+    Card: Object.assign(({ children }) => <div>{children}</div>, { Body: ({ children }) => <div>{children}</div> }),
 }));
 vi.mock('../../components/common/AnimatedContent', () => ({ default: ({ children }) => children }));
 vi.mock('../../components/common/IconTool', () => ({ default: ({ label, unavailableReason }) => <button disabled={Boolean(unavailableReason)}>{label}</button> }));
@@ -57,13 +64,14 @@ beforeEach(() => {
     state.author = query({ publicId, nickname: '합성 작성자' });
     state.list = query({ content: [{ id: 3, title: '합성 게시물', state: 'PUBLISHED' }], totalElements: 1 });
     state.post = query({ id: 3, title: '합성 게시물', state: 'PUBLISHED' });
+    state.activities = {};
+    state.activityReads.clear();
 });
 
 describe('feed read failure ownership', () => {
     it.each([
         ['feed', <Feed />, '/feed', '/feed'],
-        ['author', <FeedAuthor />, `/feed/authors/${publicId}`, '/feed/authors/:publicId'],
-        ['detail', <FeedDetail />, '/feed/posts/3', '/feed/posts/:id'],
+        ['detail', <FeedDetail />, '/feed/posts/00000000-0000-4000-8000-000000000003', '/feed/posts/:id'],
         ['notifications', <FeedNotifications />, '/feed/notifications', '/feed/notifications'],
     ])('retries only policy after %s is disabled even with stale denied content', async (_kind, element, path, route) => {
         state.config = query({ enabled: false, notificationsEnabled: false }, offline);
@@ -77,12 +85,12 @@ describe('feed read failure ownership', () => {
     });
     it.each([
         [<FeedAuthor />, `/feed/authors/${publicId}`, '/feed/authors/:publicId'],
-        [<FeedDetail />, '/feed/posts/3', '/feed/posts/:id'],
+        [<FeedDetail />, '/feed/posts/00000000-0000-4000-8000-000000000003', '/feed/posts/:id'],
     ].flatMap(row => [offline, { status: 403 }].map(error => [...row, error])))('shows a profile-only failure beside usable primary content without repeating successful reads', async (element, path, route, error) => {
         state.profile = query(undefined, error);
         show(element, path, route);
         expect(screen.getAllByRole('alert')).toHaveLength(1);
-        expect(screen.getByRole('alert')).toHaveTextContent('공개 프로필을 불러오지 못했어요.');
+        expect(screen.getByRole('alert')).toHaveTextContent('프로필을 불러오지 못했어요.');
         expect(screen.getByRole('article')).toHaveTextContent('합성 게시물');
         await act(async () => fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' })));
         expect(state.profile.refetch).toHaveBeenCalledOnce();
@@ -101,8 +109,7 @@ describe('feed read failure ownership', () => {
     });
     it.each([
         ['feed', <Feed />, '/feed', '/feed'],
-        ['author', <FeedAuthor />, `/feed/authors/${publicId}`, '/feed/authors/:publicId'],
-        ['detail', <FeedDetail />, '/feed/posts/3', '/feed/posts/:id'],
+        ['detail', <FeedDetail />, '/feed/posts/00000000-0000-4000-8000-000000000003', '/feed/posts/:id'],
         ['notifications', <FeedNotifications />, '/feed/notifications', '/feed/notifications'],
     ])('does not show inactive cached read failures after %s is disabled', (_kind, element, path, route) => {
         state.config = query({ enabled: false, notificationsEnabled: false });
@@ -119,9 +126,69 @@ describe('feed read failure ownership', () => {
         expect(screen.getAllByRole('alert')).toHaveLength(1);
         expect(screen.getByRole('alert')).toHaveTextContent('게시물을 불러오지 못했어요.');
         expect(screen.getByRole('alert')).toHaveTextContent('서버에 연결할 수 없어요.');
-        expect(screen.queryByText('공개 프로필을 갱신하지 못했어요.')).not.toBeInTheDocument();
+        expect(screen.queryByText('프로필을 갱신하지 못했어요.')).not.toBeInTheDocument();
         await act(async () => fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' })));
         for (const read of [state.config, state.profile, state.list]) expect(read.refetch).toHaveBeenCalledOnce();
+    });
+
+    it('switches between the same profile’s activities and uses public content links', () => {
+        const post = '304295c2-3970-4bdc-a889-991f6d2a57a8';
+        const comment = '6b2ce140-01c0-4d39-8b96-acd6da0e3c00';
+        state.author.data = { ...state.author.data, activityAvailable: true, mine: false };
+        state.activities.comments = query({ content: [{ postPublicId: post, commentPublicId: comment, content: '공개 댓글' }] });
+        state.activities.reviews = query({ content: [{ id: 50, storePublicId: post, storeName: '합성 가게', rating: 5, title: '공개 리뷰' }] });
+        show(<FeedAuthor />, `/feed/u/${publicId}`, '/feed/u/:publicId');
+        expect(screen.getByText('합성 게시물')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('tab', { name: '댓글', exact: true }));
+        expect(screen.getByRole('tab', { name: '댓글', selected: true })).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: '댓글 보기' })).toHaveAttribute('href', expect.stringContaining(comment));
+        expect(screen.queryByText('합성 게시물')).toBeNull();
+        fireEvent.click(screen.getByRole('tab', { name: '리뷰', exact: true }));
+        expect(screen.getByRole('tab', { name: '리뷰', selected: true })).toBeInTheDocument();
+        expect(screen.getByText('공개 리뷰')).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: '합성 가게' })).toHaveAttribute('href', '/store/' + post);
+        expect(screen.queryByText('공개 댓글')).toBeNull();
+    });
+
+    it('shows a fallback on a readable profile with an empty bio', () => {
+        state.author.data = { ...state.author.data, bio: '   ' };
+        show(<FeedAuthor />, `/feed/u/${publicId}`, '/feed/u/:publicId');
+        expect(screen.getByText('소개가 없어요.')).toBeInTheDocument();
+    });
+
+    it('shows all tabs for a legacy profile while keeping unshared activities out of reads and rendering', () => {
+        state.author.data = { ...state.author.data, activityAvailable: false, mine: false };
+        state.activities.reviews = query({ content: [{ id: 45, title: '기존 캐시 리뷰' }] });
+        show(<FeedAuthor />, `/feed/u/${publicId}`, '/feed/u/:publicId');
+        expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['게시물', '댓글', '리뷰']);
+        expect(screen.getByText('합성 게시물')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('tab', { name: '리뷰' }));
+        expect(screen.getByText('리뷰 목록을 아직 공개하지 않았어요.')).toBeInTheDocument();
+        expect(state.activityReads.get('reviews')).toBe(false);
+        expect(screen.queryByText('기존 캐시 리뷰')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('tab', { name: '댓글' }));
+        expect(screen.getByText('댓글 목록을 아직 공개하지 않았어요.')).toBeInTheDocument();
+        expect(state.activityReads.get('comments')).toBe(false);
+    });
+
+    it('lets a legacy profile owner open their activity and see where to set its audience', () => {
+        state.author.data = { ...state.author.data, activityAvailable: true, mine: true, visibility: null };
+        state.activities.reviews = query({ content: [] });
+        show(<FeedAuthor />, `/feed/u/${publicId}?tab=reviews`, '/feed/u/:publicId');
+        expect(screen.getByRole('tab', { name: '리뷰', selected: true })).toBeInTheDocument();
+        expect(state.activityReads.get('reviews')).toBe(true);
+        expect(screen.getByText('공개한 리뷰가 없어요.')).toBeInTheDocument();
+        expect(screen.getByText('댓글과 리뷰를 다른 사람에게 보여줄 범위는 프로필 수정에서 정할 수 있어요.')).toBeInTheDocument();
+    });
+
+    it('hides cached headers and activities when the profile audience no longer allows the viewer', () => {
+        state.author = query({ ...state.author.data, activityAvailable: true }, { status: 404 });
+        show(<FeedAuthor />, `/feed/u/${publicId}?tab=reviews`, '/feed/u/:publicId');
+        expect(screen.queryByText('합성 작성자')).toBeNull();
+        expect(screen.queryByRole('tab')).toBeNull();
+        expect(screen.getByText('프로필을 불러올 수 없어요.')).toBeInTheDocument();
     });
 
     it('keeps cached posts with one compact refresh failure', () => {
@@ -138,7 +205,7 @@ describe('feed read failure ownership', () => {
         state.profile = query(undefined, offline);
         show(<Feed />);
         expect(screen.getAllByRole('alert')).toHaveLength(1);
-        expect(screen.getByRole('alert')).toHaveTextContent('공개 프로필을 불러오지 못했어요.');
+        expect(screen.getByRole('alert')).toHaveTextContent('프로필을 불러오지 못했어요.');
         expect(screen.getByRole('article')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: '새 글 작성' })).toBeDisabled();
         await act(async () => fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' })));
@@ -157,7 +224,7 @@ describe('feed read failure ownership', () => {
 
     it.each([
         ['author', <FeedAuthor />, `/feed/authors/${publicId}`, '/feed/authors/:publicId'],
-        ['detail', <FeedDetail />, '/feed/posts/3', '/feed/posts/:id'],
+        ['detail', <FeedDetail />, '/feed/posts/00000000-0000-4000-8000-000000000003', '/feed/posts/:id'],
         ['notifications', <FeedNotifications />, '/feed/notifications', '/feed/notifications'],
     ])('suppresses a cached config failure beside a blocking %s failure', (kind, element, path, route) => {
         state.config = query(state.config.data, offline);

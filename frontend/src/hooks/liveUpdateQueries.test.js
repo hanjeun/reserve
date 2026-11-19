@@ -1,8 +1,9 @@
 import { QueryCache, QueryClient, QueryObserver } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { reservationKeys } from './queryKeys';
 import {
     clearDeniedQueryData, createLiveQueryRefresh, isBlockingListReadError, isLiveReadQuery, liveUpdateMatches,
-    nextNewsBoundary, parseLiveUpdate,
+    liveReadInterval, nextLiveRefreshDelay, nextNewsBoundary, parseLiveUpdate,
 } from './liveUpdateQueries';
 
 const clients = [];
@@ -22,6 +23,26 @@ const deferred = () => {
 afterEach(() => { clients.forEach(value => value.clear()); clients.length = 0; });
 
 describe('metadata update routing', () => {
+    it('refreshes reservation notifications and the combined badge without touching human chat or feed', () => {
+        const event = signal({ domain: 'SYSTEM_NOTIFICATION', entityId: 0, operation: 'INVALIDATED' });
+        expect(parseLiveUpdate(event)).toEqual(event);
+        for (const key of [query('chat', 'unread'), query('chat', 'notifications', null)]) {
+            expect(liveUpdateMatches(key, event)).toBe(true);
+            expect(isLiveReadQuery(key)).toBe(true);
+        }
+        expect(liveReadInterval(query('chat', 'unread'))).toBeNull();
+        for (const key of [query('chat', 'conversations'), query('feed', 'interactions', 'notifications', 'count'),
+            query('notification-reservation', 12)]) {
+            expect(liveUpdateMatches(key, event)).toBe(false);
+        }
+    });
+
+    it('matches the owned reservation key against the selected store', () => {
+        const event = signal({ domain: 'RESERVATION', storeId: 7 });
+        expect(liveUpdateMatches({ queryKey: reservationKeys.managePage({ storeId: 7 }) }, event)).toBe(true);
+        expect(liveUpdateMatches({ queryKey: reservationKeys.managePage({ storeId: 9 }) }, event)).toBe(false);
+        expect(liveUpdateMatches({ queryKey: reservationKeys.managePage({}) }, event)).toBe(true);
+    });
     it('rejects malformed or incompatible signals', () => {
         expect(parseLiveUpdate(JSON.stringify(signal()))).toEqual(signal());
         for (const invalid of ['{', null, signal({ domain: 'PAYMENT' }), signal({ entityId: -1 }),
@@ -43,6 +64,9 @@ describe('metadata update routing', () => {
         const event = signal({ targetType: 'NEWS' });
         expect(liveUpdateMatches(query('public-promotions', 'detail', 8), event)).toBe(true);
         expect(liveUpdateMatches(query('public-promotions', 'detail', 9), event)).toBe(false);
+        const uuidDetail = { queryKey: ['public-promotions', 'detail', '00000000-0000-4000-8000-000000000008'], state: { data: { id: 8 } } };
+        expect(liveUpdateMatches(uuidDetail, event)).toBe(true);
+        expect(liveUpdateMatches(uuidDetail, { ...event, entityId: 9 })).toBe(false);
         expect(liveUpdateMatches(query('store-news', 'application', 8), event)).toBe(false);
         expect(liveUpdateMatches(query('store-news', 'applications', {}), event)).toBe(false);
         expect(liveUpdateMatches(query('store-news', 'application', 8), signal())).toBe(true);
@@ -76,6 +100,54 @@ describe('metadata update routing', () => {
 });
 
 describe('read freshness and private-cache boundaries', () => {
+    it('retains the short fallback periods only for the supported list and connection state', () => {
+        const item = (key, data = {}) => ({ queryKey: key, state: { data } });
+        expect(liveReadInterval(item(['waiting', 1, 'my', 7]))).toBe(15_000);
+        expect(liveReadInterval(item(['waiting', 1, 7]))).toBe(30_000);
+        expect(liveReadInterval(item(['waiting-stores', '']))).toBe(30_000);
+        expect(liveReadInterval(item(['reservations', 'my', {}], { content: [{ status: 'PENDING' }] }))).toBe(10_000);
+        expect(liveReadInterval(item(['waiting', 1, 'my', 7]), { connected: true, domains: ['WAITING'] })).toBe(60_000);
+        expect(liveReadInterval(item(['stores', 'list', {}]), { connected: true, domains: ['STORE'] })).toBe(180_000);
+        expect(liveReadInterval(item(['stores', 'regions']), { connected: true, domains: ['STORE'] })).toBe(180_000);
+        expect(liveReadInterval(item(['stores', 'list', {}]), { connected: true, domains: ['NEWS'] })).toBe(60_000);
+        expect(liveReadInterval(item(['reservations', 'my', {}], { content: [] }))).toBe(60_000);
+        for (const key of [['admin', 'auditLogs'], ['store-news', 'application', 8], ['reservations', 'qrToken', 7]]) {
+            expect(liveReadInterval(item(key))).toBeNull();
+        }
+    });
+
+    it('schedules from the last response and does not fetch a fresh cache for a periodic tick', async () => {
+        const value = client(), key = ['waiting', 1, 'my', 7];
+        const now = Date.now(), clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+        const read = vi.fn().mockResolvedValue({ content: [] });
+        value.setQueryData(key, { content: [] }, { updatedAt: now - 14_000 });
+        const stop = new QueryObserver(value, { queryKey: key, queryFn: read, staleTime: Infinity }).subscribe(() => {});
+        try {
+            expect(nextLiveRefreshDelay(value, {})).toBe(1000);
+            const refresh = createLiveQueryRefresh(value, () => true);
+            refresh([], true, { periodic: true });
+            expect(read).not.toHaveBeenCalled();
+            clock.mockReturnValue(now + 1001);
+            refresh([], true, { periodic: true });
+            await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(1));
+            await vi.waitFor(() => expect(value.getQueryState(key).fetchStatus).toBe('idle'));
+            expect(nextLiveRefreshDelay(value, {})).toBe(15_000);
+        } finally { stop(); clock.mockRestore(); }
+    });
+
+    it('does not queue a second read for a passive timer during an existing request', async () => {
+        const value = client(), first = deferred(), key = ['waiting', 1, 'my', 7];
+        value.setQueryData(key, { content: [] }, { updatedAt: Date.now() - 60_000 });
+        const read = vi.fn(() => first.promise);
+        const stop = new QueryObserver(value, { queryKey: key, queryFn: read }).subscribe(() => {});
+        try {
+            expect(read).toHaveBeenCalledTimes(1);
+            createLiveQueryRefresh(value, () => true)([], true, { periodic: true });
+            first.resolve({ content: [] });
+            await vi.waitFor(() => expect(value.getQueryState(key).fetchStatus).toBe('idle'));
+            expect(read).toHaveBeenCalledTimes(1);
+        } finally { stop(); }
+    });
     it.each([
         [undefined, undefined, false], [undefined, [], false], [undefined, [{ id: 7 }], false],
         [{ status: 503 }, undefined, true], [{ status: 503 }, [], true], [{ status: 503 }, [{ id: 7 }], false],
@@ -95,7 +167,7 @@ describe('read freshness and private-cache boundaries', () => {
         ];
         const reads = keys.map(() => vi.fn().mockResolvedValue({ revision: 2 }));
         const stops = keys.map((key, index) => {
-            value.setQueryData(key, { revision: 1 });
+            value.setQueryData(key, { revision: 1 }, { updatedAt: Date.now() - 60_001 });
             return new QueryObserver(value, { queryKey: key, queryFn: reads[index], staleTime: Infinity }).subscribe(() => {});
         });
         const refresh = createLiveQueryRefresh(value, () => true);

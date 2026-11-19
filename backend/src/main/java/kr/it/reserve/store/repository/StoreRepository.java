@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -16,6 +17,8 @@ import java.util.List;
 import java.util.Optional;
 
 public interface StoreRepository extends JpaRepository<Store, Long>, JpaSpecificationExecutor<Store> {
+
+    Optional<Store> findByPublicId(String publicId);
 
     /**
      * 예약 생성·수정·광고 신청·가게 영업 종료의 공통 비관적 락 조회.
@@ -25,6 +28,20 @@ public interface StoreRepository extends JpaRepository<Store, Long>, JpaSpecific
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT s FROM Store s WHERE s.id = :id")
     Optional<Store> findByIdForUpdate(@Param("id") Long id);
+
+    /** 가게 행을 먼저 잠근 리뷰 변경에서만 호출하며 RR의 오래된 조회 snapshot을 사용하지 않는다. */
+    @Modifying(flushAutomatically = true)
+    @Query(value = """
+            UPDATE store SET
+                rating = (SELECT ROUND(AVG(r.rating), 1) FROM review r
+                          WHERE r.store_id = :storeId AND r.deleted_at IS NULL AND r.moderation_hidden = false),
+                review_count = (SELECT COUNT(*) FROM review r
+                                WHERE r.store_id = :storeId AND r.deleted_at IS NULL AND r.moderation_hidden = false)
+             WHERE store_id = :storeId
+            """, nativeQuery = true)
+    int updateReviewRating(Long storeId);
+
+    boolean existsByIdAndOwnerIdAndDeletedAtIsNull(Long id, Long ownerId);
 
     // 사업자 — 본인 가게 목록 (소프트 삭제된 가게 제외)
     List<Store> findByOwnerAndDeletedAtIsNullOrderByCreatedAtDesc(Member owner);
@@ -66,10 +83,10 @@ public interface StoreRepository extends JpaRepository<Store, Long>, JpaSpecific
 
     /**
      * 공개 sitemap 전용 최소 투영. 목록과 같은 공개 정책(ACTIVE + 미삭제)을 사용한다.
-     * 개인정보와 이미지 필드를 엔티티째 읽지 않도록 id와 수정 시각만 가져온다.
+     * 주소를 구성하는 식별자와 수정 시각만 가져온다.
      */
     @Query("""
-            SELECT new kr.it.reserve.store.dto.StoreSitemapEntry(s.id, s.updatedAt, s.createdAt)
+            SELECT new kr.it.reserve.store.dto.StoreSitemapEntry(s.id, s.publicId, s.updatedAt, s.createdAt)
               FROM Store s
              WHERE s.deletedAt IS NULL
                AND s.status = kr.it.reserve.store.entity.StoreStatus.ACTIVE

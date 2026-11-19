@@ -26,7 +26,7 @@ export function useLineLoop({ typeSpeed = 58, eraseSpeed = 40, pauseMs = 1800, s
     const [current, setCurrent] = useState(fullText(LINES[0]));
     const idxRef = useRef(0);
     const timerRef = useRef(null);
-    // NOTE: props를 ref로 유지 — 마운트 시 1회만 실행되는 루프이므로 deps 배열에 넣지 않음
+    // 루프를 다시 시작하지 않도록 최신 속성은 ref로 읽는다.
     const speedRef = useRef({ typeSpeed, eraseSpeed, pauseMs, startDelay });
     useEffect(() => { speedRef.current = { typeSpeed, eraseSpeed, pauseMs, startDelay }; });
 

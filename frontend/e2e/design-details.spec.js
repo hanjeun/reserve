@@ -11,7 +11,7 @@ const user = { id: 41, name: '검사 사용자', email: 'ui@example.test', role:
 const profile = { publicId: 'design-review', nickname: '검사 작성자' };
 const pageOf = content => ({ content, page: { number: 0, totalElements: content.length, totalPages: 1 } });
 const photos = [1, 2, 3].map(id => ({ id, url: `/api/feed/media/${id}`, width: 800, height: 450 }));
-const store = { id: 81, name: '디자인 검사 가게', category: '카페', ownerId: 8, phone: '02-1234-5678',
+const store = { id: 81, publicId: '00000000-0000-4000-8000-000000000081', name: '디자인 검사 가게', category: '카페', ownerId: 8, phone: '02-1234-5678',
     mainImageUrl: '/api/feed/media/1', detailImageUrls: ['/api/feed/media/2'], reservationEnabled: true,
     description: '예약 폼과 아이콘을 확인하는 가게예요.', bookingType: 'SESSION',
     openTime: '09:00', closeTime: '18:00', sessionTimes: ['10:00'], maxCapacityPerSlot: 3 };
@@ -35,7 +35,7 @@ async function setup(page) {
             return route.fulfill({ body: photo, contentType: 'image/webp' });
         if (pathname === '/api/auth/session') { return route.fulfill({ json: { success: true, data: { member: user, refreshPossible: false } } }); }
         if (pathname === '/api/member/me') return ok(user);
-        if (pathname === '/api/stores/81') return ok(store);
+        if (pathname === '/api/stores/00000000-0000-4000-8000-000000000081') return ok(store);
         if (pathname.includes('favorite')) return ok({ isFavorite: false });
         if (pathname.includes('unread')) return ok(0);
         if (pathname === '/api/chat/images/config') return ok({ enabled: true });
@@ -58,10 +58,10 @@ async function setup(page) {
         }
         if (pathname === '/api/feed/config' || pathname === '/api/store-news/config' || pathname === '/api/feed/interactions/config') return ok(config);
         if (pathname === '/api/feed/me/profile') return ok(profile);
-        if (pathname === '/api/feed/posts/8') return ok({ id: 8, revision: 0, state: 'PUBLISHED', author: profile,
+        if (pathname === '/api/feed/posts/00000000-0000-4000-8000-000000000008') return ok({ id: 8, publicId: '00000000-0000-4000-8000-000000000008', revision: 0, state: 'PUBLISHED', author: profile,
             content: '사진 배지와 댓글 입력을 확인해요.', images: photos, createdAt: new Date().toISOString() });
-        if (pathname === '/api/promotions/public/7') return ok({ id: 7, title: '사진 배지 확인', content: '같은 사진 수 표기를 사용해요.',
-            images: photos, state: 'PUBLISHED', storeId: 81, storeName: store.name, createdAt: new Date().toISOString() });
+        if (pathname === '/api/promotions/public/00000000-0000-4000-8000-000000000007') return ok({ id: 7, publicId: '00000000-0000-4000-8000-000000000007', title: '사진 배지 확인', content: '같은 사진 수 표기를 사용해요.',
+            images: photos, state: 'PUBLISHED', storeId: 81, storePublicId: store.publicId, storeName: store.name, createdAt: new Date().toISOString() });
         if (pathname === '/api/stores') return ok(pageOf([store]));
         if (pathname.endsWith('/comments') || pathname.includes('conversations') || pathname.includes('inbox')) return ok(pageOf([]));
         if (pathname.endsWith('/retractions')) return ok({ messages: [], nextRevision: 0 });
@@ -95,19 +95,28 @@ test('three chat photos keep tools clear, animate after load and retry only the 
     await expect(page.getByRole('button', { name: '첨부 사진 크게 보기' })).toHaveCount(3);
     await expect.poll(() => page.evaluate(() => window.attachmentEntries)).toBe(3);
     await expect(page.getByRole('button', { name: '사진 첨부', exact: true })).toBeDisabled();
-    const previews = await page.locator('.reserve-chat-attachments').boundingBox();
-    const toolbar = await page.locator('.reserve-chat-composer-toolbar').boundingBox();
-    expect((await page.locator('.reserve-chat-composer').boundingBox()).height).toBeCloseTo(emptyComposer.height, 1);
-    expect(toolbar.y).toBeCloseTo(emptyToolbar.y, 1);
-    expect(previews.y + previews.height).toBeLessThanOrEqual(toolbar.y);
+    await expect.poll(async () => (await page.locator('.reserve-chat-composer').boundingBox()).height)
+        .toBeGreaterThan(emptyComposer.height);
+    await expect.poll(async () => (await page.locator('.reserve-chat-composer-toolbar').boundingBox()).y)
+        .toBeCloseTo(emptyToolbar.y, 1);
+    await expect.poll(async () => {
+        const previews = await page.locator('.reserve-chat-attachments').boundingBox();
+        const inputBox = await page.getByRole('textbox', { name: '메시지 입력' }).boundingBox();
+        return previews.y + previews.height - inputBox.y;
+    }).toBeLessThanOrEqual(0.5);
     await expect(page.getByRole('button', { name: '이모지 선택', exact: true })).toBeVisible();
     await capture(page, 'chat-three-photos', testInfo);
-    await page.getByRole('button', { name: '첨부 사진 제거: second.webp' }).click();
+    const remove = async name => {
+        const button = page.getByRole('button', { name: `첨부 사진 제거: ${name}` });
+        await page.locator('.reserve-chat-draft-photo').filter({ has: button }).hover();
+        await button.click();
+    };
+    await remove('second.webp');
     await expect(page.getByRole('button', { name: '첨부 사진 크게 보기' })).toHaveCount(2);
     await input.setInputFiles([files[1]]);
     await expect(page.getByRole('button', { name: '첨부 사진 크게 보기' })).toHaveCount(3);
     // 재첨부 순서는 first, third, second다.
-    await page.getByRole('button', { name: '첨부 사진 제거: third.webp' }).click();
+    await remove('third.webp');
     await expect(page.getByRole('button', { name: '첨부 사진 크게 보기' })).toHaveCount(2);
     await input.setInputFiles([files[2]]);
     await page.getByRole('textbox', { name: '메시지 입력' }).fill('사진 세 장이에요.');
@@ -124,21 +133,23 @@ test('three chat photos keep tools clear, animate after load and retry only the 
     await expect(page.getByRole('button', { name: '첨부 사진 크게 보기' })).toHaveCount(0);
 });
 
-test('comment attachments remain inside the original input footprint', async ({ page }, testInfo) => {
+test('comment attachments expand above the field and keep its tools usable', async ({ page }, testInfo) => {
     await setup(page);
-    await page.goto('/feed/posts/8');
+    await page.goto('/feed/posts/00000000-0000-4000-8000-000000000008');
     const composer = page.locator('.reserve-feed-comment-composer .reserve-chat-composer');
     await expect(composer).toBeVisible();
     await composer.scrollIntoViewIfNeeded();
     const before = await composer.boundingBox();
     await page.getByLabel('첨부할 사진 선택').setInputFiles(files);
     await expect(composer.getByRole('button', { name: '첨부 사진 크게 보기', exact: true })).toHaveCount(3);
-    expect((await composer.boundingBox()).height).toBeCloseTo(before.height, 1);
+    await expect.poll(async () => (await composer.boundingBox()).height).toBeGreaterThan(before.height);
     const field = await composer.locator('.reserve-chat-composer-input-area').boundingBox();
+    const text = await composer.locator('textarea').boundingBox();
     const photos = await composer.locator('.reserve-chat-composer-attachments').boundingBox();
     const tools = await composer.locator('.reserve-chat-composer-toolbar').boundingBox();
     expect(photos.y).toBeGreaterThanOrEqual(field.y);
-    expect(photos.y + photos.height).toBeLessThanOrEqual(tools.y);
+    expect(photos.y + photos.height).toBeLessThanOrEqual(text.y);
+    expect(text.y + text.height).toBeLessThanOrEqual(tools.y);
     await expect(composer.getByRole('button', { name: '이모지 선택' })).toBeEnabled();
     await composer.getByRole('button', { name: '댓글 남기기', exact: true }).click({ trial: true });
     await capture(page, 'comment-three-photos', testInfo);
@@ -146,7 +157,7 @@ test('comment attachments remain inside the original input footprint', async ({ 
 
 test('reservation placeholders and all three store actions use matching type and icon measurements', async ({ page }, testInfo) => {
     await setup(page);
-    await page.goto('/store/81');
+    await page.goto('/store/00000000-0000-4000-8000-000000000081');
     const date = page.getByText('날짜 선택', { exact: true });
     const time = page.getByText('날짜를 먼저 선택해주세요', { exact: true });
     const typography = element => {
@@ -202,18 +213,22 @@ test('home keeps its counter, benefits use gallery dots, and fullscreen keeps it
     const mainSkin = await main.evaluate(skin);
     expect(mainSkin).toMatchObject({ backgroundColor: 'rgba(0, 0, 0, 0.58)', color: 'rgb(255, 255, 255)', borderRadius: '30px' });
     await capture(page, 'home-counter', testInfo);
-    await page.goto('/benefits/7');
-    const gallery = page.locator('.reserve-benefit-photos .reserve-carousel');
+    await page.goto('/benefits/00000000-0000-4000-8000-000000000007');
+    const gallery = page.locator('.reserve-benefit-photos .reserve-store-gallery');
     const dots = gallery.locator('.slick-dots li');
     await expect(page.locator('.reserve-benefit-photo-count')).toHaveCount(0);
     await expect(dots).toHaveCount(3);
     await expect(dots.nth(0)).toHaveClass(/slick-active/);
     await expect(gallery.locator('.slick-slide.slick-active').getByAltText('혜택 사진 1', { exact: true })).toBeVisible();
-    await dots.nth(1).getByRole('button').click();
+    await gallery.focus();
+    await page.keyboard.press('ArrowRight');
     await expect(dots.nth(1)).toHaveClass(/slick-active/);
     await expect(gallery.locator('.slick-slide.slick-active').getByAltText('혜택 사진 2', { exact: true })).toBeVisible();
+    await expect(gallery).toHaveAttribute('data-photo-dots-visible', '');
+    await dots.nth(0).getByRole('button').click();
+    await expect(dots.nth(0)).toHaveClass(/slick-active/);
     await capture(page, 'benefit-gallery-dots', testInfo);
-    await page.goto('/feed/posts/8');
+    await page.goto('/feed/posts/00000000-0000-4000-8000-000000000008');
     await page.getByAltText('게시물 사진 1', { exact: true }).click();
     const progress = page.locator('.reserve-image-preview .ant-image-preview-progress');
     await expect(progress).toHaveText('1 / 3');

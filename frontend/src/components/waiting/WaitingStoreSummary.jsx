@@ -9,10 +9,11 @@ export default function WaitingStoreSummary({ store, detail = false }) {
     const client = useQueryClient();
     const live = useLiveUpdatesStatus();
     const [open, setOpen] = useState(false);
-    const storeId = store.id;
+    const { id: storeId, publicId } = store;
     const refresh = useCallback(() => client.invalidateQueries(detail
-        ? { queryKey: storeKeys.detail(String(storeId)), exact: true }
-        : { queryKey: ['waiting-stores'] }, { cancelRefetch: false }), [client, detail, storeId]);
+        ? { queryKey: storeKeys.all(), predicate: ({ queryKey }) => queryKey.length === 3 && queryKey[1] === 'detail'
+            && [String(storeId), publicId].includes(String(queryKey[2])) }
+        : { queryKey: ['waiting-stores'] }, { cancelRefetch: false }), [client, detail, storeId, publicId]);
     const refreshOnOpen = useCallback(open => {
         setOpen(open);
         if (open) void refresh();
@@ -41,6 +42,7 @@ export default function WaitingStoreSummary({ store, detail = false }) {
 WaitingStoreSummary.propTypes = {
     store: PropTypes.shape({
         id: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+        publicId: PropTypes.string,
         waitingIntakeMode: PropTypes.string,
         waitingPaused: PropTypes.bool,
         waitingTeams: PropTypes.number,

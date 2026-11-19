@@ -1,6 +1,7 @@
 /**
  * RESERVE - 폼 유틸리티
  */
+import { bookingOpeningFromForm } from './bookingOpening';
 
 /*
  * 첫 오류 필드를 필요한 경우에만 세로로 이동한다. inline: nearest를 유지해 가로 뷰포트 이동을 막는다.
@@ -87,6 +88,15 @@ export const buildStoreFormData = (values) => {
 
     // 누락 = 유지, 명시적인 0/빈 값 = 제한 없음.
     if (Object.hasOwn(values, 'bookingDeadlineHours')) fd.append('bookingDeadlineHours', optionalString(values.bookingDeadlineHours));
+    if (values.bookingOpeningMode && values.reservationEnabled !== false) {
+        const opening = bookingOpeningFromForm(values);
+        fd.append('bookingOpeningScheduled', boolString(opening != null));
+        if (opening) {
+            appendOptional(fd, 'bookingOpensAt', opening.opensAt);
+            appendOptional(fd, 'bookingOpeningFrom', opening.from);
+            appendOptional(fd, 'bookingOpeningTo', opening.to);
+        }
+    }
 
     // multipart 배열은 같은 키를 반복해 추가해야 서버의 List로 바인딩된다.
 

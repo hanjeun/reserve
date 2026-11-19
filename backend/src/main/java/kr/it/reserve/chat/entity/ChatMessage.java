@@ -67,6 +67,7 @@ public class ChatMessage {
     @Column(name = "content", columnDefinition = "TEXT", nullable = false)
     private String content;
 
+    // 기존 컬럼과 보존 원장을 공유하고, 문서는 별도 암호화 경로에서 읽는다.
     @Column(name = "image_key", length = 512)
     private String imageKey;
 

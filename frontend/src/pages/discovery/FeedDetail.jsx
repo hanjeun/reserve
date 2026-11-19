@@ -18,13 +18,14 @@ import feedService from '../../services/feedService';
 import { discoveryTabDestination } from '../../utils/discoveryNavigation';
 import { httpStatusOf, isMissingRequestError } from '../../utils/listErrorMessage';
 import { refetchFailedReads } from '../../hooks/liveUpdateQueries';
+import { normalizePublicId } from '../../utils/publicAddress';
 
 const FeedReportModal = lazy(() => import('../../components/feed/FeedReportModal'));
 
 export default function FeedDetail() {
     const { id } = useParams();
-    const postId = Number(id);
-    const validId = Number.isSafeInteger(postId) && postId > 0;
+    const publicId = normalizePublicId(id);
+    const validId = Boolean(publicId);
     const user = useAuthStore(state => state.user);
     const navigate = useNavigate();
     const config = useFeedConfig();
@@ -34,8 +35,14 @@ export default function FeedDetail() {
     const [composerMounted, setComposerMounted] = useState(false);
     const [reportMounted, setReportMounted] = useState(false);
     const [reportId, setReportId] = useState(null);
-    const post = useQuery({ queryKey: feedKeys.detail(postId), queryFn: ({ signal }) => feedService.detail(postId, signal),
-        enabled: enabled && validId, staleTime: 30_000 });
+    const post = useQuery({ queryKey: feedKeys.detail(publicId), queryFn: async ({ signal }) => {
+        const data = await feedService.detail(publicId, signal);
+        if (normalizePublicId(data?.publicId) !== publicId || !Number.isSafeInteger(data?.id) || data.id <= 0) {
+            throw new Error('게시물 주소를 확인하지 못했어요.');
+        }
+        return data;
+    }, enabled: enabled && validId, staleTime: 30_000 });
+    const postId = post.data?.id;
     const postEnabled = enabled && validId;
     const reads = [config, ...(postEnabled ? [post] : []), ...(postEnabled && user ? [profile] : [])];
     const unavailable = [config, ...(postEnabled ? [post] : [])].some(query => [401, 403].includes(httpStatusOf(query.error))) || postEnabled && isMissingRequestError(post.error);
@@ -50,10 +57,10 @@ export default function FeedDetail() {
     const { onDelete, onShare, requestReport } = useFeedActions({ onDeleted: () => navigate(back, { replace: true }) });
     const renderPost = () => {
         if (!validId) return <DataState state="empty" title="게시물을 찾을 수 없어요." />;
-        if (config.isPending && !config.data) return <FeedSkeleton detail postId={postId} />;
+        if (config.isPending && !config.data) return <FeedSkeleton detail postId={publicId} />;
         if (config.isError && (!config.data || [401, 403].includes(httpStatusOf(config.error)))) return <DataState state="error" title="피드 상태를 불러오지 못했어요." error={config.error} onRetry={retryReads} retrying={retrying} />;
         if (!enabled) return <DataState state="empty" title="피드를 준비하고 있어요." />;
-        if (post.isPending && !post.data) return <FeedSkeleton detail postId={postId} />;
+        if (post.isPending && !post.data) return <FeedSkeleton detail postId={publicId} />;
         if (post.isError && (!post.data || unavailable)) return <DataState state={isMissingRequestError(post.error) ? 'empty' : 'error'} requestType="detail" title={isMissingRequestError(post.error) ? '게시물을 찾을 수 없어요.' : '게시물을 불러오지 못했어요.'}
             error={post.error} onRetry={isMissingRequestError(post.error) ? undefined : retryReads} retrying={retrying} />;
         return <FeedPostCard post={post.data} detail onShare={onShare} onDelete={onDelete}
@@ -62,14 +69,14 @@ export default function FeedDetail() {
                 setEditing(true);
             } : undefined} onReport={item => requestReport(item, id => { setReportMounted(true); setReportId(id); })} />;
     };
-    if (!editing && !reportId && validId && (!config.data && config.isPending || enabled && !post.data && post.isPending)) return <FeedPageSkeleton kind="feed-detail" postId={postId} />;
+    if (!editing && !reportId && validId && (!config.data && config.isPending || enabled && !post.data && post.isPending)) return <FeedPageSkeleton kind="feed-detail" postId={publicId} />;
     return <PageContainer size="md" paddingTop="12px" paddingX="0px" paddingBottom="40px" style={{ maxWidth: 640, backgroundColor: 'transparent' }} className="reserve-feed-page" aria-labelledby="feed-post-title">
         <header className="reserve-feed-heading"><IconTool kind="navigation" label="이전 화면으로 돌아가기" icon={<ArrowLeftOutlined aria-hidden="true" />} onClick={goBack} /><PageTitle level={1} id="feed-post-title">게시물</PageTitle></header>
-        {profileFailure && <DataState compact state="error" title={profile.data === undefined ? '공개 프로필을 불러오지 못했어요.' : '공개 프로필을 갱신하지 못했어요.'}
+        {profileFailure && <DataState compact state="error" title={profile.data === undefined ? '프로필을 불러오지 못했어요.' : '프로필을 갱신하지 못했어요.'}
             error={profile.error} onRetry={retryReads} retrying={retrying} />}
         {!unavailable && backgroundFailure && <DataState compact state="error" title="게시물을 갱신하지 못했어요." error={backgroundFailure.error} onRetry={retryReads} retrying={retrying} />}
         {renderPost()}
-        {enabled && !unavailable && !blockingFailure && post.data?.state === 'PUBLISHED' && <FeedComments key={postId} postId={postId} />}
+        {enabled && !unavailable && !blockingFailure && post.data?.state === 'PUBLISHED' && <FeedComments key={postId} postId={postId} postPublicId={publicId} />}
         {composerMounted && enabled && !unavailable && post.data && config.data && <FeedEditor open={editing}
             post={post.data} config={config.data} onClose={() => setEditing(false)} onSaved={(saved, draft) => {
                 setEditing(false); if (draft) navigate('/feed?view=drafts');

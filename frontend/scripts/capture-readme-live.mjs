@@ -10,6 +10,7 @@ import readline from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { README_IMAGE_FILENAMES, readmeImageDimensions } from './readme-image-paths.mjs';
+import { normalizePublicId } from '../src/utils/publicAddress.js';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.resolve(SCRIPT_DIR, '..');
@@ -76,14 +77,18 @@ async function cleanAuth() {
     console.log('저장한 로그인 상태를 지웠습니다.');
 }
 
-async function firstStoreId() {
-    if (process.env.README_STORE_ID) return process.env.README_STORE_ID;
-    const response = await fetch(`${BASE_URL}/api/stores?page=0&size=1`);
+async function firstStorePublicId() {
+    const selected = process.env.README_STORE_ID;
+    const publicId = normalizePublicId(selected);
+    if (publicId) return publicId;
+    if (selected && !/^[1-9]\d*$/.test(selected)) throw new Error('README_STORE_ID에 가게 식별자를 지정하세요.');
+    const path = selected ? '/api/stores/' + selected : '/api/stores?page=0&size=1';
+    const response = await fetch(BASE_URL + path);
     const body = await response.json();
     const data = body?.data ?? body;
     const list = Array.isArray(data) ? data : data?.content;
-    const id = list?.[0]?.id;
-    if (!id) throw new Error('가게 목록이 비어 있습니다. README_STORE_ID 를 지정하세요.');
+    const id = normalizePublicId(selected ? data?.publicId : list?.[0]?.publicId);
+    if (!id) throw new Error('공개 UUID가 있는 가게를 확인할 수 없어요.');
     return id;
 }
 
@@ -273,12 +278,12 @@ async function main() {
     await mkdir(OUTPUT_DIR, { recursive: true });
     const hasAuth = existsSync(AUTH_FILE);
     const wanted = scene => ONLY.length === 0 || ONLY.includes(scene.name);
-    const needsStoreId = ONLY.length === 0 || ONLY.includes('store-detail');
-    const storeId = needsStoreId ? await firstStoreId() : null;
+    const needsStorePublicId = ONLY.length === 0 || ONLY.includes('store-detail');
+    const storePublicId = needsStorePublicId ? await firstStorePublicId() : null;
     const publicScenes = [
         { name: 'home', pathname: '/' },
         { name: 'stores', pathname: '/stores' },
-        { name: 'store-detail', pathname: `/store/${storeId}` },
+        { name: 'store-detail', pathname: `/store/${storePublicId}` },
     ].filter(wanted);
     const authScenes = [
         { name: 'business', pathname: '/business?tab=analytics', auth: true },

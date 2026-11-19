@@ -393,7 +393,7 @@ test('the shared inquiry form keeps common action height and padding and release
     const trigger = page.getByRole('button', { name: '문의하기', exact: true });
     await trigger.click();
     const dialog = page.getByRole('dialog', { name: '문의하기', exact: true });
-    await equalActions(dialog, '보내기');
+    await equalActions(dialog, '미리보기');
     await expect.poll(() => page.evaluate(() => document.body.style.position)).toBe('fixed');
     await dialog.getByPlaceholder('문의 제목을 입력하세요').fill('로컬 스크롤 확인');
     await dialog.getByRole('button', { name: '취소', exact: true }).click();

@@ -10,10 +10,12 @@ import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.reservation.dto.ReservationCreateRequest;
 import kr.it.reserve.reservation.dto.ReservationResponse;
 import kr.it.reserve.reservation.dto.ReservationRequestResult;
+import kr.it.reserve.reservation.dto.ReservationUpdateRequest;
 import kr.it.reserve.reservation.scheduler.ReservationExpiryProcessor;
 import kr.it.reserve.payment.service.PortoneService;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
+import kr.it.reserve.reservation.service.ReservationEditQueryService;
 import kr.it.reserve.reservation.service.ReservationService;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.repository.StoreRepository;
@@ -26,6 +28,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -37,6 +40,7 @@ import static org.assertj.core.api.Assertions.*;
 @Timeout(90)
 class ReservationAdmissionPersistenceTest {
     @Autowired ReservationService service;
+    @Autowired ReservationEditQueryService editQueries;
     @Autowired ReservationRepository reservations;
     @Autowired MemberRepository members;
     @Autowired StoreRepository stores;
@@ -125,6 +129,37 @@ class ReservationAdmissionPersistenceTest {
         assertThat(results).containsExactlyInAnyOrder(true, false);
         assertThat(jdbc.queryForObject("SELECT SUM(guest_count) FROM reservation WHERE store_id = ? AND status IN ('PENDING','CONFIRMED')", Integer.class, store.getId())).isEqualTo(1);
     }
+    @Test void fullDayRemainsEditableForItsOwnerWithoutAllowingZeroGuests() {
+        store.setOpenTime(LocalTime.NOON);
+        store.setCloseTime(LocalTime.of(12, 30));
+        stores.saveAndFlush(store);
+        var customer = customers.getFirst();
+        var booking = service.createReservation(request(), customer);
+        var month = YearMonth.from(date);
+
+        assertThat(service.getAvailability(store.getId(), date)).singleElement().satisfies(slot -> {
+            assertThat(slot.isAvailable()).isFalse();
+            assertThat(slot.getRemainingCapacity()).isZero();
+        });
+        assertThat(service.getMonthCalendar(store.getId(), month)).filteredOn(day -> day.getDate().equals(date.toString()))
+                .singleElement().satisfies(day -> assertThat(day.getStatus()).isEqualTo("FULL"));
+        assertThat(editQueries.getEditAvailability(booking.getId(), store.getId(), date, customer))
+                .singleElement().satisfies(slot -> {
+                    assertThat(slot.isAvailable()).isTrue();
+                    assertThat(slot.getRemainingCapacity()).isEqualTo(1);
+                });
+        assertThat(editQueries.getEditCalendar(booking.getId(), store.getId(), month, customer))
+                .filteredOn(day -> day.getDate().equals(date.toString()))
+                .singleElement().satisfies(day -> assertThat(day.getStatus()).isEqualTo("OPEN"));
+        assertThatThrownBy(() -> editQueries.getEditAvailability(booking.getId(), store.getId(), date, customers.get(1)))
+                .isInstanceOf(ReservationException.class).hasMessageContaining("권한");
+
+        var invalid = new ReservationUpdateRequest(null, null, 0, null, null);
+        assertThatThrownBy(() -> service.updateReservation(booking.getId(), invalid, customer))
+                .isInstanceOf(ReservationException.class).hasMessageContaining("최소 1명");
+        assertThat(reservations.findById(booking.getId()).orElseThrow().getGuestCount()).isEqualTo(1);
+    }
+
     @Test void undoCannotTakeTheSeatBookedAfterCompletion() {
         var a = service.createReservation(request(), customers.getFirst());
         new TransactionTemplate(transactions).executeWithoutResult(tx -> {

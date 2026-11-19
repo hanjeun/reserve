@@ -10,6 +10,12 @@ it('같은 탭·계정의 폼 종류만 한 번 복원해요', () => {
     expect(takeSecurityReturn(7)).toBeNull();
 });
 
+it('이메일 로그인 해제 목적을 설정 목적과 구분해서 한 번 복원해요', () => {
+    saveSecurityReturn(7, 'remove-password');
+    expect(takeSecurityReturn(7)).toEqual({ memberId: '7', target: 'remove-password', createdAt: 1000 });
+    expect(takeSecurityReturn(7)).toBeNull();
+});
+
 it('다른 계정·만료·미래 시각의 요청과 임의 경로는 복원하지 않아요', () => {
     saveSecurityReturn(7, 'mfa'); expect(takeSecurityReturn(8)).toBeNull();
     saveSecurityReturn(7, 'mfa'); vi.setSystemTime(301001); expect(takeSecurityReturn(7)).toBeNull();

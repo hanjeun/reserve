@@ -35,4 +35,15 @@ describe('business statistics toolbar source contract', () => {
         expect(styleAtWidth('.reserve-statistics-tab .reserve-filter-toolbar-controls', 768).gap).toBeUndefined();
         expect(styleAtWidth('.reserve-statistics-tab .reserve-filter-toolbar-extra', 768)['margin-left']).toBeUndefined();
     });
+
+    it('gives the store menu a separate row on narrow screens', () => {
+        const toolbar = '.reserve-filter-toolbar-primary:has(.reserve-filter-toolbar-extra)';
+        const controls = '.reserve-filter-toolbar-controls:has(> .reserve-filter-toolbar-extra)';
+
+        expect(styleAtWidth(toolbar, 390)['grid-template-columns']).toBe('minmax(0, 1fr) auto');
+        expect(styleAtWidth(controls, 390).display).toBe('contents');
+        expect(styleAtWidth(controls + ' > .reserve-filter-menu', 390)['grid-column']).toBe('1 / -1');
+        expect(styleAtWidth(toolbar + ' .reserve-filter-toolbar-refresh', 390)['padding-left']).toBe('0');
+        expect(styleAtWidth(toolbar, 768).display).toBeUndefined();
+    });
 });

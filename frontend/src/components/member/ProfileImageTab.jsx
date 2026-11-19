@@ -103,8 +103,7 @@ const ProfileImageTab = ({ user }) => {
     };
 
     const previewSrc = pending?.previewUrl ?? (user?.profileImageUrl || user?.profileImage);
-    // 취소/저장 버튼 행 — 새 이미지를 고르면 슬라이드 인으로 나타나는데, 취소를 누르면(pending이 null이
-    // 되는 순간) 그 자리에서 바로 사라져서 "열릴 땐 애니메이션, 닫힐 땐 즉시"였던 것을 수정
+    // 취소·저장 버튼은 퇴장 모션이 끝날 때까지 유지한다.
     const showButtons = !!pending?.file;
     const reducedMotion = useReducedMotion();
     const { shouldRender: buttonsShouldRender, isClosing: buttonsClosing } = useExitAnimation(showButtons, reducedMotion ? 0 : 200);
@@ -112,7 +111,8 @@ const ProfileImageTab = ({ user }) => {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
 
-            <ProfilePhotoPicker src={previewSrc} disabled={loading} onSelect={handleFileChange} animate={Boolean(pending?.previewUrl)} />
+            <ProfilePhotoPicker src={previewSrc} disabled={loading} onSelect={handleFileChange}
+                animate={!reducedMotion && (Boolean(pending?.previewUrl) || buttonsShouldRender)} />
 
             <div style={{ display: 'grid', alignItems: 'start', width: '100%', marginTop: 4 }}>
                 <div aria-hidden={buttonsShouldRender || undefined} inert={buttonsShouldRender ? true : undefined}

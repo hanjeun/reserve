@@ -25,7 +25,7 @@ class JpaWaitingSearchReader implements WaitingSearchReader {
                 SELECT w.id, COALESCE(s.name, '가게'), w.entryNumber, w.businessDate
                   FROM WaitingEntry w LEFT JOIN Store s ON s.id = w.storeId
                  WHERE w.memberId = :memberId AND
-                """ + WaitingEntryRepository.PERSONAL_VISIBLE_WINDOW + """
+                """ + WaitingEntryRepository.PERSONAL_VISIBLE_ENTRY + """
                    AND
                 """ + MemberSearchAccess.EXISTS + """
 

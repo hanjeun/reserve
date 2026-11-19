@@ -51,6 +51,17 @@ it('reports reuse only for an existing matching request and preserves the string
     expect((await reservationRequestAttempt('attempt-reuse', payload)).reused).toBe(false);
 });
 
+it('checks for an existing attempt without writing a new one', async () => {
+    const scope = 'reuse-only';
+    const options = { reuseOnly: true };
+    expect(await reservationRequestAttempt(scope, payload, null, options)).toBeNull();
+    expect(sessionStorage.length).toBe(0);
+    const original = await reservationRequestAttempt(scope, payload);
+
+    expect(await reservationRequestAttempt(scope, { ...payload, guestCount: 2 }, null, options)).toBeNull();
+    expect(await reservationRequestAttempt(scope, payload, null, options)).toEqual({ ...original, reused: true });
+});
+
 it('recognizes persisted recovery metadata after F5 while discarding an invalid request UUID', async () => {
     const first = await reservationRequestAttempt('attempt-f5', payload);
     vi.resetModules();

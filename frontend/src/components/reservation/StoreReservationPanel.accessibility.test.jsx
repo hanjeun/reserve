@@ -1,13 +1,17 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { Form } from 'antd';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReservationPanel } from './StoreReservationPanel';
 vi.mock('../store', async () => ({ BookingCalendar: (await import('../store/BookingCalendar')).default }));
 vi.mock('../../hooks', () => ({ useBookingCalendar: () => ({ byDate: {}, loading: false, fetching: false, error: null }) }));
 afterEach(cleanup);
 function Panel({ isPC = false }) {
     const [form] = Form.useForm();
-    return <ReservationPanel form={form} store={{ id: 12, name: '합성 가게', bookingType: 'SLOT' }} isPC={isPC} preview />;
+    const client = new QueryClient();
+    return <QueryClientProvider client={client}>
+        <ReservationPanel form={form} store={{ id: 12, name: '합성 가게', bookingType: 'SLOT' }} isPC={isPC} preview />
+    </QueryClientProvider>;
 }
 it.each([false, true])('PC만 입력 영역과 제출 영역을 분리하고 모바일 DOM은 유지해요 (%s)', isPC => {
     const { container } = render(<Panel isPC={isPC} />);

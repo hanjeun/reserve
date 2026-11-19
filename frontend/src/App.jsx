@@ -4,13 +4,15 @@ import SessionQueryProvider from './components/common/SessionQueryProvider';
 import ServiceAdmissionProvider from './components/common/ServiceAdmissionProvider';
 import WorkspaceNavigationProvider from './components/layout/WorkspaceNavigationProvider';
 import WorkspaceMenuProvider from './components/layout/WorkspaceMenuProvider';
-import LegacyDomainNotice from './components/layout/LegacyDomainNotice';
+import { isWorkspacePath } from './components/layout/workspaceMenu';
 import LoginFeedback from './components/layout/LoginFeedback';
+import { isLegacyAppOrigin } from './config/siteUrls';
 import { uiIconConfig } from './components/common/uiIconConfig';
-import { Layout, ConfigProvider, App as AntApp, theme as antdTheme } from 'antd';
+import { Layout, ConfigProvider, App as AntApp } from 'antd';
 import koKR from 'antd/locale/ko_KR';
 import useAuthStore from './store/useAuthStore';
-import { colors, rawColors, semanticActionPalettes, field, fieldPx, zIndex, fontWeight, fontSize } from './styles/tokens';
+import { colors } from './styles/tokens';
+import { appMessageConfig, buildThemeConfig, validateMessages } from './components/common/appProviderConfig';
 import useTheme from './hooks/useTheme';
 import useImagePreviewSwipe from './hooks/useImagePreviewSwipe';
 import useModalScrollLock from './hooks/useModalScrollLock';
@@ -36,14 +38,15 @@ const Benefits = lazyPublicPage('/benefits', () => import('./pages/discovery/Ben
 const BenefitDetail = lazyPublicPage('/benefits/:id', () => import('./pages/discovery/BenefitDetail'));
 const Login = lazyPublicPage('/login', () => import('./pages/auth/Login'));
 const Signup = lazyPublicPage('/signup', () => import('./pages/auth/Signup'));
-const ForgotPassword = lazyPublicPage('/forgot-password', () => import('./pages/auth/ForgotPassword'));
+const SignupLegalLayout = lazy(() => import('./components/layout/SignupLegalLayout'));
+const RecoveryPage = lazyPublicPage('/forgot-password', () => import('./pages/auth/RecoveryPage'));
 const OAuthCallback = lazy(() => import('./pages/auth/OAuthCallback'));
 const StoreList = lazyPublicPage('/stores', () => import('./pages/store/StoreList'));
 const StoreDetail = lazyPublicPage('/store/:id', () => import('./pages/store/StoreDetail'));
 const StoreRegister = lazy(() => import('./pages/store/StoreRegister'));
 const StoreEdit = lazy(() => import('./pages/store/StoreEdit'));
-const DraftTransfer = lazy(() => import('./pages/store/DraftTransfer'));
 const MyStores = lazy(() => import('./pages/store/MyStores'));
+const Drafts = lazy(() => import('./pages/drafts/Drafts'));
 const MyReservations = lazy(() => import('./pages/reservation/MyReservations'));
 const Waiting = lazyPublicPage('/waiting', () => import('./pages/discovery/Waiting'));
 const BusinessPanel = lazy(() => import('./pages/business/BusinessPanel'));
@@ -63,6 +66,7 @@ const CommonGuide = lazyPublicPage('/guide/common', () => import('./pages/legal/
 const MessagesPage = lazy(() => import('./pages/member/MessagesPage'));
 
 const NotFound = lazy(() => import('./pages/NotFound'));
+const LegacyDomainNotice = lazy(() => import('./components/layout/LegacyDomainNotice'));
 // 로그인한 사용자만 쓰는 통합 메신저는 익명 랜딩의 초기 번들에서 제외한다.
 const MessengerShell = lazy(() => import('./components/chat/MessengerShell'));
 const DiscoverySwipe = lazy(() => import('./components/layout/DiscoverySwipe'));
@@ -86,7 +90,6 @@ import { TooltipScopeContext } from './components/common/tooltipScope';
 import { LoadingPresentationContext, useRouteLoadingPresentation, useDocumentEntry, useSkeletonShown } from './components/layout/loadingPresentation';
 import { DISCOVERY_NAV_ITEMS, isDiscoveryRootPath } from './constants/discovery';
 import AppFooter from './components/layout/Footer';
-import SignupLegalLayout from './components/layout/SignupLegalLayout';
 import OfflineBanner from './components/layout/OfflineBanner';
 import { loadingConfig } from './components/common/loadingConfig';
 import PrivateRoute from './components/PrivateRoute';
@@ -94,113 +97,6 @@ import ScrollToTop from './components/ScrollToTop';
 import { AppErrorBoundary, RouteErrorBoundary } from './components/layout/AppErrorBoundary';
 
 const { Content } = Layout;
-
-const validateMessages = {
-    required: '${label}을(를) 입력해주세요.',
-    types: {
-        email: '올바른 이메일 형식이 아니에요.',
-        number: '숫자를 입력해주세요.',
-    },
-    string: {
-        min: '최소 ${min}자 이상 입력해주세요.',
-        max: '최대 ${max}자까지 입력할 수 있어요.',
-    },
-};
-
-const buildNeutralFocus = isDark => ({
-    activeBorderColor: isDark ? '#8b939e' : rawColors.gray[500],
-    hoverBorderColor: isDark ? '#5c636d' : rawColors.gray[400],
-    activeShadow: 'none',
-});
-
-/*
- * AntD는 JS에서 파생색·글꼴을 계산하므로 CSS 변수 대신 색 리터럴과 글꼴 상속을 사용한다. 테마 변경은 AntD 알고리즘에도 별도로 반영한다.
- */
-/**
- * @param isDark   다크 모드인지
- * @param accent   사용자가 고른 포인트 색의 **리터럴 hex** (useTheme 의 accentColors).
- *                 AntD 토큰은 CSS 변수를 못 받는다 — AntD 가 JS 로 파생색을 계산하기 때문이다.
- *                 그래서 CSS 쪽(--c-primary)과 여기(colorPrimary)를 각각 넣어야 하고,
- *                 둘 다 같은 출처(ACCENT_OPTIONS)에서 나오므로 어긋나지 않는다.
- */
-const buildThemeConfig = (isDark, accent) => {
-    const neutralFocus = buildNeutralFocus(isDark);
-    const semantic = semanticActionPalettes[isDark ? 'dark' : 'light'];
-    return {
-        algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
-        token: {
-            colorPrimary: accent.main,
-            colorBgContainer: isDark ? '#1e2126' : '#ffffff',
-            colorBorder: isDark ? '#2d3138' : rawColors.gray[100],
-            borderRadius: fieldPx(field.radius),
-            // 고정 헤더·메신저보다 위에 모달을 두어 입력·결제 도구를 가리지 않는다.
-
-            zIndexPopupBase: zIndex.modal,
-            // 검증 메시지·테두리·아이콘은 같은 의미별 색 리터럴을 사용한다.
-
-            colorError: semantic.error.main,
-            colorWarning: isDark ? '#ffc633' : '#ffb800',
-            // 다크 배경의 자리표시자·비활성 문구 대비를 보정하고 라이트 기본값은 유지한다.
-
-            colorTextPlaceholder: isDark ? 'rgba(255, 255, 255, 0.45)' : 'rgba(0, 0, 0, 0.25)',
-            colorTextDisabled:    isDark ? 'rgba(255, 255, 255, 0.38)' : 'rgba(0, 0, 0, 0.25)',
-            // 사용자가 선택한 글꼴을 body에서 상속한다.
-
-            fontFamily: 'inherit',
-        },
-        components: {
-            Tooltip: {
-                colorBgSpotlight: isDark ? '#ffffff' : '#1a1f27',
-                colorTextLightSolid: isDark ? '#1a1f27' : '#ffffff',
-                borderRadius: 10,
-            },
-            Button: {
-                primaryColor: accent.foreground,
-                colorPrimaryHover: accent.solidHover,
-                colorPrimaryActive: accent.solidHover,
-                dangerColor: semantic.error.foreground,
-                colorError: semantic.error.solid,
-                colorErrorHover: semantic.error.solidHover,
-                colorErrorActive: semantic.error.solidHover,
-                colorPrimary: accent.solid,
-                borderRadius: 16,
-                borderRadiusSM: 10,
-                borderRadiusLG: 16,
-            },
-            // 입력 포커스는 같은 중립 테두리를 사용한다.
-
-            Input: {
-                colorBgContainer: isDark ? '#23262b' : rawColors.gray[50],
-                ...neutralFocus,
-            },
-            InputNumber: { ...neutralFocus },
-            DatePicker: { ...neutralFocus },
-            // 채움형 입력은 gray[50], 비활성 입력은 gray[100]을 사용한다.
-
-            Select: {
-                colorBgContainer: isDark ? '#23262b' : rawColors.gray[50],
-                colorBgElevated: isDark ? '#1e2126' : '#ffffff',
-                optionSelectedBg: isDark ? '#2d3138' : rawColors.gray[200],
-                activeBorderColor: neutralFocus.activeBorderColor,
-                hoverBorderColor: neutralFocus.hoverBorderColor,
-                activeOutlineColor: 'transparent',
-            },
-            // 카드 하단 도구는 전용 actionsBg 토큰을 사용한다.
-
-            Card: {
-                actionsBg: isDark ? '#1e2126' : '#ffffff',
-            },
-            Tabs: {
-                inkBarColor: accent.main,
-                horizontalItemGutter: 24,
-                itemColor: isDark ? '#8b939e' : rawColors.gray[500],
-                itemHoverColor: isDark ? '#e8eaed' : rawColors.gray[900],
-                itemSelectedColor: accent.main,
-                colorBorderSecondary: isDark ? '#23262b' : rawColors.gray[100],
-            },
-        },
-    };
-};
 
 const isSearchPath = pathname => /^\/search\/?$/.test(pathname);
 const isMessagesPath = pathname => /^\/messages\/?$/.test(pathname);
@@ -218,12 +114,18 @@ function appLayoutClassName(pathname) {
 function AppContent() {
     const location = useLocation();
     const { pathname, search } = location;
+    const loginCompleting = Boolean(matchPath('/oauth2/callback', pathname));
     const initialPathnameRef = useRef(pathname);
     const presentation = useRouteLoadingPresentation(location, useNavigationType());
-    const { initializeAuth, sessionRevision } = useAuthStore();
+    const initializeAuth = useAuthStore(state => state.initializeAuth);
+    const sessionRevision = useAuthStore(state => state.sessionRevision);
+    const browserRegistrationReference = useAuthStore(state => state.browserRegistrationReference);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => installRecentSearchPrivacyBoundary(useAuthStore), []);
+    useEffect(() => {
+        if (browserRegistrationReference && !matchPath('/login', pathname)) useAuthStore.getState().clearBrowserRegistration();
+    }, [browserRegistrationReference, pathname]);
 
     useEffect(() => {
         // 현재 공개 페이지의 코드만 인증 복구와 병렬로 받는다. 마운트와 API 조회는 인증 뒤에 유지한다.
@@ -248,7 +150,7 @@ function AppContent() {
         return (
             <LoadingPresentationContext.Provider value={presentation}>
             <Layout className={appLayoutClassName(pending.pathname) + ' reserve-boot-shell'} style={appLayoutStyle}>
-                {!isSearchPath(pending.pathname) && !isMessagesPath(pending.pathname) && <HeaderPlaceholder discoveryRoot={discoveryRoot} workspace={/^\/(admin|business)\/?$/.test(pending.pathname)} />}
+                {!isSearchPath(pending.pathname) && !isMessagesPath(pending.pathname) && <HeaderPlaceholder discoveryRoot={discoveryRoot} workspace={isWorkspacePath(pending.pathname)} />}
                 {discoveryRoot && <DiscoveryNav pendingPathname={pending.pathname} />}
                 <Content>
                     <RouteLoadingSkeleton />
@@ -260,14 +162,10 @@ function AppContent() {
 
     return (
         <LoadingPresentationContext.Provider value={presentation}>
-        <AntApp message={{ maxCount: 3, styles: {
-            list: { willChange: 'auto' }, listContent: { willChange: 'auto', pointerEvents: 'none' },
-            root: { willChange: 'auto', backfaceVisibility: 'visible' },
-            title: { color: colors.text.primary, fontWeight: fontWeight.medium, fontSize: fontSize.base, lineHeight: '24px' },
-        } }}>
+        <AntApp message={appMessageConfig}>
             <LoginFeedback />
-            <SessionQueryProvider key={sessionRevision}>
-                <ServiceAdmissionProvider>
+            <SessionQueryProvider key={sessionRevision} liveUpdatesEnabled={!loginCompleting}>
+                <ServiceAdmissionProvider enabled={!loginCompleting}>
                     <WorkspaceNavigationProvider><WorkspaceMenuProvider><AppRoutes /></WorkspaceMenuProvider></WorkspaceNavigationProvider>
                 </ServiceAdmissionProvider>
             </SessionQueryProvider>
@@ -279,7 +177,7 @@ function AppContent() {
 function AppRoutes() {
     const isLoggedIn = useAuthStore((state) => !!state.user);
     const { pathname, search, key: locationKey, state: locationState } = useLocation();
-    const isOAuthCallback = /^\/oauth2\/callback\/?$/.test(pathname);
+    const isOAuthCallback = Boolean(matchPath('/oauth2/callback', pathname));
     const displayLocation = resolveRouteSkeletonLocation(pathname, search);
     const discoveryRoot = isDiscoveryRootPath(displayLocation.pathname, displayLocation.search);
     const isSearchLayout = isSearchPath(displayLocation.pathname);
@@ -341,7 +239,8 @@ function AppRoutes() {
             <ScrollToTop />
             {mobileDiscovery && <Suspense fallback={null}><DiscoverySwipe contentRef={routeContentRef} /></Suspense>}
             <OfflineBanner />
-            {!isSearchLayout && !isMessagesLayout && (isOAuthCallback ? <HeaderPlaceholder discoveryRoot={discoveryRoot} /> : <Header />)}
+            {!isSearchLayout && !isMessagesLayout && (isOAuthCallback ? <HeaderPlaceholder discoveryRoot={discoveryRoot} />
+                : <Header restoreControls={isMessagesPath(presentation?.previousPathname) || isSearchPath(presentation?.previousPathname)} />)}
             {discoveryRoot && <DiscoveryNav pendingPathname={isOAuthCallback ? displayLocation.pathname : undefined} />}
             <Content ref={routeContentRef} data-skeleton-shown={skeletonShown ? 'true' : undefined}
                 data-document-entry={documentEntry ? 'true' : undefined}
@@ -353,7 +252,7 @@ function AppRoutes() {
                 }}>
                 {/* 라우트 콘텐츠의 렌더 오류는 여기서 멈춘다 — 헤더·푸터는 남아 다른 화면으로 갈 수 있다. */}
                 <RouteErrorBoundary>
-                <LegacyDomainNotice />
+                {isLegacyAppOrigin() && <Suspense fallback={null}><LegacyDomainNotice /></Suspense>}
                 <Suspense fallback={<RouteLoadingSkeleton />}>
                 <Routes>
                     {/* 공용 페이지 */}
@@ -366,7 +265,8 @@ function AppRoutes() {
                     <Route path="/feed/posts/:id" element={<FeedDetail />} />
                     <Route path="/feed/u/:publicId" element={<FeedAuthor />} />
                     <Route path="/login" element={<Login />} />
-                    <Route path="/forgot-password" element={<ForgotPassword />} />
+                    <Route path="/forgot-password" element={<RecoveryPage />} />
+                    <Route path="/account-recovery" element={<RecoveryPage accountProtection />} />
                     <Route path="/oauth2/callback" element={<OAuthCallback />} />
                     <Route path="/stores" element={<StoreList />} />
                     <Route path="/store/:id" element={<StoreDetail />} />
@@ -387,7 +287,6 @@ function AppRoutes() {
                         <Route path="/my-stores" element={<MyStores />} />
                         <Route path="/store/register" element={<StoreRegister />} />
                         <Route path="/store/:id/edit" element={<StoreEdit />} />
-                        <Route path="/drafts/transfer" element={<DraftTransfer />} />
                         <Route path="/business" element={<BusinessPanel />} />
                     </Route>
 
@@ -402,6 +301,7 @@ function AppRoutes() {
                         <Route path="/feed/notifications" element={<FeedNotifications />} />
                         <Route path="/my-reservations" element={<MyReservations />} />
                         <Route path="/my-favorites" element={<MyFavorites />} />
+                        <Route path="/drafts" element={<Drafts />} />
                         <Route path="/payment/result" element={<PaymentResult />} />
                         <Route path="/my-page" element={<MyPage />} />
                         <Route path="/messages" element={<MessagesPage />} />
@@ -419,7 +319,7 @@ function AppRoutes() {
             {isLoggedIn && !isOAuthCallback && (
                 <LoadingPresentationContext.Provider value={null}>
                 <Suspense fallback={null}>
-                    <MessengerShell launcherImageSrc="/icons/R_logo.png" />
+                    <MessengerShell />
                 </Suspense>
                 </LoadingPresentationContext.Provider>
             )}

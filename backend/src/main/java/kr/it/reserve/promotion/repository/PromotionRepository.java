@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 
 @Repository
 public interface PromotionRepository extends JpaRepository<Promotion, Long>, JpaSpecificationExecutor<Promotion> {
+    Optional<Promotion> findByPublicId(String publicId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Promotion p WHERE p.id = :id")

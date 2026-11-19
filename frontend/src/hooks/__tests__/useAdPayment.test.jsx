@@ -55,10 +55,11 @@ describe('광고 결제 수단 인계', () => {
     beforeEach(() => {
         vi.clearAllMocks(); useAuthStore.setState({ sessionRevision: 1 });
         vi.stubEnv('VITE_PORTONE_NAVERPAY_CHANNEL_KEY', '');
+        vi.stubEnv('VITE_PORTONE_NAVERPAY_TEST_CHANNEL_KEY', '');
         vi.stubEnv('VITE_PORTONE_KCP_TEST_CHANNEL_KEY', '');
         vi.stubEnv('VITE_PORTONE_TOSS_CHANNEL_KEY', 'channel-key-11111111-1111-4111-8111-111111111111');
         vi.stubEnv('VITE_PORTONE_TOSS_EASY_PAY_PROVIDERS', '');
-        fixture.create.mockResolvedValue(prepared); fixture.prepare.mockResolvedValue(prepared);
+        fixture.create.mockReset().mockResolvedValue(prepared); fixture.prepare.mockReset().mockResolvedValue(prepared);
         fixture.choose.mockResolvedValue({ ...configuredPaymentMethods()[0], cardCompany: 'SHINHAN_CARD' });
         fixture.sdk.mockResolvedValue({ paymentId: prepared.merchantUid }); fixture.verify.mockResolvedValue({ id: 8 });
     });
@@ -66,7 +67,7 @@ describe('광고 결제 수단 인계', () => {
     it.each(['create', 'existing'])('네이버 단독 채널도 같은 광고 원장·검증과 복귀 주소를 사용해요 (%s)', async origin => {
         vi.stubEnv('VITE_PORTONE_NAVERPAY_CHANNEL_KEY', 'channel-key-55555555-5555-4555-8555-555555555555');
         const order = { ...prepared, adId: 8 };
-        fixture.create.mockResolvedValueOnce(order); fixture.prepare.mockResolvedValueOnce(order);
+        (origin === 'create' ? fixture.create : fixture.prepare).mockResolvedValueOnce(order);
         fixture.choose.mockResolvedValueOnce(configuredPaymentMethods(import.meta.env, order).find(method => method.brand === 'NAVERPAY'));
         const { result } = show();
         await act(async () => { await (origin === 'create' ? result.current.pay({}) : result.current.payExisting(8)); });
@@ -85,7 +86,9 @@ describe('광고 결제 수단 인계', () => {
     });
     it('결제 선택을 취소하면 광고를 결제 성공으로 안내하지 않아요', async () => {
         fixture.choose.mockResolvedValue(null);
-        const { result } = show(); await act(async () => { await result.current.pay({}); });
+        const summary = { storeName: '합성 가게', adType: 'BANNER', startDate: '2026-11-17', endDate: '2026-11-19' };
+        const { result } = show(); await act(async () => { await result.current.pay({}, summary); });
+        expect(fixture.choose).toHaveBeenCalledExactlyOnceWith(prepared, { ...summary, kind: 'ADVERTISEMENT' });
         expect(fixture.sdk).not.toHaveBeenCalled(); expect(fixture.verify).not.toHaveBeenCalled();
         expect(fixture.success).not.toHaveBeenCalled(); expect(fixture.invalidate).toHaveBeenCalled();
     });

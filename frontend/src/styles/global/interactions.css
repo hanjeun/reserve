@@ -85,9 +85,7 @@
         transform: none !important;
     }
 }
-/* 태블릿 구간에서는 텍스트·목업의 기준 폭과 간격을 함께 조정해 두 열의 줄바꿈을 방지한다.
-   목업의 수축을 막아 기기 프레임 비율을 유지하고, 공간이 부족하면 텍스트가 먼저 줄어들게 한다.
-   PC·모바일 규칙과 섞이지 않도록 미디어쿼리 범위를 유지한다. */
+/* 태블릿에서는 목업의 비율을 유지하고 텍스트가 먼저 줄어들게 한다. */
 @media (min-width: 769px) and (max-width: 1023px) {
     .rsv-feature-inner {
         gap: clamp(32px, 5vw, 80px) !important;
@@ -96,14 +94,11 @@
         flex: 0 1 clamp(300px, 40vw, 420px) !important;
     }
     .rsv-feature-ui {
-        /* shrink 0 — 좁아질 때 목업이 눌리면 기기 프레임이 찌그러진다. 글이 먼저 줄어야 한다. */
         flex: 0 0 clamp(280px, 34vw, 380px) !important;
     }
 }
 
-/* 카드 본문과 액션·추가 버튼의 hover 역할을 구분한다.
-   액션 영역과 추가 버튼에만 면 채움을 적용하며 기존 인라인 배경보다 우선하도록 important를 사용한다.
-   테마별 배경·아이콘 규칙은 아래에서 각각 지정한다. */
+/* 카드 본문과 독립된 액션 영역·추가 버튼에만 hover 면을 적용한다. */
 .reserve-card .ant-card-actions > li,
 .reserve-card-add {
     transition: background-color 0.15s ease;
@@ -133,9 +128,7 @@
     background-color: #333840 !important;
 }
 
-/* 복사 아이콘
-   한 줄 코드 안에서 아이콘 크기는 작게 두되, 가상 요소로 40px 클릭 면을 만든다.
-   표·상세·결제 결과가 모두 같은 CopyableText를 쓰므로 여기 한 곳에서 유지한다. */
+/* CopyableText의 글리프 크기는 유지하고 가상 요소로 클릭 영역을 넓힌다. */
 .reserve-copyable-text {
     display: inline-flex;
     align-items: center;
@@ -188,13 +181,11 @@
     border: 0;
 }
 
-/* 입력·Select의 지우기 버튼은 글리프 크기를 유지하면서 클릭 영역을 넓힌다.
-   늘어난 폭의 절반만큼 여백을 보정해 기존 아이콘 중심과 입력 정렬을 유지한다.
-   이 내부 지우기 아이콘의 규격을 다른 역할의 닫기·도구 버튼에 적용하지 않는다. */
+/* 입력 내부의 지우기 버튼은 글리프 위치를 유지하며 클릭 영역만 넓힌다. */
 .ant-input-clear-icon,
 .ant-select-clear {
     --clear-hit: 24px;        /* 히트 영역. WCAG 2.5.8 최소값 */
-    --clear-glyph: 14px;      /* X 글리프. 히트보다 작게 유지해야 버튼처럼 무거워지지 않는다 */
+    --clear-glyph: 14px;
     --clear-radius: 50%;
     width: var(--clear-hit) !important;
     height: var(--clear-hit) !important;
@@ -211,8 +202,7 @@
     transition: background-color 0.15s ease, color 0.15s ease !important;
 }
 
-/* Select 의 clear 는 absolute + top:50% 라 높이가 바뀌면 아래로 처진다.
-   절반만큼 올려 수직 중앙을 유지한다(Input 은 inline 이라 불필요). */
+/* 절대 배치된 Select 지우기 버튼의 중심을 늘어난 클릭 영역에 맞춘다. */
 .ant-select-clear {
     margin-top: calc(var(--clear-hit) / -2) !important;
 }
@@ -223,9 +213,7 @@
     background: var(--c-gray-100, rgba(0, 0, 0, 0.06)) !important;
 }
 
-/* 폼 입력의 회색 채움과 필터 도구의 흰 면·테두리를 구분한다.
-   AntD 6의 배경은 .ant-select 루트가 소유하므로 루트에 필터 클래스를 함께 지정한다.
-   토큰으로 주입되는 variant 규칙보다 우선하도록 선택자 특이도와 important를 유지한다. */
+/* AntD 6의 Select 루트에 필터 면을 적용해 폼 입력의 채움과 구분한다. */
 .ant-select.reserve-filter-select {
     background-color: #ffffff !important;
     border-color: #f2f4f6 !important;
@@ -298,30 +286,37 @@
     .reserve-filter-menu-chevron { transition: none; }
 }
 
-.reserve-chart-summary { display: flex; align-items: center; gap: 6px; list-style: none; }
-.reserve-chart-summary::-webkit-details-marker { display: none; }
+.reserve-chart-summary { display: flex; align-items: center; gap: 6px; border: 0; background: transparent; padding: 0; font: inherit; }
+.reserve-chart-summary:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 2px; }
 .reserve-chart-chevron { flex-shrink: 0; font-size: 10px; color: var(--c-text-tertiary, #8b95a1); transform: rotate(0deg); transition: transform 0.2s ease; }
-.reserve-chart-details[open] > .reserve-chart-summary .reserve-chart-chevron { transform: rotate(90deg); }
+.reserve-chart-summary[aria-expanded="true"] .reserve-chart-chevron { transform: rotate(90deg); }
+.reserve-data-table-motion { min-width: 0; }
+.reserve-collapse-motion:not([hidden]) { display: grid; grid-template-rows: 1fr; }
+.reserve-collapse-clip { min-height: 0; overflow: hidden; }
+.reserve-collapse-motion[data-closing] .reserve-collapse-clip > div { min-block-size: var(--reserve-collapse-height, 0px); }
+@media (prefers-reduced-motion: no-preference) {
+    .reserve-collapse-motion:not([hidden]) { animation: reserve-feed-replies-enter 200ms ease-out both; }
+    .reserve-collapse-motion[data-closing]:not([hidden]) { animation: reserve-feed-replies-exit 200ms ease-in both; }
+}
 @media (prefers-reduced-motion: reduce) {
     .reserve-chart-chevron { transition: none; }
 }
 
-/* 소셜 아이콘은 테마별 밝은 면과 브랜드 마크 색을 조합한다.
-   Velog의 currentColor는 바깥 마크를 칠하고 내부 글자는 배경이 비치는 형태다.
-   SocialBtn의 인라인 색·테두리를 hover에서 덮도록 important를 사용한다. */
+/* 브랜드 마크의 대비를 유지하고 SocialBtn의 인라인 색보다 hover 색을 우선한다. */
 .reserve-social:hover {
-    background-color: #f2f4f6 !important;   /* 연한 회색 원 (gray[100]) */
+    background-color: #f2f4f6 !important;
     border-color: #f2f4f6 !important;
-    color: #181717 !important;              /* 검은 고양이 */
+    color: #181717 !important;
 }
 [data-theme='dark'] .reserve-social:hover {
-    background-color: #ffffff !important;   /* 흰 원 */
+    background-color: #ffffff !important;
     border-color: #ffffff !important;
     color: #181717 !important;
 }
 .reserve-social--velog:hover,
 [data-theme='dark'] .reserve-social--velog:hover {
-    color: #20C997 !important;              /* 민트 박스 + (구멍으로 비치는) 흰 v */
+    /* Velog의 내부 글자는 배경이 비치므로 바깥 마크만 브랜드색으로 칠한다. */
+    color: #20C997 !important;
 }
 
 /* 카드 액션의 배경은 항목 전체에 적용하고 버튼은 눌림 반응만 담당한다. 파괴적 동작의 색상 구분은 유지한다. */
@@ -377,31 +372,25 @@
     }
 }
 
-/* 줄바꿈 선택기는 최소 터치 폭을 유지하되 마지막 항목이 남은 줄을 채우지 않게 한다. */
+/* 좁은 그리드에서는 라벨을 줄바꿈해 선택 칩이 겹치지 않게 한다. */
 .reserve-segmented-btn--wrap {
-    min-width: 78px;
-    padding: 14px 18px;
+    min-width: 0;
+    min-height: 44px;
+    padding: 13px 17px;
     font-size: 15px;
-}
-.reserve-segmented-btn:hover:not(:disabled):not(.reserve-segmented-btn--active) {
-    background-color: var(--c-gray-100, #f2f4f6);
-    color: var(--c-text-primary, #1a1f27);
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 .reserve-segmented-btn:active:not(:disabled) {
     transform: scale(0.97);
-}
-.reserve-segmented-btn--active {
-    background-color: var(--c-gray-200, #e5e8eb);
-    color: var(--c-text-primary, #1a1f27) !important;
-    font-weight: 600;
 }
 .reserve-segmented-btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
 }
 @media (max-width: 768px) {
-    .reserve-segmented-btn {
-        padding: 8px 10px;
+    .reserve-segmented-btn--wrap {
+        padding: 7px 9px;
         font-size: 12.5px;
     }
 }
@@ -459,8 +448,7 @@
 .ant-picker-status-error.ant-picker .ant-picker-suffix .anticon {
     color: var(--c-error, #f04452) !important;
 }
-/* 단, 비활성은 에러보다 우선한다 — 조작할 수 없는 칸을 빨갛게 칠하면
-   "지금 고치라"는 잘못된 지시가 된다(날짜를 먼저 골라야 열리는 시간 칸이 그 경우다). */
+/* 조작할 수 없는 입력은 오류색보다 비활성 표시를 우선한다. */
 .ant-picker-disabled .ant-picker-suffix .anticon {
     color: var(--c-gray-400, #b5b8bd) !important;
 }
@@ -503,7 +491,6 @@
 /* 사진은 확대 문구 없이 기존 덮개로 호버와 키보드 포커스를 표시한다. */
 .reserve-photo-preview-trigger .ant-image-cover { pointer-events: none; }
 /* 채팅 사진의 투명 영역에는 덮개 배경을 칠하지 않는다. */
-.reserve-chat-photo.reserve-photo-preview-trigger .ant-image-cover { background: transparent; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.28); }
 @media (hover: none), (pointer: coarse) {
     .reserve-photo-preview-trigger:not(:focus-visible) .ant-image-cover { opacity: 0; }
 }
@@ -516,11 +503,7 @@
     --preview-btn-hover: rgba(229, 232, 235, 0.28);
 }
 
-/* 첫 프리뷰 포털 생성 시 동적 스타일 주입을 기다리지 않도록 진입 모션의 기본 상태를 둔다.
-   AntD 이미지 프리뷰의 모션 클래스가 바뀌면 이 선택자와 시작·완료 상태를 함께 검토한다.
-   마스크와 사진 확대의 타이밍은 아래 규칙에서 구분한다. */
-/* 배경 마스크는 확대보다 먼저 안정돼야 사진만 먼저 튀어나온 듯 보이지 않는다.
-   시작 프레임은 같게 두고, 마스크를 포함한 루트 페이드만 더 짧게 끝낸다. */
+/* 첫 포털의 시작 프레임을 제공하고 배경 페이드를 사진 확대보다 먼저 마친다. */
 .ant-image-preview-fade { transition: opacity 0.18s ease-out; }
 .ant-image-preview-fade-appear,
 .ant-image-preview-fade-enter { opacity: 0; }
@@ -533,8 +516,7 @@
     transform: scale(1);
     transition: transform 0.3s;
 }
-/* 첫 프레임의 마스크와 사진 확대를 각자 시작시킨다. 루트 opacity 주입이 늦어져도
-   배경이 사진 뒤늦게 따라오지 않고, 마스크는 확대보다 짧은 시간 안에 안정된다. */
+/* 동적 스타일 주입과 무관하게 첫 프레임의 마스크와 사진 확대를 각각 시작한다. */
 @keyframes reserve-preview-first-mask {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -637,4 +619,43 @@
 .reserve-image-preview .ant-image-preview-close:focus-visible {
     outline: var(--reserve-focus-ring);
     outline-offset: -2px;
+}
+
+.ant-message .ant-message-notice.reserve-swipe-message {
+    touch-action: none;
+    cursor: grab;
+    translate: 0 var(--reserve-message-drag-y, 0px);
+    transition-property: transform, inset, clip-path, opacity, translate;
+}
+.ant-message .ant-message-notice.reserve-swipe-message[data-message-dragging] {
+    cursor: grabbing;
+    user-select: none;
+    transition-property: transform, inset, clip-path, opacity;
+}
+.ant-message .ant-message-notice.reserve-swipe-message.ant-message-fade-leave-active {
+    pointer-events: none;
+    translate: 0 calc(min(0px, var(--reserve-message-drag-y, 0px)) - 44px);
+}
+.reserve-swipe-message > .ant-message-notice-close {
+    position: absolute;
+    inset: 2px 2px auto auto;
+    inline-size: 28px;
+    block-size: 28px;
+    border: 0;
+    border-radius: 8px;
+    color: var(--c-text-primary);
+    background: var(--c-bg-paper);
+}
+.reserve-swipe-message > .ant-message-notice-close:not(:focus-visible) {
+    clip-path: inset(50%);
+}
+@media (prefers-reduced-motion: reduce) {
+    .ant-message .ant-message-notice.reserve-swipe-message {
+        transition: none;
+    }
+    .ant-message .ant-message-notice.reserve-swipe-message.ant-message-fade-leave-active {
+        translate: none;
+        /* 종료 이벤트로 알림과 포커스 가능한 버튼을 정리한다. */
+        transition: opacity 1ms linear;
+    }
 }

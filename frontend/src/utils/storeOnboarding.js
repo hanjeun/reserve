@@ -1,4 +1,5 @@
 import { VALIDATION_RULES } from './validation';
+import { bookingOpeningFromForm } from './bookingOpening';
 
 export const STORE_ONBOARDING_DEFAULTS = Object.freeze({
     reservationEnabled: true, bookingType: 'SLOT', reservationSlotMinutes: 30,
@@ -6,7 +7,7 @@ export const STORE_ONBOARDING_DEFAULTS = Object.freeze({
     allowLatePayment: false, allowDuplicateReservation: false, emailNotificationEnabled: true,
     imageAutoplayEnabled: true, nearbyRadiusKm: 3, fullRefundDays: 3,
     partialRefundDays: 1, partialRefundRate: 50, paymentTimeoutMinutes: 30,
-    closedDays: [], closedDates: [], bookingDeadlineHours: 0,
+    closedDays: [], closedDates: [], bookingDeadlineHours: 0, bookingOpeningMode: 'IMMEDIATE',
 });
 
 export const intakeService = values => values.reservationEnabled === false ? 'waiting'
@@ -23,6 +24,16 @@ export const paymentTimeoutApplies = values => depositApplies(values) && values.
 const refundWindowApplies = values => depositApplies(values) && Number(values.fullRefundDays) > 0;
 const partialRefundApplies = values => refundWindowApplies(values) && Number(values.partialRefundDays) > 0;
 const required = message => [{ required: true, message }];
+const scheduledOpening = values => reservationApplies(values) && values.bookingOpeningMode === 'SCHEDULED';
+const openingVisitDates = [({ getFieldValue }) => ({
+    validator: (_rule, dates) => {
+        if (!dates?.[0] || !dates?.[1]) return Promise.reject(new Error('첫 방문일과 마지막 방문일을 선택해주세요.'));
+        const starts = getFieldValue('bookingOpeningDate');
+        return dates[1].isBefore(dates[0], 'day') || starts?.isAfter(dates[0], 'day')
+            ? Promise.reject(new Error('방문일 범위는 오픈 날짜와 같거나 그 이후로 선택해주세요.'))
+            : Promise.resolve();
+    },
+})];
 const positiveDeposit = [...required('예약금을 입력해주세요.'),
     { type: 'number', min: 1, max: 100000, message: '1~100,000원 사이로 입력해주세요.' }];
 const partialRefundRules = [...required('부분 환불 기준을 선택해주세요.'), ({ getFieldValue }) => ({
@@ -57,7 +68,11 @@ export const STORE_ONBOARDING_DOMAINS = Object.freeze([
         description: '예약 인원·승인·중복·예약 가능 기간과 마감을 바꿔요.', applies: reservationApplies,
         fields: [field('maxCapacityPerSlot', VALIDATION_RULES.maxCapacityPerSlot, reservationApplies),
             field('maxAdvanceBookingDays', VALIDATION_RULES.maxAdvanceBookingDays, reservationApplies),
-            field('bookingDeadlineHours', [], reservationApplies), field('autoApprovalEnabled'), field('autoCompletionEnabled'), field('serviceDurationMinutes', [{ required: true, type: 'number', min: 1, max: 1440, message: '1~1,440분 사이로 입력해주세요.' }], values => reservationApplies(values) && values.bookingType !== 'DAY'),
+            field('bookingDeadlineHours', [], reservationApplies), field('bookingOpeningMode', [], reservationApplies),
+            field('bookingOpeningDate', required('오픈 날짜를 선택해주세요.'), scheduledOpening),
+            field('bookingOpeningTime', required('오픈 시각을 선택해주세요.'), scheduledOpening),
+            field('bookingOpeningPeriod', openingVisitDates, scheduledOpening),
+            field('autoApprovalEnabled'), field('autoCompletionEnabled'), field('serviceDurationMinutes', [{ required: true, type: 'number', min: 1, max: 1440, message: '1~1,440분 사이로 입력해주세요.' }], values => reservationApplies(values) && values.bookingType !== 'DAY'),
             field('allowDuplicateReservation'), field('emailNotificationEnabled')] },
     { key: 'deposit', label: '노쇼 예약금·결제', title: '노쇼 예약금을 설정하실 건가요?', asset: 'edit-deposit',
         description: '예약금 사용 여부·금액과 결제 시점을 바꿔요.', applies: reservationApplies,
@@ -97,6 +112,7 @@ const previewFields = {
     '최대 인원': 'maxCapacityPerSlot', '중복 예약': 'allowDuplicateReservation', '예약 알림 메일': 'emailNotificationEnabled',
     '노쇼 예약금': 'noShowDeposit', '환불 정책': 'fullRefundDays', '결제 마감': 'paymentTimeoutMinutes',
     '나중 결제': 'allowLatePayment', '예약 범위': 'maxAdvanceBookingDays', '예약 마감': 'bookingDeadlineHours', '예약 단위': 'bookingType',
+    '예약 오픈': 'bookingOpeningMode',
 };
 export const onboardingPreviewDestination = (label, values, mode) => onboardingEditDestination(previewFields[label], values, mode);
 
@@ -113,7 +129,7 @@ export const onboardingSteps = (values, mode = 'create') => [
 export const migrateOnboardingDraft = (values = {}, mode = 'create') => {
     const next = { ...values };
     if (next._onboardingVersion !== 2) {
-        // 이전 직렬화기는 누락된 날짜 필드도 undefined로 추가했다. 서버 기준값을 지우지 않는다.
+        // 저장된 초안의 undefined 필드로 서버 기준값을 지우지 않는다.
         for (const name of ['times', 'breakTimes', 'operatingPeriod', 'closedDays', 'closedDates', 'sessionTimes', 'maxCapacityPerSlot', 'maxAdvanceBookingDays']) {
             if (next[name] === undefined) delete next[name];
         }
@@ -147,6 +163,7 @@ export const onboardingPreviewStore = (values, imageUrls, originalStore = {}) =>
     openTime: clockTime(values.times?.[0]), closeTime: clockTime(values.times?.[1]),
     breakStartTime: clockTime(values.breakTimes?.[0]), breakEndTime: clockTime(values.breakTimes?.[1]),
     sessionTimes: (values.sessionTimes || []).map(clockTime),
+    bookingOpening: bookingOpeningFromForm(values),
     openDate: date(values.operatingPeriod?.[0]), closeDate: date(values.operatingPeriod?.[1]),
     closedDates: (values.closedDates || []).map(date),
     noShowDeposit: !depositApplies(values) ? 0 : values.noShowDeposit || 0,

@@ -1,7 +1,6 @@
-# Deployed to the server at ~/promtail-config.yml, which is what the compose
-# file mounts. Editing this file alone changes nothing on the server:
-# Apply the validated nginx-directory overlay and recreate only promtail.
-# Preserve the positions volume; see docs/technical/monitoring.md.
+# compose는 서버의 ~/promtail-config.yml을 사용하므로 저장소 수정만으로 운영에 반영되지 않는다.
+# 복구에 사용할 때 nginx 디렉터리 오버레이를 검증하고 Promtail만 재생성한다.
+# 읽기 위치 볼륨을 보존하며 복구 조건은 docs/technical/monitoring.md를 따른다.
 
 server:
   http_listen_port: 9080
@@ -13,21 +12,9 @@ clients:
   - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
-  # Spring Boot application log (logback).
-  #
-  # pipeline_stages is NOT optional here. Without it promtail stamps each line
-  # with the moment it was READ, not the moment it was WRITTEN. A promtail
-  # restart re-reads the whole file and dumps a day of logs into one second,
-  # which silently destroys every time-based panel and alert. That was the state
-  # of this stack until 2026-08-19 and nobody noticed, because the dashboards
-  # still rendered -- they were just showing a lie.
-  #
-  # The app container runs in UTC, so `location: UTC` must match logback's
-  # %d{yyyy-MM-dd HH:mm:ss}. Getting this wrong shifts everything by 9 hours.
-  #
-  # The `level` label is what the dashboards filter on. It is an index label, so
-  # {job="reserve", level="ERROR"} costs far less than scanning lines for "ERROR"
-  # -- and it cannot false-positive on a message that merely contains the word.
+  # 재수집해도 앱의 기록 시각을 유지하도록 pipeline_stages에서 시각을 파싱한다.
+  # location: UTC는 logback의 %d{yyyy-MM-dd HH:mm:ss}와 같은 시간대를 사용해야 한다.
+  # level 인덱스 라벨로 수준을 필터링해 본문 검색 비용과 단어 오탐을 피한다.
   - job_name: reserve
     static_configs:
       - targets:
@@ -45,7 +32,7 @@ scrape_configs:
           format: '2006-01-02 15:04:05'
           location: UTC
 
-  # Backup timestamps differ from the application parser. Preserve both deployed formats.
+  # 앱과 다른 백업 로그 형식을 사용하며 기존 두 형식을 모두 허용한다.
   - job_name: backup
     static_configs:
       - targets:
@@ -63,9 +50,9 @@ scrape_configs:
           format: '2006-01-02 15:04:05'
           location: UTC
 
-  # Only the nginx container's directory is mounted; no Docker socket or other logs.
-  # Drop every line that is not the complete privacy-safe reserve_timing schema.
-  # Docker's timestamp is retained, including on restart; stderr is never shipped.
+  # Docker 소켓이나 다른 로그 대신 nginx 컨테이너의 디렉터리만 연결한다.
+  # 개인정보를 제외한 reserve_timing 스키마와 정확히 일치하는 행만 수집한다.
+  # 재시작해도 Docker의 기록 시각을 유지하며 stderr는 전송하지 않는다.
   - job_name: nginx
     static_configs:
       - targets:
@@ -87,15 +74,10 @@ scrape_configs:
           action: drop
           drop_counter_reason: nginx_non_timing
 
-  # Host/container metrics from scripts/collect-metrics.sh (cron, every minute).
-  #
-  # No Prometheus + node_exporter: this is a 2GB box and blue/green deploys run
-  # two ~600MB app containers at once, which already pushes it into swap.
-  # Prometheus would add 170-320MB and could OOM a deploy. This path costs no
-  # resident memory at all. Trade-off: fixed 1-minute resolution.
-  #
-  # No timestamp stage on purpose -- these lines carry no time field, and the
-  # read time IS the sample time (within a second).
+  # scripts/collect-metrics.sh를 cron에서 매분 실행해 지표를 생성한다.
+  # 2GB 환경의 blue/green 두 앱(각 약 600MB)과 수집기의 메모리 경합을 피한다.
+  # Prometheus·node_exporter의 추가 170~320MB 대신 지표용 상주 프로세스 없이 1분 해상도를 사용한다.
+  # 지표 행에는 시각 필드가 없고 읽은 시각이 표본 시각이므로 timestamp 단계를 두지 않는다.
   - job_name: metrics
     static_configs:
       - targets:

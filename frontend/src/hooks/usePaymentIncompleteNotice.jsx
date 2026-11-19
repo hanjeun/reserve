@@ -24,10 +24,13 @@ export default function usePaymentIncompleteNotice() {
         navigate({ pathname: location.pathname, search: location.search, hash: location.hash }, { replace: true, state });
         if (!memberId || notice.memberId !== memberId) return;
         const session = currentSession().epoch;
+        const onReservations = location.pathname === '/my-reservations';
         let confirmed = false;
         modal.info({ title: '결제가 완료되지 않았어요',
-            content: '내 예약에 결제 대기 상태로 남아 있어요. 내 예약에서 결제를 이어갈 수 있어요. 기한이 지나면 자동 취소돼요.',
-            okText: '확인', centered: true, rootClassName: 'reserve-confirm-root',
+            content: onReservations
+                ? '이 예약은 결제 대기 중이에요. 기한 안에 이 목록에서 결제하기를 다시 선택할 수 있어요. 기한이 지나면 자동 취소돼요.'
+                : '내 예약에 결제 대기 상태로 남아 있어요. 기한 안에 내 예약에서 결제를 이어갈 수 있어요. 기한이 지나면 자동 취소돼요.',
+            okText: onReservations ? '확인' : '내 예약 보기', centered: true, rootClassName: 'reserve-confirm-root',
             onOk: () => { confirmed = true; },
             afterClose: () => {
                 if (!confirmed) return;
@@ -36,7 +39,7 @@ export default function usePaymentIncompleteNotice() {
                 // 닫힘 중 계정이나 화면이 바뀌면 이전 안내가 새 이동을 덮지 않아요.
                 if (!active || !isCurrentSession(session) || active.memberId !== memberId
                     || active.location.pathname !== location.pathname || active.location.search !== location.search
-                    || active.location.hash !== location.hash || location.pathname === '/my-reservations') return;
+                    || active.location.hash !== location.hash || onReservations) return;
                 navigate('/my-reservations', { state: { refetch: true, reserveRouteMotion: 'from-right' } });
             },
         });

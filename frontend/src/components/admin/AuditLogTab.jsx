@@ -1,7 +1,7 @@
 import React from 'react';
 import { Typography, Tag } from 'antd';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { FilterToolbar, AdminTableSkeleton, DataState, DataTable } from '../common';
+import { FilterToolbar, AdminTableSkeleton, DataState, PagedDataTable } from '../common';
 import { useQueryParamsState } from '../../hooks';
 import { adminKeys } from '../../hooks/queryKeys';
 import api from '../../api/axios';
@@ -20,16 +20,24 @@ const ACTION_CONFIG = {
     UNBAN:       { label: '정지 해제',    color: 'cyan'   },
     APPROVED:    { label: '인증 승인',    color: 'green'  },
     REJECTED:    { label: '인증 거절',    color: 'red'    },
+    ACCOUNT_PROTECTED: { label: '계정 보호', color: 'volcano' },
+    RECOVERY_MAIL_RETRY: { label: '복구 메일 재발송', color: 'blue' },
+    ACCOUNT_RECOVERED: { label: '계정 복구', color: 'green' },
+    NO_SHOW_CORRECTION: { label: '노쇼 제한 정정', color: 'blue' },
+    NO_SHOW_UNDONE: { label: '노쇼 복구', color: 'blue' },
+    BOOKING_RESTRICTED: { label: '가게 예약 제한', color: 'red' },
+    BOOKING_RELEASED: { label: '가게 예약 제한 해제', color: 'blue' },
+    RECEIPT_LOOKUP: { label: '영수증 조회', color: 'blue' },
 };
 
 // 로그 내용 한 줄 생성
 const makeLogMessage = (action, entityType, entityId, snapshot) => {
     const entity = ENTITY_LABELS[entityType]?.label || entityType;
-    let detail = '';
+    let fields = {};
     try {
-        const obj = JSON.parse(snapshot || '{}');
-        detail = obj['사유'] || obj['상호명'] || '';
+        fields = JSON.parse(snapshot || '{}') ?? {};
     } catch { /* 스냅샷을 읽지 못하면 공통 감사 문구만 표시한다. */ }
+    const detail = fields['사유'] || fields['상호명'] || '';
     switch (action) {
         case 'SOFT_DELETE': return `${entity} #${entityId} 소프트 삭제 처리됨`;
         case 'RESTORE':     return `${entity} #${entityId} 복구 완료`;
@@ -39,6 +47,15 @@ const makeLogMessage = (action, entityType, entityId, snapshot) => {
         case 'UNBAN':       return `회원 #${entityId} 정지 해제`;
         case 'APPROVED':    return `회원 #${entityId} 사업자 인증 승인${detail ? ' — ' + detail : ''}`;
         case 'REJECTED':    return `회원 #${entityId} 사업자 인증 거절${detail ? ' — ' + detail : ''}`;
+        case 'ACCOUNT_PROTECTED': return `회원 #${entityId} 계정 보호 시작${detail ? ' · ' + detail : ''}`;
+        case 'RECOVERY_MAIL_RETRY': return `회원 #${entityId} 복구 메일 재발송 요청`;
+        case 'ACCOUNT_RECOVERED': return `회원 #${entityId} 소유자 계정 복구 완료`;
+        case 'NO_SHOW_CORRECTION': return `예약 #${entityId} 노쇼 제한 기록 정정`;
+        case 'NO_SHOW_UNDONE': return `예약 #${entityId} 노쇼 처리 복구`;
+        case 'BOOKING_RESTRICTED': return `회원 #${entityId} 가게 예약 제한`;
+        case 'BOOKING_RELEASED': return `회원 #${entityId} 가게 예약 제한 해제`;
+        case 'RECEIPT_LOOKUP': return `${fields['결제 유형'] === 'ad' ? '광고 ' : '예약 '}결제 #${entityId} 영수증 조회`
+            + (fields['문의 번호'] ? ` · 문의 #${fields['문의 번호']}` : '');
         default:            return `${entity} #${entityId} ${action}`;
     }
 };
@@ -46,6 +63,8 @@ const makeLogMessage = (action, entityType, entityId, snapshot) => {
 // 처리자 표시 — 이메일이면 사용자/관리자, system이면 스케줄러명
 const formatActor = (actorEmail) => {
     if (!actorEmail || actorEmail === 'system') return 'TrashCleanupScheduler';
+    if (/^admin:\d+$/.test(actorEmail)) return '관리자 #' + actorEmail.split(':')[1];
+    if (/^member:\d+$/.test(actorEmail)) return '소유자 #' + actorEmail.split(':')[1];
     return actorEmail;
 };
 
@@ -90,7 +109,7 @@ const AuditLogTab = () => {
     const logs = data?.logs ?? [];
     const totalElements = data?.totalElements ?? 0;
 
-    // 하나의 setQuery 호출로 묶음(따로 호출하면 뒤 호출이 앞 변경을 덮어씀 — useQueryParamState.js 상단 주석 참고)
+    // 연속 갱신이 앞선 값을 덮지 않도록 필터와 페이지를 함께 바꾼다.
     const handleFilterChange = (v) => setQuery({ type: v, page: '0' });
 
     const columns = [
@@ -146,19 +165,12 @@ const AuditLogTab = () => {
             <DataState state="error" subject="시스템 로그" error={error}
                 onRetry={refetch} retrying={isFetching} />
         );
-    } else if (loading || isPlaceholderData) {
-        logsContent = (
-            <AdminTableSkeleton
-                rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
-                cols={SKELETON_COLS}
-                headers={SKELETON_HEADERS}
-                actionBtns={0}
-                pagination={totalElements ? { current: page + 1, pageSize: PAGE_SIZE, total: totalElements } : null}
-            />
-        );
     } else {
         logsContent = (
-            <DataTable
+            <PagedDataTable
+                placeholder={(loading || isPlaceholderData) && <AdminTableSkeleton
+                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
+                    cols={SKELETON_COLS} headers={SKELETON_HEADERS} actionBtns={0} />}
                 columns={columns}
                 dataSource={logs}
                 rowKey="id"

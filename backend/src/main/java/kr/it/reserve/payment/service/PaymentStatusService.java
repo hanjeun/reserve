@@ -4,6 +4,7 @@ import kr.it.reserve.advertisement.repository.AdvertisementRepository;
 import kr.it.reserve.advertisement.repository.AdPaymentAttemptRepository;
 import kr.it.reserve.global.error.PaymentException;
 import kr.it.reserve.payment.dto.PaymentStatusResponse;
+import kr.it.reserve.payment.entity.Payment;
 import kr.it.reserve.payment.repository.PaymentRepository;
 import kr.it.reserve.reservation.entity.Reservation;
 import java.util.Objects;
@@ -31,8 +32,7 @@ public class PaymentStatusService {
             var payment = paymentRepository.findByMerchantUid(merchantUid)
                     .filter(value -> value.getMember() != null && value.getMember().getId().equals(memberId))
                     .orElseThrow(PaymentException::notFound);
-            return new PaymentStatusResponse(type, payment.getMerchantUid(), payment.getStatus().name(),
-                    payment.getAmount(), payment.getPayMethod(), payment.getPgProvider(), payment.refundedSoFar(), reservationSummary(payment.getReservation(), memberId));
+            return reservationStatus(payment, memberId);
         }
         if ("ad".equals(type)) {
             var attempt = adPaymentAttempts.findByMerchantUid(merchantUid).orElse(null);
@@ -60,13 +60,29 @@ public class PaymentStatusService {
         throw new PaymentException("결제 유형을 확인해주세요.", HttpStatus.BAD_REQUEST);
     }
 
+    @Transactional(readOnly = true)
+    public PaymentStatusResponse getReservationStatus(Long reservationId, Long memberId) {
+        if (reservationId == null || reservationId <= 0) {
+            throw new PaymentException("예약을 확인해주세요.", HttpStatus.BAD_REQUEST);
+        }
+        var payment = paymentRepository.findFirstByReservation_IdAndMember_IdOrderByPaidAtDescIdDesc(reservationId, memberId)
+                .orElseThrow(PaymentException::notFound);
+        return reservationStatus(payment, memberId);
+    }
+
+    private PaymentStatusResponse reservationStatus(Payment payment, Long memberId) {
+        return new PaymentStatusResponse("reservation", payment.getMerchantUid(), payment.getStatus().name(),
+                payment.getAmount(), payment.getPayMethod(), payment.getPgProvider(), payment.refundedSoFar(),
+                reservationSummary(payment.getReservation(), memberId));
+    }
+
     private PaymentStatusResponse.ReservationSummary reservationSummary(Reservation reservation, Long memberId) {
         if (reservation == null) return null;
         if (reservation.getMember() == null || !Objects.equals(reservation.getMember().getId(), memberId)) {
             throw PaymentException.notFound();
         }
         return new PaymentStatusResponse.ReservationSummary(
-                reservation.getStore() == null ? null : reservation.getStore().getName(), reservation.getReservationCode(),
+                reservation.getId(), reservation.getStore() == null ? null : reservation.getStore().getName(), reservation.getReservationCode(),
                 reservation.getReservationDate(), reservation.getReservationTime(), reservation.getGuestCount(),
                 reservation.getMember().getName());
     }

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import Pagination from '../../components/common/Pagination';
 import { useSearchParams } from 'react-router-dom';
 import { DataState, FilterToolbar, PageContainer } from '../../components/common';
-import ListingContent from '../../components/common/ListingContent';
+import { AnimatedListingContent } from '../../components/common/AnimatedContent';
 import StoreCard from '../../components/store/StoreCard';
 import StoreListRow from '../../components/store/StoreListRow';
 import LoadingStatus from '../../components/common/LoadingStatus';
@@ -14,15 +14,16 @@ import { WaitingPageSkeleton, WaitingStoresContentSkeleton } from '../../compone
 import { WAITING_STORE_STATUSES, WAITING_STORE_SORTS } from '../../components/waiting/waitingDirectoryFilters';
 import useDiscoveryRegion from '../../hooks/useDiscoveryRegion';
 import useViewModeParam from '../../hooks/useViewModeParam';
-import useDebounce from '../../hooks/useDebounce';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { useWindowWidth } from '../../hooks/useWindowWidth';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import waitingService from '../../services/waitingService';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
+import useListSelectionMotion from '../../hooks/useListSelectionMotion';
+import { keepListForSort } from '../../hooks/listSortPlaceholder';
 import useLiveUpdatesStatus from '../../hooks/useLiveUpdatesStatus';
 import useWaitingEvents from '../../hooks/useWaitingEvents';
-import { isBlockingListReadError, isListQueryLoading } from '../../hooks/liveUpdateQueries';
+import { isBlockingListReadError, isListQueryLoading, isReadAccessDenied } from '../../hooks/liveUpdateQueries';
 import { writeQuerySelection } from '../../utils/querySelection';
 
 const PAGE_SIZE = 12;
@@ -39,18 +40,24 @@ export default function Waiting() {
     const [refreshing, setRefreshing] = useState(false);
     const listRef = useRef(null);
     const [view, setView] = useViewModeParam(params, 'cards');
-    const keyword = params.get('keyword') || '';
+    const keyword = (params.get('keyword') || '').trim();
     const status = WAITING_STORE_STATUSES.some(option => option.value === params.get('status')) ? params.get('status') : 'ALL';
     const sort = WAITING_STORE_SORTS.some(option => option.value === params.get('sort')) ? params.get('sort') : 'recommended';
-    const term = useDebounce(keyword, 300);
     const rawPage = Number(params.get('page') || 1);
     const page = Number.isSafeInteger(rawPage) && rawPage > 0 && rawPage <= 100_000 ? rawPage - 1 : 0;
     const result = useQuery({ queryKey: ['waiting-stores', keyword, region, status, sort, page],
-        enabled: keyword === term,
         queryFn: ({ signal }) => waitingService.getStores({ keyword, region, status, sort, page, size: PAGE_SIZE }, signal),
-        placeholderData: keepPreviousData, retry: false, staleTime: 30_000,
-        refetchInterval: live.connected && live.domains.includes('WAITING') ? false : 30_000,
-        refetchIntervalInBackground: false, refetchOnWindowFocus: live.present ? false : 'always' });
+        placeholderData: (previous, query) => {
+            if (isReadAccessDenied(query?.state.error)) return undefined;
+            const source = query?.queryKey;
+            if (source?.[1] === keyword && source[2] === region && source[3] === status) {
+                return keepListForSort(previous, source[4], sort, source[5]) ?? previous;
+            }
+            return previous;
+        },
+        retry: false, staleTime: 30_000,
+        refetchInterval: live.present ? false : 30_000,
+        refetchIntervalInBackground: false, refetchOnWindowFocus: live.present ? false : 'always', refetchOnReconnect: false });
     if (!settled && (result.isSuccess || result.isError)) setSettled(true);
     const change = (key, value) => {
         if (key === 'region' && !rememberRegion(value)) return;
@@ -68,7 +75,13 @@ export default function Waiting() {
     };
     const stores = result.data?.content || [];
     const blockingError = isBlockingListReadError(result.error, stores);
+    const previousOrder = result.isPlaceholderData ? result.data?.previousOrder : undefined;
+    const loading = !previousOrder && isListQueryLoading(result);
     useListRefreshAnchor(listRef, `${keyword}:${region}:${status}:${sort}:${page}:${view}`, result.isFetching, result.data);
+    useListSelectionMotion(listRef, {
+        selection: JSON.stringify([keyword, region, status, previousOrder?.sort ?? sort]), view,
+        ids: stores.map(store => store.id), ready: !loading && !blockingError,
+    });
     const total = result.data?.page?.totalElements ?? result.data?.totalElements ?? 0;
     useEffect(() => {
         const lastPage = Math.max(0, Math.ceil(total / PAGE_SIZE) - 1);
@@ -84,20 +97,21 @@ export default function Waiting() {
     return <PageContainer size="xl" paddingTop="16px" className="reserve-explore-page" aria-label="웨이팅 가게">
         <WaitingStoreToolbar view={view} onViewChange={setView} count={blockingError ? undefined : total} region={region} regionOpen={regionOpen}
             onRegionOpen={() => setRegionOpen(true)} status={status} onStatusChange={value => change('status', value)}
-            sort={sort} onSortChange={value => change('sort', value)} disabled={false} />
-        <FilterToolbar search={{ value: keyword, onChange: event => change('keyword', event.target.value),
+            sort={sort} onSortChange={value => change('sort', value)} disabled={false} sortLoading={Boolean(previousOrder)} />
+        <FilterToolbar search={{ value: keyword, onSubmit: value => change('keyword', value),
             placeholder: '웨이팅 가게 검색' }} onReload={reload} loading={refreshing} />
-        <ListingContent notice={result.error && result.data && !blockingError && <DataState compact state="error" subject="웨이팅 가게 갱신" error={result.error} onRetry={reload} retrying={result.isFetching} />}>
-        {isListQueryLoading(result) ? <LoadingStatus aria-label="웨이팅 가게를 불러오는 중" aria-busy="true">
+        <AnimatedListingContent motionKey={view} ready={!loading} keepResultsHeight={total > PAGE_SIZE}
+            notice={result.error && result.data && !blockingError && <DataState compact state="error" subject="웨이팅 가게 갱신" error={result.error} onRetry={reload} retrying={result.isFetching} />}>
+        {loading ? <LoadingStatus aria-label="웨이팅 가게를 불러오는 중" aria-busy="true">
             <WaitingStoresContentSkeleton view={view} />
         </LoadingStatus> : blockingError ? <DataState state="error" subject="웨이팅 가게" error={result.error} onRetry={reload} retrying={result.isFetching} />
                 : stores.length ? <div ref={listRef} className={view === 'cards' ? 'rsv-store-grid' : 'reserve-store-list-rows'} aria-busy={result.isFetching}>
                     {stores.map(store => <Item key={store.id} store={store} extraTools={<WaitingStoreSummary store={store} />} />)}
                 </div> : <DataState state="empty" kind="waiting" title={keyword ? '검색에 맞는 웨이팅 가게가 없어요.' : '접수 가능한 가게가 없어요.'}
                     description="가게가 웨이팅 접수를 켜면 여기에 표시돼요." />}
-        </ListingContent>
+        </AnimatedListingContent>
         {!blockingError && total > PAGE_SIZE && <nav className="reserve-listing-pagination" aria-label="웨이팅 가게 목록 페이지">
-            <Pagination current={page + 1} total={total} pageSize={PAGE_SIZE} onChange={next => {
+            <Pagination current={(previousOrder?.page ?? page) + 1} total={total} pageSize={PAGE_SIZE} disabled={loading || Boolean(previousOrder)} onChange={next => {
                 change('page', String(next));
                 window.scrollTo({ top: 0, left: 0, behavior: reducedMotion ? 'instant' : 'smooth' });
             }} showSizeChanger={false} showLessItems={isMobile} size={isMobile ? 'small' : 'default'} align="end" />

@@ -10,9 +10,15 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "mfa_challenge", indexes = {@Index(name = "idx_mfa_challenge_expiry", columnList = "expires_at"), @Index(name = "idx_mfa_challenge_member", columnList = "member_id")})
 public class MfaChallenge {
-    public enum Purpose { LOGIN, MANAGE, PASSKEY_LOGIN }
+    public enum Purpose {
+        LOGIN, MANAGE, PASSKEY_LOGIN, ADMIN_PROTECT, ADMIN_NOTIFY, ACCOUNT_RECOVERY;
+
+        public boolean adminProtection() { return this == ADMIN_PROTECT || this == ADMIN_NOTIFY; }
+    }
     @Id @Column(length = 64) private String id;
     @Column(name = "member_id") private Long memberId;
+    @Column(name = "target_member_id") private Long targetMemberId;
+    @Column(name = "target_auth_version") private Integer targetAuthVersion;
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 20) private Purpose purpose;
     @Column(name = "primary_method", length = 20) private String primaryMethod;
     @Column(name = "auth_version", nullable = false) private int authVersion;
@@ -39,13 +45,17 @@ public class MfaChallenge {
     public void limitExpiry(LocalDateTime expiry) { if (expiry.isBefore(expiresAt)) expiresAt = expiry.truncatedTo(java.time.temporal.ChronoUnit.MICROS); }
     public void sensitive(String method, boolean verified) { primaryMethod = method; factorVerified = verified; clearCeremony(); }
     public void sensitiveVerified(boolean strong) {
-        if (primaryMethod != null && primaryMethod.matches("(?:PASSWORD|OAUTH|PASSKEY)_(?:LINK|UNLINK|CHANGE|REMOVE|SET)"))
+        if (primaryMethod != null && primaryMethod.matches("(?:PASSWORD|OAUTH|PASSKEY)_(?:LINK|UNLINK|CHANGE|REMOVE|SET|DEVICES|DEVKEY)"))
             primaryMethod += strong ? "_MFA" : "_MAIL";
     }
     public void loginContinuation() { purpose = Purpose.LOGIN; boundSessionId = null; }
     public void bindMember(Long id, int version) { memberId = id; authVersion = version; }
     public void updateAuthVersion(int version) { authVersion = version; }
     public void bindSession(String id) { boundSessionId = id; }
+    public void bindTarget(Long id, int version) {
+        targetMemberId = id;
+        targetAuthVersion = version;
+    }
     public boolean active(LocalDateTime now) {
         return consumedAt == null && failures < 5 && expiresAt.isAfter(now);
     }

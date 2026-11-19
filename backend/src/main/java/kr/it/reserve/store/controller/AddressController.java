@@ -1,5 +1,6 @@
 package kr.it.reserve.store.controller;
 
+import kr.it.reserve.config.util.SecurityUtil;
 import kr.it.reserve.global.common.ApiResponse;
 import kr.it.reserve.global.error.StoreException;
 import kr.it.reserve.global.ratelimit.IpExtractor;
@@ -39,9 +40,11 @@ public class AddressController {
             @RequestParam String query,
             @RequestParam(defaultValue = "10") int size,
             HttpServletRequest httpRequest) {
-        // 서버 API 키의 호출 한도를 보호하기 위해 주소 검색에도 IP별 제한을 적용한다.
+        // 서버 API 키의 호출 한도를 보호하기 위해 회원·IP별로 제한한다.
         String ip = IpExtractor.extract(httpRequest);
-        if (!rateLimiter.tryConsume(ip, RateLimiter.Policy.ADDRESS_SEARCH)) {
+        if ((SecurityUtil.isLoggedIn() && !rateLimiter.tryConsume(
+                SecurityUtil.getCurrentMemberId().toString(), RateLimiter.Policy.ADDRESS_SEARCH_MEMBER))
+                || !rateLimiter.tryConsume(ip, RateLimiter.Policy.ADDRESS_SEARCH)) {
             throw new StoreException("주소 검색 요청이 너무 많아요. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
         }
 

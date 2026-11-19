@@ -14,7 +14,7 @@ import java.util.Set;
 final class BrowserCsrfMatcher implements RequestMatcher {
     private static final Set<String> SAFE_METHODS = Set.of("GET", "HEAD", "OPTIONS", "TRACE");
     private static final Set<String> CREDENTIAL_COOKIES = Set.of(
-            "access_token", "refresh_token", "mfa_ticket", "JSESSIONID",
+            "access_token", "refresh_token", "mfa_ticket", "account_recovery", "JSESSIONID",
             "__Host-reserve-entry", "reserve_entry");
     private final Set<String> allowedOrigins;
 
@@ -28,6 +28,7 @@ final class BrowserCsrfMatcher implements RequestMatcher {
         String path = request.getServletPath();
         if ("POST".equals(request.getMethod())
                 && (ApiPaths.matchesAlias(path, "/api/payment/webhook/portone")
+                || ApiPaths.matchesAlias(path, ApiPaths.RESEND_INBOUND)
                 || ApiPaths.matchesAlias(path, "/api/oauth/events/google")
                 || ApiPaths.matchesAlias(path, "/api/oauth/events/kakao")
                 || ApiPaths.matchesAlias(path, "/api/oauth/events/naver")

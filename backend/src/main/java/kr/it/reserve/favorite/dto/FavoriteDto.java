@@ -17,6 +17,7 @@ public class FavoriteDto {
     public static class Response {
         private Long id;
         private Long storeId;
+        private String storePublicId;
         private String storeName;
         private String storeDescription;
         private String storeMainImageUrl;
@@ -28,6 +29,7 @@ public class FavoriteDto {
             return Response.builder()
                     .id(favorite.getId())
                     .storeId(favorite.getStore().getId())
+                    .storePublicId(favorite.getStore().getPublicId())
                     .storeName(favorite.getStore().getName())
                     .storeDescription(favorite.getStore().getDescription())
                     .storeMainImageUrl(favorite.getStore().getMainImageUrl())

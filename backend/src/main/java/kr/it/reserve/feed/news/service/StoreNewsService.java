@@ -1,24 +1,26 @@
 package kr.it.reserve.feed.news.service;
 
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.LockModeType;
 import kr.it.reserve.feed.FeedException;
+import kr.it.reserve.feed.FeedInteractionPolicy;
 import kr.it.reserve.feed.FeedPolicy;
-import kr.it.reserve.feed.dto.FeedDto;
-import kr.it.reserve.feed.entity.FeedAuditRecord;
-import kr.it.reserve.feed.entity.FeedPost;
 import kr.it.reserve.feed.news.StoreNewsAvailability;
-import kr.it.reserve.feed.news.dto.StoreNewsDto;
+import kr.it.reserve.feed.dto.FeedDto;
+import kr.it.reserve.feed.entity.FeedPost;
+import kr.it.reserve.feed.entity.FeedAuditRecord;
+import kr.it.reserve.feed.repository.ContentLikeRepository;
 import kr.it.reserve.feed.repository.FeedAuditRepository;
 import kr.it.reserve.feed.repository.FeedMediaRepository;
 import kr.it.reserve.feed.repository.FeedPostRepository;
 import kr.it.reserve.feed.service.FeedService;
 import kr.it.reserve.global.common.PageRequests;
+import kr.it.reserve.global.persistence.CurrentLockedState;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.promotion.StoreNewsPolicy;
 import kr.it.reserve.promotion.dto.PromotionDto;
+import kr.it.reserve.feed.news.dto.StoreNewsDto;
 import kr.it.reserve.promotion.entity.Promotion;
 import kr.it.reserve.promotion.repository.PromotionRepository;
 import kr.it.reserve.store.entity.Store;
@@ -33,7 +35,6 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -51,24 +52,46 @@ public class StoreNewsService {
     private final StoreRepository stores;
     private final EntityManager entityManager;
     private final FeedAuditRepository audits;
+    private final FeedInteractionPolicy interactions;
+    private final ContentLikeRepository likes;
     @Autowired(required = false)
     private StoreNewsEvents changes;
 
-    public Page<PromotionDto.PublicPromotionSummaryResponse> publicList(int page, int size, Long storeId, String type, String period) {
+    public Page<PromotionDto.PublicPromotionSummaryResponse> publicList(int page, int size, Long storeId, String type, String period, Long viewerId) {
         if (storeId != null && storeId <= 0) throw FeedException.invalid("가게를 다시 선택해주세요.");
         if (!Set.of("ONGOING", "ALL").contains(period)) throw FeedException.invalid("소식 기간을 다시 선택해주세요.");
         Promotion.NewsType selected = type == null || type.isBlank() ? null : type(type);
-        return promotions.findAll(StoreNewsPolicy.publicSpecification(storeId, selected, "ONGOING".equals(period)),
-                PageRequests.bounded(page, size).withSort(Sort.by(Sort.Direction.DESC, "createdAt", "id")))
-                .map(news -> {
-                    var result = PromotionDto.PublicPromotionSummaryResponse.fromEntity(news);
-                    result.setImages(images(news)); return result;
-                });
+        var results = promotions.findAll(StoreNewsPolicy.publicSpecification(storeId, selected, "ONGOING".equals(period)),
+                PageRequests.bounded(page, size).withSort(Sort.by(Sort.Direction.DESC, "createdAt", "id")));
+        boolean includeLikes = interactions.isNewsEnabled() && !results.isEmpty();
+        Map<Long, ContentLikeRepository.NewsLikeSummary> summaries = new HashMap<>();
+        if (includeLikes) likes.summarizeNewsLikes(results.stream().map(Promotion::getId).toList(), viewerId)
+                .forEach(summary -> summaries.put(summary.getNewsId(), summary));
+        return results.map(news -> {
+            var result = PromotionDto.PublicPromotionSummaryResponse.fromEntity(news);
+            result.setImages(images(news));
+            if (includeLikes) {
+                var summary = summaries.get(news.getId());
+                result.setLikeCount(summary == null ? 0L : summary.getLikeCount());
+                result.setLiked(summary != null && summary.getViewerLikes() > 0);
+            }
+            return result;
+        });
     }
 
     public PromotionDto.PublicPromotionDetailResponse publicDetail(Long id) {
-        Promotion news = promotions.findById(id).filter(StoreNewsPolicy::publiclyVisible).orElseThrow(FeedException::missing);
-        var result = PromotionDto.PublicPromotionDetailResponse.fromEntity(news); result.setImages(images(news)); return result;
+        return publicDetail(promotions.findById(id));
+    }
+
+    public PromotionDto.PublicPromotionDetailResponse publicDetailById(java.util.UUID publicId) {
+        return publicDetail(promotions.findByPublicId(publicId.toString()));
+    }
+
+    private PromotionDto.PublicPromotionDetailResponse publicDetail(java.util.Optional<Promotion> candidate) {
+        Promotion news = candidate.filter(StoreNewsPolicy::publiclyVisible).orElseThrow(FeedException::missing);
+        var result = PromotionDto.PublicPromotionDetailResponse.fromEntity(news);
+        result.setImages(images(news));
+        return result;
     }
 
     public List<StoreNewsDto.StoreChoice> stores(Long memberId) {
@@ -82,12 +105,13 @@ public class StoreNewsService {
     public Page<StoreNewsDto.News> mine(Long memberId, Long storeId, String state, int page, int size) {
         policy.requireEnabled(); business(reader(memberId));
         if (storeId != null && storeId <= 0) throw FeedException.invalid("가게를 다시 선택해주세요.");
-        if (!Set.of("ALL", "DRAFT", "PUBLISHED", "ENDED", "HIDDEN", "DELETED").contains(state)) throw FeedException.invalid("소식 상태를 다시 선택해주세요.");
+        if (!Set.of("ALL", "MANAGED", "DRAFT", "PUBLISHED", "ENDED", "HIDDEN", "DELETED").contains(state)) throw FeedException.invalid("소식 상태를 다시 선택해주세요.");
         LocalDateTime now = StoreNewsPolicy.now();
         Specification<Promotion> specification = (root, query, cb) -> {
             var result = cb.and(cb.equal(root.get("member").get("id"), memberId), cb.notEqual(root.get("state"), Promotion.State.DELETED));
             if (storeId != null) result = cb.and(result, cb.equal(root.get("store").get("id"), storeId));
             if ("ENDED".equals(state)) result = cb.and(result, cb.equal(root.get("state"), Promotion.State.PUBLISHED), cb.lessThanOrEqualTo(root.get("endsAt"), now));
+            else if ("MANAGED".equals(state)) result = cb.and(result, cb.notEqual(root.get("state"), Promotion.State.DRAFT));
             else if (!"ALL".equals(state)) {
                 result = cb.and(result, cb.equal(root.get("state"), Promotion.State.valueOf(state)));
                 if ("PUBLISHED".equals(state)) result = cb.and(result, cb.or(cb.isNull(root.get("endsAt")), cb.greaterThan(root.get("endsAt"), now)));
@@ -143,7 +167,7 @@ public class StoreNewsService {
             post = FeedPost.create(profile, null, StoreNewsPolicy.now());
             apply(news, values, request); post.linkNews(news, region(news.getStore()), StoreNewsPolicy.now()); posts.saveAndFlush(post);
         } else {
-            entityManager.refresh(post, LockModeType.PESSIMISTIC_WRITE);
+            CurrentLockedState.refresh(entityManager, post);
             apply(news, values, request); post.linkNews(news, region(news.getStore()), StoreNewsPolicy.now());
         }
         feeds.applyMedia(post, values.mediaIds(), memberId);
@@ -151,11 +175,17 @@ public class StoreNewsService {
     }
 
     @Transactional
-    public void delete(Long memberId, Long id) {
+    public void delete(Long memberId, Long id, Long draftRevision) {
         policy.requireEnabled(); business(feeds.activeWriter(memberId));
         Promotion news = lockedNews(memberId, id);
+        if (draftRevision != null) {
+            if (news.getState() == Promotion.State.DELETED) return;
+            if (news.getState() != Promotion.State.DRAFT || draftRevision != news.getRevision()) {
+                throw new FeedException("초안이 변경됐어요. 임시보관함을 다시 확인해주세요.", HttpStatus.CONFLICT);
+            }
+        }
         boolean wasPublic = StoreNewsPolicy.publiclyVisible(news);
-        if (news.getNewsPost() != null) entityManager.refresh(news.getNewsPost(), LockModeType.PESSIMISTIC_WRITE);
+        if (news.getNewsPost() != null) CurrentLockedState.refresh(entityManager, news.getNewsPost());
         news.deleteNews(StoreNewsPolicy.now());
         changed(news, wasPublic);
     }
@@ -164,7 +194,7 @@ public class StoreNewsService {
         Promotion candidate = promotions.findById(id).orElseThrow(FeedException::missing); owner(candidate, memberId);
         ownedStore(candidate.getStore().getId(), memberId);
         // 회원→가게→소식→피드→사진. 후보의 stale managed 상태를 잠금 아래 재검사한다.
-        entityManager.refresh(candidate, LockModeType.PESSIMISTIC_WRITE); owner(candidate, memberId); return candidate;
+        CurrentLockedState.refresh(entityManager, candidate); owner(candidate, memberId); return candidate;
     }
 
     private Store ownedStore(Long id, Long memberId) {
@@ -268,7 +298,7 @@ public class StoreNewsService {
         }
         FeedPost post = FeedPost.linkedTo(news);
         if (post == null) throw FeedException.invalid("신청 사진을 다시 확인해주세요.");
-        entityManager.refresh(post, LockModeType.PESSIMISTIC_WRITE);
+        CurrentLockedState.refresh(entityManager, post);
         if (!post.isPublished()) throw FeedException.missing();
         List<Long> ids = imageIds(news);
         if (ids.isEmpty() || ids.size() > FeedPolicy.MAX_IMAGES) throw FeedException.invalid("혜택 신청 사진은 1~6장이어야 해요.");
@@ -308,7 +338,7 @@ public class StoreNewsService {
                 deleted ? null : StoreNewsPolicy.period(news, StoreNewsPolicy.now()), false, news.getState().name(), news.getRevision(), adminView && post != null ? post.getId() : null,
                 photos, StoreNewsPolicy.offset(news.getCreatedAt()), StoreNewsPolicy.offset(news.getUpdatedAt()), news.getBenefitState().name(),
                 StoreNewsPolicy.offset(news.getBenefitRequestedAt()), StoreNewsPolicy.offset(news.getBenefitReviewedAt()), deleted ? null : news.getBenefitReviewNote(),
-                news.getDesign() == null ? "STANDARD" : news.getDesign().name());
+                news.getDesign() == null ? "STANDARD" : news.getDesign().name(), deleted ? null : news.getPublicId(), store.getPublicId());
     }
     private List<FeedDto.Image> images(Promotion news) {
         if (news.getNewsPost() == null || news.getState() == Promotion.State.DELETED) return List.of();

@@ -16,6 +16,10 @@ function Navigation() {
         <output aria-label="현재 경로">{location.pathname}{location.search}</output>
         <button onClick={() => navigate('/messages?storeId=42')}>메시지</button>
         <button onClick={() => navigate('/messages', { replace: true })}>대화 목록</button>
+        <button onClick={() => navigate('/search', { state: {
+            searchEntry: true, searchOrigin: { key: location.key, left: window.scrollX, top: window.scrollY },
+        } })}>검색 열기</button>
+        <button onClick={() => navigate('/search?keyword=cafe', { replace: true, state: location.state })}>검색어 확정</button>
         <button onClick={() => navigate(-1)}>이전</button>
         <button onClick={() => navigate('/store/42')}>같은 가게 새 방문</button>
         <button onClick={() => navigate('/my-page')}>다른 화면</button>
@@ -31,7 +35,7 @@ const leaveStore = () => {
     expect(screen.getByLabelText('현재 경로')).toHaveTextContent('/messages?storeId=42');
 };
 
-describe('messenger return scroll boundary', () => {
+describe('return scroll after messages or search', () => {
     beforeEach(() => {
         vi.useFakeTimers();
         top = 0;
@@ -98,5 +102,27 @@ describe('messenger return scroll boundary', () => {
         contentHeight = 5000;
         await settle();
         expect(top).toBe(120);
+    });
+
+    it('restores the original review scroll position after searching and visiting a result', async () => {
+        top = 1280;
+        fireEvent.scroll(window);
+        fireEvent.click(screen.getByRole('button', { name: '검색 열기' }));
+        expect(top).toBe(0);
+        fireEvent.click(screen.getByRole('button', { name: '검색어 확정' }));
+
+        fireEvent.click(screen.getByRole('button', { name: '같은 가게 새 방문' }));
+        await settle();
+        expect(top).toBe(0);
+        fireEvent.click(screen.getByRole('button', { name: '이전', exact: true }));
+        expect(screen.getByLabelText('현재 경로')).toHaveTextContent('/search?keyword=cafe');
+
+        contentHeight = 800;
+        fireEvent.click(screen.getByRole('button', { name: '이전', exact: true }));
+        await settle();
+        expect(top).toBe(0);
+        contentHeight = 5000;
+        await settle();
+        expect(top).toBe(1280);
     });
 });

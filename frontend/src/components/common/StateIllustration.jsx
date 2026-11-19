@@ -6,18 +6,16 @@ import { stateIllustrationSize, stateIllustrationDesktopSize } from '../../style
 import Bone from './Bone';
 import LoadingImage from './LoadingImage';
 
-// Vite가 해시 파일을 생성하며 URL 메타데이터만으로 다른 그림을 요청하지 않는다.
-const files = import.meta.glob('../../assets/state-illustrations/*.webp', { eager: true, query: '?url&no-inline', import: 'default' });
-const sources = Object.fromEntries(Object.entries(files).map(([path, url]) => [path.split('/').pop(), url]));
+// 최대 112px로 표시하는 상태 그림에는 512px 원본을 사용해요.
+const sources = import.meta.glob('./*-512.webp', {
+    base: '../../assets/state-illustrations', eager: true, query: '?url&no-inline', import: 'default',
+});
 // 완료 상태는 다시 재생할 수 있지만 QR·결제 대기는 진행 표시를 유지한다.
 const STATIC_STATES = new Set(['not-found', 'access-restricted', 'network-offline', 'rate-limited',
     'retry', 'server-unavailable', 'unknown-error', 'preparing', 'payment-success', 'payment-failure', 'waiting-called']);
 const slotStyle = size => ({
     '--state-illustration-mobile-size': `${stateIllustrationSize[size]}px`,
     '--state-illustration-desktop-size': `${stateIllustrationDesktopSize[size]}px`,
-    display: 'inline-flex', width: `var(--state-illustration-size, ${stateIllustrationSize[size]}px)`,
-    height: `var(--state-illustration-size, ${stateIllustrationSize[size]}px)`,
-    maxWidth: '100%', flexShrink: 0, alignItems: 'center', justifyContent: 'center', verticalAlign: 'middle',
 });
 
 export function StateIllustrationSkeleton({ size = 'lg', style }) {
@@ -31,15 +29,14 @@ function IllustrationImage({ name, size, fallback, interactive }) {
     const [failed, setFailed] = useState(false);
     const reduced = useReducedMotion();
     const pixels = stateIllustrationSize[size] ?? stateIllustrationSize.md;
-    const desktopPixels = stateIllustrationDesktopSize[size] ?? stateIllustrationDesktopSize.md;
-    const src = sources[`${name}-512.webp`];
-    const large = sources[`${name}-768.webp`];
-    const { pictureRef, replay } = useIllustrationMotion(interactive && !failed ? src : null);
+    const src = failed ? undefined : sources[`./${name}-512.webp`];
+    const embeddedFallback = name === 'network-offline' || name === 'server-unavailable' ? name : undefined;
+    const { pictureRef, replay } = useIllustrationMotion(interactive ? src : null);
     const updateReplayable = host => {
         if (!host) return;
         // 실행 도구 안의 그림을 중첩 버튼으로 만들지 않는다.
         const action = host.parentElement?.closest('a, button, input, label, [role="button"], [role="link"], [aria-hidden="true"], [inert]');
-        setReplayable(interactive && !action && !reduced && !failed && Boolean(src) && typeof host.querySelector('img')?.animate === 'function');
+        setReplayable(interactive && !action && !reduced && Boolean(src) && typeof host.querySelector('img')?.animate === 'function');
     }; // 커밋마다 부모의 role·inert 변경도 다시 확인한다.
     return <span ref={updateReplayable} className="reserve-state-illustration"
         style={slotStyle(size)} aria-hidden={replayable ? undefined : true}
@@ -49,12 +46,10 @@ function IllustrationImage({ name, size, fallback, interactive }) {
         onKeyDown={replayable ? event => {
             if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); replay(); }
         } : undefined}>
-        {failed || !src ? <span className="reserve-state-illustration__fallback" style={{ fontSize: `calc(var(--state-illustration-size, ${pixels}px) / 2)` }}>{fallback}</span>
-            : <LoadingImage ref={pictureRef} src={src} srcSet={`${src} 512w, ${large} 768w`} sizes={`(min-width: 768px) ${desktopPixels}px, ${pixels}px`}
+        {src ? <LoadingImage ref={pictureRef} src={src}
                 width={pixels} height={pixels} alt="" loading="lazy" decoding="async" draggable={false}
-                style={{ display: 'block', width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none',
-                    userSelect: 'none', transformOrigin: '50% 55%' }}
-                onError={() => setFailed(true)} />}
+                onError={() => setFailed(true)} />
+            : <span className="reserve-state-illustration__fallback" data-embedded={embeddedFallback}>{!embeddedFallback && fallback}</span>}
     </span>;
 }
 IllustrationImage.propTypes = { name: PropTypes.string.isRequired, size: PropTypes.oneOf(['sm', 'md', 'lg']).isRequired, fallback: PropTypes.node, interactive: PropTypes.bool };

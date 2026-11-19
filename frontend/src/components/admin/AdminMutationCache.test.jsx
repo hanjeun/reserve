@@ -1,6 +1,8 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
+import { ConfigProvider } from 'antd';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import BusinessVerificationTab from './BusinessVerificationTab';
 import MailboxTab from './MailboxTab';
@@ -10,21 +12,23 @@ import { API_ENDPOINTS } from '../../constants';
 
 const state = vi.hoisted(() => ({
     confirm: vi.fn(), message: { success: vi.fn(), error: vi.fn() },
+    queryParams: {},
 }));
 vi.mock('../../api/axios', () => ({ default: { get: vi.fn(), post: vi.fn(), delete: vi.fn() } }));
 vi.mock('../../hooks', async () => ({
     useMessage: () => ({ message: state.message, confirm: state.confirm }),
     useWindowWidth: () => 1024,
-    useQueryParamsState: (defaults) => [defaults, vi.fn()],
+    useQueryParamsState: (defaults) => [{ ...defaults, ...state.queryParams }, vi.fn()],
     useFormErrors: (await import('../../hooks/useFormErrors')).default,
 }));
 vi.mock('../../hooks/useDebounce', () => ({ default: value => value }));
-vi.mock('../common', () => ({
+vi.mock('../common', async () => ({
     Button: ({ children, onClick, disabled }) => <button type="button" onClick={onClick} disabled={disabled}>{children}</button>,
     AdminTableSkeleton: () => <span>조회 중</span>,
-    DataTable: ({ columns, dataSource }) => <>{dataSource.map(row => <div key={row.id}>{columns.find(c => c.key === 'actions').render(null, row)}</div>)}</>,
+    PagedDataTable: ({ columns, dataSource, placeholder }) => placeholder || <>{dataSource.map(row => <div key={row.id}>{columns.find(c => c.key === 'actions').render(null, row)}</div>)}</>,
     DataState: ({ onRetry }) => <button onClick={onRetry}>다시 불러오기</button>,
     FilterToolbar: () => null,
+    SegmentedControl: (await import('../common/SegmentedControl')).default,
     RefreshButton: ({ onReload }) => <button onClick={onReload}>새로고침</button>,
     FormField: ({ children, label, error }) => <label>{label}{children}{error && <span role="alert">{error}</span>}</label>,
     FormInput: ({ value, onChange, placeholder }) => <input value={value} onChange={onChange} placeholder={placeholder} />,
@@ -37,11 +41,14 @@ const clients = new Set();
 function mount(node) {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
     clients.add(client);
-    render(<QueryClientProvider client={client}>{node}</QueryClientProvider>);
+    render(<MemoryRouter><ConfigProvider theme={{ token: { motion: false } }}>
+        <QueryClientProvider client={client}>{node}</QueryClientProvider>
+    </ConfigProvider></MemoryRouter>);
     return client;
 }
 beforeEach(() => {
     vi.clearAllMocks();
+    state.queryParams = {};
     api.get.mockReset(); api.post.mockReset(); api.delete.mockReset();
     api.post.mockResolvedValue(null); api.delete.mockResolvedValue(null);
 });
@@ -109,17 +116,24 @@ function fillMail() {
 }
 it('closes a successful nonmarketing mail draft and refreshes the sent cache', async () => {
     api.get.mockResolvedValue({ content: [], page: { totalElements: 0 } });
+    api.post.mockResolvedValueOnce({ html: '<!DOCTYPE html><html><body>안내 내용</body></html>' });
     const client = mount(<MailboxTab />);
     const retainedKey = [...adminKeys.sentMails(), 2, 'retained'];
     client.setQueryData(retainedKey, { mails: [] });
     fireEvent.click(await screen.findByRole('button', { name: /새 메일$/ }));
     fillMail();
+    fireEvent.click(screen.getByRole('button', { name: '미리보기' }));
+    expect(await screen.findByTitle('발송될 메일 디자인')).toBeInTheDocument();
+    expect(api.post).toHaveBeenCalledExactlyOnceWith(API_ENDPOINTS.MAIL.PREVIEW, {
+        toEmail: 'reader@example.com', subject: '시험 안내', body: '안내 내용', marketing: false,
+    }, { signal: expect.any(AbortSignal) });
     fireEvent.click(screen.getByRole('button', { name: '보내기' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(api.post).toHaveBeenCalledWith(API_ENDPOINTS.MAIL.COMPOSE, { toEmail: 'reader@example.com', subject: '시험 안내', body: '안내 내용', marketing: false });
     expect(client.getQueryState(retainedKey).isInvalidated).toBe(true);
 });
 it('clears the selected trashed mail and refreshes both sent and trash caches', async () => {
+    state.queryParams = { mailFolder: 'sent' };
     api.get.mockResolvedValue({ content: [{ id: 82, toEmail: 'reader@example.com', subject: '보관 메일', body: '보관 내용', sentAt: '2026-10-02T12:00:00' }], page: { totalElements: 1 } });
     const client = mount(<MailboxTab />);
     const sentKey = [...adminKeys.sentMails(), 2, 'retained'];

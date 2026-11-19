@@ -60,7 +60,9 @@ public class AdminManagementController {
                 "provider", m.getProvider().name(),
                 "status",   m.getStatus() != null ? m.getStatus().name() : "ACTIVE",
                 "suspendedUntil", m.getSuspendedUntil() != null ? m.getSuspendedUntil().toLocalDate().toString() : "",
-                "suspendReason", m.getSuspendReason() != null ? m.getSuspendReason() : ""
+                "suspendReason", m.getSuspendReason() != null ? m.getSuspendReason() : "",
+                "accountProtected", m.isAccountProtected(),
+                "protectionContactReady", m.getSecurityContactEmail() != null
         ));
 
         return ApiResponse.success(result, "회원 목록 조회 성공");

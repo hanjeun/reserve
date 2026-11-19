@@ -1,6 +1,7 @@
 package kr.it.reserve.payment;
 
 import jakarta.persistence.EntityManager;
+import kr.it.reserve.global.persistence.CurrentLockedStateTestSupport;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.it.reserve.global.error.PaymentException;
 import kr.it.reserve.member.entity.Member;
@@ -67,6 +68,7 @@ class PaymentServiceRefundSafetyTest {
 
     @BeforeEach
     void transactionBoundaries() {
+        CurrentLockedStateTestSupport.managedEntities(entityManager);
         preparedLedgerCreated = false;
         lenient().when(transactionManager.getTransaction(any()))
                 .thenAnswer(ignored -> new SimpleTransactionStatus());

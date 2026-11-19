@@ -1,5 +1,12 @@
 import { API_BASE_URL, API_ENDPOINTS } from '../constants/api';
 
+export const SOCIAL_LOGIN_LABELS = Object.freeze({ NAVER: '네이버', KAKAO: '카카오', GOOGLE: 'Google' });
+
+export function socialLoginLabel(provider) {
+    return typeof provider === 'string' && Object.hasOwn(SOCIAL_LOGIN_LABELS, provider)
+        ? SOCIAL_LOGIN_LABELS[provider] : undefined;
+}
+
 /* OAuth는 API 출처에서 시작해 등록된 콜백 주소를 유지한다. */
 export function oauthAuthorizationUrl(provider, accountLink, rememberMe) {
     const key = typeof provider === 'string' ? provider.toUpperCase() : '';

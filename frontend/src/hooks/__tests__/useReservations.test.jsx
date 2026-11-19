@@ -6,6 +6,7 @@ import useReservations from '../useReservations';
 import reservationService from '../../services/reservationService';
 import { reservationKeys } from '../queryKeys';
 import { handleApiError } from '../../utils/errorHandler';
+import useAuthStore from '../../store/useAuthStore';
 
 vi.mock('../../services/reservationService', () => ({ default: { getMyReservations: vi.fn(), cancelReservation: vi.fn() } }));
 vi.mock('../useMessage', () => ({ default: () => ({ message: { success: vi.fn(), error: vi.fn() } }) }));
@@ -48,7 +49,57 @@ it('keeps each server page in a separate cache and accepts nested and legacy pag
     expect(hook.result.current.total).toBe(16);
     expect(hook.result.current.totalPages).toBe(2);
     expect(client.getQueryData(reservationKeys.myPage(first)).content[0].id).toBe(30);
-    expect(reservationService.getMyReservations).toHaveBeenLastCalledWith(second);
+    expect(reservationService.getMyReservations).toHaveBeenLastCalledWith(second, expect.any(AbortSignal));
+});
+
+it('정렬 중 같은 세션의 예약만 유지하고 계정이 바뀌면 즉시 숨긴다', async () => {
+    const auth = useAuthStore.getState();
+    let previousResponse, nextResponse;
+    const oldSort = { page: 1, size: 15, status: 'CONFIRMED', sort: 'recent' };
+    const nextSort = { ...oldSort, page: 0, sort: 'oldest' };
+    useAuthStore.setState({ isLoggedIn: true, user: { id: 41 }, sessionRevision: 22 });
+    reservationService.getMyReservations
+        .mockResolvedValueOnce({ content: [{ id: 7 }], totalElements: 22 })
+        .mockImplementationOnce(() => new Promise(resolve => { previousResponse = resolve; }))
+        .mockImplementationOnce(() => new Promise(resolve => { nextResponse = resolve; }));
+    const hook = renderHook(({ params }) => useReservations(params), { initialProps: { params: oldSort }, wrapper });
+    try {
+        await waitFor(() => expect(hook.result.current.reservations).toEqual([{ id: 7 }]));
+        hook.rerender({ params: nextSort });
+        await waitFor(() => expect(previousResponse).toBeTypeOf('function'));
+        expect(hook.result.current).toMatchObject({ sorting: true, loading: false, resultPage: 2, resultSort: 'recent', reservations: [{ id: 7 }] });
+
+        act(() => useAuthStore.setState({ user: { id: 42 }, sessionRevision: 23 }));
+        await waitFor(() => expect(nextResponse).toBeTypeOf('function'));
+        expect(hook.result.current).toMatchObject({ sorting: false, reservations: [] });
+        await act(async () => previousResponse({ content: [{ id: 8 }] }));
+        expect(hook.result.current.reservations).toEqual([]);
+        await act(async () => nextResponse({ content: [{ id: 9 }] }));
+        await waitFor(() => expect(hook.result.current.reservations).toEqual([{ id: 9 }]));
+    } finally {
+        hook.unmount();
+        useAuthStore.setState(auth, true);
+    }
+});
+
+it('keeps the page count but hides previous page reservations while the next page is loading', async () => {
+    const auth = useAuthStore.getState();
+    useAuthStore.setState({ isLoggedIn: true, user: { id: 41 }, sessionRevision: 22 });
+    let resolvePage;
+    reservationService.getMyReservations.mockResolvedValueOnce({ content: [{ id: 7 }], totalElements: 22, totalPages: 2 })
+        .mockImplementationOnce(() => new Promise(resolve => { resolvePage = resolve; }));
+    const first = { page: 0, size: 20, sort: 'recent' };
+    const hook = renderHook(({ params }) => useReservations(params), { initialProps: { params: first }, wrapper });
+    try {
+        await waitFor(() => expect(hook.result.current.reservations).toEqual([{ id: 7 }]));
+        hook.rerender({ params: { ...first, page: 1 } });
+        expect(hook.result.current).toMatchObject({ hasData: true, loading: true, reservations: [], total: 22, resultPage: 2 });
+        await act(async () => resolvePage({ content: [{ id: 8 }], totalElements: 22, totalPages: 2 }));
+        await waitFor(() => expect(hook.result.current).toMatchObject({ loading: false, reservations: [{ id: 8 }] }));
+    } finally {
+        hook.unmount();
+        useAuthStore.setState(auth, true);
+    }
 });
 
 it('cancellation invalidates every page and preserves filtered content and totals until server revalidation', async () => {

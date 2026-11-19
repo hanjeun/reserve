@@ -8,11 +8,11 @@ const photo = readFileSync(new URL('../public/images/discovery-v3/dining-cover.w
 const user = { id: 41, name: '확인 사용자', email: 'ui@example.test', role: 'BUSINESS', termsAgreed: true };
 const profile = { publicId: '326f8cca-6b4d-4ef2-90bc-d380872f1888', nickname: '확인 작성자' };
 const pageOf = content => ({ content, page: { number: 0, totalElements: content.length, totalPages: 1 } });
-const store = { id: 81, ownerId: 41, name: '리저브 카페', category: '맛집 · 카페', description: '커피와 함께 잠시 쉬어가는 공간이에요.',
+const store = { id: 81, publicId: '00000000-0000-4000-8000-000000000081', ownerId: 41, name: '리저브 카페', category: '맛집 · 카페', description: '커피와 함께 잠시 쉬어가는 공간이에요.',
     mainImageUrl: '/api/feed/media/1', mainImageWidth: 960, mainImageHeight: 640, detailImageUrls: ['/api/feed/media/1', '/api/feed/media/2'],
     imageAutoplayEnabled: false, reservationEnabled: true, waitingEnabled: true, waitingIntakeMode: 'ONSITE',
     bookingType: 'SESSION', openTime: '09:00', closeTime: '18:00', sessionTimes: ['10:00'], maxCapacityPerSlot: 3 };
-const post = { id: 8, state: 'PUBLISHED', author: profile, store, content: '새로 문을 연 카페를 소개해요.', images: [], createdAt: new Date().toISOString() };
+const post = { id: 8, publicId: '00000000-0000-4000-8000-000000000008', state: 'PUBLISHED', author: profile, store, content: '새로 문을 연 카페를 소개해요.', images: [], createdAt: new Date().toISOString() };
 
 async function capture(page, name, info) {
     if (process.env.RESERVE_CAPTURE_UI !== 'true') return;
@@ -52,9 +52,9 @@ async function setup(page, { holdInteractions = false } = {}) {
         if (endpoint === '/api/member/me') return ok(user);
         if (endpoint === '/api/waiting/stores') return ok(pageOf([{ ...store, waitingTeams: teams }]));
         if (endpoint === '/api/stores') return ok(pageOf([store]));
-        if (endpoint === '/api/stores/81') return ok(store);
+        if (endpoint === '/api/stores/00000000-0000-4000-8000-000000000081') return ok(store);
         if (endpoint === '/api/stores/my') return ok([store]);
-        if (endpoint === '/api/favorites/my') return ok([{ id: 4, storeId: 81, storeName: store.name, storeCategory: store.category, storeMainImageUrl: store.mainImageUrl }]);
+        if (endpoint === '/api/favorites/my') return ok([{ id: 4, storeId: 81, storePublicId: store.publicId, storeName: store.name, storeCategory: store.category, storeMainImageUrl: store.mainImageUrl }]);
         if (endpoint.includes('/favorites/status/')) return ok({ isFavorite: false });
         if (endpoint === '/api/feed/config') return ok({ enabled: true, imageEnabled: true, maxImages: 6 });
         if (endpoint === '/api/feed/interactions/config') {
@@ -66,7 +66,7 @@ async function setup(page, { holdInteractions = false } = {}) {
         if (endpoint === `/api/feed/authors/${profile.publicId}/posts`) return ok(pageOf([post]));
         if (endpoint === '/api/feed/notifications') return ok(pageOf([]));
         if (endpoint === '/api/feed/posts') return ok(pageOf([post]));
-        if (endpoint === '/api/feed/posts/8') return ok(post);
+        if (endpoint === '/api/feed/posts/00000000-0000-4000-8000-000000000008') return ok(post);
         if (endpoint === '/api/feed/me/likes' || endpoint.endsWith('/comments')) return ok(pageOf([]));
         if (endpoint.includes('/feed/likes/')) return ok({ liked: false, likeCount: 0, commentCount: 0 });
         if (endpoint === '/api/feed/notifications/count') return ok({ unread: 2 });
@@ -218,13 +218,14 @@ test('feed detail, profile and notifications return through the shared back cont
     await expect(page).toHaveURL(origin);
 
     await page.emulateMedia({ reducedMotion: 'no-preference' });
-    const avatar = page.getByRole('link', { name: `${profile.nickname}의 공개 프로필`, exact: true });
+    const avatar = page.getByRole('link', { name: `${profile.nickname}의 프로필`, exact: true });
     await avatar.hover();
     await page.mouse.down();
     await expect(avatar.locator(':scope > div')).toHaveCSS('scale', '0.96');
     await page.mouse.up();
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await expect(page.getByRole('heading', { name: '공개 프로필', exact: true })).toBeVisible();
+    await expect(page).toHaveURL(url => url.pathname === `/feed/u/${profile.publicId}`);
+    await expect(page.getByRole('heading', { name: '프로필', level: 1, exact: true })).toBeVisible();
     await expect(page.locator('.reserve-feed-profile')).toContainText(profile.nickname);
     await capture(page, 'feed-profile-back', info);
     await page.locator('.reserve-feed-heading').getByRole('button', { name: '이전 화면으로 돌아가기' }).click();

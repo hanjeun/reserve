@@ -17,23 +17,26 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
+import java.util.function.Predicate;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
+import java.util.concurrent.RejectedExecutionException;
 
-/** 유실 구간을 재생하지 않는 제한된 임시 스트림이다. ready 뒤에는 REST로 상태를 다시 확인한다. */
+/** 유실 구간을 재생하지 않는 제한된 임시 스트림이다. */
 @Component
 public class EntityUpdateStream {
     static final int MAX_SUBSCRIBERS = 256;
     static final int MAX_PER_SCOPE = 4;
+    private static final EntityUpdates.Domain[] CLIENT_DOMAINS = Arrays.stream(EntityUpdates.Domain.values())
+            .filter(domain -> domain != EntityUpdates.Domain.SESSION).toArray(EntityUpdates.Domain[]::new);
     private final UpdateStreamAccess access;
     private final Supplier<SseEmitter> emitters;
     private final Executor delivery;
@@ -95,8 +98,8 @@ public class EntityUpdateStream {
         emitter.onCompletion(() -> subscribers.remove(emitter));
         emitter.onTimeout(() -> { subscribers.remove(emitter); emitter.complete(); });
         emitter.onError(error -> subscribers.remove(emitter));
-        send(emitter, "ready", Map.of("epoch", epoch, "revision", revision, "domains", EntityUpdates.Domain.values(),
-                "serverTime", Instant.now().toString()), null);
+        send(emitter, "ready", Map.of("epoch", epoch, "revision", revision, "revisionTracksGaps", true,
+                "domains", CLIENT_DOMAINS, "serverTime", Instant.now().toString()), null);
         return emitter;
     }
 
@@ -117,6 +120,13 @@ public class EntityUpdateStream {
     }
 
     private void accept(EntityUpdates.Change change, Predicate<Long> recipients) {
+        if (change.domain() == EntityUpdates.Domain.SESSION) {
+            enqueue(() -> subscribers.forEach((emitter, subscriber) -> {
+                var identity = subscriber.identity();
+                if (identity != null && recipients.test(identity.memberId())) valid(emitter, subscriber);
+            }));
+            return;
+        }
         long next = ++revision;
         var signal = new Signal(epoch + ":" + next, epoch, next, change.domain(), change.entityId(),
                 change.parentId(), change.storeId(), change.operation(), change.targetType());
@@ -124,13 +134,13 @@ public class EntityUpdateStream {
     }
 
     private void deliver(EntityUpdates.Change change, Signal signal, Predicate<Long> recipients) {
+        boolean publiclyVisible = EntityUpdates.publicChange(change);
         subscribers.forEach((emitter, subscriber) -> {
-            if (!valid(emitter, subscriber)) return;
             var identity = subscriber.identity();
-            boolean allowed = EntityUpdates.publicChange(change) || identity != null
+            boolean allowed = publiclyVisible || identity != null
                     && (recipients.test(identity.memberId())
                     || change.administrators() && identity.role() == Role.ADMIN);
-            if (allowed) send(emitter, "update", signal, signal.eventId());
+            if (allowed && valid(emitter, subscriber)) send(emitter, "update", signal, signal.eventId());
         });
     }
 
@@ -146,7 +156,9 @@ public class EntityUpdateStream {
         catch (RejectedExecutionException saturated) { disconnectAll(); }
     }
 
-    private void disconnectAll() {
+    private synchronized void disconnectAll() {
+        // 중계 단절이나 큐 포화로 놓친 변경은 재접속 시 REST로 확인한다.
+        revision++;
         subscribers.forEach((emitter, ignored) -> complete(emitter));
         subscribers.clear();
     }

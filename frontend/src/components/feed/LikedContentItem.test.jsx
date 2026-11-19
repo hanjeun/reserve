@@ -12,7 +12,6 @@ import favoriteService from '../../services/favoriteService';
 vi.mock('../../services/feedInteractionService', () => ({ default: { mine: vi.fn(), status: vi.fn(), setLike: vi.fn() } }));
 vi.mock('../../services/favoriteService', () => ({ default: { getMyFavorites: vi.fn() } }));
 vi.mock('../../hooks/useDocumentTitle', () => ({ default: vi.fn() }));
-vi.mock('../../hooks/useFeedActions', () => ({ default: () => ({ onShare: vi.fn() }) }));
 vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: { error: vi.fn() } }) }));
 vi.mock('../../hooks/feedInteractionQueries', () => ({
     useFeedInteractions: () => ({ data: { enabled: true, newsEnabled: true } }),
@@ -24,9 +23,11 @@ vi.mock('../../hooks/useContentLike', () => ({ default: () => ({ enabled: true, 
 vi.mock('./FeedReportModal', () => ({ default: ({ postId, newsId, commentId, onClose }) => postId || newsId || commentId
     ? <section role="dialog" aria-label="신고"><output>{newsId ? 'NEWS' : commentId ? 'COMMENT' : 'POST'}:{newsId || commentId || postId}</output><button onClick={onClose}>닫기</button></section> : null }));
 
-const news = { id: 9, type: 'NEWS', targetId: 7, available: true, news: { id: 7, title: '새 메뉴', storeId: 12, storeName: '테스트 가게',
+const news = { id: 9, type: 'NEWS', targetId: 7, available: true, news: { id: 7, publicId: '00000000-0000-4000-8000-000000000007', title: '새 메뉴', storeId: 12, storePublicId: '00000000-0000-4000-8000-000000000012', storeName: '테스트 가게',
     content: '가게 소식 내용', createdAt: '2026-11-02T07:00:00', images: [{ url: '/api/store-news/media/1', width: 1200, height: 800 }] } };
-const post = { id: 10, type: 'POST', targetId: 8, available: true, post: { id: 8, author: { nickname: '테스트 작성자' }, content: '게시물 내용' } };
+const post = { id: 10, type: 'POST', targetId: 8, available: true, post: { id: 8, publicId: '00000000-0000-4000-8000-000000000008', author: { nickname: '테스트 작성자' }, content: '게시물 내용' } };
+const comment = { id: 11, type: 'COMMENT', targetId: 6, available: true, comment: { publicId: '00000000-0000-4000-8000-000000000006',
+    postPublicId: post.post.publicId, author: { nickname: '댓글 작성자' }, content: '댓글 내용' } };
 const clients = [];
 function RouteProbe() { const location = useLocation(); return <output aria-label="현재 경로">{location.pathname}</output>; }
 function show(content, view = 'cards') {
@@ -51,8 +52,8 @@ describe('liked content follows the store card and row presentation', () => {
     });
 
     it('preserves default feed counts while allowing the likes view to hide them', async () => {
-        show(<><section aria-label="기본 상호작용"><PostInteractionBar targetId={8} postId={8} /></section>
-            <section aria-label="간단한 상호작용"><PostInteractionBar targetId={8} postId={8} showCounts={false} /></section></>);
+        show(<><section aria-label="기본 상호작용"><PostInteractionBar targetId={8} postPublicId="00000000-0000-4000-8000-000000000008" /></section>
+            <section aria-label="간단한 상호작용"><PostInteractionBar targetId={8} postPublicId="00000000-0000-4000-8000-000000000008" showCounts={false} /></section></>);
         const regular = screen.getByRole('region', { name: '기본 상호작용' });
         const compact = screen.getByRole('region', { name: '간단한 상호작용' });
         expect(await within(regular).findByText('2')).toBeInTheDocument();
@@ -76,19 +77,21 @@ describe('liked content follows the store card and row presentation', () => {
             await act(async () => { vi.advanceTimersByTime(500); });
             expect(link).toHaveFocus(); expect(screen.getByRole('tooltip')).toHaveTextContent(title);
             fireEvent.click(link);
-            expect(screen.getByRole('status', { name: '현재 경로' })).toHaveTextContent('/benefits/7');
+            expect(screen.getByRole('status', { name: '현재 경로' })).toHaveTextContent('/benefits/00000000-0000-4000-8000-000000000007');
         } finally { vi.useRealTimers(); }
     });
 
-    it('keeps the original photo ratio and the common card title tools', () => {
+    it('keeps the original photo ratio and places card tools before the title', () => {
         const { container } = show(<LikedContentItem item={news} view="cards" onReport={vi.fn()} />);
         const image = container.querySelector('.reserve-card-image');
         expect(image).toHaveAttribute('width', '1200'); expect(image).toHaveAttribute('height', '800');
         expect(image.style.height).toBe('auto'); expect(image.parentElement.style.aspectRatio).toBe('');
         const titleLine = screen.getByRole('heading', { name: '새 메뉴' }).closest('.reserve-store-card-title-line');
-        expect(within(titleLine).getByRole('link', { name: '가게 보기' })).toHaveAttribute('href', '/store/12');
-        expect(within(titleLine).getByRole('button', { name: '소식 신고' })).toBeInTheDocument();
-        expect(within(titleLine).getByRole('button', { name: '좋아요 취소' })).toBeInTheDocument();
+        const tools = container.querySelector('.reserve-store-card-info > .reserve-liked-title-tools');
+        expect(tools.nextElementSibling).toBe(titleLine);
+        expect(within(tools).getByRole('link', { name: '가게 보기' })).toHaveAttribute('href', '/store/00000000-0000-4000-8000-000000000012');
+        expect(within(tools).getByRole('button', { name: '소식 신고' })).toBeInTheDocument();
+        expect(within(tools).getByRole('button', { name: '좋아요 취소' })).toBeInTheDocument();
         expect(container.querySelector('.ant-card-actions')).toBeNull();
     });
 
@@ -96,21 +99,25 @@ describe('liked content follows the store card and row presentation', () => {
         const report = vi.fn(); const { container } = show(<LikedContentItem item={news} view={view} onReport={report} />);
         const details = screen.getByRole('link', { name: '새 메뉴 가게 소식 보기' });
         const title = view === 'cards' ? screen.getByRole('heading', { name: '새 메뉴' }) : screen.getByText('새 메뉴');
-        const titleLine = title.closest('.reserve-liked-title-line');
-        const button = within(titleLine).getByRole('button', { name: '소식 신고' });
+        const info = title.closest(view === 'cards' ? '.reserve-store-card-info' : '.reserve-liked-title-line');
+        const button = within(info).getByRole('button', { name: '소식 신고' });
         expect(details.contains(button)).toBe(false);
         fireEvent.click(button); expect(report).toHaveBeenCalledWith(news);
         expect(screen.getByRole('status', { name: '현재 경로' })).toHaveTextContent('/my-favorites');
-        fireEvent.click(within(titleLine).getByRole('link', { name: '가게 보기' }));
-        expect(screen.getByRole('status', { name: '현재 경로' })).toHaveTextContent('/store/12');
+        fireEvent.click(within(info).getByRole('link', { name: '가게 보기' }));
+        expect(screen.getByRole('status', { name: '현재 경로' })).toHaveTextContent('/store/00000000-0000-4000-8000-000000000012');
         expect(container.querySelector('a a, a button')).toBeNull();
     });
 
-    it.each(['cards', 'list'])('retains post comment and share actions with one like control in %s', async view => {
-        const share = vi.fn(); show(<LikedContentItem item={post} view={view} onShare={share} onReport={vi.fn()} />);
-        expect(screen.getAllByRole('button', { name: '좋아요 취소' })).toHaveLength(1);
-        expect(await screen.findByRole('link', { name: '댓글 보기' })).toHaveAttribute('href', '/feed/posts/8#comments');
-        fireEvent.click(screen.getByRole('button', { name: '게시물 공유' })); expect(share).toHaveBeenCalledWith(post.post);
+    it.each(['cards', 'list'])('puts one type-specific navigation icon with the likes tools in %s', view => {
+        const { container } = show(<>{[post, comment, news].map(item => <LikedContentItem key={item.id} item={item} view={view} />)}</>);
+        const buttons = container.querySelectorAll('.reserve-liked-title-tools');
+        expect(within(buttons[0]).getByRole('link', { name: '게시물 보기' })).toHaveAttribute('href', '/feed/posts/' + post.post.publicId);
+        expect(within(buttons[1]).getByRole('link', { name: '댓글 보기' })).toHaveAttribute('href', '/feed/posts/' + post.post.publicId + '#comment-' + comment.comment.publicId);
+        expect(within(buttons[2]).getByRole('link', { name: '혜택 보기' })).toHaveAttribute('href', '/benefits/' + news.news.publicId);
+        for (const tools of buttons) expect(within(tools).getAllByRole('button', { name: '좋아요 취소' })).toHaveLength(1);
+        expect(screen.queryByRole('button', { name: '게시물 공유' })).toBeNull();
+        expect(screen.getAllByRole('link', { name: '댓글 보기', exact: true })).toHaveLength(1);
     });
 
     it('opens the existing report form for the selected content type', async () => {

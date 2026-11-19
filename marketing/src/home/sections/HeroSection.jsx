@@ -1,77 +1,38 @@
-import { Typography } from '../../primitives.jsx';
-import { ArrowRightOutlined } from '../../../../frontend/src/components/common/icons.js';
-import Button from '../../../../frontend/src/components/common/Button.jsx';
-import { LINES } from '../../typing';
+import { LINES, fullText } from '../../typing';
 import TypingLine from '../../TypingLine';
-import { styles } from '../Home.styles';
 import BounceArrow from './BounceArrow';
+import FeatureSection from './FeatureSection';
+import { SECTIONS } from '../Home.constants';
 
-const { Title, Text } = Typography;
-
-const ANIMATION = `bounceAppear 0.75s cubic-bezier(0.22,1,0.36,1) 0.6s forwards, bounceY 1.6s ease-in-out 1.5s infinite`;
-
-export default function HeroSection({ isMobile }) {
-    return (
-        <section className="marketing-scene" style={{
-            ...styles.contentArea,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'flex-start',
-            padding: isMobile ? '0 20px' : '0 24px',
-        }}>
-
-            <div style={{ flex: 1 }} />
-
-            <div style={{
-                width: '100%',
-                maxWidth: 1000,
-                margin: '0 auto',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-            }}>
-                <div className="slide-up" style={{ ...styles.badge, animationDelay: '0.05s' }}>
-                    가장 쉬운 예약 경험
-                </div>
-                <div className="slide-up" style={{ ...styles.titleContainer, animationDelay: '0.18s' }}>
-                    <Title style={styles.mainTitle} aria-label="예약이 필요한 순간, RESERVE">
-                        <div style={styles.lineWrapper}>예약이 필요한 순간,</div>
-                        <div data-marketing-typing style={styles.lineWrapper}>
-                            <TypingLine line={LINES[0]} />
-                        </div>
-                    </Title>
-                </div>
-                <div className="slide-up" style={{ animationDelay: '0.28s', textAlign: 'center' }}>
-                    <Text style={styles.subTitle}>
-                        기다림 없는 완벽한 하루를 위해,<br />
-                        원하는 예약을 가장 빠르게 도와드립니다.
-                    </Text>
-                </div>
-                <div className="slide-up marketing-hero-actions" style={{ animationDelay: '0.36s', marginTop: 32 }}>
-                    <Button variant="primary" size={isMobile ? 'lg' : 'hero'} data-app-path="/stores" style={{ flex: '1 1 0', minWidth: 0, padding: '0 20px' }}>
-                        지금 둘러보기
-                        <ArrowRightOutlined style={{ marginLeft: 8, fontSize: 17 }} />
-                    </Button>
-                    <Button variant="secondary" size={isMobile ? 'lg' : 'hero'} data-app-path="/signup" style={{ flex: '1 1 0', minWidth: 0, padding: '0 20px' }}>
-                        시작하기
-                    </Button>
-                </div>
+export default function HeroSection({ heroVideo, isMobile }) {
+    const video = heroVideo?.[isMobile ? 'mobile' : 'desktop'];
+    return <section id={video ? 'section-0' : 'section-top'} className={`marketing-scene marketing-hero${video ? ' marketing-hero--film marketing-hero--composed' : ''}`} data-hero-story={video ? 'true' : undefined}
+        data-hero-frame={video ? JSON.stringify({ width: video.width, height: video.height, frame: video.frame }) : undefined}>
+        <div className="marketing-hero-stage">
+        {video && <div className="marketing-hero-film" aria-hidden="true">
+            <video src={video.idle} poster={video.poster} width={video.width} height={video.height} muted loop playsInline preload="none" disablePictureInPicture tabIndex={-1} data-hero-idle />
+            <video src={video.src} poster={video.poster} width={video.width} height={video.height} muted playsInline preload="none" disablePictureInPicture tabIndex={-1} data-hero-video />
+        </div>}
+        <div className="marketing-hero-content">
+            <h1 className="marketing-hero-title slide-up" aria-label="예약이 필요한 순간, RESERVE">
+                <span>예약이 필요한 순간,</span>
+                <span data-marketing-typing className="marketing-hero-typing">
+                    {LINES.map((line, index) => <span key={index} className="marketing-typing-measure" aria-hidden="true">{fullText(line)}<span className="cursor" /></span>)}
+                    <TypingLine line={LINES[0]} />
+                </span>
+            </h1>
+            <div className="marketing-hero-actions slide-up">
+                <a data-app-path="/stores" className="marketing-hero-arrow" aria-label="가게 둘러보기">
+                    <svg width="76" height="48" viewBox="0 0 76 48" fill="none" stroke="currentColor" strokeWidth="2"
+                        strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                        <path d="M 6 24 H 69 M 62 17 L 69 24 L 62 31" />
+                    </svg>
+                </a>
             </div>
-
-            <div style={{ flex: 1 }} />
-
-            <BounceArrow
-                targetId="section-0"
-                style={{
-                    position: 'absolute',
-                    bottom: isMobile ? 10 : 0,
-                    left: 0,
-                    right: 0,
-                    opacity: 0,
-                    animation: ANIMATION,
-                }}
-                />
-        </section>
-    );
+        </div>
+        {video && <div className="marketing-hero-handoff" data-hero-handoff inert aria-hidden="true"><FeatureSection sec={{ ...SECTIONS[1], reverse: false }} index={1} embedded /></div>}
+        <BounceArrow targetId={heroVideo ? 'section-1' : 'section-0'} style={{ position: 'absolute', bottom: 16, left: 0, right: 0 }} />
+        </div>
+        {video && <div className="marketing-hero-landing" aria-hidden="true" />}
+    </section>;
 }

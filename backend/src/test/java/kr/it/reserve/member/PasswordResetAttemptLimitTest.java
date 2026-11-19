@@ -1,7 +1,9 @@
 package kr.it.reserve.member;
 
 import kr.it.reserve.global.error.MemberException;
+import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.PasswordResetToken;
+import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.member.repository.PasswordResetTokenRepository;
 import kr.it.reserve.member.service.PasswordResetService;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,13 +31,10 @@ class PasswordResetAttemptLimitTest {
 
     @Autowired
     private PasswordResetTokenRepository tokenRepository;
+    @Autowired
+    private MemberRepository members;
 
-    /**
-     * 준비 작업만 트랜잭션에 태운다. 테스트 메서드 자체는 트랜잭션 밖이어야
-     * 서비스가 진짜로 커밋했는지를 볼 수 있다(클래스에 {@code @Transactional} 을 붙이면
-     * 전부 한 트랜잭션에 묶여 이 테스트의 의미가 사라진다).
-     * {@code deleteByEmail} 같은 파생 delete 쿼리는 트랜잭션이 없으면 예외가 난다.
-     */
+    /** 실제 커밋을 검증하므로 시험 메서드는 트랜잭션 밖에 두고, 파생 삭제 쿼리가 있는 준비 작업만 묶는다. */
     private TransactionTemplate tx;
 
     @Autowired
@@ -46,6 +45,8 @@ class PasswordResetAttemptLimitTest {
     @BeforeEach
     void setUp() {
         tx.executeWithoutResult(status -> {
+            members.findByEmail(EMAIL).orElseGet(() -> members.save(
+                    Member.builder().name("attempt limit test").email(EMAIL).password("fixture-hash").build()));
             tokenRepository.deleteByEmail(EMAIL);
             tokenRepository.save(PasswordResetToken.builder()
                     .email(EMAIL)
@@ -55,11 +56,7 @@ class PasswordResetAttemptLimitTest {
         });
     }
 
-    /**
-     * 이 테스트가 이 파일의 존재 이유다.
-     *
-     * <p>{@code noRollbackFor} 를 빼면 여기서 {@code attemptCount} 가 0 으로 나오며 실패한다.
-     */
+    /** 검증 예외에도 실패 횟수가 커밋되도록 {@code noRollbackFor} 경계를 검증한다. */
     @Test
     void failedAttemptIsPersistedEvenThoughTheServiceThrows() {
         assertThatThrownBy(() -> passwordResetService.verifyCode(EMAIL, WRONG_CODE))
@@ -84,11 +81,10 @@ class PasswordResetAttemptLimitTest {
         assertThat(tokenRepository.findTopByEmailOrderByIdDesc(EMAIL).orElseThrow().getAttemptCount())
                 .isEqualTo(PasswordResetToken.MAX_VERIFY_ATTEMPTS);
 
-        // 상한을 넘기면 **맞는 코드도 거부**해야 한다. 여기가 뚫리면 공격자는 상한을 소진한 뒤
-        // 계속 시도하면 되므로 방어가 통째로 무의미해진다.
+        // 소진된 코드를 계속 대조할 수 없도록 상한 이후에는 맞는 코드도 거부한다.
         assertThatThrownBy(() -> passwordResetService.verifyCode(EMAIL, REAL_CODE))
                 .isInstanceOf(MemberException.class)
-                .hasMessageContaining("초과");
+                .hasMessage("인증 코드를 확인하지 못했어요. 코드를 다시 확인하거나 새로 요청해주세요.");
     }
 
     /** 재설정 경로도 코드별 실패 횟수를 소모해 검증 API 우회를 막는다. */

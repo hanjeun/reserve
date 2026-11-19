@@ -8,17 +8,18 @@ import { EditOutlined, PlusOutlined } from '../common/icons';
 import { Bone, DataState } from '../common';
 import api from '../../api/axios';
 import useAuthStore from '../../store/useAuthStore';
-import SocialLoginButton from '../common/SocialLoginButton';
 import { revealSecurityPanel } from '../../utils/securityReturn';
 import useExitAnimation from '../../hooks/useExitAnimation';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import LoginMethodFormActions from './LoginMethodFormActions';
+import LoginSecurityPanelHeading from './LoginSecurityPanelHeading';
+import { LoginMethodSocialProof } from './LoginMethodForms';
 import MfaFlow from './MfaFlow';
 import styles from './myPageStyles';
 import { mfaCredentialName } from '../../utils/passkey';
 import useMessage from '../../hooks/useMessage';
 
-export default function MfaSecuritySection({ loginMethods, disabled = false, resumeRequest, onIntentChange, onSocialProof }) {
+export default function MfaSecuritySection({ loginMethods, disabled = false, resumeRequest, onIntentChange, onSocialProof, onSettingsChange }) {
     const navigate = useNavigate();
     const location = useLocation();
     const { message } = useMessage();
@@ -54,10 +55,16 @@ export default function MfaSecuritySection({ loginMethods, disabled = false, res
     useEffect(() => {
         const controller = new AbortController();
         api.get('/api/member/mfa', { signal: controller.signal }).then(value => {
-            if (!controller.signal.aborted) setLoad({ revision, status: value });
-        }).catch(failure => { if (!controller.signal.aborted) setLoad({ revision, error: failure }); });
+            if (controller.signal.aborted) return;
+            setLoad({ revision, status: value });
+            onSettingsChange?.(value);
+        }).catch(failure => {
+            if (controller.signal.aborted) return;
+            setLoad({ revision, error: failure });
+            onSettingsChange?.(null);
+        });
         return () => controller.abort();
-    }, [revision, retry]);
+    }, [revision, retry, onSettingsChange]);
     useEffect(() => {
         return () => { activeManage.current?.controller.abort(); activeManage.current = null; returnReveal.current?.(); };
     }, [revision]);
@@ -135,25 +142,26 @@ export default function MfaSecuritySection({ loginMethods, disabled = false, res
                 animation: reducedMotion ? 'none' : !open || isClosing ? 'reserve-feed-replies-exit 200ms ease-in both' : 'reserve-feed-replies-enter 200ms ease-out both' }}>
             <div style={{ minHeight: 0, overflow: 'hidden' }}><div ref={surfaceRef} tabIndex={-1} className="reserve-login-security-surface">
                 {!status || busy && directManage ? <div role="status" aria-label="인증 수단을 확인하는 중" aria-busy="true">
-                    <Bone width={160} height={20} pageLoading={false} />
+                    <LoginSecurityPanelHeading onClose={close} disabled><Typography.Text strong>{label}</Typography.Text></LoginSecurityPanelHeading>
                     <Bone height={16} pageLoading={false} style={{ marginTop: 12 }} />
                     <Bone width={44} height={44} pageLoading={false} style={{ marginTop: 16, marginInlineStart: 'auto' }} />
-                </div> : view?.revision === revision ? <MfaFlow ref={flowRef} initialView={view.value} settings={status} revealOnMount={false} onDone={() => { setRetry(value => value + 1); close(); }} onCancel={close} />
-                    : <Form key={revision} aria-label={label} layout="vertical" requiredMark={false} onFinish={manage}>
-                        {showPassword && <Form.Item name="password" label="현재 비밀번호" rules={[{ required: !loginMethods.socialProofFresh, message: '현재 비밀번호를 입력해주세요.' }]}>
-                            <FormInput type="password" autoComplete="current-password" maxLength={64} disabled={busy} />
-                        </Form.Item>}
-                        {needsSocialProof && <>
-                            <Typography.Paragraph style={styles.loginMethodHint}>연결된 소셜 계정으로 본인 확인을 먼저 진행해주세요.</Typography.Paragraph>
-                            {onSocialProof && loginMethods.socialProvider && <SocialLoginButton provider={loginMethods.socialProvider.toLowerCase()}
-                                label="연결된 소셜 계정으로 본인 확인" disabled={busy || disabled} onClick={onSocialProof} />}
+                </div> : view?.revision === revision ? <MfaFlow ref={flowRef} initialView={view.value} settings={status} revealOnMount={false}
+                    onDone={() => { setRetry(value => value + 1); close(); }} onCancel={() => { setRetry(value => value + 1); close(); }} />
+                    : <Form key={revision} aria-label={label} layout="vertical" requiredMark={false} onFinish={needsSocialProof ? undefined : manage}>
+                        {needsSocialProof ? <LoginMethodSocialProof title={label}
+                            description={`연결된 소셜 계정으로 본인 확인 후 ${status?.enabled ? '인증 수단 관리' : '패스키·인증 앱 등록'} 화면으로 이어져요.`}
+                            provider={loginMethods.socialProvider?.toLowerCase()} buttonLabel={`${label} 본인 확인`}
+                            disabled={busy || disabled} onConfirm={onSocialProof} onClose={close} /> : <>
+                            <LoginSecurityPanelHeading onClose={close} disabled={busy || disabled}><Typography.Text strong>{label}</Typography.Text></LoginSecurityPanelHeading>
+                            {showPassword && <Form.Item name="password" label="현재 비밀번호" rules={[{ required: !loginMethods.socialProofFresh, message: '현재 비밀번호를 입력해주세요.' }]}>
+                                <FormInput type="password" autoComplete="current-password" maxLength={64} disabled={busy} />
+                            </Form.Item>}
+                            <LoginMethodFormActions submitLabel={label} submitText="확인" busy={busy} />
                         </>}
-                        <LoginMethodFormActions submitLabel={label} submitText="확인" busy={busy}
-                            unavailableReason={needsSocialProof ? '연결된 소셜 계정으로 본인 확인을 먼저 진행해주세요.' : ''} />
                     </Form>}
             </div></div>
         </div>}
     </div>;
 }
 MfaSecuritySection.propTypes = { loginMethods: PropTypes.object.isRequired, disabled: PropTypes.bool,
-    resumeRequest: PropTypes.object, onIntentChange: PropTypes.func, onSocialProof: PropTypes.func };
+    resumeRequest: PropTypes.object, onIntentChange: PropTypes.func, onSocialProof: PropTypes.func, onSettingsChange: PropTypes.func };

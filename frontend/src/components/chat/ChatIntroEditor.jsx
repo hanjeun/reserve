@@ -60,8 +60,14 @@ export default function ChatIntroEditor({ intro, onSave, onUploadAvatar, saving 
 
     const body = bodyOf(draft, items, identityEditable);
     const dirty = JSON.stringify(body) !== savedSnapshot;
-    // 질문·답변이 둘 다 있는 항목만 손님에게 보인다. 미리보기도 같은 기준이다.
-    const previewItems = body.items.filter(item => item.question && item.answer);
+    // 중복 질문은 첫 답변만 미리 보여주고 저장할 때는 입력 오류로 안내한다.
+    const previewQuestions = new Set();
+    const previewItems = body.items.filter(item => {
+        const key = item.question.toLowerCase();
+        if (!key || !item.answer || previewQuestions.has(key)) return false;
+        previewQuestions.add(key);
+        return true;
+    });
     const full = items.length >= LIMITS.items;
     const shownName = isStore ? identity?.name : (body.displayName || SUPPORT_DISPLAY_NAME);
     const shownImage = isStore ? identity?.imageSrc : (draft.avatarUrl || undefined);

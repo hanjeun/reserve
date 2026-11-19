@@ -4,9 +4,11 @@ import jakarta.persistence.EntityManager;
 import kr.it.reserve.global.error.MemberException;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.repository.MemberRepository;
+import kr.it.reserve.global.persistence.CurrentLockedStateTestSupport;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -26,6 +28,8 @@ class FinancialReservationLocksTest {
     private final ReservationRepository reservations = mock(ReservationRepository.class);
     private final EntityManager entityManager = mock(EntityManager.class);
     private final FinancialReservationLocks locks = new FinancialReservationLocks(members, reservations, entityManager);
+
+    @BeforeEach void financialPersistence() { CurrentLockedStateTestSupport.managedEntities(entityManager); }
 
     @ParameterizedTest
     @CsvSource({"3,9", "9,3"})

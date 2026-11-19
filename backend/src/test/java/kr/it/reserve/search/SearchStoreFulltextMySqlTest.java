@@ -103,10 +103,11 @@ class SearchStoreFulltextMySqlTest {
         assertThat(ReflectionTestUtils.getField(fulltextTarget, "available")).isNull();
     }
 
-    @Test void explicitOptInUsesNgramWithTheSamePublicWindowOrderingAndFourFieldProjection() {
+    @Test void explicitOptInKeepsPublicWindowOrderingAndProjectsOnlyTheRepresentativeImage() {
         correctIndex(); Long[] first = new Long[1];
         tx.executeWithoutResult(status -> {
             Store promoted = store("사진 배지"); first[0] = promoted.getId();
+            promoted.setMainImageUrl(thumbnail(promoted.getId()));
             em.persist(Advertisement.builder().store(promoted).adType(AdType.BADGE).status(AdStatus.ACTIVE)
                     .startDate(ServiceTime.today()).endDate(ServiceTime.today().plusDays(1)).amount(0)
                     .merchantUid("synthetic-" + UUID.randomUUID()).build());
@@ -120,13 +121,19 @@ class SearchStoreFulltextMySqlTest {
         var indexed = read("사진");
         assertThat(indexed.items()).containsExactlyElementsOf(literal.items()).hasSize(6);
         assertThat(indexed.items().getFirst().id()).isEqualTo(first[0]);
+        assertThat(indexed.items().getFirst().thumbnailUrl()).isEqualTo(thumbnail(first[0]));
         assertThat(indexed.sql()).hasSize(2).filteredOn(sql -> sql.contains("match(")).hasSize(2);
         assertThat(indexed.sql()).noneMatch(sql -> sql.contains("count("));
-        assertThat(indexed.sql()).allSatisfy(sql -> assertThat(sql).doesNotContain("main_image_url", "detail_images", "password"));
+        assertThat(indexed.sql().stream().filter(sql -> sql.contains("main_image_url")).count()).isEqualTo(1L);
+        assertThat(indexed.sql()).allSatisfy(sql -> assertThat(sql).doesNotContain("detail_images", "password"));
         var plan = jdbc.queryForList("EXPLAIN SELECT store_id FROM store WHERE " + MATCH, fulltext.candidateQuery("사진"));
         assertThat(plan).anySatisfy(row -> {
             assertThat(row.get("type")).isEqualTo("fulltext"); assertThat(row.get("key")).isEqualTo("ft_store_search");
         });
+    }
+
+    private String thumbnail(Long id) {
+        return "https://cdn.reserve.it.kr/users/" + owner.getId() + "/stores/" + id + "/thumbnails/main.webp";
     }
 
     @ParameterizedTest @ValueSource(strings = {"missing", "parser", "columns"})

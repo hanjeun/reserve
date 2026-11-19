@@ -33,11 +33,11 @@ export default function UserGuide() {
             <GuideLinks links={[{ to: '/my-reservations', label: '내 예약 열기' }, { to: '/messages', label: '메시지 확인하기' }]} />
         </>,
         feed: <>
-            <GuideParagraph>피드에서는 공개 닉네임으로 글과 사진을 나눠요. 작성 아이콘을 눌러 시작하고 처음 한 번 공개 프로필을 설정해주세요. 계정 사진 공개는 직접 선택하며, 닉네임과 소개는 내 공개 프로필에서 바꿀 수 있어요.</GuideParagraph>
-            <GuideParagraph>임시저장한 글은 피드 왼쪽의 폴더 아이콘에서 확인해요. 폴더를 다시 누르면 최신 피드로 돌아와요. 임시저장 글을 열어 수정·저장하거나 게시할 수 있고, 내 글의 더 보기에서 수정·삭제할 수 있어요.</GuideParagraph>
+            <GuideParagraph>피드에서는 공개 닉네임으로 글과 사진을 나눠요. 마이페이지의 프로필에서 사진, 닉네임, 소개와 공개 범위를 정할 수 있어요. 프로필에서 게시물·댓글·리뷰를 모아 볼 수 있어요.</GuideParagraph>
+            <GuideParagraph>임시저장한 글은 계정 메뉴의 임시보관함이나 피드의 폴더 아이콘에서 열어요. 초안을 이어서 수정·저장하거나 게시할 수 있고, 내 글의 더 보기에서 수정·삭제할 수 있어요.</GuideParagraph>
             <GuideParagraph>글을 열면 댓글과 한 단계 답글을 남길 수 있어요. 댓글에는 글 또는 사진을 넣고 사진은 최대 6장까지 첨부해 순서를 바꿀 수 있어요. 내 댓글·답글은 수정·삭제하고 문제가 있는 내용은 신고할 수 있어요.</GuideParagraph>
             <GuideParagraph>가게·피드 글·혜택·댓글의 좋아요는 좋아요 화면에서 함께 확인해요. 댓글·답글·댓글 좋아요의 새 반응은 피드의 알림 아이콘에서 확인하고 해당 댓글로 이동해요. 읽음 상태를 관리할 수 있으며 알림은 90일 보관해요. 삭제되거나 숨겨진 내용은 알림에서 제외돼요.</GuideParagraph>
-            <GuideLinks links={[{ to: '/feed', label: '피드 열기' }, { to: '/feed?view=drafts', label: '피드 임시저장 보기' }, { to: '/feed/notifications', label: '피드 알림 보기' }, { to: '/my-favorites', label: '좋아요 모아보기' }]} />
+            <GuideLinks links={[{ to: '/feed', label: '피드 열기' }, { to: '/drafts?tab=posts', label: '피드 임시저장 보기' }, { to: '/feed/notifications', label: '피드 알림 보기' }, { to: '/my-favorites', label: '좋아요 모아보기' }]} />
         </>,
     }} />;
 }

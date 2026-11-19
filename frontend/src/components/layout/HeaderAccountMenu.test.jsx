@@ -23,9 +23,9 @@ vi.mock('antd', () => ({
     Dropdown: ({ children, menu }) => (
         <div>
             {children}
-            {menu.items.filter(item => item?.key).map(item => (
-                <button key={item.key} type="button" disabled={item.disabled} onClick={item.onClick}>{item.label}</button>
-            ))}
+            {menu.items.map((item, index) => item.type === 'divider'
+                ? <hr key={`divider-${index}`} />
+                : <button key={item.key} type="button" disabled={item.disabled} onClick={item.onClick}>{item.label}</button>)}
         </div>
     ),
     Typography: { Text: ({ children }) => <span>{children}</span> },
@@ -81,5 +81,14 @@ describe('HeaderAccountMenu logout', () => {
         await waitFor(() => expect(logout).toHaveBeenCalledTimes(1));
         expect(navigate).toHaveBeenCalledWith('/', { replace: true, state: { reserveRouteMotion: 'from-left' } });
         expect(message.warning).toHaveBeenCalledWith('이 기기에서 로그아웃했어요. 서버 연결은 확인하지 못했어요.');
+    });
+
+    it.each(['BUSINESS', 'ADMIN'])('puts one divider before the first management link for %s', role => {
+        authState.user = { ...authState.user, role };
+        render(<HeaderAccountMenu />);
+        const business = screen.getByRole('button', { name: '사업자 패널' });
+        const first = role === 'ADMIN' ? screen.getByRole('button', { name: '관리자 패널' }) : business;
+        expect(first.previousElementSibling.tagName).toBe('HR');
+        if (role === 'ADMIN') expect(business.previousElementSibling).toBe(first);
     });
 });

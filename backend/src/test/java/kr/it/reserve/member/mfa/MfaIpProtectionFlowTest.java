@@ -1,6 +1,9 @@
 package kr.it.reserve.member.mfa;
 
 import jakarta.persistence.EntityManager;
+import jakarta.servlet.http.Cookie;
+import kr.it.reserve.global.security.ip.IpLoginProtection.RegisteredBrowser;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import kr.it.reserve.config.jwt.TokenProvider;
 import kr.it.reserve.email.service.EmailService;
 import kr.it.reserve.global.error.AuthException;
@@ -9,6 +12,8 @@ import kr.it.reserve.member.entity.*;
 import kr.it.reserve.member.repository.MemberRepository;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +24,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import java.time.*;
+import java.util.List;
 import java.util.UUID;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -34,7 +42,9 @@ class MfaIpProtectionFlowTest {
     @Autowired EntityManager em;
     @Autowired PlatformTransactionManager transactions;
     @Autowired TokenProvider tokens;
+    @Autowired kr.it.reserve.config.service.TokenService tokenService;
     @Autowired MfaChallengeRepository completionChallenges;
+    @Autowired MfaRecoveryCodeRepository recoveryCodes;
     @Autowired kr.it.reserve.config.jwt.repository.RefreshTokenRepository completionSessions;
     @Autowired MockMvc http;
     @Autowired com.fasterxml.jackson.databind.ObjectMapper json;
@@ -79,6 +89,38 @@ class MfaIpProtectionFlowTest {
         assertThatThrownBy(() -> mfa.confirmCompletion(proof.reference(), null, sid)).isInstanceOf(AuthException.class);
         assertThatThrownBy(() -> mfa.confirmCompletion("b".repeat(64), current(), sid)).isInstanceOf(AuthException.class);
     }
+    @Test void browserRegistrationRequiresTheCompletedLoginCookieAndExactLiveSession() throws Exception {
+        var proof = verifiedRisk();
+        var ticket = new Cookie("mfa_ticket", proof.ticket().value());
+        String body = json.writeValueAsString(java.util.Map.of("completionId", proof.reference()));
+        String route = "/api/member/mfa/remember-browser";
+        http.perform(post(route).cookie(ticket).header("Referer", "https://reserve.it.kr/login")
+                .contentType("application/json").content(body)).andExpect(status().isUnauthorized());
+
+        var finished = http.perform(post("/api/auth/mfa/finish").cookie(ticket).header("Referer", "https://reserve.it.kr/login")
+                .contentType("application/json").content(json.writeValueAsString(
+                        java.util.Map.of("completionId", proof.reference(), "offerBrowserRegistration", true))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.browserRegistration").value("AVAILABLE"))
+                .andReturn().getResponse();
+        assertThat(finished.getHeaders("Set-Cookie")).noneMatch(value -> value.startsWith("mfa_ticket="));
+        var access = new Cookie("access_token", responseCookie(finished, "access_token"));
+        String sid = tokens.getSessionId(access.getValue());
+        verify(protection, never()).rememberAfterLogin(any(), anyString(), anyString());
+        assertThat(tokens.verifyAuthentication(access.getValue()).member().getId()).isEqualTo(member.getId());
+
+        http.perform(post(route).cookie(access).header("Referer", "https://reserve.it.kr/login")
+                .contentType("application/json").content(body)).andExpect(status().isUnauthorized());
+        assertThatThrownBy(() -> mfa.rememberAfterLogin(ticket.getValue(), proof.reference(), current(),
+                tokens.getSessionId(tokens.issueSession(current(), null).accessToken()))).isInstanceOf(AuthException.class);
+        http.perform(post(route).cookie(access, ticket).header("Origin", "https://unrelated.example")
+                .contentType("application/json").content(body)).andExpect(status().isForbidden());
+        verify(protection, never()).rememberAfterLogin(any(), anyString(), anyString());
+
+        http.perform(post(route).cookie(access, ticket).header("Referer", "https://reserve.it.kr/login")
+                .contentType("application/json").content(body)).andExpect(status().isOk());
+        verify(protection).rememberAfterLogin(argThat(owner -> owner.getId().equals(member.getId())), eq(sid), eq(ticket.getValue()));
+    }
+
     @Test void completionCannotAcceptAnExpiredVersionOrWeakenRequiredAdministratorAuthentication() {
         var proof = verifiedRisk();
         var session = mfa.finish(proof.ticket().value(), null, null, proof.reference()).session();
@@ -178,6 +220,254 @@ class MfaIpProtectionFlowTest {
         assertThat(new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().matches("SyntheticNext123!", current().getPassword())).isTrue();
         assertThatThrownBy(() -> tokens.verifyAuthentication(access.getValue())).isInstanceOf(RuntimeException.class);
     }
+    @Test void deviceManagementRequiresItsOwnProofAndRevokesOnlyTheSelectedOtherSession() throws Exception {
+        when(protection.enabled()).thenReturn(true);
+        when(protection.needsStepUp(any())).thenReturn(false);
+        var local = tokens.issueSession(current(), null);
+        var remote = tokens.issueSession(current(), null);
+        var unregistered = tokens.issueSession(current(), null);
+        String localSid = tokens.getSessionId(local.accessToken()), remoteSid = tokens.getSessionId(remote.accessToken());
+        String unregisteredSid = tokens.getSessionId(unregistered.accessToken());
+        var localAccess = new Cookie("access_token", local.accessToken());
+        var remoteAccess = new Cookie("access_token", remote.accessToken());
+        Member other = tx.execute(ignored -> {
+            Member value = Member.builder().name("다른 합성 회원").email(UUID.randomUUID() + "@example.test").role(Role.USER).termsAgreed(true)
+                    .password(current().getPassword()).build();
+            em.persist(value); return value;
+        });
+        var otherSession = tokens.issueSession(other, null);
+        String path = "/api/member/login-methods/devices";
+        String localId = "a".repeat(64), remoteId = "b".repeat(64), legacyId = "c".repeat(64), otherId = "d".repeat(64);
+        Instant expiry = Instant.now().plusSeconds(60);
+        when(protection.registeredBrowsers(any(), eq(localSid))).thenReturn(List.of(
+                new RegisteredBrowser(localId, "windows", "chrome", expiry, true, List.of("local-ref")),
+                new RegisteredBrowser(remoteId, "ios", "safari", expiry, false, List.of("remote-ref")),
+                new RegisteredBrowser(legacyId, "other", "other", expiry, false, List.of())));
+        when(protection.sessionReference(any(), eq(remoteSid))).thenReturn("remote-ref");
+        when(protection.sessionReference(any(), eq(localSid))).thenReturn("local-ref");
+        when(protection.sessionReference(any(), eq(unregisteredSid))).thenReturn("unregistered-ref");
+
+        http.perform(deviceRequest(get(path), member, localAccess)).andExpect(status().isPreconditionRequired());
+        var wrongProof = confirmation("CHANGE", localAccess);
+        http.perform(deviceRequest(get(path), member, localAccess, wrongProof)).andExpect(status().isPreconditionRequired());
+        var proof = confirmation("DEVICES", localAccess);
+        http.perform(deviceRequest(get(path), member, remoteAccess, proof)).andExpect(status().isPreconditionRequired());
+        http.perform(deviceRequest(get(path), other, new Cookie("access_token", otherSession.accessToken()), proof))
+                .andExpect(status().isPreconditionRequired());
+        var listing = http.perform(deviceRequest(get(path), member, localAccess, proof))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.data.length()").value(4))
+                .andExpect(jsonPath("$.data[0].current").value(true))
+                .andExpect(jsonPath("$.data[0].registered").value(true))
+                .andExpect(jsonPath("$.data[1].sessionState").value("ACTIVE"))
+                .andExpect(jsonPath("$.data[2].sessionState").value("UNKNOWN"))
+                .andExpect(jsonPath("$.data[3].registered").value(false))
+                .andExpect(jsonPath("$.data[3].sessionState").value("ACTIVE"))
+                .andExpect(jsonPath("$.data[3].signedInAt").exists())
+                .andExpect(jsonPath("$.data[1].sessionReferences").doesNotExist())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(listing).doesNotContain(localSid, remoteSid, unregisteredSid);
+        http.perform(deviceRequest(post(path + "/" + otherId + "/sign-out"), member, localAccess, proof)).andExpect(status().isNotFound());
+        http.perform(deviceRequest(post(path + "/" + localId + "/sign-out"), member, localAccess, proof)).andExpect(status().isBadRequest());
+        http.perform(deviceRequest(post(path + "/" + remoteId + "/sign-out"), member, localAccess, proof)).andExpect(status().isOk());
+        assertThatThrownBy(() -> tokens.verifyAuthentication(remote.accessToken())).isInstanceOf(AuthException.class);
+        assertThat(tokens.verifyAuthentication(unregistered.accessToken()).sessionId()).isEqualTo(unregisteredSid);
+        assertThat(tokens.verifyAuthentication(local.accessToken()).sessionId()).isEqualTo(localSid);
+        assertThat(tokens.verifyAuthentication(otherSession.accessToken()).member().getId()).isEqualTo(other.getId());
+        http.perform(deviceRequest(get(path), member, localAccess, proof))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data[1].sessionState").value("UNKNOWN"));
+        completionSessions.delete(completionSessions.findBySessionIdAndMemberId(unregisteredSid, member.getId()).orElseThrow());
+        http.perform(deviceRequest(get(path), member, localAccess, proof))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data[1].sessionState").value("SIGNED_OUT"));
+        http.perform(deviceRequest(delete(path + "/" + localId), member, localAccess, proof)).andExpect(status().isOk());
+        verify(protection).forgetRegisteredBrowser(any(), eq(localId));
+        assertThat(tokens.verifyAuthentication(local.accessToken()).sessionId()).isEqualTo(localSid);
+        http.perform(deviceRequest(post(path), member, localAccess, proof)).andExpect(status().isOk());
+        verify(protection).registerCurrentBrowser(any(), eq(localSid), eq(proof.getValue()));
+        http.perform(deviceRequest(get(path), member, localAccess, proof)).andExpect(status().isOk());
+    }
+
+    @Test void disabledBrowserTrustStillAllowsVerifiedSessionManagementWithoutRegistration() throws Exception {
+        when(protection.needsStepUp(any())).thenReturn(false);
+        when(protection.browserStatus(any())).thenReturn("DISABLED");
+        var local = access();
+        var remote = access();
+        var another = access();
+        String path = "/api/member/login-methods/devices";
+        LocalDateTime past = LocalDateTime.now(ZoneOffset.UTC).minusDays(1);
+        var expired = new kr.it.reserve.config.jwt.entity.RefreshToken(member.getId(), UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(), null, past, past.plusMinutes(30), past.plusHours(1), 0, null, "PASSWORD");
+        expired.bindRefreshToken("expired-synthetic-session");
+        completionSessions.save(expired);
+
+        http.perform(deviceRequest(get(path), member, local)).andExpect(status().isPreconditionRequired());
+        http.perform(deviceRequest(get("/api/member/login-methods"), member, local))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.deviceSessionsAvailable").value(true))
+                .andExpect(jsonPath("$.data.browserTrust").value("DISABLED"));
+        var proof = confirmation("DEVICES", local);
+        var body = http.perform(deviceRequest(get(path), member, local, proof))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(3))
+                .andExpect(jsonPath("$.data[0].current").value(true))
+                .andExpect(jsonPath("$.data[0].registered").value(false))
+                .andExpect(jsonPath("$.data[1].current").value(false))
+                .andExpect(jsonPath("$.data[1].registered").value(false))
+                .andExpect(jsonPath("$.data[2].current").value(false))
+                .andExpect(jsonPath("$.data[2].registered").value(false))
+                .andReturn().getResponse().getContentAsString();
+        String localId = json.readTree(body).at("/data/0/id").asText();
+        var remoteProof = confirmation("DEVICES", remote);
+        var remoteBody = http.perform(deviceRequest(get(path), member, remote, remoteProof))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].current").value(true))
+                .andReturn().getResponse().getContentAsString();
+        String remoteId = json.readTree(remoteBody).at("/data/0/id").asText();
+        assertThat(remoteId).isNotBlank().isNotEqualTo(localId);
+        http.perform(deviceRequest(post(path), member, local, proof)).andExpect(status().isBadRequest());
+        http.perform(deviceRequest(delete(path + "/" + localId), member, local, proof)).andExpect(status().isBadRequest());
+        http.perform(deviceRequest(post(path + "/" + localId + "/sign-out"), member, local, proof)).andExpect(status().isBadRequest());
+        http.perform(deviceRequest(post(path + "/" + remoteId + "/sign-out"), member, local, proof)).andExpect(status().isOk());
+        assertThatThrownBy(() -> tokens.verifyAuthentication(remote.getValue())).isInstanceOf(AuthException.class);
+        assertThatCode(() -> tokens.verifyAuthentication(local.getValue())).doesNotThrowAnyException();
+        assertThatCode(() -> tokens.verifyAuthentication(another.getValue())).doesNotThrowAnyException();
+        var remaining = http.perform(deviceRequest(get(path), member, local, proof))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(2))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(remaining).doesNotContain(remoteId);
+        verify(protection, never()).registeredBrowsers(any(), any());
+    }
+
+    @Test void socialSessionCanVerifyDevicesWithOneRegisteredCodeWithoutAnotherPrimaryLogin() throws Exception {
+        when(protection.enabled()).thenReturn(true);
+        when(protection.needsStepUp(any())).thenReturn(true);
+        LocalDateTime at = LocalDateTime.now(ZoneOffset.UTC).minusMinutes(10);
+        Member social = socialDeviceMember(AuthProvider.NAVER, Role.USER, true);
+        var session = tokens.issueSession(social, at);
+        var access = new Cookie("access_token", session.accessToken());
+        String sid = tokens.getSessionId(session.accessToken());
+        http.perform(deviceRequest(get("/api/member/login-methods"), social, access)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.deviceFactorAvailable").value(true));
+        var ticket = mfa.beginSensitive(social, sid, at, null, true, null, MfaService.SensitiveAction.DEVICES);
+        var proof = new Cookie("mfa_ticket", ticket.value());
+        var view = mfa.status(ticket.value(), social, sid);
+        assertThat(view.passkeyOnly()).isFalse();
+        assertThat(view.verified()).isFalse();
+        assertThat(view.passkeyAvailable()).isFalse();
+        assertThat(view.totpAvailable()).isTrue();
+        assertThat(view.emailAvailable()).isFalse();
+        assertThatThrownBy(() -> mfa.verify(ticket.value(), social, sid, "BACKUP", "fixture-code")).isInstanceOf(AuthException.class);
+        http.perform(deviceRequest(get("/api/member/login-methods/devices"), social, access, proof)).andExpect(status().isPreconditionRequired());
+        assertThatThrownBy(() -> mfa.beginSensitive(social, sid, at, null, true, null, MfaService.SensitiveAction.LINK))
+                .isInstanceOf(AuthException.class);
+        var verified = mfa.verify(ticket.value(), social, sid, "TOTP",
+                MfaCrypto.code(DEVICE_SECRET, Instant.now().getEpochSecond() / 30, 6));
+        assertThat(verified.view().verified()).isTrue();
+        http.perform(deviceRequest(get("/api/member/login-methods/devices"), social, access, proof)).andExpect(status().isOk());
+        assertThat(tokens.getLoginMethod(session.accessToken())).isEqualTo("OAUTH");
+    }
+
+    @ParameterizedTest @ValueSource(booleans = {true, false})
+    void enrolledMemberCanUseFreshPasswordOnceButExistingSessionAloneDoesNotVerifyDevices(boolean browserProtection) {
+        when(protection.enabled()).thenReturn(browserProtection);
+        when(protection.needsStepUp(any())).thenReturn(false);
+        var primary = tokens.issueSession(current(), null);
+        String primarySid = tokens.getSessionId(primary.accessToken());
+        var setupTicket = mfa.beginManage(current(), primarySid, null, "synthetic-password");
+        var setup = mfa.beginTotp(setupTicket.value(), current(), primarySid);
+        var enrolled = mfa.confirmTotp(setupTicket.value(), current(), primarySid,
+                MfaCrypto.code(setup.secret(), Instant.now().getEpochSecond() / 30, 6));
+        String sid = tokens.getSessionId(enrolled.session().accessToken());
+        var ticket = mfa.beginSensitive(current(), sid, null, "synthetic-password", true, null, MfaService.SensitiveAction.DEVICES);
+        var view = mfa.status(ticket.value(), current(), sid);
+        assertThat(view.verified()).isTrue();
+        assertThat(view.totpAvailable()).isTrue();
+        assertThat(view.emailAvailable()).isFalse();
+        assertThatThrownBy(() -> mfa.finish(ticket.value(), current(), sid)).isInstanceOf(AuthException.class);
+        var withoutPrimary = mfa.beginSensitive(current(), sid, null, null, true, ticket.value(), MfaService.SensitiveAction.DEVICES);
+        assertThat(mfa.status(withoutPrimary.value(), current(), sid).verified()).isFalse();
+        assertThatThrownBy(() -> mfa.beginSensitive(current(), sid, null, null, true, withoutPrimary.value(), MfaService.SensitiveAction.CHANGE))
+                .isInstanceOf(AuthException.class);
+        var strongSession = tokens.issueVerifiedSession(current(), null, "PASSWORD_MFA");
+        String strongSid = tokens.getSessionId(strongSession.accessToken());
+        var change = mfa.beginSensitive(current(), strongSid, null, null, true, null, MfaService.SensitiveAction.CHANGE);
+        assertThat(mfa.status(change.value(), current(), strongSid).verified()).isFalse();
+    }
+
+    private static final String DEVICE_SECRET = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
+
+    private Member socialDeviceMember(AuthProvider provider, Role role, boolean enrolled) {
+        return tx.execute(ignored -> {
+            Member value = Member.builder().name("합성 기기 회원").email(UUID.randomUUID() + "@example.test")
+                    .provider(provider).providerId(UUID.randomUUID().toString()).role(role).termsAgreed(true).build();
+            em.persist(value);
+            if (enrolled) {
+                var account = new MfaAccount(value.getId(), LocalDateTime.now(ZoneOffset.UTC));
+                account.enable(); em.persist(account);
+                em.persist(MfaCredential.totp(value.getId(), crypto.encrypt(DEVICE_SECRET, value.getId()), -1, LocalDateTime.now(ZoneOffset.UTC)));
+            }
+            return value;
+        });
+    }
+
+    @ParameterizedTest
+    @CsvSource({"NAVER, USER", "GOOGLE, USER", "KAKAO, USER", "NAVER, BUSINESS", "GOOGLE, BUSINESS", "KAKAO, BUSINESS",
+            "NAVER, ADMIN", "GOOGLE, ADMIN", "KAKAO, ADMIN"})
+    void freshSocialProofOpensOnlyDevicesWithoutRepeatingAnEnrolledFactor(AuthProvider provider, Role role) throws Exception {
+        when(protection.needsStepUp(any())).thenReturn(false);
+        Member social = socialDeviceMember(provider, role, true);
+        LocalDateTime earlier = LocalDateTime.now(ZoneOffset.UTC).minusMinutes(10);
+        var initial = role == Role.ADMIN ? tokens.issueVerifiedSession(social, earlier, "OAUTH_MFA") : tokens.issueSession(social, earlier);
+        LocalDateTime at = LocalDateTime.now(ZoneOffset.UTC);
+        var session = tokens.reauthenticateOAuth(social, initial.accessToken(), at);
+        String sid = tokens.getSessionId(session.accessToken());
+        var access = new Cookie("access_token", session.accessToken());
+        var response = http.perform(deviceRequest(post("/api/member/login-methods/confirm"), social, access)
+                        .contentType("application/json").content("{\"action\":\"DEVICES\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.verified").value(true)).andReturn().getResponse();
+        var proof = response.getCookie("mfa_ticket");
+        http.perform(deviceRequest(get("/api/member/login-methods/devices"), social, access, proof)).andExpect(status().isOk());
+        assertThat(completionChallenges.findById(MfaCrypto.digest(proof.getValue())).orElseThrow().getPrimaryMethod()).isEqualTo("OAUTH_DEVICES");
+        assertThatThrownBy(() -> mfa.beginTotp(proof.getValue(), social, sid)).isInstanceOf(AuthException.class);
+        if (role == Role.ADMIN) {
+            assertThat(tokens.getLoginMethod(session.accessToken())).isEqualTo("OAUTH_MFA");
+            assertThat(mfa.beginLogin(social, at)).isNotNull();
+            var otherAction = mfa.beginSensitive(social, sid, at, null, true, null, MfaService.SensitiveAction.REMOVE);
+            assertThat(mfa.status(otherAction.value(), social, sid).verified()).isFalse();
+        }
+        when(protection.needsStepUp(any())).thenReturn(true);
+        http.perform(deviceRequest(get("/api/member/login-methods/devices"), social, access, proof)).andExpect(status().isPreconditionRequired());
+    }
+
+    @ParameterizedTest @EnumSource(value = AuthProvider.class, names = {"NAVER", "GOOGLE", "KAKAO"})
+    void socialMemberWithoutPasskeyOrTotpCanManageDevicesAfterFreshSocialProof(AuthProvider provider) throws Exception {
+        when(protection.needsStepUp(any())).thenReturn(false);
+        Member social = socialDeviceMember(provider, Role.USER, false);
+        LocalDateTime at = LocalDateTime.now(ZoneOffset.UTC);
+        var session = tokens.issueSession(social, at);
+        var ticket = mfa.beginSensitive(social, tokens.getSessionId(session.accessToken()), at, null, true, null, MfaService.SensitiveAction.DEVICES);
+        assertThat(mfa.status(ticket.value(), social, tokens.getSessionId(session.accessToken())).verified()).isTrue();
+        http.perform(deviceRequest(get("/api/member/login-methods/devices"), social,
+                new Cookie("access_token", session.accessToken()), new Cookie("mfa_ticket", ticket.value()))).andExpect(status().isOk());
+    }
+
+    @Test void deviceProofCannotKeepUsingABasicSessionAfterMandatoryProtectionIsEnabled() {
+        when(protection.needsStepUp(any())).thenReturn(false);
+        Member social = socialDeviceMember(AuthProvider.GOOGLE, Role.USER, true);
+        LocalDateTime at = LocalDateTime.now(ZoneOffset.UTC);
+        var session = tokens.issueSession(social, at);
+        String sid = tokens.getSessionId(session.accessToken());
+        var ticket = mfa.beginSensitive(social, sid, at, null, true, null, MfaService.SensitiveAction.DEVICES);
+        tx.executeWithoutResult(ignored -> em.find(Member.class, social.getId()).setAccountRecoveryMfaRequired(true));
+        Member protectedMember = members.findById(social.getId()).orElseThrow();
+        assertThatThrownBy(() -> mfa.status(ticket.value(), protectedMember, sid)).isInstanceOf(AuthException.class);
+        assertThatThrownBy(() -> mfa.beginSensitive(protectedMember, sid, at, null, true, null, MfaService.SensitiveAction.DEVICES))
+                .isInstanceOf(AuthException.class);
+    }
+
+    private MockHttpServletRequestBuilder deviceRequest(MockHttpServletRequestBuilder request, Member owner, Cookie... cookies) {
+        return request.header("Referer", "https://reserve.it.kr/my-page")
+                .header("X-Reserve-Member-Id", owner.getId().toString()).cookie(cookies)
+                .with(incoming -> { incoming.setRemoteAddr("192.0.2.37"); return incoming; });
+    }
+
     @Test void trustedBrowserStillNeedsFreshPrimaryAndCannotReuseTheProofForAnotherActionOrSession() throws Exception {
         when(protection.needsStepUp(any())).thenReturn(false);
         var access = access();
@@ -223,6 +513,7 @@ class MfaIpProtectionFlowTest {
         var view = mfa.status(ticket.value(), null, null);
         assertThat(view.purpose()).isEqualTo("RISK_LOGIN");
         assertThat(view.emailAvailable()).isTrue();
+        assertThat(view.recoveryCodeAvailable()).isFalse();
         assertThat(view.enrollmentRequired()).isFalse();
         assertThat(view.canDeferEnrollment()).isFalse();
         assertThatThrownBy(() -> mfa.finish(ticket.value(), null, null)).isInstanceOf(AuthException.class);
@@ -274,12 +565,14 @@ class MfaIpProtectionFlowTest {
         var sid = tokens.getSessionId(primary.accessToken());
         var setupTicket = mfa.beginManage(current(), sid, null, "synthetic-password");
         var setup = mfa.beginTotp(setupTicket.value(), current(), sid);
-        var codes = mfa.confirmTotp(setupTicket.value(), current(), sid, MfaCrypto.code(setup.secret(), Instant.now().getEpochSecond() / 30, 6));
+        var codes = mfa.confirmTotp(setupTicket.value(), current(), sid, MfaCrypto.code(setup.secret(), Instant.now().getEpochSecond() / 30, 6)).codes();
         mfa.finish(setupTicket.value(), null, null);
         when(protection.needsStepUp(any())).thenReturn(true);
         var ticket = mfa.beginLogin(current(), null);
-        assertThat(mfa.status(ticket.value(), null, null).totpAvailable()).isTrue();
-        assertThat(mfa.status(ticket.value(), null, null).emailAvailable()).isFalse();
+        var view = mfa.status(ticket.value(), null, null);
+        assertThat(view.totpAvailable()).isTrue();
+        assertThat(view.emailAvailable()).isFalse();
+        assertThat(view.recoveryCodeAvailable()).isTrue();
         assertThatThrownBy(() -> mfa.sendRiskEmail(ticket.value(), null, null)).isInstanceOf(AuthException.class);
         String proof = "BACKUP".equals(kind) ? codes.getFirst() : MfaCrypto.code(setup.secret(), Instant.now().getEpochSecond() / 30 + 1, 6);
         mfa.verify(ticket.value(), null, null, kind, proof);
@@ -288,6 +581,9 @@ class MfaIpProtectionFlowTest {
         assertThat(mfa.settings(current()).recoveryCodes()).isEqualTo("BACKUP".equals(kind) ? 9 : 10);
         assertThatThrownBy(() -> mfa.verify(mfa.beginLogin(current(), null).value(), null, null, kind, proof))
                 .isInstanceOf(MfaService.RejectedProof.class);
+        tx.executeWithoutResult(ignored -> recoveryCodes.deleteByMemberId(member.getId()));
+        var afterExhaustion = mfa.beginLogin(current(), null);
+        assertThat(mfa.status(afterExhaustion.value(), null, null).recoveryCodeAvailable()).isFalse();
     }
     @Test void socialPrimaryProofKeepsItsExpiryAndOauthMethodAfterTheNetworkCheck() {
         LocalDateTime at = LocalDateTime.now(Clock.systemUTC()).truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
@@ -309,15 +605,20 @@ class MfaIpProtectionFlowTest {
         assertThat(mfa.beginLogin(current(), null)).isNull();
         verify(protection, never()).bind(any(), any());
     }
-    @Test void rolledBackSessionIssuanceNeverRecordsATrustedNetwork() {
+    @Test void onlyCommittedInteractiveLoginRenewsARegisteredBrowser() {
         Runnable remember = mock(Runnable.class);
         when(protection.beforeSession(any(), anyBoolean())).thenReturn(remember);
         assertThatThrownBy(() -> tx.executeWithoutResult(ignored -> {
-            tokens.issueSession(current(), null);
+            tokens.issueSession(current(), null, true);
             throw new IllegalStateException("synthetic rollback");
         })).isInstanceOf(IllegalStateException.class);
         verify(remember, never()).run();
-        tokens.issueSession(current(), null);
+        verify(protection, never()).renewBrowserAfterLogin(any());
+        var login = tokens.issueSession(current(), null, true);
         verify(remember).run();
+        verify(protection).renewBrowserAfterLogin(any());
+        tokenService.refresh(login.refreshToken());
+        tokens.issueReplacementSession(current(), null, null, true);
+        verify(protection, times(1)).renewBrowserAfterLogin(any());
     }
 }

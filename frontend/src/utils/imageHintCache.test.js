@@ -93,4 +93,17 @@ describe('public store photo hints', () => {
             document.querySelectorAll('meta[name^="reserve-store-image-"]').forEach(meta => meta.remove());
         }
     });
+
+    it('accepts the matching public address while checking the numeric photo path', () => {
+        const publicId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+        documentHint(FIRST, { 'public-id': publicId });
+        expect(cache.getImageHint(publicId.toUpperCase())).toEqual({ width: 600, height: 800 });
+        expect(cache.getImageHint('ffffffff-bbbb-4ccc-8ddd-eeeeeeeeeeee')).toBeNull();
+
+        document.querySelector('meta[name="reserve-store-image-url"]').content = FIRST.replace('/stores/41/', '/stores/42/');
+        expect(cache.getImageHint(publicId)).toBeNull();
+        document.querySelector('meta[name="reserve-store-image-url"]').content = FIRST;
+        cache.forgetImageHint(publicId);
+        expect(cache.getImageHint(publicId)).toBeNull();
+    });
 });

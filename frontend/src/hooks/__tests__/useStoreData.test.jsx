@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import useStoreData from '../useStoreData';
+import { storeKeys } from '../queryKeys';
 import storeService from '../../services/storeService';
 import reservationService from '../../services/reservationService';
 
@@ -20,11 +21,40 @@ const renderStoreData = (storeId, options) => {
 describe('useStoreData failure boundary', () => {
     beforeEach(() => vi.resetAllMocks());
 
+    const publicId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+
+    it('loads a UUID through the public read and returns the numeric store identity', async () => {
+        const store = { id: 12, publicId, name: '가게' };
+        storeService.getStoreById.mockResolvedValueOnce(store);
+        const { result } = renderStoreData(publicId.toUpperCase());
+        await waitFor(() => expect(result.current.store).toEqual(store));
+        expect(storeService.getStoreById).toHaveBeenCalledWith(publicId);
+        expect(storeService.getStoreForEdit).not.toHaveBeenCalled();
+    });
+
+    it('does not expose a response for a different public address', async () => {
+        storeService.getStoreById.mockResolvedValueOnce({ id: 12, publicId: 'ffffffff-bbbb-4ccc-8ddd-eeeeeeeeeeee' });
+        const { result } = renderStoreData(publicId);
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        expect(storeService.getStoreById).toHaveBeenCalledWith(publicId);
+        expect(result.current.store).toBeNull();
+    });
+
+    it.each([[publicId, { forEdit: true }], [12, {}], [12, { reservationId: 31 }]])(
+        'rejects the wrong identity type without a fallback (%s, %j)', async (address, options) => {
+        const { result } = renderStoreData(address, options);
+        await act(async () => { await result.current.refetch(); });
+        expect(result.current.store).toBeNull();
+        expect(storeService.getStoreById).not.toHaveBeenCalled();
+        expect(storeService.getStoreForEdit).not.toHaveBeenCalled();
+        expect(reservationService.getEditStore).not.toHaveBeenCalled();
+    });
+
     it.each([404, 410])('retains status %s and hides a cached store once the server says it is missing', async (status) => {
         const missing = Object.assign(new Error('정보를 찾을 수 없어요.'), { status });
-        storeService.getStoreById.mockResolvedValueOnce({ id: 12, name: '가게' }).mockRejectedValue(missing);
+        storeService.getStoreById.mockResolvedValueOnce({ id: 12, publicId, name: '가게' }).mockRejectedValue(missing);
 
-        const { result } = renderStoreData(12);
+        const { result } = renderStoreData(publicId);
         await waitFor(() => expect(result.current.store?.id).toBe(12));
         await act(async () => { await result.current.refetch(); });
 
@@ -49,12 +79,27 @@ describe('useStoreData failure boundary', () => {
         expect(storeService.getStoreById).not.toHaveBeenCalled();
     });
 
+    it('reads the current edit base before resuming a draft even with a fresh ordinary edit cache', async () => {
+        const client = new QueryClient({ defaultOptions: { queries: { staleTime: 60_000, retry: false } } });
+        client.setQueryData([...storeKeys.detail(12), 'edit'], { id: 12, name: '캐시된 가게' });
+        let finishRead;
+        storeService.getStoreForEdit.mockReturnValueOnce(new Promise(resolve => { finishRead = resolve; }));
+        const wrapper = ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+        const { result } = renderHook(() => useStoreData(12, { forEdit: true, editDraftEntryKey: 'resume' }), { wrapper });
+
+        expect(result.current).toMatchObject({ loading: true, store: null });
+        const currentStore = { id: 12, name: '현재 가게' };
+        await act(async () => { finishRead(currentStore); });
+        await waitFor(() => expect(result.current.store).toEqual(currentStore));
+        expect(storeService.getStoreForEdit).toHaveBeenCalledExactlyOnceWith(12);
+    });
+
     it('keeps cached store data when a refresh fails temporarily', async () => {
-        const store = { id: 12, name: '가게' };
+        const store = { id: 12, publicId, name: '가게' };
         const unavailable = Object.assign(new Error('일시적인 서버 오류'), { status: 503 });
         storeService.getStoreById.mockResolvedValueOnce(store).mockRejectedValue(unavailable);
 
-        const { result } = renderStoreData(12);
+        const { result } = renderStoreData(publicId);
         await waitFor(() => expect(result.current.store).toEqual(store));
         await act(async () => { await result.current.refetch(); });
 
@@ -76,10 +121,10 @@ describe('useStoreData failure boundary', () => {
 
     it('uses only the authorized reservation context and hides cached context after access is revoked', async () => {
         const denied = Object.assign(new Error('변경할 수 없는 예약이에요.'), { status: 403 });
-        reservationService.getEditStore.mockResolvedValueOnce({ id: 12 }).mockRejectedValueOnce(denied);
-        const { result } = renderStoreData(12, { reservationId: 31 });
+        reservationService.getEditStore.mockResolvedValueOnce({ id: 12, publicId }).mockRejectedValueOnce(denied);
+        const { result } = renderStoreData(publicId, { reservationId: 31 });
         await waitFor(() => expect(result.current.store?.id).toBe(12));
-        expect(reservationService.getEditStore).toHaveBeenCalledWith(31, 12, { signal: expect.any(AbortSignal) });
+        expect(reservationService.getEditStore).toHaveBeenCalledWith(31, publicId, { signal: expect.any(AbortSignal) });
         await act(async () => { await result.current.refetch(); });
         await waitFor(() => expect(result.current.error).toBe(denied));
         expect(result.current.store).toBeNull();
@@ -88,7 +133,7 @@ describe('useStoreData failure boundary', () => {
     });
 
     it.each(['', 'abc', '-1', '0', '9007199254740992'])('never falls back to public data for invalid reservation context %s', async reservationId => {
-        const { result } = renderStoreData(12, { reservationId });
+        const { result } = renderStoreData(publicId, { reservationId });
         await act(async () => { await result.current.refetch(); });
         expect(result.current.store).toBeNull();
         expect(reservationService.getEditStore).not.toHaveBeenCalled();
@@ -99,7 +144,7 @@ describe('useStoreData failure boundary', () => {
         'retries status %s only when the failure can be temporary', async (status, requests) => {
             const error = Object.assign(new Error('서버에 연결할 수 없습니다.'), { status });
             storeService.getStoreById.mockRejectedValue(error);
-            const { result } = renderStoreData(12);
+            const { result } = renderStoreData(publicId);
             await waitFor(() => expect(result.current.error).toBe(error));
             expect(storeService.getStoreById).toHaveBeenCalledTimes(requests);
         },
@@ -112,9 +157,9 @@ describe('useStoreData failure boundary', () => {
         read.mockReturnValue(pending);
         const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
         const wrapper = ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
-        const view = renderHook(() => useStoreData(12, { forEdit }), { wrapper, reactStrictMode: true });
+        const view = renderHook(() => useStoreData(forEdit ? 12 : publicId, { forEdit }), { wrapper, reactStrictMode: true });
         expect(read).toHaveBeenCalledTimes(1);
-        await act(async () => { resolve({ id: 12, name: '서버 원본 가게' }); });
+        await act(async () => { resolve({ id: 12, publicId, name: '서버 원본 가게' }); });
         await waitFor(() => expect(view.result.current.store?.name).toBe('서버 원본 가게'));
         expect(read).toHaveBeenCalledTimes(1);
         view.unmount();
@@ -122,7 +167,7 @@ describe('useStoreData failure boundary', () => {
 
     it('aborts the authorized reservation edit lookup on unmount', () => {
         reservationService.getEditStore.mockReturnValue(new Promise(() => {}));
-        const { unmount } = renderStoreData(12, { reservationId: 31 });
+        const { unmount } = renderStoreData(publicId, { reservationId: 31 });
         expect(reservationService.getEditStore).toHaveBeenCalledOnce();
         const signal = reservationService.getEditStore.mock.calls[0][2].signal;
         expect(signal.aborted).toBe(false);

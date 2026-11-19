@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
+import PropTypes from 'prop-types';
 import { Tag, Typography } from 'antd';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     AdminTableSkeleton,
     Button,
     DataState,
-    DataTable,
+    PagedDataTable,
     FilterMenu,
     FormField,
     FormModal,
@@ -19,6 +20,7 @@ import { adminKeys } from '../../hooks/queryKeys';
 import { chatService } from '../../services';
 import { listRows } from '../../utils/listResponse';
 import ChatImage from '../chat/ChatImage';
+import ChatFileDownload from '../chat/ChatFileDownload';
 import ChatRetentionModal from './ChatRetentionModal';
 import ManagementListToolbar from '../common/ManagementListToolbar';
 import SkeletonText from '../common/SkeletonText';
@@ -27,6 +29,10 @@ import { useQueryParamsState } from '../../hooks/useQueryParamState';
 import { reviewOption, reviewPage } from './managementReviewQuery';
 import useWorkspaceAction from '../../hooks/useWorkspaceAction';
 import { assertCurrentSession, currentSession, isCurrentSession } from '../../api/sessionScope';
+import { WorkspaceActivityContext } from '../layout/workspaceActivity';
+import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
+import ListingContent from '../common/ListingContent';
+import { CHAT_REPORT_REASON_LABELS } from '../report/serviceReportLabels';
 
 const { Text } = Typography;
 const PAGE_SIZE = 20;
@@ -37,10 +43,6 @@ const FILTERS = [
 ];
 const STATUS_LABELS = {
     OPEN: '접수', REVIEWING: '검토 중', RESOLVED: '조치 완료', DISMISSED: '기각',
-};
-const REASON_LABELS = {
-    SPAM: '스팸·도배', HARASSMENT: '욕설·괴롭힘', INAPPROPRIATE: '부적절한 내용',
-    FRAUD: '사기·결제 유도', OTHER: '기타',
 };
 const RESOLUTION_OPTIONS = [
     { value: 'RESOLVED', label: '조치 완료' },
@@ -56,7 +58,8 @@ const formatDateTime = (value) => {
 };
 
 /** 자동 제재 없이 관리자가 신고 상태와 처리 근거를 명시적으로 남기는 목록. */
-const ChatReportsPanel = () => {
+const ChatReportsPanel = ({ initialContextId = null }) => {
+    const active = useContext(WorkspaceActivityContext);
     const { message } = useMessage();
     const client = useQueryClient();
     const [queryState, setQuery] = useQueryParamsState({ chatReportStatus: 'ALL', chatReportPage: '1' });
@@ -64,7 +67,7 @@ const ChatReportsPanel = () => {
     const page = reviewPage(queryState.chatReportPage);
     const setPage = value => setQuery({ chatReportPage: String(value) });
     const [selected, setSelected] = useState(null);
-    const [contextReportId, setContextReportId] = useState(null);
+    const [contextReportId, setContextReportId] = useState(initialContextId);
     const [retentionReportId, setRetentionReportId] = useState(null);
     const [resolutionStatus, setResolutionStatus] = useState('RESOLVED');
     const [resolutionNote, setResolutionNote] = useState('');
@@ -76,12 +79,13 @@ const ChatReportsPanel = () => {
     const query = useQuery({
         queryKey: [...adminKeys.chatReports(filter), page],
         queryFn: () => chatService.listReports(page - 1, filter === 'ALL' ? undefined : filter),
+        enabled: active,
         placeholderData: keepPreviousData,
     });
     const contextQuery = useQuery({
         queryKey: adminKeys.chatReportContext(contextReportId),
         queryFn: () => chatService.getReportContext(contextReportId),
-        enabled: contextReportId != null,
+        enabled: active && contextReportId != null,
     });
     const review = useMutation({
         mutationFn: async ({ id, status, note, revision, session }) => {
@@ -89,7 +93,11 @@ const ChatReportsPanel = () => {
             const result = await chatService.reviewReport(id, { status, resolutionNote: note || undefined, revision });
             assertCurrentSession(session); return result;
         },
-        onSuccess: (_, values) => { if (isCurrentSession(values.session)) message.success('신고 처리 상태를 저장했어요.'); },
+        onSuccess: (_, values) => {
+            if (!isCurrentSession(values.session)) return;
+            void client.invalidateQueries({ queryKey: adminKeys.reportQueue() });
+            message.success('신고 처리 상태를 저장했어요.');
+        },
         onError: (failure, values) => {
             if (!isCurrentSession(values.session) || failure.isStaleSession) return;
             if (failure.status === 409) setConflict(true);
@@ -150,7 +158,7 @@ const ChatReportsPanel = () => {
         { title: '신고자', dataIndex: 'reporterRole', width: 90,
             render: (value) => value === 'OWNER' ? '사장님' : '회원' },
         { title: '사유', dataIndex: 'reason', width: 120,
-            render: (value) => REASON_LABELS[value] ?? value },
+            render: (value) => CHAT_REPORT_REASON_LABELS[value] ?? value },
         { title: '대상', dataIndex: 'messageId', width: 110,
             render: (value) => value ? `메시지 #${value}` : '대화 전체' },
         { title: '설명', dataIndex: 'details', width: 260, render: (value) => value || '-' },
@@ -180,30 +188,27 @@ const ChatReportsPanel = () => {
     ];
 
     const rows = listRows(query.data);
-    const total = query.data?.page?.totalElements ?? query.data?.totalElements ?? rows.length;
+    const total = query.data?.page?.totalElements ?? query.data?.totalElements ?? 0;
+    const blocking = isBlockingListReadError(query.error, rows);
     const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
     useEffect(() => {
         if (query.isSuccess && !query.isFetching && !query.isPlaceholderData && page > lastPage) setQuery({ chatReportPage: String(lastPage) });
     }, [query.isSuccess, query.isFetching, query.isPlaceholderData, page, lastPage, setQuery]);
     // 오류를 빈 결과로 숨기지 않고 로딩·표와 구분한다.
     const renderReports = () => {
-        if (query.isError) {
+        if (blocking) {
             return (
                 <DataState state="error" kind="message" subject="채팅 신고" error={query.error}
                     onRetry={query.refetch} retrying={query.isFetching} />
             );
         }
-        if (query.isPending) {
-            return (
-                <AdminTableSkeleton rows={4} headers={columns.map((column) => column.title)}
-                    cols={columns.map((column) => column.width)} actionBtns={3} />
-            );
-        }
         return (
-            <DataTable
+            <PagedDataTable
                 columns={columns}
                 dataSource={rows}
                 rowKey="id"
+                placeholder={(query.isPending || query.isPlaceholderData) && <AdminTableSkeleton rows={4}
+                    headers={columns.map(column => column.title)} cols={columns.map(column => column.width)} actionBtns={3} />}
                 locale={{ emptyText: '해당 상태의 채팅 신고가 없어요.' }}
                 pagination={{ current: page, pageSize: PAGE_SIZE, total, onChange: setPage }}
                 scroll={{ x: 1360 }}
@@ -229,6 +234,9 @@ const ChatReportsPanel = () => {
                         {contextQuery.data.reportedMessage.imageUrl && <ChatImage
                             url={`/api/admin/chat/reports/${contextReportId}/images/${contextQuery.data.reportedMessage.id}`}
                             width={contextQuery.data.reportedMessage.imageWidth} height={contextQuery.data.reportedMessage.imageHeight} />}
+                        {contextQuery.data.reportedMessage.fileUrl && <ChatFileDownload
+                            url={`/api/admin/chat/reports/${contextReportId}/files/${contextQuery.data.reportedMessage.id}`}
+                            filename={contextQuery.data.reportedMessage.fileName} />}
                         <div style={{ marginTop: 6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                             {contextQuery.data.reportedMessage.content}
                         </div>
@@ -241,6 +249,8 @@ const ChatReportsPanel = () => {
                         <strong>{item.senderRole === 'OWNER' ? '사장님' : '회원'}</strong>
                         {item.imageUrl && <ChatImage url={`/api/admin/chat/reports/${contextReportId}/images/${item.id}`}
                             width={item.imageWidth} height={item.imageHeight} />}
+                        {item.fileUrl && <ChatFileDownload url={`/api/admin/chat/reports/${contextReportId}/files/${item.id}`}
+                            filename={item.fileName} />}
                         <div style={{ marginTop: 4, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                             {item.content}
                         </div>
@@ -256,12 +266,15 @@ const ChatReportsPanel = () => {
                 trailing={<><FilterMenu value={filter} options={FILTERS} aria-label="채팅 신고 상태"
                     onChange={value => setQuery({ chatReportStatus: value, chatReportPage: '1' })} />
                     <RefreshButton onReload={query.refetch} loading={query.isFetching} /></>} />
-            {renderReports()}
-            <ChatRetentionModal reportId={retentionReportId} onClose={() => setRetentionReportId(null)} />
+            <ListingContent notice={query.error && !blocking && <DataState state="error" compact error={query.error}
+                title="최신 신고를 확인하지 못했어요." onRetry={query.refetch} retrying={query.isFetching} />}>
+                {renderReports()}
+            </ListingContent>
+            <ChatRetentionModal reportId={active ? retentionReportId : null} onClose={() => setRetentionReportId(null)} />
 
             <FormModal
                 title={`신고 #${selected?.id ?? ''} 처리`}
-                open={Boolean(selected)}
+                open={active && Boolean(selected)}
                 onClose={closeResolution}
                 onSubmit={submitResolution}
                 submitting={review.isPending || reloading}
@@ -273,11 +286,11 @@ const ChatReportsPanel = () => {
                 {conflict && <DataState state="error" compact title="다른 관리자가 신고를 변경했어요. 다시 불러와 검토해주세요."
                     onRetry={() => requestAction(reloadResolution, { discard: false })} retrying={reloading} />}
                 <FormField label="처리 결과">
-                    <FormSelect value={resolutionStatus} onChange={setResolutionStatus}
+                    <FormSelect aria-label="처리 결과" value={resolutionStatus} onChange={setResolutionStatus}
                         options={RESOLUTION_OPTIONS} />
                 </FormField>
                 <FormField label="처리 근거" error={noteError}>
-                    <FormTextArea value={resolutionNote}
+                    <FormTextArea aria-label="처리 근거" value={resolutionNote}
                         onChange={(event) => { setResolutionNote(event.target.value); setNoteError(''); }}
                         maxLength={500} showCount rows={4}
                         placeholder="확인 내용과 조치 또는 기각 사유를 적어주세요" />
@@ -286,7 +299,7 @@ const ChatReportsPanel = () => {
 
             <FormModal
                 title={`신고 #${contextReportId ?? ''} 대화 내용`}
-                open={contextReportId != null}
+                open={active && contextReportId != null}
                 onClose={() => setContextReportId(null)}
                 footer={null}
                 width={640}
@@ -297,5 +310,7 @@ const ChatReportsPanel = () => {
         </section>
     );
 };
+
+ChatReportsPanel.propTypes = { initialContextId: PropTypes.number };
 
 export default ChatReportsPanel;

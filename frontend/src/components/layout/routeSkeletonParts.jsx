@@ -36,7 +36,7 @@ RefreshToolbarSkeleton.propTypes = { search: PropTypes.bool, viewControl: PropTy
 
 export function SegmentedControlSkeleton({ options, value, block = false }) {
     return <div className="reserve-segmented reserve-segmented--skeleton" aria-hidden="true"
-        style={{ display: 'flex', flexWrap: 'nowrap', gap: 4, width: block ? '100%' : undefined }}>
+        style={{ display: 'flex', flexWrap: 'nowrap', gap: 8, width: block ? '100%' : undefined }}>
         {options.map(option => <span key={option.value}
             className={`reserve-segmented-btn${option.value === value ? ' reserve-segmented-btn--active' : ''}`}
             style={block ? { flex: 1 } : undefined}>

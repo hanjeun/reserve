@@ -1,6 +1,9 @@
 package kr.it.reserve.store.service;
 
 import kr.it.reserve.store.dto.StoreResponse;
+import kr.it.reserve.global.error.StoreException;
+import kr.it.reserve.store.util.StorePublicAddress;
+import kr.it.reserve.store.util.StorePublicImage;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
@@ -9,11 +12,8 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.HtmlUtils;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
-import java.util.Locale;
-import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -23,7 +23,6 @@ public class StorePageService {
     @Value("#{siteUrls.appOrigin}")
     private String origin = kr.it.reserve.config.SiteUrls.DEFAULT_APP_ORIGIN;
     private static final String META_PROPERTY = "property";
-    private static final Set<String> IMAGE_HOSTS = Set.of("cdn.reserve.it.kr", "reserve.it.kr", "app.reserve.it.kr");
     private static final Pattern TITLE = Pattern.compile("<title>[^<]*</title>");
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
     private final StoreService stores;
@@ -35,8 +34,8 @@ public class StorePageService {
         this.shell = resource.exists() ? resource.getContentAsString(StandardCharsets.UTF_8) : null;
     }
 
-    public String storePage(Long id) {
-        return render(stores.getStore(id));
+    public String storePage(UUID publicId) {
+        return render(stores.getStoreByPublicId(publicId));
     }
 
     public String notFoundPage() {
@@ -47,7 +46,9 @@ public class StorePageService {
         String pageTitle = shorten(store.getName(), 100) + " | RESERVE";
         String description = shorten(store.getDescription(), 160);
         if (description.isBlank()) description = shorten(store.getName(), 100) + "의 정보를 확인하고 예약하세요.";
-        String canonical = origin + "/store/" + store.getId();
+        String path = StorePublicAddress.path(store.getPublicId());
+        if (path == null) throw StoreException.notFound();
+        String canonical = origin + path;
         String html = title(requireShell(), pageTitle);
         html = meta(html, "name", "description", description);
         html = meta(html, "name", "robots", "index, follow");
@@ -77,26 +78,7 @@ public class StorePageService {
     }
 
     private static String publicThumbnail(StoreResponse store) {
-        return publicStoreImage(store.getMainImageUrl(), store.getId(), "thumbnails");
-    }
-
-    private static String publicStoreImage(String value, Long storeId, String folder) {
-        if (value == null || value.isBlank()) return null;
-        try {
-            URI uri = new URI(value);
-            // 공개 가게의 관리 경로 사진만 사용하며 비공개·서명 URL은 제외한다.
-            String path = uri.getPath();
-            return "https".equals(uri.getScheme()) && uri.getHost() != null
-                    && IMAGE_HOSTS.contains(uri.getHost().toLowerCase(Locale.ROOT))
-                    && uri.getUserInfo() == null && uri.getPort() == -1
-                    && uri.getQuery() == null && uri.getFragment() == null
-                    && path != null && !path.contains("\\") && !path.endsWith("/.") && !path.endsWith("/..")
-                    && path.equals(uri.normalize().getPath())
-                    && path.matches("/users/[0-9]+/stores/" + storeId + "/" + folder + "/[^/]+")
-                    ? value : null;
-        } catch (URISyntaxException exception) {
-            return null;
-        }
+        return StorePublicImage.thumbnail(store.getMainImageUrl(), store.getId());
     }
 
     private record ImageHint(String url, Integer width, Integer height) {}
@@ -107,7 +89,7 @@ public class StorePageService {
             if (store.getDetailImageMeta() == null) return null;
             for (StoreResponse.ImageMeta meta : store.getDetailImageMeta()) {
                 if (meta == null || first == null || !first.equals(meta.getUrl())) continue;
-                String url = publicStoreImage(first, store.getId(), "images");
+                String url = StorePublicImage.detail(first, store.getId());
                 return url != null && positive(meta.getWidth()) && positive(meta.getHeight())
                         ? new ImageHint(url, meta.getWidth(), meta.getHeight()) : null;
             }
@@ -126,7 +108,7 @@ public class StorePageService {
                 || store.getDetailImageMeta() == null) return null;
         double ratio = Double.POSITIVE_INFINITY;
         for (String url : store.getDetailImageUrls()) {
-            if (publicStoreImage(url, store.getId(), "images") == null) return null;
+            if (StorePublicImage.detail(url, store.getId()) == null) return null;
             StoreResponse.ImageMeta measured = null;
             for (StoreResponse.ImageMeta meta : store.getDetailImageMeta()) {
                 if (meta != null && url.equals(meta.getUrl())) { measured = meta; break; }
@@ -148,6 +130,9 @@ public class StorePageService {
                 <meta name="reserve-store-image-height" content="%s" />
                 <link rel="preload" as="image" href="%s" referrerpolicy="no-referrer" fetchpriority="high" />
                 """.formatted(store.getId(), escape(image.url()), image.width(), image.height(), escape(image.url()));
+        if (store.getPublicId() != null) {
+            hint += "<meta name=\"reserve-store-image-public-id\" content=\"" + escape(store.getPublicId()) + "\" />\n";
+        }
         Double layoutRatio = galleryLayoutRatio(store);
         if (layoutRatio != null) {
             // 배치 값은 사진 크기·미리 읽기·OG 메타데이터와 별도로 유지한다.

@@ -27,8 +27,8 @@ class SitemapServiceTest {
     void includesPublicPagesAndStoreDetailsButNotAuthenticationPages() {
         when(storeRepository.findPublicSitemapEntries(org.mockito.ArgumentMatchers.any(Pageable.class)))
                 .thenReturn(List.of(
-                        new StoreSitemapEntry(7L, LocalDateTime.of(2026, 9, 2, 10, 0), null),
-                        new StoreSitemapEntry(9L, null, LocalDateTime.of(2026, 8, 31, 12, 0))
+                        new StoreSitemapEntry(7L, null, LocalDateTime.of(2026, 9, 2, 10, 0), null),
+                        new StoreSitemapEntry(9L, "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", LocalDateTime.of(2026, 9, 2, 10, 0), null)
                 ));
 
         String xml = new SitemapService(storeRepository).build();
@@ -42,7 +42,9 @@ class SitemapServiceTest {
                 .contains("<loc>https://reserve.it.kr/guide/user</loc>")
                 .contains("<loc>https://reserve.it.kr/guide/business</loc>")
                 .contains("<loc>https://reserve.it.kr/guide/common</loc>")
-                .contains("<loc>https://reserve.it.kr/store/7</loc>")
+                .doesNotContain("<loc>https://reserve.it.kr/store/7</loc>")
+                .contains("<loc>https://reserve.it.kr/store/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee</loc>")
+                .doesNotContain("<loc>https://reserve.it.kr/store/9</loc>")
                 .contains("<lastmod>2026-09-02</lastmod>")
                 .doesNotContain("/login")
                 .doesNotContain("/signup")
@@ -50,7 +52,7 @@ class SitemapServiceTest {
 
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
         verify(storeRepository).findPublicSitemapEntries(pageable.capture());
-        int staticUrls = xml.split("<url>").length - 1 - 2;
+        int staticUrls = xml.split("<url>").length - 1 - 1;
         assertThat(staticUrls).isEqualTo(8);
         assertThat(pageable.getValue().getPageSize() + staticUrls).isEqualTo(50_000);
     }

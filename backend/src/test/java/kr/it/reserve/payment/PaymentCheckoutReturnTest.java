@@ -2,6 +2,7 @@ package kr.it.reserve.payment;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
+import kr.it.reserve.global.persistence.CurrentLockedStateTestSupport;
 import kr.it.reserve.global.error.PaymentException;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.repository.MemberRepository;
@@ -49,6 +50,7 @@ class PaymentCheckoutReturnTest {
             .merchantUid("ORDER-test").amount(10000).status(Payment.PaymentStatus.READY).build();
 
     @BeforeEach void setUp() {
+        CurrentLockedStateTestSupport.managedEntities(entityManager);
         when(statuses.getStatus("reservation", "ORDER-test", 1L)).thenReturn(
                 new PaymentStatusResponse("reservation", "ORDER-test", "READY", 10000, null, null, 0, null));
         when(rows.findReservationIdByMerchantUid("ORDER-test")).thenReturn(Optional.of(2L));

@@ -40,8 +40,8 @@ class MfaRequestLimitTest {
         when(service.verify(any(), any(), any(), any(), any())).thenReturn(new MfaService.Verification(null, null));
         for (int i = 0; i < RateLimiter.Policy.CODE_VERIFY.capacity(); i++)
             controller.verify(request, response, member, new MfaController.Proof("PASSKEY", "synthetic-proof"));
-        assertThatThrownBy(() -> controller.confirmTotp(request, member, new MfaController.Code("123456"))).isInstanceOf(AuthException.class);
-        assertThatThrownBy(() -> controller.confirmPasskey(request, member, new MfaController.Registration("synthetic-proof", "패스키"))).isInstanceOf(AuthException.class);
+        assertThatThrownBy(() -> controller.confirmTotp(request, response, member, new MfaController.Code("123456"))).isInstanceOf(AuthException.class);
+        assertThatThrownBy(() -> controller.confirmPasskey(request, response, member, new MfaController.Registration("synthetic-proof", "패스키"))).isInstanceOf(AuthException.class);
         controller.cancel(request, response, member);
         verify(service).cancel(null);
         verify(service, never()).confirmTotp(any(), any(), any(), any());

@@ -1,6 +1,7 @@
 package kr.it.reserve.favorite.service;
 
 import kr.it.reserve.config.updates.EntityUpdates;
+
 import kr.it.reserve.favorite.dto.FavoriteDto;
 import kr.it.reserve.favorite.entity.Favorite;
 import kr.it.reserve.favorite.repository.FavoriteRepository;

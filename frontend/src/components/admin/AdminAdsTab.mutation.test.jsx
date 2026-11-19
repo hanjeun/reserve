@@ -18,7 +18,7 @@ vi.mock('./SanctionModal', () => ({ default: props => { state.sanction = props; 
 vi.mock('../common', () => ({
     Button: ({ children, onClick }) => <button onClick={onClick}>{children}</button>,
     AdminTableSkeleton: () => <span>조회 중</span>, DataState: () => null, FilterToolbar: () => null,
-    DataTable: ({ columns, dataSource }) => <>{dataSource.map(row => <div key={row.id}>
+    PagedDataTable: ({ columns, dataSource, placeholder }) => placeholder || <>{dataSource.map(row => <div key={row.id}>
         {columns.find(column => column.key === 'actions').render(null, row)}
     </div>)}</>,
 }));

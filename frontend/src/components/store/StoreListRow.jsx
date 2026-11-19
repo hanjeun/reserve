@@ -6,9 +6,47 @@ import FavoriteButton from '../common/FavoriteButton';
 import { getThumbnailUrl } from '../../utils';
 import { isNearby } from '../../utils/distance';
 import { normalizeStoreRating } from '../../utils/storeRating';
+import { storeDetailPath } from '../../utils/storePublicAddress';
 import adService from '../../services/adService';
 import StoreIdentityText from './StoreIdentityText';
 import LoadingImage from '../common/LoadingImage';
+
+export function StoreListRowLayout({
+    itemKey, className, detailPath, detailLabel, onOpenDetail, detailDisabled = false, title, cover, children, actions, trailing, status,
+}) {
+    const content = <>
+        {cover && <span className="reserve-store-list-row-image">{cover}</span>}
+        <span className="reserve-store-list-row-body">
+            {title && <span className="reserve-store-list-row-title-line"><strong className="reserve-store-list-row-name">{title}</strong></span>}
+            {children}
+        </span>
+    </>;
+    return <article className={['reserve-store-list-row', className].filter(Boolean).join(' ')} data-list-item-id={itemKey}>
+        {detailPath ? <Link to={detailPath} className="reserve-store-list-row-link" aria-label={detailLabel}>{content}</Link>
+            : onOpenDetail ? <button type="button" className="reserve-store-list-row-link" aria-label={detailLabel}
+                disabled={detailDisabled} onClick={onOpenDetail}>{content}</button>
+                : <div className="reserve-store-list-row-link">{content}</div>}
+        {status ? <div className="reserve-store-list-row-tools">
+            <strong className="reserve-store-list-row-status">{status}</strong>
+            {actions && <div className="reserve-list-row-actions">{actions}</div>}
+        </div> : actions ? <div className="reserve-store-list-row-actions">{actions}</div> : trailing}
+    </article>;
+}
+
+StoreListRowLayout.propTypes = {
+    itemKey: PropTypes.string,
+    className: PropTypes.string,
+    detailPath: PropTypes.string,
+    detailLabel: PropTypes.string,
+    onOpenDetail: PropTypes.func,
+    detailDisabled: PropTypes.bool,
+    title: PropTypes.string,
+    cover: PropTypes.node,
+    children: PropTypes.node,
+    actions: PropTypes.node,
+    trailing: PropTypes.node,
+    status: PropTypes.node,
+};
 
 /**
  * 가게 목록 한 줄 — 가게 목록·홈 추천·내 가게 관리·광고 미리보기가 모두 이 컴포넌트를 재사용한다.
@@ -16,6 +54,7 @@ import LoadingImage from '../common/LoadingImage';
  */
 const StoreListRow = React.memo(({ store, userLocation, isAdvertised = false, adId, preview = false, actions, className, metadata, extraTools }) => {
     const name = store.name || '가게';
+    const detailPath = storeDetailPath(store);
     const { rating, reviewCount } = normalizeStoreRating(store.rating, store.reviewCount);
     const nearby = isNearby(userLocation, store.latitude, store.longitude, store.nearbyRadiusKm ?? undefined);
     const fallbackImage = getThumbnailUrl();
@@ -28,58 +67,29 @@ const StoreListRow = React.memo(({ store, userLocation, isAdvertised = false, ad
         if (event.currentTarget.src !== fallbackImage) event.currentTarget.src = fallbackImage;
     };
 
-    const content = (
-        <>
-            <span className="reserve-store-list-row-image">
-                <LoadingImage
-                    src={getThumbnailUrl(store.mainImageUrl)}
-                    alt={`${name} 대표 이미지`}
-                    width={160}
-                    height={160}
-                    loading="lazy"
-                    decoding="async"
-                    onError={handleImageError}
-                />
-            </span>
-            <span className="reserve-store-list-row-body">
-                <span className="reserve-store-list-row-title-line">
-                    <strong className="reserve-store-list-row-name">{name}</strong>
-                </span>
-                {store.description && (
-                    <span className="reserve-store-list-row-description">{store.description}</span>
-                )}
-                <span className="reserve-store-list-row-meta">
-                    <span className="reserve-store-list-row-rating">
-                        <StarFilled aria-hidden="true" />
-                        <b>{rating.toFixed(1)}</b>
-                        <span>({reviewCount.toLocaleString('ko-KR')})</span>
-                    </span>
-                    <StoreIdentityText category={store.category} isAdvertised={isAdvertised} nearby={nearby} />
-                </span>
-                {metadata}
-            </span>
-        </>
+    const favorite = !actions && (
+        <div className={`reserve-store-list-row-favorite${extraTools ? ' reserve-store-list-row-favorite--with-tools' : ''}`}>
+            <FavoriteButton storeId={store.id} appearance="plain" preview={preview} />
+            {extraTools}
+        </div>
     );
 
-    return (
-        <article className={['reserve-store-list-row', className].filter(Boolean).join(' ')} data-list-item-id={`store:${store.id}`}>
-            {preview ? (
-                <span className="reserve-store-list-row-link">{content}</span>
-            ) : (
-                <Link to={`/store/${store.id}`} className="reserve-store-list-row-link" aria-label={`${name} 상세 보기`}>
-                    {content}
-                </Link>
-            )}
-            {actions ? (
-                <div className="reserve-store-list-row-actions">{actions}{extraTools}</div>
-            ) : (
-                <div className={`reserve-store-list-row-favorite${extraTools ? ' reserve-store-list-row-favorite--with-tools' : ''}`}>
-                    <FavoriteButton storeId={store.id} appearance="plain" preview={preview} />
-                    {extraTools}
-                </div>
-            )}
-        </article>
-    );
+    return <StoreListRowLayout itemKey={`store:${store.id}`} className={className} title={name}
+        detailPath={preview ? undefined : detailPath} detailLabel={`${name} 상세 보기`}
+        actions={actions && <>{actions}{extraTools}</>} trailing={favorite}
+        cover={<LoadingImage src={getThumbnailUrl(store.mainImageUrl)} alt={`${name} 대표 이미지`}
+            width={160} height={160} loading="lazy" decoding="async" onError={handleImageError} />}>
+        {store.description && <span className="reserve-store-list-row-description">{store.description}</span>}
+        <span className="reserve-store-list-row-meta">
+            <span className="reserve-store-list-row-rating">
+                <StarFilled aria-hidden="true" />
+                <b>{rating.toFixed(1)}</b>
+                <span>({reviewCount.toLocaleString('ko-KR')})</span>
+            </span>
+            <StoreIdentityText category={store.category} isAdvertised={isAdvertised} nearby={nearby} />
+        </span>
+        {metadata}
+    </StoreListRowLayout>;
 });
 
 StoreListRow.propTypes = {

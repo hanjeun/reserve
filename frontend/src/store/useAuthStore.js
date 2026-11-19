@@ -41,11 +41,12 @@ const isTransientAuthError = (error) => {
 };
 
 const identity = user => user ? `${user.id ?? user.email}:${user.role}` : 'anonymous';
-const applyUser = (set, get, user, force = false) => {
+const applyUser = (set, get, user, force = false, browserRegistrationReference = null) => {
     const changed = force || identity(get().user) !== identity(user);
     const sessionRevision = changed ? advanceSession() : currentSession().epoch;
     if (changed) useLocationStore.getState().setLiveLocation(null);
-    set({ user, isLoggedIn: Boolean(user), isLoggingOut: false, sessionRevision });
+    set({ user, isLoggedIn: Boolean(user), isLoggingOut: false, sessionRevision,
+        ...(changed ? { browserRegistrationReference } : {}) });
 };
 
 const useAuthStore = create(
@@ -56,13 +57,20 @@ const useAuthStore = create(
             isLoggedIn: false,
             isLoggingOut: false,
             authRestoring: false,
+            browserRegistrationReference: null,
 
             setLoggingOut: (val) => set({ isLoggingOut: val }),
             withAuthTransition: (action) => restoringDuring(set, action),
 
             expireSession: () => { set({ authRestoring: false }); applyUser(set, get, null); },
 
-            login: (userData) => { set({ authRestoring: false }); applyUser(set, get, userData, true); },
+            login: (userData, { browserRegistrationReference = null } = {}) => {
+                set({ authRestoring: false });
+                applyUser(set, get, userData, true, browserRegistrationReference);
+            },
+            clearBrowserRegistration: () => {
+                if (get().browserRegistrationReference) set({ browserRegistrationReference: null });
+            },
 
             // 프로필 표시 갱신은 새 로그인과 다르다. 다른 계정의 늦은 콜백은 반영하지 않는다.
             updateUser: (userData) => {
@@ -164,7 +172,8 @@ if (typeof window !== 'undefined') {
         if (isCurrentSession(event.detail?.epoch)) useAuthStore.getState().expireSession();
     };
     window.addEventListener('reserve:session-expired', onSessionExpired);
-    import.meta.hot?.dispose(() => {
+    const hot = import.meta.hot;
+    hot?.dispose(() => {
         window.removeEventListener('storage', onStorage);
         window.removeEventListener('reserve:session-expired', onSessionExpired);
     });

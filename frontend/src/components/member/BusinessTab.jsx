@@ -11,6 +11,7 @@ import { IMAGE_ACCEPT, imageFileError } from '../../utils/imageUploadPolicy';
 import { SCROLL_TO_FIRST_ERROR } from '../../utils/form';
 import useAuthStore from '../../store/useAuthStore';
 import useImagePreview from '../../hooks/useImagePreview';
+import AnimatedContent from '../common/AnimatedContent';
 import { colors, radius, fontSize } from '../../styles/tokens';
 const { Text } = Typography;
 const PROFILE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
@@ -137,7 +138,7 @@ const BusinessTab = ({ user }) => {
         }
     };
 
-    // 상호명·등록증 검사도 BusinessForm 의 rules / license validator 가 담당한다(위 handleUpdate 주석 참고).
+    // 상호명·등록증 검증은 BusinessForm에서 처리한다.
     const handleSubmit = async () => {
         setSubmitLoading(true);
         try {
@@ -241,7 +242,8 @@ const BusinessTab = ({ user }) => {
     // 심사 대기중 ──
     if (status === 'PENDING') {
         // 수정 모드일 때는 폼 표시
-        if (isEditing && editState.scope === editScope && editState.status === 'ready') return (
+        const editing = isEditing && editState.scope === editScope && editState.status === 'ready';
+        return <AnimatedContent motionKey={editing ? 'edit' : 'summary'}>{editing ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div style={bizStyles.statusCard('warning')}>
                     <ClockCircleOutlined style={{ fontSize: 20, color: colors.warning.main }} />
@@ -261,9 +263,7 @@ const BusinessTab = ({ user }) => {
                 />
                 {previewNode}
             </div>
-        );
-
-        return (
+        ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div style={bizStyles.statusCard('warning')}>
                     <ClockCircleOutlined style={{ fontSize: 20, color: colors.warning.main }} />
@@ -285,7 +285,7 @@ const BusinessTab = ({ user }) => {
                     <Button variant="primary" loading={editLoading} disabled={cancelLoading} onClick={handleStartEdit} style={{ flex: 1 }}>수정하기</Button>
                 </div>
             </div>
-        );
+        )}</AnimatedContent>;
     }
 
     // 거절됨 ──
@@ -411,8 +411,7 @@ const BusinessForm = ({ form, setForm, fileList, onFileListChange, onPreview, on
             </Form.Item>
 
             {/* Button 은 우리 공용 컴포넌트라 htmlType 을 전달하지 않는다 → submit() 을 직접 호출한다. */}
-            {/* 취소가 있는 수정 모드는 [취소 | 저장] 한 줄 — 이 파일의 사진 변경·심사 중 버튼과 같은 배치다.
-                세로로 쌓으면 두 버튼이 같은 무게로 보이고 저장 버튼이 폼 안, 취소가 폼 밖으로 갈라진다. */}
+            {/* 취소와 저장은 같은 폼의 실행 영역에 둔다. */}
             {onCancel ? (
                 <div style={{ display: 'flex', gap: 8 }}>
                     <Button variant="outline" onClick={onCancel} disabled={loading} style={{ flex: 1 }}>취소</Button>

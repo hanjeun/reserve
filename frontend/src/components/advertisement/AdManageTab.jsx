@@ -2,13 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Typography, Tag, Upload } from 'antd';
 import dayjs from 'dayjs';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { PlusOutlined, CreditCardOutlined, CloseOutlined, EditOutlined, DeleteOutlined } from '../common/icons';
-import { Bone, Button, DataState, FormModal, FormField, FormInput, FormTextArea, FormSelect, FormDatePicker, SegmentedControl, AdminTableSkeleton, DataTable, FilterMenu, FilterToolbar } from '../common';
+import { PlusOutlined, CreditCardOutlined, CloseOutlined, EditOutlined, DeleteOutlined, ShopOutlined } from '../common/icons';
+import { Bone, Button, DataState, FormModal, FormField, FormInput, FormTextArea, FormSelect, FormDatePicker, SegmentedControl, AdminTableSkeleton, PagedDataTable, FilterMenu, FilterToolbar } from '../common';
 import { FilterMenuSkeleton } from '../common/FilterToolbarSkeleton';
+import DetailInfoRows from '../common/DetailInfoRows';
 import SkeletonText from '../common/SkeletonText';
 import LoadingUpload from '../common/LoadingUpload';
 import { useAdPayment, useMessage, useImagePreview, useMyStores, useFormErrors, useQueryParamsState } from '../../hooks';
-import useDebounce from '../../hooks/useDebounce';
 import { adKeys } from '../../hooks/queryKeys';
 import { invalidateAdData } from '../../hooks/invalidateAfterWrite';
 import adService from '../../services/adService';
@@ -22,6 +22,8 @@ import {
 import { colors, fontSize } from '../../styles/tokens';
 import {
     AD_TYPE_LABELS,
+    AD_DAILY_PRICE,
+    AD_PRICE_SUMMARY,
     BANNER_DESCRIPTION_MAX_LENGTH,
     BANNER_TITLE_MAX_LENGTH,
     DEFAULT_BANNER_COPY_KEY,
@@ -50,8 +52,6 @@ const AD_LIST_QUERY_DEFAULTS = Object.freeze({
     advertisementPage: '0',
 });
 
-// 하루 노출 금액 — 결제 화면에 "하루 금액 × 일수"로 계산 근거를 보여준다. 최종 금액은 서버가 다시 계산해 확인한다.
-const AD_DAILY_PRICE = { BADGE: 1_000, BANNER: 5_000 };
 const PAGE_SIZE = 20;
 const EMPTY_ADS = [];
 
@@ -105,12 +105,13 @@ const revokeBlobUrl = (url) => {
 
 const errorMessageOr = (err, fallback) => (err instanceof Error ? err.message : fallback);
 
-const fetchMyAds = async (page, storeFilter, debouncedSearch) => {
+const fetchMyAds = async (page, storeFilter, search, signal) => {
     const result = await adService.getMyAds(
         page,
         PAGE_SIZE,
         storeFilter === 'ALL' ? undefined : Number(storeFilter),
-        debouncedSearch,
+        search,
+        signal,
     );
     return {
         ads: result?.content ?? [],
@@ -193,20 +194,13 @@ const renderAdsContent = ({ adsError, refetch, isFetching, loading, isPlaceholde
                 onRetry={refetch} retrying={isFetching} />
         );
     }
-    if (loading || isPlaceholderData) {
-        return (
-            <AdminTableSkeleton
-                rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
-                cols={SKELETON_COLS}
-                headers={SKELETON_HEADERS}
-                actionBtns={2}
-                pagination={totalElements ? { current: page + 1, pageSize: PAGE_SIZE, total: totalElements } : null}
-            />
-        );
-    }
     return (
-        <DataTable
+        <PagedDataTable
+            placeholder={(loading || isPlaceholderData) && <AdminTableSkeleton
+                rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
+                cols={SKELETON_COLS} headers={SKELETON_HEADERS} actionBtns={2} />}
             rowKey="id"
+            scroll={{ x: SKELETON_COLS.reduce((total, width) => total + width, 0) }}
             columns={columns}
             dataSource={ads}
             pagination={{
@@ -255,7 +249,6 @@ const AdManageTab = () => {
     };
     const [{ advertisementSearch, advertisementStore, advertisementPage }, setAdListParams] = useQueryParamsState(AD_LIST_QUERY_DEFAULTS);
     const search = advertisementSearch;
-    const debouncedSearch = useDebounce(search, 300);
     // 가게 필터는 공통 FilterToolbar를 사용한다.
 
     const storeFilter = advertisementStore;
@@ -309,8 +302,8 @@ const AdManageTab = () => {
     }, []);
 
     const { data, isLoading: loading, isFetching, isPlaceholderData, error: adsError, refetch } = useQuery({
-        queryKey: adKeys.my({ page, size: PAGE_SIZE, storeFilter, search: debouncedSearch.trim() }),
-        queryFn: () => fetchMyAds(page, storeFilter, debouncedSearch),
+        queryKey: adKeys.my({ page, size: PAGE_SIZE, storeFilter, search: search.trim() }),
+        queryFn: ({ signal }) => fetchMyAds(page, storeFilter, search, signal),
         placeholderData: keepPreviousData,
     });
     const ads = data?.ads ?? EMPTY_ADS;
@@ -440,14 +433,17 @@ const AdManageTab = () => {
             storeId, adType, dateRange, bannerCopyKey, bannerTitle, bannerDescription, bannerMotionKey, imageFiles,
         });
 
-        const result = await pay(formData);
+        const result = await pay(formData, {
+            storeName: selectedStore?.name, adType,
+            startDate: dateRange[0].format('YYYY-MM-DD'), endDate: dateRange[1].format('YYYY-MM-DD'),
+        });
         if (result.success) {
             setModalOpen(false);
             resetForm();
         }
     };
 
-    const handlePay = (ad) => payExisting(ad.id);
+    const handlePay = ({ id, storeName, adType, startDate, endDate }) => payExisting(id, { storeName, adType, startDate, endDate });
 
     // 수정 모달에는 기존 텍스트와 사진 미리보기를 채운다.
 
@@ -507,7 +503,7 @@ const AdManageTab = () => {
 
     const retryReads = () => Promise.allSettled([refetch(), ...(storesError ? [refetchStores()] : [])]);
     const adsContent = renderAdsContent({
-        adsError, refetch: retryReads, isFetching: isFetching || storesLoading, loading: loading || search.trim() !== debouncedSearch.trim(), isPlaceholderData, totalElements, page, columns, ads,
+        adsError, refetch: retryReads, isFetching: isFetching || storesLoading, loading: loading, isPlaceholderData, totalElements, page, columns, ads,
         onPageChange: (nextPage) => setAdListParams({ advertisementPage: String(nextPage - 1) }),
     });
 
@@ -517,7 +513,7 @@ const AdManageTab = () => {
         <div className="reserve-ad-manage-tab">
             <div className="reserve-ad-manage-heading">
                 <Text className="reserve-ad-manage-intro" type="secondary" style={{ fontSize: fontSize.sm }}>
-                    <SkeletonText loading={loading}>노출형(1,000원/일)은 가게 목록 상단에 카드·리스트로 우선 노출되고 작은 &quot;광고&quot; 표기가 붙어요. 배너형(5,000원/일)은 화면 우측 하단에 표시돼요.</SkeletonText>
+                    <SkeletonText loading={loading}>{AD_PRICE_SUMMARY}</SkeletonText>
                 </Text>
             </div>
 
@@ -546,7 +542,7 @@ const AdManageTab = () => {
             </div>
 
             <FilterToolbar
-                search={{ value: search, onChange: (e) => setAdListParams({ advertisementSearch: e.target.value, advertisementPage: '0' }), placeholder: '가게명으로 검색' }}
+                search={{ value: search, onSubmit: value => setAdListParams({ advertisementSearch: value, advertisementPage: '0' }), placeholder: '가게명으로 검색' }}
                 onReload={refetch}
                 loading={loading || isFetching}
                 initialLoading={loading}
@@ -702,7 +698,7 @@ const AdManageTab = () => {
 
             {/* 가게/유형/기간은 결제 금액과 연결되므로 문구 프리셋과 대표 이미지만 수정한다. */}
             <FormModal
-                title={editTarget ? `배너 광고 수정 — ${editTarget.storeName}` : '배너 광고 수정'}
+                title="배너 광고 수정"
                 open={!!editTarget}
                 navigationDirty={Boolean(editTarget && (editBannerTitle !== (editTarget.title || DEFAULT_BANNER_COPY.title)
                     || editBannerDescription !== (editTarget.description || DEFAULT_BANNER_COPY.description) || editBannerMotionKey !== findBannerMotionKey(editTarget)
@@ -713,6 +709,7 @@ const AdManageTab = () => {
                 submitting={updateMutation.isPending}
                 submitText="저장"
             >
+                {editTarget?.storeName && <DetailInfoRows rows={[{ Icon: ShopOutlined, label: '가게', value: editTarget.storeName }]} />}
                 <FormField label="추천 문구">
                     <Text type="secondary" style={{ fontSize: fontSize.xs, display: 'block', marginBottom: 8 }}>
                         추천을 적용해도 제목과 내용은 다시 수정할 수 있어요.

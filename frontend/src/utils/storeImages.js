@@ -1,4 +1,21 @@
 import { imageDimensions } from './imageDimensions';
+import { isLegacyStoreId } from './storePublicAddress';
+
+const IMAGE_HOSTS = new Set(['cdn.reserve.it.kr', 'reserve.it.kr', 'app.reserve.it.kr']);
+
+export function publicStoreImageUrl(value, storeId, { thumbnailOnly = false } = {}) {
+    if (typeof value !== 'string' || !isLegacyStoreId(storeId)) return null;
+    try {
+        const url = new URL(value);
+        const path = decodeURIComponent(url.pathname);
+        const folder = thumbnailOnly ? 'thumbnails' : '(?:images|thumbnails)';
+        const namespace = thumbnailOnly ? '(?:/local)?' : '';
+        if (url.protocol !== 'https:' || !IMAGE_HOSTS.has(url.hostname) || url.username || url.password
+            || url.port || url.search || url.hash || path.includes('\\')
+            || !new RegExp(`^${namespace}/users/[0-9]+/stores/${storeId}/${folder}/[^/]+$`).test(path)) return null;
+        return value;
+    } catch { return null; }
+}
 
 /* 상세·골격·캐시 힌트가 같은 사진 순서를 사용한다. */
 export const storeGalleryImages = store => {

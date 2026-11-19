@@ -48,7 +48,7 @@ export const reportTabSearch = (search, requested, remembered) => {
     params.set('reportMode', mode);
     return normalizeQuerySelections(params, owned).toString();
 };
-export const BENEFIT_QUERY_DEFAULTS = { benefitState: 'PENDING', benefitPage: '1' };
+export const BENEFIT_QUERY_DEFAULTS = { benefitState: 'PENDING', benefitPage: '1', view: 'list' };
 export const reviewOption = (options, value, fallback) => options.some(item => item.value === value) ? value : fallback;
 export const reviewPage = value => /^\d+$/.test(String(value)) ? feedPage(value) : 1;
 export const reportMode = value => ['reports', 'comments', 'audit'].includes(value) ? value : 'reports';

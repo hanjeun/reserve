@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS reservation_notification (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    event_key VARCHAR(36) NOT NULL,
+    recipient_id BIGINT NOT NULL,
+    reservation_id BIGINT NOT NULL,
+    kind VARCHAR(16) NOT NULL,
+    owner_notice BIT NOT NULL,
+    store_name VARCHAR(255) NOT NULL,
+    reservation_date DATE NOT NULL,
+    reservation_time TIME(6) NOT NULL,
+    created_at DATETIME(6) NOT NULL,
+    next_attempt_at DATETIME(6) NULL,
+    attempts INT NOT NULL,
+    delivered_at DATETIME(6) NULL,
+    read_at DATETIME(6) NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_reservation_notification_event_recipient UNIQUE (event_key, recipient_id),
+    CONSTRAINT fk_reservation_notification_recipient FOREIGN KEY (recipient_id) REFERENCES member (member_id) ON DELETE CASCADE,
+    CONSTRAINT fk_reservation_notification_reservation FOREIGN KEY (reservation_id) REFERENCES reservation (reservation_id) ON DELETE CASCADE,
+    INDEX idx_reservation_notification_due (next_attempt_at, id),
+    INDEX idx_reservation_notification_inbox (recipient_id, id),
+    INDEX idx_reservation_notification_unread (recipient_id, read_at, delivered_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -9,6 +9,7 @@ import kr.it.reserve.config.oauth2.OAuthProviderTokenConverter;
 import kr.it.reserve.global.security.LoginIdentity;
 
 @Entity
+@org.hibernate.annotations.DynamicUpdate
 @Table(name = "member", indexes = @Index(name = "idx_member_oauth_subject", columnList = "provider,provider_id,deleted_at"))
 @Getter
 @Setter
@@ -39,6 +40,20 @@ public class Member implements LoginIdentity {
     @Builder.Default
     @Column(name = "auth_version", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
     private int authVersion = 0;
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Column(name = "security_contact_email", length = 254)
+    private String securityContactEmail;
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Column(name = "account_recovery_digest", length = 64, unique = true)
+    private String accountRecoveryDigest;
+
+    @Column(name = "account_recovery_expires_at")
+    private LocalDateTime accountRecoveryExpiresAt;
+
+    @Column(name = "account_recovery_mfa_required", nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private boolean accountRecoveryMfaRequired;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)
@@ -157,6 +172,19 @@ public class Member implements LoginIdentity {
         this.authVersion = this.authVersion == Integer.MAX_VALUE ? 1 : this.authVersion + 1;
     }
 
+    public boolean isAccountProtected() { return accountRecoveryDigest != null; }
+
+    public void setAccountRecoveryLink(String digest, LocalDateTime expiresAt) {
+        accountRecoveryDigest = digest;
+        accountRecoveryExpiresAt = expiresAt;
+    }
+
+    public void completeAccountRecovery() {
+        accountRecoveryDigest = null;
+        accountRecoveryExpiresAt = null;
+        accountRecoveryMfaRequired = true;
+    }
+
     public void softDelete() {
         this.deletedAt = LocalDateTime.now(Clock.systemDefaultZone());
     }
@@ -173,6 +201,10 @@ public class Member implements LoginIdentity {
         this.name = "탈퇴한 회원";
         this.email = anonymizedEmail;
         this.password = null;
+        this.securityContactEmail = null;
+        this.accountRecoveryDigest = null;
+        this.accountRecoveryExpiresAt = null;
+        this.accountRecoveryMfaRequired = false;
         this.role = Role.USER;
         this.provider = null;
         this.providerId = null;
@@ -196,8 +228,7 @@ public class Member implements LoginIdentity {
         this.deletedAt = LocalDateTime.now(Clock.systemDefaultZone());
     }
 
-    // 제재 상태 체크
-    // 주의: DB 반영은 하지 않음. 호출측에서 @Transactional 필요
+    // 만료된 일시 정지는 저장 상태를 바꾸지 않고 해제된 것으로 판정한다.
     public boolean isSuspended() {
         if (this.status == MemberStatus.BANNED) return true;
         if (this.status == MemberStatus.SUSPENDED) {

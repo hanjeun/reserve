@@ -43,7 +43,8 @@ const schemas = {
         period: new Set(['ONGOING', 'ALL']), page: value => isPage(value) && Number(value) <= 10_000 },
     '/feed': { view: valuesOf(FEED_DIRECTORY_VIEWS), region: value => value === 'all' || feedRegion(value) !== null,
         page: value => isPage(value) && Number(value) <= 10_000 },
-    '/feed/u/:publicId': { page: value => isPage(value) && Number(value) <= 10_000 },
+    '/feed/u/:publicId': { tab: new Set(['posts', 'comments', 'reviews']),
+        page: value => isPage(value) && Number(value) <= 10_000 },
     '/feed/notifications': { view: new Set(['all', 'unread']), page: value => isPage(value) && Number(value) <= 10_000 },
 };
 const defaults = {

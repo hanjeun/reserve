@@ -21,7 +21,7 @@ import {
 } from './icons';
 import RetryButton from './RetryButton';
 import StateIllustration from './StateIllustration';
-import { fontSize, spacing } from '../../styles/tokens';
+import { fontSize } from '../../styles/tokens';
 import { isMissingRequestError, listRequestErrorDescription, listRequestErrorKind, listRequestErrorMessage } from '../../utils/listErrorMessage';
 
 const EMPTY_ICON_BY_KIND = {
@@ -39,12 +39,6 @@ const EMPTY_ICON_BY_KIND = {
     review: StarOutlined,
     store: ShopOutlined,
     waiting: ClockCircleOutlined,
-};
-
-const DATA_STATE_SIZE = {
-    '--data-state-icon-size': spacing[10],
-    '--data-state-title-size': fontSize['2xl'],
-    '--data-state-description-size': fontSize.base,
 };
 
 const ERROR_ICON_BY_KIND = {
@@ -90,6 +84,16 @@ const DataState = ({
     const errorImages = { forbidden: 'access-restricted', missing: 'not-found', offline: 'network-offline',
         rateLimited: 'rate-limited', retry: 'retry', unavailable: 'server-unavailable', unknown: 'unknown-error' };
     const illustration = isMissingDetail ? 'not-found' : isError ? errorImages[errorKind] ?? 'unknown-error' : `empty-${kind}`;
+    const controls = action ?? (isMissingDetail ? missingAction : onRetry && (
+        <RetryButton
+            variant={compact ? 'ghost-sm' : 'ghost'}
+            loading={retrying}
+            onRetry={onRetry}
+            className="reserve-data-state__retry"
+        >
+            {retryLabel}
+        </RetryButton>
+    ));
 
     return (
         <section
@@ -99,27 +103,25 @@ const DataState = ({
                 isError && 'reserve-data-state--error',
                 className,
             ].filter(Boolean).join(' ')}
-            style={{ ...DATA_STATE_SIZE, ...style }}
+            style={{
+                '--data-state-title-size': compact ? fontSize.lg : fontSize['2xl'],
+                '--data-state-description-size': compact ? fontSize.md : fontSize.base,
+                ...style,
+            }}
             role={isError ? 'alert' : undefined}
             aria-live={isError ? 'assertive' : undefined}
             {...rest}
         >
-            {compact ? <span className="reserve-data-state__icon" aria-hidden="true"><Icon /></span>
-                : <StateIllustration name={illustration} fallback={<Icon />} interactive={!retrying} />}
-            <div className="reserve-data-state__copy">
-                <p className="reserve-data-state__title">{message}</p>
-                {detail && <p className="reserve-data-state__description">{detail}</p>}
+            <span className="reserve-data-state__illustration">
+                <StateIllustration name={illustration} size={compact ? 'sm' : 'md'} fallback={<Icon />} interactive={!retrying} />
+            </span>
+            <div className="reserve-data-state__body">
+                <div className="reserve-data-state__copy">
+                    <p className="reserve-data-state__title">{message}</p>
+                    {detail && <p className="reserve-data-state__description">{detail}</p>}
+                </div>
+                {controls && <div className="reserve-data-state__actions">{controls}</div>}
             </div>
-            {action ?? (isMissingDetail ? missingAction : onRetry && (
-                <RetryButton
-                    variant={compact ? 'ghost-sm' : 'ghost'}
-                    loading={retrying}
-                    onRetry={onRetry}
-                    className="reserve-data-state__retry"
-                >
-                    {retryLabel}
-                </RetryButton>
-            ))}
         </section>
     );
 };

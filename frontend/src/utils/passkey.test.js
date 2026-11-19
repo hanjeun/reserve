@@ -58,6 +58,15 @@ describe('패스키 브라우저 요청', () => {
         vi.stubGlobal('navigator', { credentials: {} });
         await expect(performPasskey('{}', true)).rejects.toThrow('이 브라우저에서 패스키를 사용할 수 없어요.');
     });
+    it('브라우저의 주소 보안 오류는 앱 안내로 바꿔요', async () => {
+        const get = vi.fn().mockRejectedValue(new DOMException('browser RP details', 'SecurityError'));
+        vi.stubGlobal('isSecureContext', true);
+        vi.stubGlobal('PublicKeyCredential', function() {});
+        vi.stubGlobal('navigator', { credentials: { get } });
+        await expect(performPasskey('{"publicKey":{"challenge":"AQID"}}', false)).rejects.toMatchObject({
+            name: 'SecurityError', message: '현재 주소에서 패스키를 사용할 수 없어요. 앱 주소를 확인한 뒤 다시 시도해주세요.',
+        });
+    });
     it('보안 출처가 아니면 자격 증명을 요청하지 않아요', async () => {
         const get = vi.fn();
         vi.stubGlobal('isSecureContext', false);

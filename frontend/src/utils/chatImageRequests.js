@@ -62,7 +62,7 @@ function start(job) {
 export function requestChatImageBlob(url, signal, isCurrent, roomScope = '') {
     if (signal.aborted || !isCurrent()) return Promise.reject(aborted());
     const scope = chatImageCacheScope(url);
-    const reusable = /^\/api\/(?:v1\/)?chat\/images\/[1-9]\d*$/.test(url);
+    const reusable = Boolean(scope.messageId);
     const key = reusable ? JSON.stringify([scope.epoch, scope.generation, scope.version, roomScope, url.replace('/api/v1/', '/api/')]) : Symbol();
     let job = flights.get(key);
     if (!job) {

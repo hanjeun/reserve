@@ -1,6 +1,6 @@
 const KEY = 'reserve.security-return';
 const LIFETIME = 5 * 60 * 1000;
-const TARGETS = new Set(['setup-password', 'change-password', 'unlink', 'email', 'social', 'mfa']);
+const TARGETS = new Set(['setup-password', 'remove-password', 'change-password', 'unlink', 'email', 'social', 'mfa', 'devices']);
 
 // 폼 복귀에만 쓰는 탭별 정보예요. 서버의 본인 확인·소유권 검증을 대신하지 않아요.
 export function saveSecurityReturn(memberId, target) {
@@ -9,15 +9,20 @@ export function saveSecurityReturn(memberId, target) {
     catch { /* 저장이 막혀도 인증 요청은 계속할 수 있어요. */ }
 }
 
-export function takeSecurityReturn(memberId) {
+export function peekSecurityReturn(memberId) {
     try {
         const raw = sessionStorage.getItem(KEY);
-        sessionStorage.removeItem(KEY);
         const value = JSON.parse(raw);
         const age = Date.now() - value?.createdAt;
         return memberId != null && value?.memberId === String(memberId) && TARGETS.has(value.target)
             && Number.isFinite(value.createdAt) && age >= 0 && age <= LIFETIME ? value : null;
     } catch { return null; }
+}
+
+export function takeSecurityReturn(memberId) {
+    const value = peekSecurityReturn(memberId);
+    try { sessionStorage.removeItem(KEY); return value; }
+    catch { return null; }
 }
 
 export function revealSecurityPanel(elementOrRead, reducedMotion) {

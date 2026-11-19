@@ -56,8 +56,7 @@ export const buildUpdateFormData = ({ editBannerCopyKey, editBannerTitle, editBa
     formData.append('title', editBannerTitle.trim());
     formData.append('description', editBannerDescription.trim());
     formData.append('bannerMotionKey', editBannerMotionKey);
-    // 사용자가 새로 고른 파일(originFileObj 있음)만 보낸다 — 기존 이미지(url만 있고 originFileObj 없음)만
-    // 있고 새로 고른 파일이 하나도 없으면 images 자체를 안 보내서 백엔드가 기존 이미지를 유지하게 한다.
+    // 새 파일이 없으면 images를 생략해 기존 사진을 유지한다.
     const newFiles = editImageFiles.filter((f) => f.originFileObj);
     newFiles.forEach((f) => formData.append('images', f.originFileObj));
     return formData;

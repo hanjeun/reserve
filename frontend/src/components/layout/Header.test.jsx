@@ -23,7 +23,9 @@ vi.mock('./HeaderAccountMenu', () => ({ default: () => <button>내 계정 메뉴
 
 function CurrentRoute() {
     const location = useLocation();
-    return <output aria-label="현재 경로">{location.pathname + location.search + (location.state?.searchEntry ? ':searchEntry' : '')}</output>;
+    return <output aria-label="현재 경로" data-entry-key={location.key} data-search-origin={JSON.stringify(location.state?.searchOrigin)}>
+        {location.pathname + location.search + (location.state?.searchEntry ? ':searchEntry' : '')}
+    </output>;
 }
 
 function CurrentListSearch() {
@@ -69,6 +71,18 @@ it.each([['/', '홈'], ['/stores', '탐색'], ['/benefits', '혜택'], ['/waitin
 describe('shared wordmark and result search header', () => {
     beforeEach(() => { vi.clearAllMocks(); authState.isLoggedIn = false; reducedMotionState.value = true; });
 
+    it('mounts the restored back arrow immediately after closing messages', () => {
+        reducedMotionState.value = false;
+        const view = render(<MemoryRouter initialEntries={['/my-page']}><Header restoreControls /></MemoryRouter>);
+        const back = screen.getByRole('button', { name: '이전 화면으로 돌아가기' });
+        const slot = back.closest('.reserve-header-back-slot');
+        expect(back).toBeEnabled();
+        expect(slot).not.toHaveClass('reserve-header-control-slot--entering');
+        view.rerender(<MemoryRouter initialEntries={['/my-page']}><Header /></MemoryRouter>);
+        expect(screen.getByRole('button', { name: '이전 화면으로 돌아가기' })).toBe(back);
+        expect(slot).not.toHaveClass('reserve-header-control-slot--entering');
+    });
+
     it('keeps the first back control still on a document load and reserves its position during auth boot', () => {
         reducedMotionState.value = false;
         const placeholder = render(<HeaderPlaceholder />);
@@ -80,6 +94,25 @@ describe('shared wordmark and result search header', () => {
         render(<MemoryRouter initialEntries={['/my-page']}><LoadingPresentationContext.Provider value={presentation}><Header /></LoadingPresentationContext.Provider></MemoryRouter>);
         expect(screen.getByRole('button', { name: '이전 화면으로 돌아가기' })).toBeEnabled();
         expect(document.querySelector('.reserve-header-back-slot')).not.toHaveClass('reserve-header-control-slot--entering');
+    });
+
+    it('enters a newly shown arrow once even when tab navigation replaces the skeleton presentation', () => {
+        reducedMotionState.value = false;
+        const initial = createLoadingPresentation('profile');
+        const placeholder = createLoadingPresentation('photo-skeleton');
+        placeholder.markSkeletonShown();
+        const layout = value => <MemoryRouter initialEntries={['/my-page']}>
+            <LoadingPresentationContext.Provider value={value}><Header /></LoadingPresentationContext.Provider>
+        </MemoryRouter>;
+        const view = render(layout(initial));
+        const arrow = screen.getByRole('button', { name: '이전 화면으로 돌아가기' });
+        const slot = arrow.closest('.reserve-header-back-slot');
+        expect(slot).toHaveClass('reserve-header-control-slot--entering');
+        view.rerender(layout(placeholder));
+        expect(slot).not.toHaveClass('reserve-header-control-slot--entering');
+        view.rerender(layout(createLoadingPresentation('photo-ready')));
+        expect(screen.getByRole('button', { name: '이전 화면으로 돌아가기' })).toBe(arrow);
+        expect(slot).not.toHaveClass('reserve-header-control-slot--entering');
     });
 
     it('uses one full wordmark and named icon links for guests', () => {
@@ -152,6 +185,7 @@ describe('shared wordmark and result search header', () => {
     it('keeps a pending search and its duplicate-click lock through canonical query replacement', () => {
         vi.useFakeTimers();
         reducedMotionState.value = false;
+        const scroll = vi.spyOn(window, 'scrollY', 'get').mockReturnValue(120);
         try {
             renderHeader('/');
             const search = screen.getByRole('link', { name: '통합 검색' });
@@ -159,12 +193,16 @@ describe('shared wordmark and result search header', () => {
             fireEvent.click(screen.getByRole('button', { name: '선택 기본값 보정' }));
             expect(screen.getByLabelText('현재 경로')).toHaveTextContent('/?region=');
             expect(screen.getByRole('banner')).toHaveAttribute('aria-busy', 'true');
+            const entryKey = screen.getByLabelText('현재 경로').dataset.entryKey;
+            scroll.mockReturnValue(760);
             fireEvent.click(search);
             act(() => { vi.advanceTimersByTime(220); });
             expect(screen.getByLabelText('현재 경로').textContent).toBe('/search:searchEntry');
+            expect(JSON.parse(screen.getByLabelText('현재 경로').dataset.searchOrigin))
+                .toEqual({ key: entryKey, left: window.scrollX, top: 760 });
             fireEvent.click(screen.getByRole('button', { name: '히스토리 뒤로' }));
             expect(screen.getByLabelText('현재 경로').textContent).toBe('/?region=');
-        } finally { vi.useRealTimers(); }
+        } finally { scroll.mockRestore(); vi.useRealTimers(); }
     });
 
     it('cancels pending search on a different page and releases its navigation lock', () => {

@@ -1,7 +1,7 @@
 package kr.it.reserve.payment.service;
 
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.LockModeType;
+import kr.it.reserve.global.persistence.CurrentLockedState;
 import kr.it.reserve.global.error.PaymentException;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.repository.MemberRepository;
@@ -43,8 +43,7 @@ final class PaymentPreparation {
         Reservation reservation = locked.reservation();
         // 빈 결제 범위의 gap lock보다 회원·예약의 단일 행 잠금을 먼저 잡는다.
         List<Payment> lockedPayments = paymentRepository.findAllByReservationIdForUpdate(requestDto.getReservationId());
-        entityManager.flush();
-        for (Payment payment : lockedPayments) entityManager.refresh(payment, LockModeType.PESSIMISTIC_WRITE);
+        for (Payment payment : lockedPayments) CurrentLockedState.refresh(entityManager, payment);
 
         // 결제 준비 전에 예약 소유권을 확인한다.
         if (reservation.getMember() == null || !reservation.getMember().getId().equals(memberId)) {

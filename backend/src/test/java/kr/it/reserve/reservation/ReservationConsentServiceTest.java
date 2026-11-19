@@ -53,7 +53,10 @@ class ReservationConsentServiceTest {
         assertThat(service.validate(store, proof(notice)).hash()).isEqualTo(notice.hash());
         store.setPartialRefundRate(25);
         assertThatThrownBy(() -> service.validate(store, proof(notice)))
-                .isInstanceOfSatisfying(ReservationException.class, e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.CONFLICT));
+                .isInstanceOfSatisfying(ReservationException.class, e -> {
+                    assertThat(e.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(e.getCode()).isEqualTo(ReservationException.Code.RESERVATION_NOTICE_CHANGED);
+                });
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM reservation_consent", Integer.class)).isZero();
     }
     @Test void anotherRecipientOrPolicyVersionCannotReuseTheProof() {

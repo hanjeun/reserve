@@ -27,7 +27,7 @@ describe('scoped UI interaction styles', () => {
                 if (rule.parent.type === 'root' && rule.selectors.some(selector => selector.includes(':active')
                     && element.matches(selector.replaceAll(':active', '')))) matching.push(rule);
             });
-            // An extra retry-specific rule must not override the variant through specificity or order.
+            // 재시도 전용 규칙이 우선순위로 버튼 변형을 덮어쓰지 않게 한다.
             expect(matching).toHaveLength(1);
             expect(declarations(matching[0])).toMatchObject({ transform, opacity });
         }
@@ -105,7 +105,10 @@ describe('scoped UI interaction styles', () => {
         const reservationRow = '.reserve-reservation-row:has(.reserve-tap-card__trigger:active)';
         expect(buttons.nodes.find(node => node.type === 'rule' && node.selectors.includes(reservationCard)).selectors).toContain(cardPressedSelector);
         expect(normalRule(reservationRow)).toBe(normalRule(link + ':active'));
-        expect(declarations(findRule(surfaces, reservationRow, '(min-width: 768px)')).transform).toBe('scale(0.995)');
+        const actionRow = 'button.reserve-store-list-row-link:enabled';
+        expect(normalRule(actionRow + ':active')).toBe(normalRule(link + ':active'));
+        expect(findRule(surfaces, reservationRow, '(min-width: 768px)')).toBeUndefined();
+        expect(declarations(findRule(surfaces, actionRow + ':active', '(prefers-reduced-motion: reduce)')).transform).toBe('none');
         expect(declarations(findRule(buttons, reservationCard, '(prefers-reduced-motion: reduce)')).transform).toBe('none');
         expect(declarations(findRule(surfaces, reservationRow, '(prefers-reduced-motion: reduce)')).transform).toBe('none');
         expect(findRule(surfaces, '.reserve-store-card-shell:has(.reserve-store-card-hit:active)')).toBeUndefined();
@@ -117,6 +120,18 @@ describe('scoped UI interaction styles', () => {
         expect(declarations(findRule(surfaces, `${link}:active`, '(prefers-reduced-motion: reduce)')).transform).toBe('none');
         expect(declarations(findRule(surfaces, link, '(prefers-reduced-motion: reduce)')).transition).toBe('none');
         expect(declarations(normalRule('.reserve-store-list-row-link:active')).opacity).toBeUndefined();
+    });
+
+    it('sizes reservation cards and row photos with the common store layouts', () => {
+        const surfaces = parse('feature-surfaces.css');
+        const workspace = parse('workspace.css');
+        expect(findRule(surfaces, '.rsv-store-grid', '(max-width: 1079px)').selectors).toContain('.reserve-reservation-card-grid');
+        const managedGrid = findRule(workspace,
+            '.reserve-workspace-layout:not(.is-menu-collapsed) :is(.rsv-mystore-grid, .reserve-reservation-card-grid)', '(min-width: 900px)');
+        expect(declarations(managedGrid)['grid-template-columns']).toBe('repeat(auto-fill, minmax(min(100%, 280px), 1fr))');
+        const photos = findRule(surfaces, '.reserve-store-list-rows', '(min-width: 768px)');
+        expect(photos.selectors).toEqual(expect.arrayContaining(['.reserve-reservation-row', '.reserve-reservation-row-skeleton']));
+        expect(declarations(photos)['--reserve-store-list-image-size']).toBe('96px');
     });
 
     it('fills the mobile message route dynamically without changing the home viewport or removing the safe area', () => {

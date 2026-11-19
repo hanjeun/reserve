@@ -14,5 +14,5 @@ export default {
     detail: (id, signal) => api.get(`/api/store-news/${id}`, { signal }),
     create: values => api.post('/api/store-news', values),
     update: (id, values) => api.put(`/api/store-news/${id}`, values),
-    remove: id => api.delete(`/api/store-news/${id}`),
+    remove: (id, draftRevision) => api.delete(`/api/store-news/${id}`, { params: { draftRevision } }),
 };

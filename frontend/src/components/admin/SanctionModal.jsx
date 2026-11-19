@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { Typography, InputNumber, Flex } from 'antd';
-import { ExclamationCircleFilled } from '../common/icons';
+import { ExclamationCircleFilled, ShopOutlined } from '../common/icons';
 import { FormTextArea } from '../common';
 import { colors } from '../../styles/tokens';
+import DetailInfoRows from '../common/DetailInfoRows';
 import ResponsiveModal from '../common/ResponsiveModal';
 import useWorkspaceDraftGuard from '../../hooks/useWorkspaceDraftGuard';
 import { surfaceForWhiteText } from '../../utils/colorContrast';
@@ -126,7 +127,7 @@ SanctionBody.propTypes = {
  */
 const SanctionModal = ({ open, presetKey, target, onCancel, onOk, loading }) => {
     const preset = SANCTION_PRESETS[presetKey];
-    // SanctionBody가 렌더될 때마다 최신 입력값을 여기에 흘려보낸다 (state가 아니라 ref라 리렌더 안 유발)
+    // 확인 동작이 최신 입력을 읽도록 ref에 보관한다.
     const valuesRef = React.useRef({ days: 7, reason: '' });
     const requestClose = useWorkspaceDraftGuard({ dirty: () => open && Boolean(valuesRef.current.reason || valuesRef.current.days !== 7),
         busy: open && loading, onDiscard: onCancel });
@@ -134,6 +135,7 @@ const SanctionModal = ({ open, presetKey, target, onCancel, onOk, loading }) => 
     if (!preset) return null;
 
     const targetLabel = target?.name || target?.email || '';
+    const adStoreName = presetKey === 'AD_SUSPEND' ? targetLabel : '';
     const iconColor = preset.icon === 'danger' ? colors.error.main : colors.warning.main;
 
     return (
@@ -141,7 +143,7 @@ const SanctionModal = ({ open, presetKey, target, onCancel, onOk, loading }) => 
             title={
                 <Flex align="center" gap={8}>
                     <ExclamationCircleFilled style={{ color: iconColor, fontSize: 18 }} />
-                    <span>{targetLabel ? `${preset.title} — ${targetLabel}` : preset.title}</span>
+                    <span>{targetLabel && !adStoreName ? `${preset.title} — ${targetLabel}` : preset.title}</span>
                 </Flex>
             }
             open={open}
@@ -158,6 +160,7 @@ const SanctionModal = ({ open, presetKey, target, onCancel, onOk, loading }) => 
             mask={{ closable: false }}
             destroyOnHidden
         >
+            {adStoreName && <DetailInfoRows rows={[{ Icon: ShopOutlined, label: '가게', value: adStoreName }]} />}
             <SanctionBody preset={preset} onReady={(v) => { valuesRef.current = v; }} />
         </ResponsiveModal>
     );

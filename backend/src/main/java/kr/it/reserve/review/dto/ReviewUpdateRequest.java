@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -26,4 +27,12 @@ public class ReviewUpdateRequest {
     @NotBlank(message = "내용은 필수예요.")
     @Size(max = 1000, message = "내용은 1000자 이하이어야 해요.")
     private String content;
+
+    @Size(max = 30, message = "리뷰 닉네임은 30자 이내여야 해요.")
+    @Pattern(regexp = "[\\p{L}\\p{N} ]*", message = "리뷰 닉네임을 다시 선택해주세요.")
+    private String authorAlias;
+
+    public ReviewUpdateRequest(Integer rating, String title, String content) {
+        this(rating, title, content, null);
+    }
 }

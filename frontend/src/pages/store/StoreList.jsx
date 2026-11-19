@@ -5,7 +5,7 @@ import Pagination from '../../components/common/Pagination';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { DataState, FilterToolbar, PageContainer, StoreCardSkeleton } from '../../components/common';
-import ListingContent from '../../components/common/ListingContent';
+import { AnimatedListingContent } from '../../components/common/AnimatedContent';
 import { StoreCard } from '../../components/store';
 import StoreListRow from '../../components/store/StoreListRow';
 import StoreListRowSkeleton from '../../components/store/StoreListRowSkeleton';
@@ -20,6 +20,8 @@ import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import useViewModeParam from '../../hooks/useViewModeParam';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
+import useListSelectionMotion from '../../hooks/useListSelectionMotion';
+import useInitialLoading from '../../hooks/useInitialLoading';
 import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
 import adService from '../../services/adService';
 import { adKeys } from '../../hooks/queryKeys';
@@ -44,11 +46,12 @@ StoreListResult.propTypes = {
 const StoreList = () => {
     const {
         stores, totalElements,
-        loading, initialLoading = loading, refetching, page, pageSize, setPage, refetch,
+        loading, initialLoading: coldLoading = loading, refetching, page, resultPage, resultOrder, sorting, pageSize, setPage, refetch,
         searchParams, setSearchParams,
         error, hasData = stores.length > 0 || !loading && !error,
     } = useStoreList();
     const [urlSearchParams] = useSearchParams();
+    const initialLoading = useInitialLoading(coldLoading);
     const blockingError = isBlockingListReadError(error, stores);
     const reducedMotion = useReducedMotion();
     const [pageMotion, setPageMotion] = useState(null);
@@ -56,6 +59,11 @@ const StoreList = () => {
     const [view, setView] = useViewModeParam(urlSearchParams, 'cards');
     const listRef = React.useRef(null);
     useListRefreshAnchor(listRef, JSON.stringify([view, page, searchParams]), refetching, hasData ? stores : null);
+    const paging = pageMotion?.page === page;
+    useListSelectionMotion(listRef, {
+        selection: JSON.stringify([searchParams.keyword, searchParams.domain, searchParams.region, resultOrder]),
+        view, ids: stores.map(store => store.id), ready: !loading && !blockingError && !paging,
+    });
     const recordedAdIdsRef = React.useRef(new Set());
     const recordImpressionOnce = React.useCallback((adId) => {
         if (recordedAdIdsRef.current.has(adId)) return;
@@ -64,7 +72,7 @@ const StoreList = () => {
     }, []);
     const resultClassName = view === 'list' ? 'reserve-store-list-rows' : 'rsv-store-grid';
     let resultMotionClassName = '';
-    if (!reducedMotion && pageMotion?.page === page) {
+    if (!reducedMotion && paging) {
         resultMotionClassName = ` reserve-explore-result--page-${pageMotion.direction}`;
     }
     const ResultItem = view === 'list' ? StoreListRow : StoreCard;
@@ -176,6 +184,7 @@ const StoreList = () => {
             <div
                 ref={listRef}
                 className={resultClassName + resultMotionClassName}
+                aria-busy={sorting || undefined}
                 onAnimationEnd={event => {
                     if (event.target !== event.currentTarget) return;
                     setPageMotion(null);
@@ -212,28 +221,29 @@ const StoreList = () => {
                 sort={pendingSort ?? searchParams.sort}
                 onSortChange={handleSortChange}
                 sortOptions={SORT_OPTIONS}
-                disabled={loading}
+                disabled={initialLoading}
                 initialLoading={initialLoading}
-                sortDisabled={loading || locating}
-                sortLoading={locating}
+                sortDisabled={locating}
+                sortLoading={locating || sorting}
             />
 
             <FilterToolbar search={{ value: searchParams.keyword,
-                onChange: event => setSearchParams({ keyword: event.target.value }),
-                placeholder: '가게 검색' }} onReload={refetch} loading={refetching} initialLoading={initialLoading} />
+                onSubmit: keyword => setSearchParams({ keyword }),
+                placeholder: '가게 검색' }} onReload={refetch} loading={refetching && !sorting} initialLoading={initialLoading} />
 
             {/*
-             * 최초 조회·쿼리 전환에만 골격을 사용한다. 수동 새로고침은 카드와 읽던 위치를 유지하고 툴바에서 진행 상태를 표시한다.
+             * 정렬과 같은 목록의 재조회는 현재 카드와 읽던 위치를 유지한다.
              */}
-            <ListingContent notice={error && !blockingError && <DataState state="error" kind="store" subject="가게 목록" error={error}
+            <AnimatedListingContent motionKey={view} ready={!loading} keepResultsHeight={totalElements > pageSize}
+                notice={error && !blockingError && <DataState state="error" kind="store" subject="가게 목록" error={error}
                 title="최신 가게 정보를 확인하지 못해 이전 목록을 보여드리고 있어요."
                 onRetry={refetch} retrying={refetching} compact />}>
                 {renderResult()}
-            </ListingContent>
+            </AnimatedListingContent>
             {hasData && !blockingError && totalElements > 0 && (
                 <nav aria-label="가게 목록 페이지" className="reserve-listing-pagination">
                     <Pagination
-                        current={page}
+                        current={resultPage}
                         pageSize={pageSize}
                         total={totalElements}
                         onChange={value => {
@@ -246,7 +256,7 @@ const StoreList = () => {
                         showLessItems={isMobile}
                         size={isMobile ? 'small' : 'default'}
                         align="end"
-                        disabled={loading}
+                        disabled={loading || sorting}
                     />
                 </nav>
             )}

@@ -2,6 +2,7 @@ package kr.it.reserve.seo.service;
 
 import kr.it.reserve.store.dto.StoreSitemapEntry;
 import kr.it.reserve.store.repository.StoreRepository;
+import kr.it.reserve.store.util.StorePublicAddress;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -61,7 +62,8 @@ public class SitemapService {
             LocalDate lastModified = store.lastModifiedAt() == null
                     ? null
                     : store.lastModifiedAt().toLocalDate();
-            appendUrl(xml, origin + "/store/" + store.id(), lastModified, "weekly", "0.8");
+            String path = StorePublicAddress.path(store.publicId());
+            if (path != null) appendUrl(xml, origin + path, lastModified, "weekly", "0.8");
         }
 
         return xml.append("</urlset>\n").toString();

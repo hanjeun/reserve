@@ -1,4 +1,5 @@
 import { useCallback, useState, useSyncExternalStore } from 'react';
+import { reservationPaymentDeadline } from '../utils/reservationPayment';
 
 let timer;
 const listeners = new Set();
@@ -31,11 +32,7 @@ function watch(deadline, notify) {
 
 /** 표시와 실행 도구가 같은 서버 기한과 하나의 화면 시계를 사용한다. */
 export default function useReservationPaymentState(reservation) {
-    const raw = reservation.paymentDeadline;
-    const eligible = reservation.depositAmount > 0 && !reservation.depositPaid
-        && reservation.status === 'PENDING' && !reservation.allowLatePayment;
-    const parsed = eligible && typeof raw === 'string' && /(Z|[+-]\d{2}:\d{2})$/.test(raw) ? Date.parse(raw) : NaN;
-    const deadline = Number.isFinite(parsed) ? parsed : null;
+    const deadline = reservationPaymentDeadline(reservation);
     const [clock] = useState(createClock);
     const subscribe = useCallback(notify => watch(deadline, value => { clock.update(value); notify(); }), [deadline, clock]);
     const now = useSyncExternalStore(subscribe, clock.snapshot, clock.snapshot);

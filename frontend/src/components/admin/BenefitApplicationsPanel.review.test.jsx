@@ -14,7 +14,8 @@ vi.mock('../../hooks/storeNewsQueries', () => ({
     storeNewsKeys: { applications: params => ['store-news', 'applications', params], application: id => ['store-news', 'application', id] },
     invalidateStoreNews: () => Promise.resolve(),
 }));
-vi.mock('../common', () => ({
+vi.mock('../common', async () => ({
+    Card: (await import('../common/Card')).default,
     Button: ({ children, onClick, disabled }) => <button onClick={onClick} disabled={disabled}>{children}</button>,
     DataState: ({ title, onRetry }) => <div>{title}{onRetry && <button onClick={onRetry}>다시 조회</button>}</div>,
     FilterMenu: () => null,
@@ -23,11 +24,12 @@ vi.mock('../common', () => ({
     FormTextArea: props => <textarea {...props} />,
 }));
 vi.mock('../store-news/StoreNewsPresentation', () => ({
-    BenefitDetailContent: ({ item }) => <div><output data-testid="review-revision">{item.revision}</output>
-        <img key={item.images[0].url} src={feedMediaUrl(item.images[0].url)} alt="검토 사진" /></div>,
+    BenefitDetailContent: ({ item, photoAttempt }) => <div><output data-testid="review-revision">{item.revision}</output>
+        <img key={photoAttempt + ':' + item.images[0].url} src={feedMediaUrl(item.images[0].url)} alt="검토 사진" /></div>,
 }));
 
 const news = revision => ({ id: 7, revision, title: '혜택', storeName: '가게', benefitState: 'PENDING', state: 'PUBLISHED',
+    benefitRequestedAt: '2026-11-07T23:20:00', mainImageUrl: 'https://cdn.reserve.it.kr/users/41/stores/81/main/store.webp',
     images: [{ id: 70 + revision, url: `/api/admin/promotions/7/images/${70 + revision}` }] });
 const photoLoaded = () => {
     const image = screen.getByAltText('검토 사진');
@@ -47,6 +49,48 @@ beforeEach(() => {
 });
 
 describe('benefit review snapshot boundary', () => {
+    it('keeps private photos out of both list layouts until review opens', async () => {
+        const user = userEvent.setup(); setup();
+        const listButton = await screen.findByRole('button', { name: '검토', exact: true });
+        const row = listButton.closest('.reserve-store-list-row');
+        expect(row).toContainElement(screen.getByRole('button', { name: '혜택 검토' }));
+        expect(screen.getByText('가게 · 2026. 11. 8.')).toHaveAttribute('title', expect.stringContaining('오전 8:20'));
+        expect(row.querySelector('.reserve-list-row-actions').parentElement).toContainElement(screen.getByText('승인 대기'));
+        expect(row.querySelector('img')).toHaveAttribute('src', news(1).mainImageUrl);
+        expect(screen.queryByAltText('검토 사진')).toBeNull();
+        expect(api.application).not.toHaveBeenCalled();
+
+        await user.click(screen.getByRole('button', { name: '카드형 보기로 전환' }));
+        const cardButton = screen.getByRole('button', { name: '검토', exact: true });
+        expect(cardButton.closest('.reserve-card')).not.toBeNull();
+        expect(screen.getByText('가게 · 승인 대기 · 2026. 11. 8.')).toBeInTheDocument();
+        expect(cardButton.closest('.reserve-card').querySelector('img')).toHaveAttribute('src', news(1).mainImageUrl);
+        expect(screen.queryByAltText('검토 사진')).toBeNull();
+        expect(api.application).not.toHaveBeenCalled();
+
+        const cardBody = screen.getByRole('button', { name: '혜택 검토' });
+        expect(cardBody).toHaveClass('reserve-store-card-hit');
+        await user.click(cardBody);
+        expect(await screen.findByAltText('검토 사진')).toHaveAttribute('src', feedMediaUrl(news(1).images[0].url));
+        expect(api.application).toHaveBeenCalledOnce();
+    });
+
+    it('allows retrying failed private photos without approving before they load', async () => {
+        const user = userEvent.setup(); setup();
+        await user.click(await screen.findByRole('button', { name: '검토', exact: true }));
+        const failed = await screen.findByAltText('검토 사진');
+        fireEvent.error(failed);
+        expect(screen.getByText('신청 사진을 불러오지 못했어요.')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '승인', exact: true })).toBeDisabled();
+        await user.click(screen.getByRole('button', { name: '다시 조회' }));
+        expect(screen.getByAltText('검토 사진')).not.toBe(failed);
+        expect(api.application).toHaveBeenCalledOnce();
+        expect(screen.getByRole('button', { name: '승인', exact: true })).toBeDisabled();
+        photoLoaded();
+        await waitFor(() => expect(screen.getByRole('button', { name: '승인', exact: true })).toBeEnabled());
+        expect(api.review).not.toHaveBeenCalled();
+    });
+
     it('removes a deleted application and its cached preview instead of retaining review actions', async () => {
         const user = userEvent.setup(); const client = setup();
         await user.click(await screen.findByRole('button', { name: '검토', exact: true }));

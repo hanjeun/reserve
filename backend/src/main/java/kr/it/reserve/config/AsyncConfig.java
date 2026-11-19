@@ -36,6 +36,19 @@ public class AsyncConfig implements AsyncConfigurer {
         return executor;
     }
 
+    /** 재설정 조회와 해시 작업을 공개 요청과 메일 발송 풀에서 분리한다. */
+    @Bean(name = "passwordResetExecutor")
+    public ThreadPoolTaskExecutor passwordResetExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(1);
+        executor.setQueueCapacity(32);
+        executor.setThreadNamePrefix("password-reset-");
+        executor.setRejectedExecutionHandler(new java.util.concurrent.ThreadPoolExecutor.AbortPolicy());
+        executor.initialize();
+        return executor;
+    }
+
     /** 커밋한 환불 의도를 요청 스레드 밖에서 발신한다. */
     @Bean(name = "refundExecutor")
     public ThreadPoolTaskExecutor refundExecutor() {

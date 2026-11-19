@@ -36,14 +36,17 @@
 .reserve-listing-content__notice > * + * { margin-top: 16px; }
 /* 내 예약의 결과 여백 100px에는 툴바의 아래 16px도 포함된다.
    안내 문구와 갱신 오류는 그 안에 배치하고, 길면 필요한 만큼만 늘린다. */
-.reserve-listing-content:has(> .reserve-listing-content__results > .reserve-data-state:not(.reserve-data-state--compact)) > .reserve-listing-content__notice {
+.reserve-listing-content:has(
+    > .reserve-listing-content__results > .reserve-data-state:not(.reserve-data-state--compact),
+    > .reserve-listing-content__results > .reserve-list-view-motion > .reserve-data-state:not(.reserve-data-state--compact)
+) > .reserve-listing-content__notice {
     display: block;
     box-sizing: border-box;
     min-height: calc(100px - 16px);
     margin-bottom: 0;
     padding-bottom: 16px;
 }
-.reserve-listing-content__results > .reserve-data-state:not(.reserve-data-state--compact) {
+:is(.reserve-listing-content__results, .reserve-list-view-motion) > .reserve-data-state:not(.reserve-data-state--compact) {
     justify-content: flex-start;
 }
 .reserve-listing-pagination { margin-top: 16px; }
@@ -102,6 +105,40 @@
     border-bottom: 1px solid var(--c-border-light, #f2f4f6);
 }
 .reserve-filter-toolbar-secondary--spread { width: 100%; }
+
+.reserve-list-search {
+    flex: 1 1 0;
+    width: 100%;
+    min-width: 0;
+    max-width: 480px;
+    margin: 0;
+}
+.reserve-list-search .ant-input-affix-wrapper {
+    min-height: 44px;
+    padding-block: 0;
+    padding-inline-start: 4px;
+}
+.reserve-list-search .ant-input-affix-wrapper:not(.ant-input-affix-wrapper-disabled) {
+    background-color: var(--c-bg-paper);
+}
+.reserve-list-search input::-webkit-search-decoration,
+.reserve-list-search input::-webkit-search-cancel-button { display: none; }
+
+.reserve-no-show-tab .reserve-filter-toolbar-controls {
+    flex: 1 1 auto;
+    width: auto;
+    margin-left: auto;
+    justify-content: flex-end;
+    gap: 4px;
+}
+.reserve-no-show-tab .reserve-filter-toolbar-count {
+    order: -1;
+    margin-inline: 0 auto;
+}
+.reserve-no-show-tab .reserve-filter-toolbar-secondary > .reserve-list-search {
+    flex: 1 1 0;
+    min-width: 0;
+}
 /* 사업자 통계만: PC에서는 가게 선택을 왼쪽에 두고, 기간과 새로고침을 하나의
    오른쪽 조작 묶음으로 붙인다. 공용 FilterToolbar나 다른 관리자 목록의 배치는 바꾸지 않는다. */
 @media (min-width: 900px) {
@@ -116,7 +153,10 @@
 .reserve-ad-manage-heading {
     margin-bottom: 14px;
 }
-.reserve-ad-manage-intro { min-width: 0; }
+.reserve-ad-manage-intro { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reserve-ad-table-status { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--c-text-secondary); }
+.reserve-ad-table-status .ant-tag { flex: 0 0 auto; margin-inline-end: 0; }
+.reserve-ad-table-status-reason { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .reserve-ad-manage-primary-row {
     display: flex;
     width: 100%;
@@ -150,15 +190,22 @@
     .reserve-filter-toolbar-primary { flex-wrap: nowrap; }
     .reserve-filter-toolbar-controls { flex: 0 1 auto; }
     .reserve-filter-toolbar-extra { flex: 1 1 auto; }
+
+    .reserve-filter-toolbar-primary:has(.reserve-filter-toolbar-extra) {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+    .reserve-filter-toolbar-controls:has(> .reserve-filter-toolbar-extra) { display: contents; }
+    .reserve-filter-toolbar-controls:has(> .reserve-filter-toolbar-extra) > .reserve-filter-menu { grid-column: 1 / -1; }
+    .reserve-filter-toolbar-primary:has(.reserve-filter-toolbar-extra) .reserve-filter-toolbar-refresh { padding-left: 0; }
 }
 
 /* 예약 카드형: 내 가게 카드와 같은 이미지 → 본문 → 균등 액션 바 구조. */
-.reserve-reservation-card-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    align-items: start;
-    gap: 24px;
-}
+.reserve-personal-waiting-items { list-style: none; margin: 0; padding: 0; }
+.reserve-myreservation-divider { height: 1px; background: var(--c-border-light); }
+.reserve-reservation-row-meta-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.reserve-reservation-card-grid { align-items: start; }
 .reserve-reservation-card-grid > * { min-width: 0; }
 .reserve-reservation-summary-card-content {
     display: flex;
@@ -274,6 +321,10 @@
     width: auto !important;
     text-align: left !important;
 }
+.reserve-reservation-summary-card-payment-note {
+    grid-column: 1 / -1;
+    justify-self: end;
+}
 .reserve-reservation-card-action {
     width: 100% !important;
     min-height: 24px;
@@ -295,18 +346,17 @@
     gap: 10px;
     padding: 16px;
 }
-@media (max-width: 1079px) {
-    .reserve-reservation-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-@media (max-width: 815px) {
-    .reserve-reservation-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
 @media (max-width: 551px) {
-    .reserve-reservation-card-grid { grid-template-columns: minmax(0, 1fr); }
     .reserve-reservation-card-skeleton-cover { height: 156px; }
 }
 .reserve-mystore-list-row { padding-block: 10px; border-bottom: 1px solid var(--c-border-light); }
 .reserve-store-list-row-actions { display: flex; flex: 0 0 auto; gap: 2px; align-items: center; }
+.reserve-list-row-actions { display: flex; flex-shrink: 0; align-items: center; justify-content: flex-end; gap: 6px; }
+.reserve-store-list-row-tools { display: flex; flex: 0 0 auto; flex-direction: column; align-items: flex-end; gap: 4px; }
+.reserve-store-list-row-status { color: var(--c-text-secondary); font-size: 13px; line-height: 20px; white-space: nowrap; }
+@media (min-width: 576px) {
+    .reserve-list-row-actions { gap: 14px; }
+}
 .reserve-mystore-list-action { width: 44px !important; height: 44px; border-radius: 10px !important; }
 .reserve-mystore-add-row {
     display: inline-flex;

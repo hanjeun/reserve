@@ -7,34 +7,34 @@ import kr.it.reserve.community.repository.PostLikeRepository;
 import kr.it.reserve.config.jwt.repository.RefreshTokenRepository;
 import kr.it.reserve.config.oauth2.outbox.OAuthUnlinkOutboxService;
 import kr.it.reserve.config.updates.AccountUpdateInvalidations;
-import kr.it.reserve.email.repository.EmailVerificationRepository;
 import kr.it.reserve.email.service.EmailVerificationService;
+import kr.it.reserve.email.repository.EmailVerificationRepository;
 import kr.it.reserve.favorite.repository.FavoriteRepository;
-import kr.it.reserve.file.service.FileDeletionOutboxService;
-import kr.it.reserve.file.service.FileStorageService;
-import kr.it.reserve.file.util.FileStoragePaths;
 import kr.it.reserve.global.error.MemberException;
 import kr.it.reserve.global.ratelimit.RateLimiter;
-import kr.it.reserve.global.security.PasswordPolicy;
 import kr.it.reserve.global.security.PwnedPasswordChecker;
-import kr.it.reserve.lifecycle.dto.MemberWithdrawalReadiness;
-import kr.it.reserve.lifecycle.service.DataLifecycleGuard;
+import kr.it.reserve.global.security.PasswordPolicy;
 import kr.it.reserve.member.dto.LocationUpdateRequest;
 import kr.it.reserve.member.dto.MemberResponse;
 import kr.it.reserve.member.dto.MemberSignupRequest;
 import kr.it.reserve.member.dto.MemberUpdateRequest;
 import kr.it.reserve.member.dto.PasswordChangeRequest;
 import kr.it.reserve.member.entity.AuthProvider;
-import kr.it.reserve.member.entity.MarketingConsentHistory;
 import kr.it.reserve.member.entity.Member;
+import kr.it.reserve.member.entity.MarketingConsentHistory;
 import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.member.event.MemberWithdrawn;
-import kr.it.reserve.member.repository.MarketingConsentHistoryRepository;
 import kr.it.reserve.member.repository.MemberRepository;
+import kr.it.reserve.member.repository.MarketingConsentHistoryRepository;
 import kr.it.reserve.member.repository.PasswordResetTokenRepository;
-import kr.it.reserve.payment.repository.PaymentRepository;
 import kr.it.reserve.promotion.repository.PromotionRepository;
+import kr.it.reserve.payment.repository.PaymentRepository;
 import kr.it.reserve.reservation.repository.ReservationRepository;
+import kr.it.reserve.file.service.FileStorageService;
+import kr.it.reserve.file.service.FileDeletionOutboxService;
+import kr.it.reserve.file.util.FileStoragePaths;
+import kr.it.reserve.lifecycle.service.DataLifecycleGuard;
+import kr.it.reserve.lifecycle.dto.MemberWithdrawalReadiness;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -121,6 +121,7 @@ public class MemberService {
         Member member = memberRepository.save(Member.builder()
                 .name(signupRequest.getName())
                 .email(signupRequest.getEmail())
+                .securityContactEmail(signupRequest.getEmail())
                 .password(encodedPassword)
                 .role(Role.USER)
                 .provider(AuthProvider.LOCAL)

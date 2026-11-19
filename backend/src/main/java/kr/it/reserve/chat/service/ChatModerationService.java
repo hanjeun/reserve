@@ -52,11 +52,20 @@ public class ChatModerationService {
     public void setHidden(Member actor, Long roomId, String viewerRole, boolean hidden) {
         ChatRoom room = findRoomForUpdate(roomId);
         SenderRole role = participantRole(viewerRole);
-        if (role == SenderRole.MEMBER && room.getMember().getId().equals(actor.getId())) {
-            room.setHidden(role, hidden, actor.getId(), LocalDateTime.now(Clock.systemDefaultZone()));
-        } else {
-            assertStoreParticipant(room, actor, role);
-            room.setHidden(role, hidden, actor.getId(), LocalDateTime.now(Clock.systemDefaultZone()));
+        assertConversationParticipant(room, actor, role);
+        if (room.hasLeft(role, actor.getId())) {
+            throw new ChatException("이미 나간 대화예요.", HttpStatus.CONFLICT);
+        }
+        room.setHidden(role, hidden, actor.getId(), LocalDateTime.now(Clock.systemDefaultZone()));
+    }
+
+    @Transactional
+    public void leave(Member actor, Long roomId, String viewerRole) {
+        ChatRoom room = findRoomForUpdate(roomId);
+        SenderRole role = participantRole(viewerRole);
+        assertConversationParticipant(room, actor, role);
+        if (!room.hasLeft(role, actor.getId())) {
+            room.leave(role, actor.getId(), LocalDateTime.now(Clock.systemDefaultZone()));
         }
     }
 
@@ -183,6 +192,11 @@ public class ChatModerationService {
         if ("MEMBER".equalsIgnoreCase(viewerRole)) return SenderRole.MEMBER;
         if ("OWNER".equalsIgnoreCase(viewerRole)) return SenderRole.OWNER;
         throw new ChatException("대화 참가자 역할이 올바르지 않아요.");
+    }
+
+    private void assertConversationParticipant(ChatRoom room, Member actor, SenderRole role) {
+        if (role == SenderRole.MEMBER && room.getMember().getId().equals(actor.getId())) return;
+        assertStoreParticipant(room, actor, role);
     }
 
     private void assertStoreParticipant(ChatRoom room, Member actor, SenderRole role) {

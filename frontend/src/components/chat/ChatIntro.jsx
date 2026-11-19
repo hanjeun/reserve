@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { NotificationOutlined } from '../common/icons';
+import AnimatedContent from '../common/AnimatedContent';
 import { DEFAULT_STORE_GREETING, DEFAULT_SUPPORT_GREETING, fillGreeting } from '../../constants/chatIntro';
 
 /*
@@ -50,11 +51,13 @@ export default function ChatIntro({
                 <div className="reserve-chat-intro-answers" aria-live="polite">
                     {answered.map(item => (
                         <div className="reserve-chat-intro-exchange" key={item.question}>
-                            <p className="reserve-chat-intro-question">{item.question}</p>
-                            <div className="reserve-chat-intro-answer">
+                            <AnimatedContent as="p" className="reserve-chat-intro-question" motionKey={item.question} direction="right" animateOnMount>
+                                {item.question}
+                            </AnimatedContent>
+                            <AnimatedContent className="reserve-chat-intro-answer" motionKey={item.question} direction="left" animateOnMount>
                                 <span className="reserve-chat-intro-auto-label">자동 답변</span>
                                 <p>{item.answer}</p>
-                            </div>
+                            </AnimatedContent>
                         </div>
                     ))}
                     <p className="reserve-chat-intro-note">더 궁금한 점은 아래에 메시지로 남겨주세요.</p>

@@ -141,7 +141,7 @@ describe('store information tool slots', () => {
     it.each([['row', StoreListRow], ['card', StoreCard]])('keeps the %s information button outside its destination link', async (_kind, Component) => {
         const click = vi.fn();
         const { rerender } = setup(<MemoryRouter initialEntries={['/waiting']}>
-            <div onClick={click}><Component store={{ id: 12, name: '웨이팅 가게' }} extraTools={hint} /></div><LocationProbe />
+            <div onClick={click}><Component store={{ id: 12, publicId: '00000000-0000-4000-8000-000000000012', name: '웨이팅 가게' }} extraTools={hint} /></div><LocationProbe />
         </MemoryRouter>);
         const button = infoButton();
         expect(button.closest('a')).toBeNull();
@@ -149,10 +149,10 @@ describe('store information tool slots', () => {
         await user().click(button); await settle();
         expect(click).not.toHaveBeenCalled();
         expect(screen.getByRole('status', { name: '현재 경로' })).toHaveTextContent('/waiting');
-        expect(screen.getByRole('link', { name: '웨이팅 가게 상세 보기' })).toHaveAttribute('href', '/store/12');
+        expect(screen.getByRole('link', { name: '웨이팅 가게 상세 보기' })).toHaveAttribute('href', '/store/00000000-0000-4000-8000-000000000012');
         auth.loggedIn = false;
         rerender(shell(<MemoryRouter initialEntries={['/waiting']}>
-            <div onClick={click}><Component store={{ id: 12, name: '웨이팅 가게' }} extraTools={hint} /></div><LocationProbe />
+            <div onClick={click}><Component store={{ id: 12, publicId: '00000000-0000-4000-8000-000000000012', name: '웨이팅 가게' }} extraTools={hint} /></div><LocationProbe />
         </MemoryRouter>));
         expect(screen.queryByRole('button', { name: '즐겨찾기 추가' })).toBeNull();
         expect(infoButton()).toBeInTheDocument();

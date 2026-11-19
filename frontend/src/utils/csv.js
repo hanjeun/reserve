@@ -15,8 +15,8 @@ export const serializeCsv = (columns, rows) => '\uFEFF' + [
     ...rows.map(row => columns.map(column => csvCell(row[column.key])).join(',')),
 ].join('\r\n') + '\r\n';
 
-export const downloadCsv = (filename, columns, rows) => {
-    const url = URL.createObjectURL(new Blob([serializeCsv(columns, rows)], { type: 'text/csv;charset=utf-8' }));
+export const downloadCsvBlob = (filename, blob) => {
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     link.download = filename;
@@ -26,4 +26,8 @@ export const downloadCsv = (filename, columns, rows) => {
         link.remove();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
+};
+
+export const downloadCsv = (filename, columns, rows) => {
+    downloadCsvBlob(filename, new Blob([serializeCsv(columns, rows)], { type: 'text/csv;charset=utf-8' }));
 };

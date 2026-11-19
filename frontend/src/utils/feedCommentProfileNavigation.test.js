@@ -13,7 +13,7 @@ vi.mock('../store/useAuthStore', () => ({ default: auth.store }));
 
 import { forgetFeedCommentForProfile, readFeedCommentForProfile, rememberFeedCommentForProfile } from './feedCommentProfileNavigation';
 
-const composer = () => ({ postId: 12, content: '작성 중인 댓글', images: [], target: { parent: { id: 7 } }, nonce: 'request-1' });
+const composer = () => ({ postId: 12, postPublicId: '00000000-0000-4000-8000-000000000012', content: '작성 중인 댓글', images: [], target: { parent: { id: 7 } }, nonce: 'request-1' });
 const signIn = (id = 1) => { advanceSession(); auth.change({ user: { id, role: 'USER' }, sessionRevision: currentSession().epoch }); };
 
 beforeEach(() => signIn());

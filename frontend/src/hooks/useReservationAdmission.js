@@ -103,7 +103,8 @@ const unsubscribe = useAuthStore.subscribe((state, previous) => {
         }
     } else if (previous.authRestoring && !state.authRestoring) initialOwnerRestore = false;
 });
-import.meta.hot?.dispose(unsubscribe);
+const hot = import.meta.hot;
+hot?.dispose(unsubscribe);
 
 /* 진행 판단은 하나만 유지하고 늦은 응답도 현재 세션·실행 경계를 통과시킨다. */
 function createAdmissionFlow(onChange) {
@@ -113,7 +114,16 @@ function createAdmissionFlow(onChange) {
     let lookupCache = null;
     const lookups = new Set();
     const current = run => mounted && active === run && run.identity === sessionIdentity(useAuthStore.getState());
-    const emit = (run, patch) => { if (current(run)) onChange(previous => current(run) ? { ...previous, ...patch } : previous); };
+    const emit = (run, patch) => {
+        if (run.presented && current(run)) onChange(previous => current(run) ? { ...previous, ...patch } : previous);
+    };
+    const present = (run, patch) => {
+        if (!current(run)) return;
+        if (run.presented) { emit(run, patch); return; }
+        run.presented = true;
+        onChange(previous => current(run)
+            ? { ...EMPTY_VIEW, open: true, busy: run.inFlight, now: Date.now(), ...patch } : previous);
+    };
     const clearTimer = run => { clearTimeout(run.timer); run.timer = null; };
     const assertIdentity = expected => {
         if (!mounted || !ownerOf(useAuthStore.getState()) || identity !== expected
@@ -125,7 +135,7 @@ function createAdmissionFlow(onChange) {
         clearTimer(run);
         run.controller?.abort();
         run.poller?.dispose();
-        onChange(previous => ({ ...previous, open: false, busy: false }));
+        if (run.presented) onChange(previous => ({ ...previous, open: false, busy: false }));
         run.resolve(result);
     };
 
@@ -205,7 +215,7 @@ function createAdmissionFlow(onChange) {
                 if (!current(run)) return;
                 if (!run.campaign) { finish(run, null); return; }
                 run.attempt = readMetadata(run.owner).attempts[run.campaign.id] || null;
-                emit(run, { campaign: run.campaign, attempt: run.attempt });
+                present(run, { campaign: run.campaign, attempt: run.attempt });
                 if (run.attempt?.ticket) schedule(run, 'status', 0);
                 else {
                     const untilOpen = Date.parse(run.campaign.opensAt) - Date.now();
@@ -243,7 +253,7 @@ function createAdmissionFlow(onChange) {
             if (!current(run) || run.controller.signal.aborted || error?.name === 'AbortError') return;
             run.failedStep = step;
             run.failures += 1;
-            emit(run, { error, errorStep: step });
+            present(run, { error, errorStep: step });
             const status = error?.status ?? error?.response?.status;
             const transient = !error?.admissionStorageError && !error?.admissionProtocolError
                 && (status == null || status === 408 || status === 429 || status >= 500);
@@ -289,15 +299,17 @@ function createAdmissionFlow(onChange) {
             lookupCache = null;
             identity = next;
         },
-        getPendingAttempt: async (scope, expected) => {
+        getPendingAttempt: async (scope, expected, { storedTicketOnly = false } = {}) => {
             assertIdentity(expected);
+            const owner = ownerOf(useAuthStore.getState());
+            if (storedTicketOnly && !Object.values(readMetadata(owner).attempts).some(attempt => attempt.ticket)) return null;
             const controller = new AbortController();
             lookups.add(controller);
             try {
                 const campaign = await lookup(scope, expected, controller.signal);
                 assertIdentity(expected);
                 if (!campaign) return null;
-                const attempt = readMetadata(ownerOf(useAuthStore.getState())).attempts[campaign.id];
+                const attempt = readMetadata(owner).attempts[campaign.id];
                 return attempt?.ticket ? { ...attempt } : null;
             } finally { lookups.delete(controller); }
         },
@@ -337,9 +349,9 @@ function createAdmissionFlow(onChange) {
             const promise = new Promise(done => { resolve = done; });
             const run = { identity: expected, owner: ownerOf(useAuthStore.getState()), scope, scopeKey: scopeKey(scope),
                 resolve, promise, timer: null, controller: null, inFlight: false, attempt: null, status: null,
-                campaign: null, failures: 0, serverOffset: 0 };
+                campaign: null, failures: 0, serverOffset: 0, presented: false };
             active = run;
-            onChange({ ...EMPTY_VIEW, open: true, busy: true, now: Date.now() });
+            // 대기 대상이 확인되기 전에는 제출 버튼의 진행 상태만 유지한다.
             void request(run, 'lookup');
             return promise;
         },
@@ -401,7 +413,7 @@ export default function useReservationAdmission() {
         return () => clearInterval(timer);
     }, [view.open, view.status?.state]);
     const enter = useCallback(scope => flow.enter(scope, identity), [flow, identity]);
-    const getPendingAttempt = useCallback(scope => flow.getPendingAttempt(scope, identity), [flow, identity]);
+    const getPendingAttempt = useCallback((scope, options) => flow.getPendingAttempt(scope, identity, options), [flow, identity]);
     const restoreEntry = useCallback((scope, signal) => flow.restoreEntry(scope, identity, signal), [flow, identity]);
     const complete = useCallback(attempt => flow.complete(attempt, identity), [flow, identity]);
     const cancel = useCallback(() => flow.cancel(identity), [flow, identity]);

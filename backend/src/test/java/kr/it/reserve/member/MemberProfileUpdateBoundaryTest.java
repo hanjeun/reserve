@@ -1,6 +1,10 @@
 package kr.it.reserve.member;
 
 import kr.it.reserve.config.util.CookieUtil;
+import kr.it.reserve.feed.controller.FeedController;
+import kr.it.reserve.feed.service.FeedMediaService;
+import kr.it.reserve.feed.service.FeedModerationService;
+import kr.it.reserve.feed.service.FeedService;
 import kr.it.reserve.global.error.GlobalExceptionHandler;
 import kr.it.reserve.global.ratelimit.RateLimiter;
 import kr.it.reserve.member.controller.MemberApiController;
@@ -15,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpMethod;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -24,6 +29,7 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.List;
+import java.nio.charset.StandardCharsets;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -31,7 +37,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class MemberProfileUpdateBoundaryTest {
+    private static final int ROUTES = 9;
     private final MemberService service = mock(MemberService.class);
+    private final FeedService profiles = mock(FeedService.class);
     private final RateLimiter limiter = new RateLimiter();
     private MockMvc mvc;
 
@@ -44,7 +52,8 @@ class MemberProfileUpdateBoundaryTest {
 
     private MockMvc mvc(RateLimiter limits) {
         return MockMvcBuilders.standaloneSetup(new MemberApiController(service, mock(CookieUtil.class),
-                        mock(MemberWithdrawalService.class), limits))
+                        mock(MemberWithdrawalService.class), limits),
+                        new FeedController(profiles, mock(FeedMediaService.class), mock(FeedModerationService.class), limits))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
 
@@ -54,29 +63,43 @@ class MemberProfileUpdateBoundaryTest {
     }
 
     private RequestBuilder mutation(int route, String ip) {
+        String profile = "{\"nickname\":\"합성 회원\",\"visibility\":\"PRIVATE\"}";
+        MockMultipartFile image = new MockMultipartFile("image", "test.png", "image/png", new byte[]{1});
         AbstractMockHttpServletRequestBuilder<?> request = switch (route) {
             case 0 -> put("/api/member/update").contentType(MediaType.APPLICATION_JSON).content("{\"emailNotificationEnabled\":false}");
-            case 1 -> multipart("/api/member/profile-image").file(new MockMultipartFile("image", "test.png", "image/png", new byte[]{1}));
+            case 1 -> multipart("/api/member/profile-image").file(image);
             case 2 -> delete("/api/member/profile-image");
             case 3 -> patch("/api/member/me/location").contentType(MediaType.APPLICATION_JSON).content("{\"latitude\":0,\"longitude\":0}");
             case 4 -> patch("/api/member/me/marketing-consent").contentType(MediaType.APPLICATION_JSON).content("{\"marketingAgreed\":false}");
+            case 5 -> put("/api/feed/me/profile").contentType(MediaType.APPLICATION_JSON).content(profile);
+            case 6 -> multipart(HttpMethod.PUT, "/api/feed/me/profile")
+                    .file(new MockMultipartFile("profile", "blob", MediaType.APPLICATION_JSON_VALUE, profile.getBytes(StandardCharsets.UTF_8))).file(image);
+            case 7 -> multipart(HttpMethod.PUT, "/api/feed/me/profile/avatar").file(image);
+            case 8 -> delete("/api/feed/me/profile/avatar");
             default -> throw new IllegalArgumentException("Unknown synthetic route");
         };
         return request.with(value -> { value.setRemoteAddr(ip); return value; });
     }
 
     @Test void allMutationRoutesShareTheMemberQuotaAcrossIpChanges() throws Exception {
+        int[] accepted = new int[ROUTES];
         for (int i = 0; i < RateLimiter.Policy.MEMBER_UPDATE.capacity(); i++) {
-            mvc.perform(mutation(i % 5, "203.0.113." + (i + 1))).andExpect(status().isOk());
+            int route = i % ROUTES;
+            mvc.perform(mutation(route, "203.0.113." + (i + 1))).andExpect(status().isOk());
+            accepted[route]++;
         }
-        for (int route = 0; route < 5; route++) {
+        for (int route = 0; route < ROUTES; route++) {
             mvc.perform(mutation(route, "198.51.100.1")).andExpect(status().isTooManyRequests());
         }
-        verify(service, times(4)).updateMember(eq(7L), any());
-        verify(service, times(4)).updateProfileImage(eq(7L), any());
-        verify(service, times(4)).deleteProfileImage(7L);
-        verify(service, times(4)).updateLocation(eq(7L), any());
-        verify(service, times(4)).updateMarketingConsent(7L, false);
+        verify(service, times(accepted[0])).updateMember(eq(7L), any());
+        verify(service, times(accepted[1])).updateProfileImage(eq(7L), any());
+        verify(service, times(accepted[2])).deleteProfileImage(7L);
+        verify(service, times(accepted[3])).updateLocation(eq(7L), any());
+        verify(service, times(accepted[4])).updateMarketingConsent(7L, false);
+        verify(profiles, times(accepted[5])).updateProfile(eq(7L), any());
+        verify(profiles, times(accepted[6])).updateProfile(eq(7L), any(), any());
+        verify(profiles, times(accepted[7])).uploadProfileAvatar(eq(7L), any());
+        verify(profiles, times(accepted[8])).deleteProfileAvatar(7L);
         authenticate(8L);
         mvc.perform(mutation(2, "198.51.100.1")).andExpect(status().isOk());
     }
@@ -84,7 +107,7 @@ class MemberProfileUpdateBoundaryTest {
     @Test void changingMembersCannotBypassTheSharedIpQuotaAndOtherIpsRemainUsable() throws Exception {
         for (int i = 0; i < RateLimiter.Policy.MEMBER_UPDATE_IP.capacity(); i++) {
             authenticate(i + 1L);
-            mvc.perform(mutation(i % 5, "203.0.113.1")).andExpect(status().isOk());
+            mvc.perform(mutation(i % ROUTES, "203.0.113.1")).andExpect(status().isOk());
         }
         authenticate(99L);
         mvc.perform(mutation(2, "203.0.113.1")).andExpect(status().isTooManyRequests());
@@ -92,13 +115,13 @@ class MemberProfileUpdateBoundaryTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {0, 1, 2, 3, 4})
+    @ValueSource(ints = {0, 1, 2, 3, 4, 5, 6, 7, 8})
     void ipRejectionPrecedesMemberConsumptionAndEveryWrite(int route) throws Exception {
         RateLimiter limits = mock(RateLimiter.class);
         mvc(limits).perform(mutation(route, "203.0.113.1")).andExpect(status().isTooManyRequests());
         verify(limits).tryConsume("member-update:ip:203.0.113.1", RateLimiter.Policy.MEMBER_UPDATE_IP);
         verify(limits, never()).tryConsume(anyString(), eq(RateLimiter.Policy.MEMBER_UPDATE));
-        verifyNoInteractions(service);
+        verifyNoInteractions(service, profiles);
     }
 
     @ParameterizedTest

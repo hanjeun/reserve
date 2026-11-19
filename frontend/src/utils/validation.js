@@ -6,6 +6,9 @@
 const skipIfEmpty = (fn) => (_, value) =>
     !value || value === '' ? Promise.resolve() : fn(value);
 
+export const MAX_RESERVATION_GUESTS = 20;
+export const MAX_RESERVATION_REQUEST_LENGTH = 200;
+
 // 이메일 형식 검증을 공유한다.
 
 // 도메인 구분점을 분리해 불필요한 정규식 역추적을 줄인다.
@@ -128,10 +131,10 @@ export const VALIDATION_RULES = {
     ],
     guestCount: [
         { required: true, message: '인원 수를 입력해주세요' },
-        { type: 'number', min: 1, max: 20, message: '1~20명 사이로 입력해주세요' },
+        { type: 'number', min: 1, max: MAX_RESERVATION_GUESTS, message: '1~20명 사이로 입력해주세요' },
     ],
     specialRequest: [
-        { max: 200, message: '최대 200자까지 입력할 수 있어요' },
+        { max: MAX_RESERVATION_REQUEST_LENGTH, message: '최대 200자까지 입력할 수 있어요' },
     ],
 
     // 회원 관련

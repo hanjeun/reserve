@@ -43,6 +43,28 @@ class SecurityConfigAuthorizationTest {
     }
 
     @Test
+    void verifiedOAuthRestrictionCanOnlyBeReadOnceByTheCallbackBrowser() throws Exception {
+        var callback = new org.springframework.mock.web.MockHttpServletRequest();
+        String location = kr.it.reserve.config.oauth2.OAuthLoginOutcome.redirect(callback,
+                "https://app.reserve.it.kr", new kr.it.reserve.config.oauth2.OAuthLoginOutcome.View("account_restricted", "BANNED", null));
+        var session = (org.springframework.mock.web.MockHttpSession) callback.getSession(false);
+        String reference = org.springframework.web.util.UriComponentsBuilder.fromUriString(location).build().getQueryParams().getFirst("result");
+        String body = "{\"reference\":\"" + reference + "\"}";
+        String path = "/api/v1/auth/oauth-outcome";
+        var json = org.springframework.http.MediaType.APPLICATION_JSON;
+
+        mockMvc.perform(post(path).contentType(json).content(body)).andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data").isEmpty());
+        mockMvc.perform(post(path).session(session).header("Origin", "https://untrusted.example.test").contentType(json).content(body))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post(path).session(session).contentType(json).content(body)).andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Cache-Control", "no-store"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.status").value("BANNED"));
+        mockMvc.perform(post(path).session(session).contentType(json).content(body)).andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data").isEmpty());
+    }
+
+    @Test
     void neutralSessionReadIsPublicWhilePersonalDetailsAndWritesStayProtected() throws Exception {
         for (String prefix : new String[]{"/api", "/api/v1"}) {
             mockMvc.perform(get(prefix + "/auth/session")).andExpect(status().isOk())
@@ -59,6 +81,17 @@ class SecurityConfigAuthorizationTest {
                     .andExpect(status().isOk())
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.idleSeconds").isNumber());
             mockMvc.perform(post(prefix + "/auth/login-policy")).andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Test
+    void guestsMayReadReviewCommentsWithoutGainingWriteAccess() throws Exception {
+        for (String prefix : new String[]{"/api", "/api/v1"}) {
+            String path = prefix + "/reviews/0";
+            mockMvc.perform(get(path + "/comments")).andExpect(status().isNotFound());
+            mockMvc.perform(post(path + "/comments")).andExpect(status().isUnauthorized());
+            mockMvc.perform(delete(path + "/comments/1")).andExpect(status().isUnauthorized());
+            mockMvc.perform(put(path + "/like")).andExpect(status().isUnauthorized());
         }
     }
 
@@ -287,7 +320,7 @@ class SecurityConfigAuthorizationTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    // 보호된 API — 비로그인 상태에서는 반드시 401이어야 함 ──
+    // 보호된 API는 비로그인 요청에 401을 반환해야 한다.
 
     @Test
     void myReservationsRequiresAuth() throws Exception {

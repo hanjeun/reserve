@@ -1,28 +1,31 @@
 package kr.it.reserve.feed.service;
 
+import kr.it.reserve.config.updates.EntityUpdates;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.From;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
-import kr.it.reserve.config.updates.EntityUpdates;
-import kr.it.reserve.favorite.entity.Favorite;
 import kr.it.reserve.feed.*;
 import kr.it.reserve.feed.dto.FeedDto;
 import kr.it.reserve.feed.entity.*;
+import kr.it.reserve.feed.entity.FeedProfile.Visibility;
 import kr.it.reserve.feed.repository.*;
-import kr.it.reserve.file.service.FileDeletionOutboxService;
+import kr.it.reserve.favorite.entity.Favorite;
 import kr.it.reserve.file.service.FileStorageService;
+import kr.it.reserve.file.service.FileDeletionOutboxService;
 import kr.it.reserve.file.util.FileStoragePaths;
 import kr.it.reserve.global.common.PageRequests;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.MemberStatus;
 import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.member.repository.MemberRepository;
-import kr.it.reserve.promotion.StoreNewsPolicy;
 import kr.it.reserve.promotion.entity.Promotion;
 import kr.it.reserve.promotion.repository.PromotionRepository;
+import kr.it.reserve.promotion.StoreNewsPolicy;
+import kr.it.reserve.review.service.ReviewAuthorReader;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.entity.StoreStatus;
 import kr.it.reserve.store.entity.WaitingIntakeMode;
@@ -37,7 +40,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-
 import java.net.URI;
 import java.text.Normalizer;
 import java.time.Clock;
@@ -46,11 +48,13 @@ import java.time.ZoneOffset;
 import java.util.*;
 
 @Service @RequiredArgsConstructor @Transactional(readOnly = true)
-public class FeedService {
+public class FeedService implements ReviewAuthorReader {
     static final String PROFILE_IMAGE_DELETION_SOURCE = "FEED_PROFILE_IMAGE";
     private final FeedPolicy policy;
     private final FeedProfileRepository profiles;
     private final FeedPostRepository posts;
+    private final FeedCommentRepository comments;
+    private final ProfileReviewReader profileReviews;
     private final FeedMediaRepository media;
     private final MemberRepository members;
     private final StoreRepository stores;
@@ -62,36 +66,80 @@ public class FeedService {
     @PersistenceContext private EntityManager entityManager;
 
     public FeedDto.Profile myProfile(Long memberId) {
-        policy.requireEnabled(); activeReader(memberId);
-        return profiles.findByMember_Id(memberId).filter(profile -> !profile.isHidden() && profile.isConfigured()).map(this::profileDto).orElse(null);
+        activeReader(memberId);
+        return profiles.findByMember_Id(memberId).filter(profile -> !profile.isHidden() && profile.isConfigured())
+                .map(profile -> profilePage(profile, memberId)).orElse(null);
     }
 
     @Transactional
     public FeedDto.Profile updateProfile(Long memberId, FeedDto.ProfileRequest request) {
-        policy.requireEnabled(); Member member = activeWriter(memberId);
+        return updateProfile(memberId, request, null);
+    }
+
+    @Transactional
+    public FeedDto.Profile updateProfile(Long memberId, FeedDto.ProfileRequest request, MultipartFile image) {
+        if (request.visibility() == null) policy.requireEnabled();
+        Member member = activeWriter(memberId);
         String nickname = clean(request.nickname(), 30, "닉네임");
         if (nickname.isBlank() || nickname.contains("\n") || nickname.contains("\t")) throw FeedException.invalid("한 줄의 공개 닉네임을 입력해주세요.");
         String key = Normalizer.normalize(nickname, Normalizer.Form.NFKC).toLowerCase(Locale.ROOT);
         if (key.length() > 120) throw FeedException.invalid("다른 닉네임을 입력해주세요.");
-        if (profiles.existsByNicknameKeyAndMember_IdNot(key, memberId)) {
+        FeedProfile profile = profiles.findByMember_Id(memberId).orElseGet(() -> FeedProfile.create(member, now()));
+        if (profile.isHidden()) throw new FeedException("프로필을 변경할 수 없어요.", HttpStatus.FORBIDDEN);
+        if (!key.equals(profile.getNicknameKey()) && profiles.existsByNicknameKeyAndMember_IdNot(key, memberId)) {
             throw new FeedException("이미 사용 중인 닉네임이에요.", HttpStatus.CONFLICT);
         }
-        FeedProfile profile = profiles.findByMember_Id(memberId).orElseGet(() -> FeedProfile.create(member, now()));
-        if (profile.isHidden()) throw new FeedException("공개 프로필을 변경할 수 없어요.", HttpStatus.FORBIDDEN);
-        FeedDto.AvatarSource source = requestedAvatar(profile, request);
-        String previous = profile.getCustomAvatarKey();
-        profile.update(nickname, key, clean(request.bio(), 160, "소개"), source == FeedDto.AvatarSource.ACCOUNT, now());
-        profile.changeAvatar(source == FeedDto.AvatarSource.ACCOUNT, source == FeedDto.AvatarSource.CUSTOM ? previous : null, now());
+        String bio = clean(request.bio(), 160, "소개");
+        boolean resetPhoto = Boolean.TRUE.equals(request.resetPhoto());
+        String obsoleteCustom = null;
+        if (request.visibility() != null || profile.getVisibility() != null) {
+            updateUnifiedPhoto(profile, image, resetPhoto);
+            if (request.visibility() != null) profile.setVisibility(request.visibility());
+            profile.update(nickname, key, bio, true, now());
+        } else {
+            if (image != null || resetPhoto) throw FeedException.invalid("프로필 공개 범위를 선택해주세요.");
+            FeedDto.AvatarSource source = requestedAvatar(profile, request);
+            String previous = profile.getCustomAvatarKey();
+            profile.update(nickname, key, bio, source == FeedDto.AvatarSource.ACCOUNT, now());
+            profile.changeAvatar(source == FeedDto.AvatarSource.ACCOUNT, source == FeedDto.AvatarSource.CUSTOM ? previous : null, now());
+            if (!Objects.equals(previous, profile.getCustomAvatarKey())) obsoleteCustom = previous;
+        }
         profiles.saveAndFlush(profile);
-        if (!Objects.equals(previous, profile.getCustomAvatarKey())) deleteCustomAvatar(previous, memberId);
+        deleteCustomAvatar(obsoleteCustom, memberId);
         profileChanged();
-        return profileDto(profile);
+        return profilePage(profile, memberId);
+    }
+
+    private void updateUnifiedPhoto(FeedProfile profile, MultipartFile image, boolean reset) {
+        if (reset && image != null) throw FeedException.invalid("사진을 바꾸거나 기본 이미지로 변경해주세요.");
+        Member member = profile.getMember();
+        Long memberId = member.getId();
+        String previous = member.getProfileImage();
+        String custom = profile.getCustomAvatarKey();
+        boolean adopt = image == null && !reset && custom != null
+                && storage.isManagedFileUnderPrefix(custom, FileStoragePaths.feedProfile(memberId));
+        String selected = previous;
+        if (reset) selected = null;
+        else if (adopt) selected = storage.getPublicUrl(custom);
+        else if (image != null) {
+            String key = storage.storeFile(image, FileStoragePaths.userProfile(memberId));
+            if (key == null) throw FeedException.invalid("업로드할 프로필 사진을 선택해주세요.");
+            selected = storage.getPublicUrl(key);
+        }
+        if (!Objects.equals(previous, selected)) {
+            member.setProfileImage(selected);
+            if (ownedAccountPhoto(previous, memberId)) fileDeletions.enqueue(previous, "MEMBER_PROFILE_IMAGE", memberId);
+        }
+        if (reset || adopt || image != null) member.setProfileImageLocked(true);
+        profile.changeAvatar(true, null, now());
+        if (!adopt) deleteCustomAvatar(custom, memberId);
     }
 
     @Transactional
     public FeedDto.Profile uploadProfileAvatar(Long memberId, MultipartFile image) {
         policy.requireEnabled(); activeWriter(memberId); FeedProfile profile = writableProfile(memberId);
         if (image == null || image.isEmpty()) throw FeedException.invalid("업로드할 프로필 사진을 선택해주세요.");
+        if (profile.getVisibility() != null) return saveUnifiedAvatar(profile, image, false);
         String previous = profile.getCustomAvatarKey();
         String key = storage.storeFile(image, FileStoragePaths.feedProfile(memberId));
         if (key == null) throw FeedException.invalid("업로드할 프로필 사진을 선택해주세요.");
@@ -99,18 +147,26 @@ public class FeedService {
         profiles.saveAndFlush(profile);
         if (!Objects.equals(previous, key)) deleteCustomAvatar(previous, memberId);
         profileChanged();
-        return profileDto(profile);
+        return profileDto(profile, memberId);
     }
 
     @Transactional
     public FeedDto.Profile deleteProfileAvatar(Long memberId) {
         policy.requireEnabled(); activeWriter(memberId); FeedProfile profile = writableProfile(memberId);
+        if (profile.getVisibility() != null) return saveUnifiedAvatar(profile, null, true);
         String previous = profile.getCustomAvatarKey();
         profile.changeAvatar(false, null, now());
         profiles.saveAndFlush(profile);
         deleteCustomAvatar(previous, memberId);
         profileChanged();
-        return profileDto(profile);
+        return profileDto(profile, memberId);
+    }
+
+    private FeedDto.Profile saveUnifiedAvatar(FeedProfile profile, MultipartFile image, boolean reset) {
+        updateUnifiedPhoto(profile, image, reset);
+        profiles.saveAndFlush(profile);
+        profileChanged();
+        return profilePage(profile, profile.getMember().getId());
     }
 
     private FeedDto.AvatarSource requestedAvatar(FeedProfile profile, FeedDto.ProfileRequest request) {
@@ -122,7 +178,7 @@ public class FeedService {
         if (source == null) source = profile.isConfigured() ? avatarSource(profile) : FeedDto.AvatarSource.ACCOUNT;
         if (source == FeedDto.AvatarSource.CUSTOM && (profile.getCustomAvatarKey() == null
                 || !storage.isManagedFileUnderPrefix(profile.getCustomAvatarKey(), FileStoragePaths.feedProfile(profile.getMember().getId())))) {
-            throw FeedException.invalid("공개 프로필 사진을 먼저 업로드해주세요.");
+            throw FeedException.invalid("피드 프로필 사진을 먼저 업로드해주세요.");
         }
         return source;
     }
@@ -134,7 +190,28 @@ public class FeedService {
     }
 
     public FeedDto.Profile publicProfile(String publicId) {
-        policy.requireEnabled(); return profileDto(publicAuthor(publicId));
+        return publicProfile(publicId, null);
+    }
+
+    public FeedDto.Profile publicProfile(String publicId, Long viewer) {
+        return profilePage(profileForViewer(publicId, viewer), viewer);
+    }
+
+    private FeedProfile profileForViewer(String publicId, Long viewer) {
+        FeedProfile profile = publicAuthor(publicId);
+        if (Objects.equals(viewer, profile.getMember().getId())) return profile;
+        if (profile.getVisibility() == Visibility.PRIVATE) throw FeedException.missing();
+        if (profile.getVisibility() == Visibility.MEMBERS) {
+            if (viewer == null) throw new FeedException("로그인한 회원에게 공개된 프로필이에요.", HttpStatus.FORBIDDEN);
+            activeReader(viewer);
+        }
+        return profile;
+    }
+
+    private FeedProfile profileForActivity(String publicId, Long viewer) {
+        FeedProfile profile = profileForViewer(publicId, viewer);
+        if (profile.getVisibility() == null && !Objects.equals(viewer, profile.getMember().getId())) throw FeedException.missing();
+        return profile;
     }
 
     public Page<FeedDto.Post> publicPosts(int page, int size, String region, boolean favoriteOnly, Long viewer) {
@@ -210,10 +287,39 @@ public class FeedService {
     }
 
     public Page<FeedDto.Post> authorPosts(String publicId, int page, int size, Long viewer) {
-        policy.requireEnabled(); FeedProfile profile = publicAuthor(publicId);
+        policy.requireEnabled(); FeedProfile profile = profileForViewer(publicId, viewer);
         return posts.findAll(publicSpecification(null, profile.getId(), null),
                 PageRequests.bounded(page, size).withSort(Sort.by(Sort.Direction.DESC, "createdAt", "id")))
                 .map(post -> postDto(post, viewer));
+    }
+
+    public Page<FeedDto.ProfileComment> authorComments(String publicId, int page, int size, Long viewer) {
+        policy.requireEnabled();
+        FeedProfile profile = profileForActivity(publicId, viewer);
+        return comments.publishedByProfile(profile.getId(), now(), PageRequests.bounded(page, size))
+                .map(comment -> new FeedDto.ProfileComment(comment.getPost().getPublicId(), comment.getPublicId(),
+                        comment.getContent(), comment.getCreatedAt().atOffset(ZoneOffset.UTC)));
+    }
+
+    public Page<FeedDto.ProfileReview> authorReviews(String publicId, int page, int size, Long viewer) {
+        FeedProfile profile = profileForActivity(publicId, viewer);
+        Long memberId = profile.getMember().getId();
+        return profileReviews.findPublished(memberId, Objects.equals(viewer, memberId), now(), PageRequests.bounded(page, size));
+    }
+
+    @Override
+    public Map<Long, FeedDto.Profile> reviewAuthors(Collection<Long> ids, Member viewer) {
+        if (ids.isEmpty()) return Map.of();
+        Map<Long, FeedDto.Profile> authors = new HashMap<>();
+        for (FeedProfile profile : profiles.findByMember_IdIn(ids)) {
+            Member member = profile.getMember();
+            if (profile.isHidden() || !profile.isConfigured() || !readableMember(member)) continue;
+            if (profile.getVisibility() == Visibility.PUBLIC || profile.getVisibility() == Visibility.MEMBERS && readableMember(viewer)) {
+                authors.put(member.getId(), new FeedDto.Profile(profile.getPublicId(), profile.getNickname(), null, avatar(profile),
+                        profile.isUseAccountAvatar(), avatarSource(profile)));
+            }
+        }
+        return authors;
     }
 
     public Page<FeedDto.Post> myPosts(Long memberId, boolean drafts, int page, int size) {
@@ -225,7 +331,16 @@ public class FeedService {
     }
 
     public FeedDto.Post readPost(Long id, Long viewer) {
-        policy.requireEnabled(); FeedPost post = posts.findById(id).orElseThrow(FeedException::missing);
+        policy.requireEnabled();
+        return readablePost(posts.findById(id).orElseThrow(FeedException::missing), viewer);
+    }
+
+    public FeedDto.Post readPostByPublicId(java.util.UUID publicId, Long viewer) {
+        policy.requireEnabled();
+        return readablePost(posts.findByPublicId(publicId.toString()).orElseThrow(FeedException::missing), viewer);
+    }
+
+    private FeedDto.Post readablePost(FeedPost post, Long viewer) {
         if (post.getNewsPromotion() != null || post.getState() == FeedPost.State.DELETED) throw FeedException.missing();
         boolean mine = Objects.equals(viewer, post.getProfile().getMember().getId());
         boolean feedPublic = isPublic(post);
@@ -277,12 +392,15 @@ public class FeedService {
     }
 
     @Transactional
-    public void delete(Long memberId, Long id) {
+    public void delete(Long memberId, Long id, Long draftRevision) {
         policy.requireEnabled(); activeWriter(memberId);
         if (posts.newsSourceId(id).isPresent()) throw FeedException.missing();
         FeedPost post = posts.findForUpdate(id).orElseThrow(FeedException::missing); requireOwner(post, memberId);
         if (post.getNewsPromotion() != null) throw FeedException.missing();
         if (post.getState() != FeedPost.State.DELETED) {
+            if (draftRevision != null && (post.getState() != FeedPost.State.DRAFT || draftRevision != post.getRevision())) {
+                throw new FeedException("초안이 변경됐어요. 임시보관함을 다시 확인해주세요.", HttpStatus.CONFLICT);
+            }
             boolean wasPublic = isPublic(post);
             post.delete(now());
             changed(post, wasPublic, EntityUpdates.Operation.DELETED);
@@ -326,12 +444,12 @@ public class FeedService {
         boolean deleted = post.getState() == FeedPost.State.DELETED || (news != null && news.getState() == Promotion.State.DELETED);
         Store store = deleted ? null : post.getStore();
         FeedDto.StoreLink storeLink = usableStore(store) ? new FeedDto.StoreLink(store.getId(), store.getName(),
-                store.isReservationEnabled(), store.resolveWaitingIntakeMode() != WaitingIntakeMode.OFF) : null;
+                store.isReservationEnabled(), store.resolveWaitingIntakeMode() != WaitingIntakeMode.OFF, store.getPublicId()) : null;
         List<FeedDto.Image> images = deleted ? List.of() : media.findByPost_IdOrderByPositionAscIdAsc(post.getId()).stream().map(this::imageDto).toList();
         return new FeedDto.Post(post.getId(), deleted ? "" : news == null ? post.getContent() : news.getContent(), deleted ? null : post.getRegion(),
                 post.getCreatedAt().atOffset(ZoneOffset.UTC), post.getUpdatedAt().atOffset(ZoneOffset.UTC), post.getRevision(), post.getState().name(),
-                Objects.equals(viewer, post.getProfile().getMember().getId()), profileDto(post.getProfile()), images, storeLink, null,
-                deleted || news == null ? null : newsMetadata(news));
+                Objects.equals(viewer, post.getProfile().getMember().getId()), profileDto(post.getProfile(), viewer), images, storeLink, null,
+                deleted || news == null ? null : newsMetadata(news), deleted ? null : post.getPublicId());
     }
 
     public FeedDto.News newsMetadata(Promotion news) {
@@ -345,7 +463,7 @@ public class FeedService {
         return new FeedDto.Post(carrier == null ? null : carrier.getId(), news.getContent(), null, StoreNewsPolicy.offset(news.getCreatedAt()), StoreNewsPolicy.offset(news.getUpdatedAt()),
                 news.getRevision(), news.getState().name(), false, new FeedDto.Profile(null, store.getName(), "", null, false), List.of(),
                 new FeedDto.StoreLink(store.getId(), store.getName(), store.isReservationEnabled(),
-                        store.resolveWaitingIntakeMode() != WaitingIntakeMode.OFF), null, newsMetadata(news));
+                        store.resolveWaitingIntakeMode() != WaitingIntakeMode.OFF, store.getPublicId()), null, newsMetadata(news));
     }
 
     public FeedDto.Image imageDto(FeedMedia image) { return new FeedDto.Image(image.getId(), "/api/feed/media/" + image.getId(), image.getWidth(), image.getHeight()); }
@@ -360,7 +478,7 @@ public class FeedService {
     public FeedProfile writableProfile(Long id) {
         FeedProfile profile = profiles.findByMember_Id(id).orElseThrow(() -> FeedException.invalid("먼저 공개 닉네임을 설정해주세요."));
         if (!profile.isConfigured()) throw FeedException.invalid("먼저 공개 닉네임을 설정해주세요.");
-        if (profile.isHidden()) throw new FeedException("공개 프로필을 사용할 수 없어요.", HttpStatus.FORBIDDEN); return profile;
+        if (profile.isHidden()) throw new FeedException("피드 프로필을 사용할 수 없어요.", HttpStatus.FORBIDDEN); return profile;
     }
 
     public void activeReader(Long id) {
@@ -421,9 +539,19 @@ public class FeedService {
         media.flush();
     }
 
-    FeedDto.Profile profileDto(FeedProfile profile) {
+    FeedDto.Profile profileDto(FeedProfile profile, Long viewer) {
+        boolean mine = Objects.equals(viewer, profile.getMember().getId());
+        boolean showPhoto = profile.getVisibility() == null || profile.getVisibility() == Visibility.PUBLIC;
+        boolean linkable = showPhoto || mine || profile.getVisibility() == Visibility.MEMBERS && viewer != null;
+        return new FeedDto.Profile(linkable ? profile.getPublicId() : null, profile.getNickname(), null, showPhoto ? avatar(profile) : null,
+                profile.isUseAccountAvatar(), showPhoto ? avatarSource(profile) : FeedDto.AvatarSource.NONE);
+    }
+
+    private FeedDto.Profile profilePage(FeedProfile profile, Long viewer) {
+        boolean mine = Objects.equals(viewer, profile.getMember().getId());
         return new FeedDto.Profile(profile.getPublicId(), profile.getNickname(), profile.getBio(), avatar(profile),
-                profile.isUseAccountAvatar(), avatarSource(profile));
+                profile.isUseAccountAvatar(), avatarSource(profile), mine ? profile.getVisibility() : null,
+                mine || profile.getVisibility() != null, mine);
     }
 
     private FeedDto.AvatarSource avatarSource(FeedProfile profile) {
@@ -440,15 +568,20 @@ public class FeedService {
         if (!profile.isUseAccountAvatar()) return null;
         String candidate = profile.getMember().getProfileImage();
         if (candidate == null || candidate.isBlank()) return null;
-        if (storage.isManagedFileUnderPrefix(candidate, FileStoragePaths.userProfile(profile.getMember().getId()))) {
+        if (ownedAccountPhoto(candidate, profile.getMember().getId())) {
             return candidate.startsWith("https://") ? candidate : storage.getPublicUrl(candidate);
         }
         try {
             URI uri = URI.create(candidate); String host = uri.getHost();
             if ("https".equalsIgnoreCase(uri.getScheme()) && uri.getUserInfo() == null && (uri.getPort() == -1 || uri.getPort() == 443)
                     && host != null && Set.of("lh3.googleusercontent.com", "lh4.googleusercontent.com", "lh5.googleusercontent.com", "lh6.googleusercontent.com", "k.kakaocdn.net", "phinf.pstatic.net").contains(host.toLowerCase(Locale.ROOT))) return candidate;
-        } catch (IllegalArgumentException ignored) { /* 잘못된 계정 사진은 공개 프로필에서 제외한다. */ }
+        } catch (IllegalArgumentException ignored) { /* 잘못된 계정 사진은 피드 프로필에서 제외한다. */ }
         return null;
+    }
+
+    private boolean ownedAccountPhoto(String image, Long memberId) {
+        return image != null && (storage.isManagedFileUnderPrefix(image, FileStoragePaths.userProfile(memberId))
+                || storage.isManagedFileUnderPrefix(image, FileStoragePaths.feedProfile(memberId)));
     }
 
     /** 사진 조회나 조회수 변경 없이 같은 공개 조회 조건을 재사용한다. */

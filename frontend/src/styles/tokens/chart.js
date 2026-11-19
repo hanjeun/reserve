@@ -44,7 +44,7 @@ export const chartTooltipStyle = {
   cursor: { fill: colors.gray[50] },
 };
 
-// Bar 차트 막대 radius — 기존 [4,4,0,0]보다 더 둥글게
+// 막대 차트의 위쪽 모서리 반경.
 export const chartBarRadius = [8, 8, 0, 0];
 
 // Pie/Donut 차트 조각 radius — 둥근 도넛 느낌

@@ -5,6 +5,8 @@ import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.feed.entity.FeedPost;
 import kr.it.reserve.feed.entity.FeedProfile;
+import kr.it.reserve.feed.entity.ContentLike;
+import kr.it.reserve.feed.repository.ContentLikeRepository;
 import kr.it.reserve.promotion.entity.Promotion;
 import kr.it.reserve.promotion.dto.PromotionDto;
 import kr.it.reserve.promotion.repository.PromotionRepository;
@@ -33,6 +35,27 @@ class PublicPromotionRepositoryTest {
     @Autowired EntityManager em;
     @Autowired PromotionRepository repository;
     @Autowired PromotionService service;
+    @Autowired ContentLikeRepository likes;
+
+    @Test
+    void newsLikeSummaryUsesOnlyPageIdsAndDoesNotReuseTheViewerForGuests() {
+        Promotion first = em.find(Promotion.class, promotion(StoreStatus.ACTIVE, false));
+        Promotion second = em.find(Promotion.class, promotion(StoreStatus.ACTIVE, false));
+        Member viewer = first.getMember();
+        Member other = second.getMember();
+        em.persist(ContentLike.create(viewer, null, first, StoreNewsPolicy.now()));
+        em.persist(ContentLike.create(other, null, first, StoreNewsPolicy.now()));
+        em.persist(ContentLike.create(other, null, second, StoreNewsPolicy.now()));
+        em.flush();
+
+        assertThat(likes.summarizeNewsLikes(List.of(first.getId()), viewer.getId())).singleElement().satisfies(summary -> {
+            assertThat(summary.getNewsId()).isEqualTo(first.getId());
+            assertThat(summary.getLikeCount()).isEqualTo(2);
+            assertThat(summary.getViewerLikes()).isEqualTo(1);
+        });
+        assertThat(likes.summarizeNewsLikes(List.of(first.getId(), second.getId()), null))
+                .hasSize(2).allSatisfy(summary -> assertThat(summary.getViewerLikes()).isZero());
+    }
 
     @Test
     void unapprovedBenefitIsExcludedFromCountAndDetailDespiteLegacyFeedOptIn() {

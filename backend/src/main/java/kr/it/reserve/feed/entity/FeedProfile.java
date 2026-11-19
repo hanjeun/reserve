@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import kr.it.reserve.member.entity.Member;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -15,6 +17,8 @@ import java.util.UUID;
 })
 @Getter @NoArgsConstructor
 public class FeedProfile implements kr.it.reserve.promotion.entity.NewsPublication.PublicProfile {
+    public enum Visibility { PUBLIC, MEMBERS, PRIVATE }
+
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) @Column(name = "profile_id") private Long id;
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "member_id", nullable = false) private Member member;
     @Column(name = "public_id", nullable = false, length = 36, updatable = false) private String publicId;
@@ -23,6 +27,9 @@ public class FeedProfile implements kr.it.reserve.promotion.entity.NewsPublicati
     @Column(length = 160) private String bio;
     @Column(name = "use_account_avatar", nullable = false) private boolean useAccountAvatar;
     @Column(name = "custom_avatar_key", length = 1024) private String customAvatarKey;
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "profile_visibility", length = 16) private Visibility visibility;
     @Column(nullable = false) private boolean hidden;
     @Column(name = "created_at", nullable = false) private LocalDateTime createdAt;
     @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt;
@@ -45,6 +52,7 @@ public class FeedProfile implements kr.it.reserve.promotion.entity.NewsPublicati
         if (accountAvatar && customKey != null) throw new IllegalArgumentException("Avatar sources are exclusive");
         useAccountAvatar = accountAvatar; customAvatarKey = customKey; updatedAt = now;
     }
+    public void setVisibility(Visibility visibility) { this.visibility = visibility; }
     public void withdraw(LocalDateTime now) {
         hidden = true; nickname = "탈퇴한 회원"; nicknameKey = "withdrawn:" + publicId;
         bio = null; useAccountAvatar = false; customAvatarKey = null; updatedAt = now;

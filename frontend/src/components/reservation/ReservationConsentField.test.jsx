@@ -22,7 +22,7 @@ function show() {
     return { client, done };
 }
 function RoundTripForm() {
-    return <Form><Form.Item name="request"><input aria-label="요청사항" /></Form.Item><ReservationConsentField storeId={7} /></Form>;
+    return <Form initialValues={{ request: '' }}><Form.Item name="request"><input aria-label="요청사항" /></Form.Item><ReservationConsentField storeId={7} /></Form>;
 }
 function BackFromNotice() {
     const navigate = useNavigate();
@@ -36,14 +36,36 @@ function showRoundTrip() {
 }
 describe('예약 동의 경계', () => {
     beforeEach(() => { vi.clearAllMocks(); useAuthStore.setState({ user: { id: 3 }, sessionRevision: 1 }); fixture.get.mockResolvedValue(notice); });
+    it('제출 전 한 항목을 선택하거나 해제하는 동안 동의 오류를 표시하지 않아요', async () => {
+        const { done } = show();
+        const privacy = await screen.findByRole('checkbox', { name: /가게에 예약 정보/ });
+        vi.useFakeTimers();
+        try {
+            await act(async () => {
+                fireEvent.click(privacy);
+                await vi.advanceTimersByTimeAsync(500);
+            });
+            expect(privacy.closest('.ant-form-item')).not.toHaveClass('ant-form-item-has-error');
+            await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+            expect(screen.queryByText('예약 조건과 개인정보 제공 안내를 확인하고 동의해주세요.')).not.toBeInTheDocument();
+            await act(async () => {
+                fireEvent.click(privacy);
+                await vi.advanceTimersByTimeAsync(500);
+            });
+            expect(screen.queryByText('예약 조건과 개인정보 제공 안내를 확인하고 동의해주세요.')).not.toBeInTheDocument();
+            expect(done).not.toHaveBeenCalled();
+        } finally { vi.useRealTimers(); }
+    });
     it('조건 확인과 개인정보 제공을 따로 확인한 뒤 서버 버전·해시를 제출해요', async () => {
         const { done } = show();
         const privacy = await screen.findByRole('checkbox', { name: /가게에 예약 정보/ });
-        fireEvent.click(privacy);
+        await act(async () => fireEvent.click(privacy));
+        expect(screen.queryByText('예약 조건과 개인정보 제공 안내를 확인하고 동의해주세요.')).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: '예약 신청' }));
         await screen.findByText('예약 조건과 개인정보 제공 안내를 확인하고 동의해주세요.');
         expect(done).not.toHaveBeenCalled();
-        fireEvent.click(screen.getByRole('checkbox', { name: /예약·취소·환불 조건/ }));
+        await act(async () => fireEvent.click(screen.getByRole('checkbox', { name: /예약·취소·환불 조건/ })));
+        await waitFor(() => expect(screen.queryByText('예약 조건과 개인정보 제공 안내를 확인하고 동의해주세요.')).not.toBeInTheDocument());
         fireEvent.click(screen.getByRole('button', { name: '예약 신청' }));
         await waitFor(() => expect(done).toHaveBeenCalledWith({ legalConsent: {
             version: notice.version, noticeHash: notice.hash, privacyAccepted: true, conditionsAccepted: true,

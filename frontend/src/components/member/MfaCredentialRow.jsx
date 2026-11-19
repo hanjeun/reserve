@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types';
 import { Typography } from 'antd';
 import IconTool from '../common/IconTool';
-import { DisconnectOutlined } from '../common/icons';
+import { MinusOutlined } from '../common/icons';
 import { mfaCredentialName } from '../../utils/passkey';
 
 export default function MfaCredentialRow({ credential, busy, lastRequired, onRemove }) {
@@ -10,7 +10,7 @@ export default function MfaCredentialRow({ credential, busy, lastRequired, onRem
         <div className="reserve-mfa-credential-heading">
             <Typography.Text>{name}</Typography.Text>
             <div className="reserve-mfa-credential-tools">
-                <IconTool label={`${name} 해제`} icon={<DisconnectOutlined aria-hidden="true" />} disabled={busy}
+                <IconTool label={`${name} 해제`} icon={<MinusOutlined aria-hidden="true" />} disabled={busy}
                     unavailableReason={lastRequired ? '관리자의 마지막 인증 수단은 유지해야 해요.' : ''} onClick={() => onRemove(credential.id)} />
             </div>
         </div>

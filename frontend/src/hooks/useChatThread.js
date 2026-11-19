@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { chatAttachmentKind } from '../utils/chatAttachments';
 
 // ChatService의 증분 조회 한도와 맞춘다. 가득 찬 배치는 이어받기를 마칠 때까지 읽음을 보류한다.
 const POLL_BATCH_SIZE = 50;
@@ -42,13 +43,17 @@ const applyChanges = (previous, incoming) => {
         if (!update || message.hidden || (message.retracted && update.retracted
             && message.expired === update.expired && !update.hidden)) return message;
         changed = true;
-        return update.hidden ? withoutHiddenContent({ ...message, ...update }) : { ...message, ...update };
+        const merged = { ...message, ...update };
+        if (update.hidden) return withoutHiddenContent(merged);
+        return update.retracted || update.expired ? { ...merged, ...CLEARED_ATTACHMENTS } : merged;
     });
     return changed ? next : previous;
 };
 
-const withoutHiddenContent = message => ({ ...message, hidden: true, content: null, imageUrl: null,
-    imageOriginalFilename: null, imageWidth: null, imageHeight: null, canRetract: false });
+const CLEARED_ATTACHMENTS = { imageUrl: null,
+    imageThumbnailUrl: null, imageOriginalFilename: null, imageWidth: null, imageHeight: null,
+    fileUrl: null, fileName: null, fileBytes: null };
+const withoutHiddenContent = message => ({ ...message, ...CLEARED_ATTACHMENTS, hidden: true, content: null, canRetract: false });
 
 // 개인 삭제도 읽음·페이지 커서의 ID는 보존한다. 이미 삭제한 내용을 낡은 응답으로 복구하지 않는다.
 const applyHidden = (previous, ids) => {
@@ -63,17 +68,17 @@ const applyHidden = (previous, ids) => {
     return changed ? next : previous;
 };
 
-const newClientMessageId = () => {
+export const newClientMessageId = () => {
     if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
     if (!globalThis.crypto?.getRandomValues) return null;
     return Array.from(globalThis.crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('');
 };
 
 // 같은 본문·첨부를 다시 보내면 직전 식별자를 재사용한다.
-const reuseOrNewClientMessageId = (retry, text, attachment) => (
+const reuseOrNewClientMessageId = (retry, text, attachment, requestedId) => (
     retry?.content === text && retry?.attachment === attachment
         ? retry.clientMessageId
-        : newClientMessageId()
+        : requestedId || newClientMessageId()
 );
 
 // 중단 가능하면 signal 을, 사진이 있으면 첨부까지 넘긴다(없는 인자는 넘기지 않는다).
@@ -249,12 +254,12 @@ export default function useChatThread({
      *
      * @returns {Promise<boolean|null>} false만 현재 대화 실패다. null은 대화 전환/언마운트로 무시할 응답이다
      */
-    const submit = useCallback(async (content, attachment = null) => {
+    const submit = useCallback(async (content, attachment = null, requestedId) => {
         const text = String(content ?? '').trim();
         const active = activeRef.current;
         if (active?.scope !== scope) return null;
         if ((!text && !attachment) || active.sending || roomId == null || !active.ready || active.invalidated) return false;
-        const clientMessageId = reuseOrNewClientMessageId(retryRef.current, text, attachment);
+        const clientMessageId = reuseOrNewClientMessageId(retryRef.current, text, attachment, requestedId);
         if (!clientMessageId) { onError?.('안전한 연결에서 다시 시도해주세요.'); return false; }
         active.sending = true;
         const controller = cancellable ? new AbortController() : null;
@@ -265,9 +270,10 @@ export default function useChatThread({
         setSending(true);
         setMessages((prev) => [...prev, {
             id: tempId,
-            content: text || (attachment ? '사진 전송 중' : ''),
+            content: text || (attachment ? (chatAttachmentKind(attachment) === 'document' ? '파일 전송 중' : '사진 전송 중') : ''),
             senderRole: myRole,
             clientMessageId,
+            localSendId: clientMessageId,
             createdAt: new Date().toISOString(),
             pending: true,
         }]);
@@ -275,9 +281,10 @@ export default function useChatThread({
         try {
             const sent = await callSend(send, controller, roomId, text, clientMessageId, attachment);
             if (activeRef.current !== active || active.invalidated) return null;
+            // 전송 응답으로 교체해도 처음 그린 말풍선의 화면 키를 유지한다.
             setMessages((prev) => mergeById(
                 prev.filter((m) => m.id !== tempId),
-                sent ? [sent] : [],
+                sent ? [{ ...sent, localSendId: clientMessageId }] : [],
             ));
             if (retryRef.current?.clientMessageId === clientMessageId) retryRef.current = null;
             onSent?.(sent);

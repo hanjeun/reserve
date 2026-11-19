@@ -28,7 +28,7 @@ export { default as ResponsiveModal } from './ResponsiveModal';
 export { default as SegmentedControl } from './SegmentedControl';
 
 export { default as SegmentedGrid } from './SegmentedGrid';
-export { default as DataTable } from './DataTable';
+export { default as DataTable, PagedDataTable } from './DataTable';
 export { default as StatCard } from './StatCard';
 export { default as ChartCard } from './ChartCard';
 export { default as PieLegend } from './PieLegend';

@@ -37,7 +37,9 @@ vi.mock('../common/AnimatedContent', () => ({ default: ({ children }) => childre
 vi.mock('../common/Pagination', () => ({ default: () => null }));
 vi.mock('../store-news/StoreNewsEditor', () => ({ default: () => null }));
 vi.mock('../store-news/StoreNewsPresentation', () => ({ BenefitDetailContent: () => null, StoreNewsMetadata: () => null }));
-vi.mock('../store-news/StoreNewsActions', () => ({ StoreNewsWriteAction: () => null }));
+vi.mock('../store-news/StoreNewsActions', () => ({
+    StoreNewsWriteAction: () => <button type="button" aria-label="가게 소식 작성" />,
+}));
 vi.mock('../chat/ChatIntroEditor', () => ({ default: () => <div>합성 채팅 설정</div> }));
 
 const failure = { status: 503 };
@@ -52,6 +54,16 @@ beforeEach(() => {
 });
 
 describe('business read failure ownership', () => {
+    it('keeps the view, write and drafts controls together in the management toolbar', () => {
+        const { container } = show(<StoreNewsTab />);
+        const tools = container.querySelector('.reserve-store-news-manage-toolbar > .reserve-store-news-actions');
+        for (const control of [
+            screen.getByRole('button', { name: '사진형 보기로 전환' }),
+            screen.getByRole('button', { name: '가게 소식 작성' }),
+            screen.getByRole('link', { name: '가게 소식 임시보관함' }),
+        ]) expect(tools).toContainElement(control);
+    });
+
     it('retains a failed policy refresh after news is disabled and retries no inactive reads', async () => {
         state.config = query({ enabled: false }, failure);
         state.stores = query(state.stores.data, { status: 403 });

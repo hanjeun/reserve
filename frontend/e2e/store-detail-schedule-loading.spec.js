@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 const store = {
-    id: 81, name: '운영 안내 검증 가게', category: '카페', description: '기존 가게 소개',
+    id: 81, publicId: '00000000-0000-4000-8000-000000000081', name: '운영 안내 검증 가게', category: '카페', description: '기존 가게 소개',
     ownerId: 8, mainImageUrl: 'https://reserve-image.test/schedule.svg',
     detailImageUrls: ['https://reserve-image.test/schedule.svg'],
     reservationSlotMinutes: 30, openTime: '09:00', closeTime: '18:00',
@@ -16,7 +16,7 @@ test('keeps skeleton geometry through one parent entry and moves schedule copy i
     await page.addInitScript(() => {
         window.__storePageEntries = [];
         document.addEventListener('animationstart', event => {
-            if (location.pathname === '/store/81' && event.target.matches('.ant-layout-content')
+            if (location.pathname === '/store/00000000-0000-4000-8000-000000000081' && event.target.matches('.ant-layout-content')
                 && event.animationName.startsWith('reserve-discovery-page-from-')) window.__storePageEntries.push(event.animationName);
         });
     });
@@ -39,7 +39,7 @@ test('keeps skeleton geometry through one parent entry and moves schedule copy i
         if (path === '/api/member/me' || path === '/api/auth/refresh') {
             return route.fulfill({ status: 401, json: { success: false, message: '로그인이 필요합니다.' } });
         }
-        if (path === '/api/stores/81') {
+        if (path === '/api/stores/00000000-0000-4000-8000-000000000081') {
             await detailReady;
             return route.fulfill({ json: { success: true, data: store } });
         }

@@ -22,11 +22,10 @@ const STATUS_STYLE = {
  * 별도 줄로 빼면 오른쪽 컬럼이 한 줄 더 길어져 스켈레톤·카드 높이가 어긋나므로
  * 상태 라벨 뒤에 괄호로 붙인다("승인 대기 (미결제)").
  */
-const ReservationStatusBadge = ({ status, unpaid = false }) => {
-    const style = STATUS_STYLE[status] ?? STATUS_STYLE.PENDING;
+export function ReservationStatusText({ color, children }) {
     return (
         <span style={{
-            color: style.color,
+            color,
             fontSize: fontSize.sm,
             fontWeight: fontWeight.semibold,
             whiteSpace: 'nowrap',
@@ -36,10 +35,17 @@ const ReservationStatusBadge = ({ status, unpaid = false }) => {
             {/*
              * 알 수 없는 상태도 enum 원문을 노출하지 않고 사용자용 대체 문구를 사용한다.
              */}
-            {RESERVATION_STATUS_LABELS[status] ?? '기타'}
-            {unpaid && ' (미결제)'}
+            {children}
         </span>
     );
+}
+
+const ReservationStatusBadge = ({ status, unpaid = false }) => {
+    const style = STATUS_STYLE[status] ?? STATUS_STYLE.PENDING;
+    return <ReservationStatusText color={style.color}>
+        {RESERVATION_STATUS_LABELS[status] ?? '기타'}
+        {unpaid && ' (미결제)'}
+    </ReservationStatusText>;
 };
 
 export default ReservationStatusBadge;

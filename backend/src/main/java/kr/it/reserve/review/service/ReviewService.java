@@ -1,25 +1,34 @@
 package kr.it.reserve.review.service;
 
 import kr.it.reserve.config.updates.EntityUpdates;
+
+import kr.it.reserve.global.common.PageRequests;
 import kr.it.reserve.global.error.ReviewException;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.review.dto.ReviewCreateRequest;
+import kr.it.reserve.review.dto.ReviewInteractionResponse.Summary;
 import kr.it.reserve.review.dto.ReviewResponse;
 import kr.it.reserve.review.dto.ReviewUpdateRequest;
 import kr.it.reserve.review.entity.Review;
 import kr.it.reserve.review.repository.ReviewRepository;
 import kr.it.reserve.store.entity.Store;
-import kr.it.reserve.store.repository.StoreRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
+import java.util.function.Predicate;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -28,87 +37,174 @@ public class ReviewService {
 
     private final ReviewRepository reviewRepository;
     private final ReservationRepository reservationRepository;
-    private final StoreRepository storeRepository;
+    private final ReviewMutationGuard mutations;
+    private final ReviewPhotos photos;
+    private final ReviewAuthorReader feeds;
+    private final ReviewInteractions interactions;
     @Autowired(required = false)
     private ReviewUpdates updates;
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public ReviewResponse createReview(ReviewCreateRequest request, Member member) {
+        return createReview(request, member, List.of());
+    }
+
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public ReviewResponse createReview(ReviewCreateRequest request, Member member, List<MultipartFile> files) {
         log.info("Review created: reservationId={}, memberId={}", request.getReservationId(), member.getId());
 
-        if (!member.isTermsAgreed()) {
+        Member author = mutations.lockAuthor(member.getId());
+        if (author.isDeleted() || author.isSuspended()) {
+            throw new ReviewException("현재 리뷰를 작성할 수 없어요.", HttpStatus.FORBIDDEN);
+        }
+        if (!author.isTermsAgreed()) {
             throw new ReviewException("서비스 이용 약관에 동의해야 리뷰를 작성할 수 있어요.", HttpStatus.FORBIDDEN);
         }
 
-        Reservation reservation = reservationRepository.findById(request.getReservationId())
+        Reservation reservation = mutations.lockReservation(request.getReservationId())
                 .orElseThrow(() -> new ReviewException("예약을 찾을 수 없어요.", HttpStatus.NOT_FOUND));
 
-        // 작성 자격 검증 (분리된 메서드 호출)
-        validateReviewEligibility(reservation, member);
+        validateReviewEligibility(reservation, author);
+        Store store = mutations.lockStore(reservation.getStore().getId());
+        mutations.consumeVisit(reservation);
 
         Review review = Review.builder()
-                .member(member)
-                .store(reservation.getStore())
+                .member(author)
+                .store(store)
                 .reservation(reservation)
                 .rating(request.getRating())
                 .title(request.getTitle())
                 .content(request.getContent())
+                .authorAlias(normalizeAlias(request.getAuthorAlias()))
                 .build();
 
-        Review savedReview = reviewRepository.save(review);
+        photos.update(review, List.of(), files);
+        Review savedReview = reviewRepository.saveAndFlush(review);
         log.info("Review created: reviewId={}", savedReview.getId());
 
-        updateStoreRating(reservation.getStore());
+        mutations.updateRating(store);
         if (updates != null) updates.changed(savedReview, EntityUpdates.Operation.CREATED);
 
-        return ReviewResponse.fromEntity(savedReview);
+        return response(savedReview, author, Summary.EMPTY);
     }
 
     @Transactional
     public void deleteReview(Long reviewId, Member member) {
-        Review review = findReviewByIdOrThrow(reviewId);
+        Review review = findReviewForUpdate(reviewId);
         validateReviewOwnership(review, member);
 
         Store store = review.getStore();
+        if (review.getReservation() != null) review.getReservation().setReviewWritten(true);
+        photos.enqueueDeletion(review.getPhotos(), reviewId);
         reviewRepository.delete(review);
         log.info("Review deleted: reviewId={}", reviewId);
 
-        updateStoreRating(store);
+        mutations.updateRating(store);
         if (updates != null) updates.changed(review, EntityUpdates.Operation.DELETED);
     }
 
     @Transactional
     public ReviewResponse updateReview(Long reviewId, ReviewUpdateRequest request, Member member) {
-        Review review = findReviewByIdOrThrow(reviewId);
+        return updateReview(reviewId, request, member, List.of(), List.of());
+    }
+
+    @Transactional
+    public ReviewResponse updateReview(Long reviewId, ReviewUpdateRequest request, Member member,
+                                       List<Long> removedIds, List<MultipartFile> files) {
+        Review review = findReviewForUpdate(reviewId);
         validateReviewOwnership(review, member);
 
+        photos.update(review, removedIds, files);
         review.update(request.getRating(), request.getTitle(), request.getContent());
+        if (request.getAuthorAlias() != null) review.setAuthorAlias(normalizeAlias(request.getAuthorAlias()));
+        reviewRepository.flush();
         log.info("Review updated: reviewId={}", reviewId);
 
-        updateStoreRating(review.getStore());
+        mutations.updateRating(review.getStore());
         if (updates != null) updates.changed(review, EntityUpdates.Operation.UPDATED);
 
-        return ReviewResponse.fromEntity(review);
+        return responses(List.of(review), member).getFirst();
     }
 
     /**
      * 단일 리뷰 조회
      */
     @Transactional(readOnly = true)
-    public ReviewResponse getReview(Long reviewId) {
-        return ReviewResponse.fromEntity(findReviewByIdOrThrow(reviewId));
+    public ReviewResponse getReview(Long reviewId, Member viewer) {
+        return responses(List.of(requirePublished(findReviewByIdOrThrow(reviewId))), viewer).getFirst();
     }
 
     @Transactional(readOnly = true)
-    public List<ReviewResponse> getStoreReviews(Long storeId) {
-        return reviewRepository.findByStoreIdOrderByCreatedAtDesc(storeId).stream()
-                .map(ReviewResponse::fromEntity).toList();
+    public PhotoRead getPhoto(Long reviewId, Long photoId, boolean thumbnail, Predicate<String> notModified) {
+        var photo = reviewRepository.findPublishedPhoto(reviewId, photoId)
+                .filter(row -> !row.getReview().getStore().isDeleted() && !row.getReview().getStore().isSuspended())
+                .orElseThrow(() -> new ReviewException("리뷰 사진을 찾을 수 없어요.", HttpStatus.NOT_FOUND));
+        photos.requireKey();
+        String imageId = UUID.nameUUIDFromBytes(photo.getObjectKey().getBytes(StandardCharsets.UTF_8)).toString();
+        String etag = "\"" + imageId + (thumbnail ? "-thumbnail-v1" : "-original") + "\"";
+        return new PhotoRead(etag, notModified.test(etag) ? null : photos.read(photo, thumbnail));
+    }
+
+    public record PhotoRead(String etag, ReviewPhotos.ImageContent image) { }
+
+    @Transactional
+    public ReviewResponse replyAsOwner(Long id, Member owner, String reply) {
+        Review review = requirePublished(findReviewForUpdate(id));
+        Store store = review.getStore();
+        if (store.isDeleted() || store.getOwner() == null || !owner.getId().equals(store.getOwner().getId())) {
+            throw new ReviewException("본인 가게의 리뷰에만 답변할 수 있어요.", HttpStatus.FORBIDDEN);
+        }
+        review.setOwnerReply(reply.strip());
+        review.setOwnerRepliedAt(kr.it.reserve.global.common.ServiceTime.now());
+        if (updates != null) updates.changed(review, EntityUpdates.Operation.UPDATED);
+        return responses(List.of(review), owner).getFirst();
+    }
+
+    @Transactional
+    public void moderateVisibility(Long id, boolean hidden) {
+        Review review = findReviewForUpdate(id);
+        if (review.isModerationHidden() == hidden) return;
+        review.setModerationHidden(hidden);
+        mutations.updateRating(review.getStore());
+        if (updates != null) updates.changed(review, EntityUpdates.Operation.UPDATED);
+    }
+
+    private Review requirePublished(Review review) {
+        if (!review.isPublished()) throw new ReviewException("리뷰를 찾을 수 없어요.", HttpStatus.NOT_FOUND);
+        return review;
+    }
+
+    @Transactional(readOnly = true)
+    public List<ReviewResponse> getStoreReviews(Long storeId, Member viewer) {
+        var reviews = reviewRepository.findByStoreIdOrderByCreatedAtDesc(storeId).stream().filter(Review::isPublished).toList();
+        return responses(reviews, viewer);
+    }
+
+    public record ReviewCursor(Long beforeId, LocalDateTime beforeDate) { }
+    public record StoreReviewPage(List<ReviewResponse> content, ReviewCursor next) { }
+
+    @Transactional(readOnly = true)
+    public StoreReviewPage getStoreReviewPage(Long storeId, int limit, Long beforeId, LocalDateTime beforeDate,
+                                               Long focusId, Member viewer) {
+        var page = reviewRepository.findPublishedStoreReviews(storeId, LocalDateTime.now(), beforeDate, beforeId,
+                PageRequests.bounded(0, Math.min(limit, 10)));
+        var selected = new ArrayList<>(page.getContent());
+        ReviewCursor next = null;
+        if (page.hasNext()) {
+            Review last = selected.getLast();
+            next = new ReviewCursor(last.getId(), last.getCreatedAt());
+        }
+        if (beforeId == null && focusId != null && selected.stream().noneMatch(review -> focusId.equals(review.getId()))) {
+            reviewRepository.findById(focusId)
+                    .filter(review -> storeId.equals(review.getStore().getId()) && review.isPublished())
+                    .ifPresent(selected::addFirst);
+        }
+        return new StoreReviewPage(responses(selected, viewer), next);
     }
 
     @Transactional(readOnly = true)
     public List<ReviewResponse> getMyReviews(Member member) {
-        return reviewRepository.findByMemberOrderByCreatedAtDesc(member).stream()
-                .map(ReviewResponse::fromEntity).toList();
+        return responses(reviewRepository.findByMemberOrderByCreatedAtDesc(member), member);
     }
 
     @Transactional(readOnly = true)
@@ -123,43 +219,51 @@ public class ReviewService {
     }
 
     @Transactional(readOnly = true)
-    public ReviewResponse getReviewByReservationId(Long reservationId) {
+    public ReviewResponse getReviewByReservationId(Long reservationId, Member member) {
         return reviewRepository.findByReservationId(reservationId)
-                .filter(review -> !review.isDeleted())
-                .map(ReviewResponse::fromEntity)
+                .filter(review -> review.getMember().getId().equals(member.getId()) && review.isPublished())
+                .map(review -> responses(List.of(review), member).getFirst())
                 .orElse(null);
+    }
+
+    private List<ReviewResponse> responses(List<Review> reviews, Member viewer) {
+        if (reviews.isEmpty()) return List.of();
+        var authors = feeds.reviewAuthors(reviews.stream().filter(review -> review.getAuthorAlias() == null)
+                .map(review -> review.getMember().getId()).distinct().toList(), viewer);
+        var summaries = interactions.summaries(reviews.stream().filter(Review::isPublished).map(Review::getId).toList(), viewer);
+        return reviews.stream().map(review -> {
+            Long authorId = review.getMember().getId();
+            boolean mine = viewer != null && authorId.equals(viewer.getId());
+            return ReviewResponse.fromEntity(review, authors.get(authorId), mine, summaries.getOrDefault(review.getId(), Summary.EMPTY));
+        }).toList();
+    }
+
+    private ReviewResponse response(Review review, Member author, Summary summary) {
+        var profile = review.getAuthorAlias() == null ? feeds.reviewAuthors(List.of(author.getId()), author).get(author.getId()) : null;
+        return ReviewResponse.fromEntity(review, profile, true, summary);
+    }
+
+    private static String normalizeAlias(String alias) {
+        return alias == null || alias.isBlank() ? null : alias.strip();
     }
 
     @Transactional(readOnly = true)
     public boolean canWriteReview(Long reservationId, Member member) {
+        if (!member.isTermsAgreed()) return false;
         return reservationRepository.findById(reservationId)
                 .map(res -> res.getMember().getId().equals(member.getId()) &&
-                        res.getStatus() == Reservation.ReservationStatus.COMPLETED &&
-                        !reviewRepository.existsByReservationId(reservationId))
+                        isCompletedVisit(res) && !hasWrittenReview(res))
                 .orElse(false);
-    }
-
-    // 내부 도우미 메서드 (Private Helper Methods)
-
-    /**
-     * 리뷰 CUD 후 가게 평점/리뷰수 갱신
-     */
-    private void updateStoreRating(Store store) {
-        Long storeId = store.getId();
-        // LAZY 프록시 충돌 방지: DB에서 직접 조회한 엔티티에 갱신
-        Store managed = storeRepository.findById(storeId)
-                .orElseThrow(() -> new RuntimeException("가게를 찾을 수 없어요: " + storeId));
-        Double avg = reviewRepository.findAverageRatingByStoreId(storeId);
-        long count = reviewRepository.countByStoreId(storeId);
-        managed.setRating(avg != null ? Math.round(avg * 10) / 10.0 : null);
-        managed.setReviewCount((int) count);
-        storeRepository.save(managed);
-        log.info("Store rating updated: storeId={}, rating={}, reviewCount={}", storeId, managed.getRating(), managed.getReviewCount());
     }
 
     private Review findReviewByIdOrThrow(Long id) {
         return reviewRepository.findById(id)
                 .filter(review -> !review.isDeleted())
+                .orElseThrow(() -> new ReviewException("리뷰를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
+    }
+
+    private Review findReviewForUpdate(Long id) {
+        return mutations.lockReview(id, false)
                 .orElseThrow(() -> new ReviewException("리뷰를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
     }
 
@@ -175,12 +279,20 @@ public class ReviewService {
             throw new ReviewException("본인의 예약에만 리뷰를 작성할 수 있어요.", HttpStatus.FORBIDDEN);
         }
         // 2. 상태 확인
-        if (reservation.getStatus() != Reservation.ReservationStatus.COMPLETED) {
+        if (!isCompletedVisit(reservation)) {
             throw new ReviewException("이용완료된 예약에만 리뷰를 작성할 수 있어요.", HttpStatus.BAD_REQUEST);
         }
         // 3. 중복 확인
-        if (reviewRepository.existsByReservationId(reservation.getId())) {
+        if (hasWrittenReview(reservation)) {
             throw new ReviewException("이미 리뷰를 작성한 예약이에요.", HttpStatus.CONFLICT);
         }
+    }
+
+    private static boolean isCompletedVisit(Reservation reservation) {
+        return !reservation.isDeleted() && reservation.getStatus() == Reservation.ReservationStatus.COMPLETED;
+    }
+
+    private boolean hasWrittenReview(Reservation reservation) {
+        return reservation.isReviewWritten() || reviewRepository.existsByReservationId(reservation.getId());
     }
 }

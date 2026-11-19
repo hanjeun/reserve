@@ -17,6 +17,8 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
 
     Optional<Member> findByEmailAndDeletedAtIsNull(String email);
     Optional<Member> findByIdAndDeletedAtIsNull(Long id);
+    Optional<Member> findByAccountRecoveryDigestAndDeletedAtIsNull(String digest);
+    List<Member> findTop2BySecurityContactEmailAndAccountRecoveryDigestIsNotNullAndDeletedAtIsNull(String email);
 
     /** 탈퇴와 회원 상태 변경이 서로의 값을 덮어쓰지 않게 하는 공통 쓰기 잠금. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)

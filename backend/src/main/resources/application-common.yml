@@ -91,9 +91,14 @@ logging:
 mail:
   host: smtp.resend.com
   port: 465
-  from: ${MAIL_FROM:reserve@reserve.it.kr}
+  from: ${MAIL_FROM:support@reserve.it.kr}
   from-name: ${MAIL_FROM_NAME:RESERVE}
   admin-notify: ${MAIL_ADMIN_NOTIFY:hanjeun111@gmail.com}
+  resend-inbound:
+    enabled: ${RESEND_INBOUND_ENABLED:false}
+    recipient: ${RESEND_INBOUND_ADDRESS:}
+    signing-secret: ${RESEND_INBOUND_WEBHOOK_SECRET:}
+    api-key: ${RESEND_INBOUND_API_KEY:}
   properties:
     mail:
       smtp:
@@ -158,6 +163,13 @@ reserve:
     encryption-key: ${RESERVE_MFA_ENCRYPTION_KEY:}
   reservation:
     auto-completion-enabled: ${RESERVE_RESERVATION_AUTO_COMPLETION_ENABLED:false}
+  reservation-protection:
+    shared-limits-enabled: ${RESERVE_RESERVATION_SHARED_LIMITS_ENABLED:false}
+    turnstile:
+      enabled: ${RESERVE_RESERVATION_TURNSTILE_ENABLED:false}
+      site-key: ${RESERVE_RESERVATION_TURNSTILE_SITE_KEY:}
+      secret-key: ${RESERVE_RESERVATION_TURNSTILE_SECRET_KEY:}
+      hostname: ${RESERVE_RESERVATION_TURNSTILE_HOSTNAME:}
   settlement:
     test-enabled: ${RESERVE_SETTLEMENT_TEST_ENABLED:false}
   service-admission:

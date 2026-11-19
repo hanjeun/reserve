@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /** QR과 로그인 JWT의 서명 키를 분리해 서로의 토큰이 검증을 통과하지 못하는지 확인한다. */
 class QrCheckinTokenSecretTest {
 
-    /** 운영과 같은 제약(64자 이상)을 만족하는 더미. 테스트 리소스의 값과 같은 모양이다. */
+    /** 운영과 같은 최소 길이 조건만 맞춘 합성 입력이다. */
     private static final String JWT_SECRET =
             "test-secret-key-for-jwt-authentication-that-is-at-least-64-characters-long-for-hmac-sha256";
 
@@ -91,7 +91,7 @@ class QrCheckinTokenSecretTest {
                 .hasMessageContaining("qr.token-secret");
     }
 
-    /** provider 안의 SecretKey 를 꺼내 보기 위한 얇은 래퍼. 테스트 의도를 문장으로 남기려고 뺐다. */
+    /** 서명 키의 타입과 길이를 검증하기 위한 시험 접근자다. */
     private record SecretKeyPeek(byte[] raw) {
         static SecretKeyPeek of(QrCheckinTokenProvider provider) {
             javax.crypto.SecretKey key =

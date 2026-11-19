@@ -1,31 +1,31 @@
 package kr.it.reserve.feed.service;
 
+import kr.it.reserve.config.updates.EntityUpdates;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.LockModeType;
-import kr.it.reserve.config.updates.EntityUpdates;
 import kr.it.reserve.feed.*;
 import kr.it.reserve.feed.dto.*;
 import kr.it.reserve.feed.entity.*;
 import kr.it.reserve.feed.repository.*;
 import kr.it.reserve.global.common.PageRequests;
+import kr.it.reserve.global.persistence.CurrentLockedState;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.HashSet;
 
 @Service @RequiredArgsConstructor @Transactional(readOnly = true)
 public class FeedCommentService {
@@ -45,7 +45,16 @@ public class FeedCommentService {
     private EntityUpdates updates;
 
     public FeedInteractionDto.Comment readPublic(Long id, Long viewer) {
-        policy.requireEnabled(); var item = comments.findById(id).orElseThrow(FeedException::missing);
+        policy.requireEnabled();
+        return readableComment(comments.findById(id).orElseThrow(FeedException::missing), viewer);
+    }
+
+    public FeedInteractionDto.Comment readPublicById(UUID publicId, Long viewer) {
+        policy.requireEnabled();
+        return readableComment(comments.findByPublicId(publicId.toString()).orElseThrow(FeedException::missing), viewer);
+    }
+
+    private FeedInteractionDto.Comment readableComment(FeedComment item, Long viewer) {
         publicPost(item.getPost().getId(), false);
         if (item.getState() == FeedComment.State.HIDDEN || item.getParent() != null && item.getParent().getState() == FeedComment.State.HIDDEN
             || !visible(item) && (item.getParent() != null || comments.countReplies(item.getId(), LocalDateTime.now()) == 0)) throw FeedException.missing();
@@ -204,19 +213,20 @@ public class FeedCommentService {
     }
     private FeedComment locked(Long id) {
         FeedComment item = comments.findForUpdate(id).orElseThrow(FeedException::missing);
-        entityManager.refresh(item, LockModeType.PESSIMISTIC_WRITE); return item;
+        CurrentLockedState.refresh(entityManager, item); return item;
     }
     private boolean visibleAuthor(FeedComment item) { return item.getProfile() != null && !item.getProfile().isHidden() && FeedService.readableMember(item.getProfile().getMember()); }
     private boolean visible(FeedComment item) { return item.getState() == FeedComment.State.PUBLISHED && visibleAuthor(item); }
     private FeedInteractionDto.Comment dto(FeedComment item, Long viewer) {
         boolean publicBody = visible(item);
         return new FeedInteractionDto.Comment(item.getId(), item.getPost().getId(), item.getParent() == null ? null : item.getParent().getId(),
-            publicBody ? item.getContent() : "", publicBody ? feeds.profileDto(item.getProfile()) : null, publicBody ? item.getState().name() : "DELETED",
+            publicBody ? item.getContent() : "", publicBody ? feeds.profileDto(item.getProfile(), viewer) : null, publicBody ? item.getState().name() : "DELETED",
             item.getProfile() != null && Objects.equals(viewer, item.getProfile().getMember().getId()), item.getRevision(),
             item.getParent() == null && item.getState() != FeedComment.State.HIDDEN ? comments.countReplies(item.getId(), LocalDateTime.now()) : 0,
             item.getCreatedAt().atOffset(ZoneOffset.UTC), item.getUpdatedAt().atOffset(ZoneOffset.UTC),
             publicBody ? media.findByComment_IdOrderByPositionAscIdAsc(item.getId()).stream().map(feeds::imageDto).toList() : List.of(),
-            publicBody && viewer != null && likes.findByMember_IdAndComment_Id(viewer, item.getId()).isPresent(), publicBody ? likes.countByComment_Id(item.getId()) : 0);
+            publicBody && viewer != null && likes.findByMember_IdAndComment_Id(viewer, item.getId()).isPresent(), publicBody ? likes.countByComment_Id(item.getId()) : 0,
+            item.getPublicId(), item.getPost().getPublicId());
     }
     private FeedInteractionDto.CommentReport reportDto(FeedCommentReport item) {
         try {

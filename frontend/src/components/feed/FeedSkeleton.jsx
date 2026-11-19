@@ -8,7 +8,7 @@ import PageContainer from '../common/PageContainer';
 import { PageTitle } from '../common/PageTypography';
 import { FilterMenuSkeleton } from '../common/FilterToolbarSkeleton';
 import { StateIllustrationSkeleton } from '../common/StateIllustration';
-import { fontSize, spacing } from '../../styles/tokens';
+import { fontSize } from '../../styles/tokens';
 import ManagementListToolbar from '../common/ManagementListToolbar';
 import { REPORT_STATUS_OPTIONS, REPORT_AUDIT_ACTION_OPTIONS } from '../admin/managementReviewQuery';
 import { FEED_NOTIFICATION_RETENTION_NOTE, FEED_NOTIFICATION_VIEWS } from '../../constants/feedNotifications';
@@ -17,11 +17,12 @@ import { FEED_DIRECTORY_VIEWS } from '../../utils/feed';
 
 function FeedPreparationSkeleton({ title = '피드를 준비하고 있어요.', description = '글·사진을 나눌 수 있도록 준비 중이에요.' }) {
     return <section className="reserve-data-state" aria-hidden="true" style={{
-        '--data-state-icon-size': spacing[10], '--data-state-title-size': fontSize['2xl'], '--data-state-description-size': fontSize.base,
+        '--data-state-title-size': fontSize['2xl'], '--data-state-description-size': fontSize.base,
     }}>
-        <StateIllustrationSkeleton size="md" />
-        <div className="reserve-data-state__copy"><p className="reserve-data-state__title"><SkeletonText>{title}</SkeletonText></p>
-            {description && <p className="reserve-data-state__description"><SkeletonText>{description}</SkeletonText></p>}</div>
+        <span className="reserve-data-state__illustration"><StateIllustrationSkeleton size="md" /></span>
+        <div className="reserve-data-state__body"><div className="reserve-data-state__copy">
+            <p className="reserve-data-state__title"><SkeletonText>{title}</SkeletonText></p>
+            {description && <p className="reserve-data-state__description"><SkeletonText>{description}</SkeletonText></p>}</div></div>
     </section>;
 }
 FeedPreparationSkeleton.propTypes = { title: PropTypes.string, description: PropTypes.string };
@@ -41,13 +42,13 @@ export function FeedPageSkeleton({ kind = 'feed', view = 'all', enabled = true, 
         {enabled ? <FeedSkeleton /> : <FeedPreparationSkeleton />}
     </section>;
     return <PageContainer size="md" paddingTop="12px" paddingX="0px" paddingBottom="40px" style={{ maxWidth: 640, backgroundColor: 'transparent' }} className="reserve-feed-page" aria-label="피드를 불러오는 중" aria-busy="true">
-        <header className="reserve-feed-heading"><IconToolSkeleton kind="navigation" /><PageTitle level={1} loading>{detail ? '게시물' : '공개 프로필'}</PageTitle></header>
+        <header className="reserve-feed-heading"><IconToolSkeleton kind="navigation" /><PageTitle level={1} loading>{detail ? '게시물' : '프로필'}</PageTitle></header>
         {profile && <div className="reserve-feed-profile"><Bone width={64} height={64} borderRadius={50} />
             <div><h2><SkeletonText>공개 닉네임</SkeletonText></h2><p><SkeletonText>소개를 불러오는 중</SkeletonText></p></div></div>}
         <FeedSkeleton detail={detail} postId={postId} />
     </PageContainer>;
 }
-FeedPageSkeleton.propTypes = { kind: PropTypes.string, ownView: PropTypes.bool, signedIn: PropTypes.bool, authPending: PropTypes.bool, view: PropTypes.string, region: PropTypes.string, enabled: PropTypes.bool, notificationsEnabled: PropTypes.bool, postId: PropTypes.number };
+FeedPageSkeleton.propTypes = { kind: PropTypes.string, ownView: PropTypes.bool, signedIn: PropTypes.bool, authPending: PropTypes.bool, view: PropTypes.string, region: PropTypes.string, enabled: PropTypes.bool, notificationsEnabled: PropTypes.bool, postId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]) };
 
 export function FeedReportListSkeleton({ label = '피드·가게 소식 신고를 불러오는 중' }) {
     return <ul className="reserve-feed-report-list" aria-label={label} aria-busy="true">
@@ -117,4 +118,4 @@ export default function FeedSkeleton({ detail = false, postId }) {
         </div>)}
     </div>;
 }
-FeedSkeleton.propTypes = { detail: PropTypes.bool, postId: PropTypes.number };
+FeedSkeleton.propTypes = { detail: PropTypes.bool, postId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]) };

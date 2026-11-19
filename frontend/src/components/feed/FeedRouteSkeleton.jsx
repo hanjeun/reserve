@@ -6,6 +6,7 @@ import useAuthStore from '../../store/useAuthStore';
 import { feedKeys } from '../../hooks/feedQueries';
 import { feedRegion, FEED_DIRECTORY_VIEWS } from '../../utils/feed';
 import { interactionKeys } from '../../hooks/feedInteractionQueries';
+import { normalizePublicId } from '../../utils/publicAddress';
 
 export default function FeedRouteSkeleton({ pathname, search = '' }) {
     const detail = pathname.startsWith('/feed/posts/');
@@ -21,7 +22,7 @@ export default function FeedRouteSkeleton({ pathname, search = '' }) {
     return (
         <FeedPageSkeleton
             kind={detail ? 'feed-detail' : profile ? 'feed-author' : 'feed'}
-            postId={detail ? Number(pathname.match(/^\/feed\/posts\/([1-9]\d*)\/?$/)?.[1]) : undefined}
+            postId={detail ? normalizePublicId(pathname.split('/')[3]) : undefined}
             signedIn={signedIn}
             authPending={!client}
             enabled={config?.enabled !== false}

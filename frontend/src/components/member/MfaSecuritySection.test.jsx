@@ -24,6 +24,18 @@ describe('계정별 인증 관리', () => {
         fixture.get.mockResolvedValue(connected);
         fixture.post.mockResolvedValue({ purpose: 'MANAGE', verified: true });
     });
+    it('소셜 확인 전에 패스키 등록 목적과 다음 화면을 안내해요', async () => {
+        fixture.get.mockResolvedValue({ available: true, enabled: false, required: false, credentials: [] });
+        const proof = vi.fn();
+        render(<AntApp><MemoryRouter><MfaSecuritySection loginMethods={{ passwordEnabled: false, socialProvider: 'NAVER', socialProofFresh: false }}
+            onSocialProof={proof} /></MemoryRouter></AntApp>);
+        fireEvent.click(await screen.findByRole('button', { name: '패스키·인증 앱 등록', exact: true }));
+        const action = await screen.findByRole('button', { name: '패스키·인증 앱 등록 본인 확인' });
+        expect(screen.getByText('연결된 소셜 계정으로 본인 확인 후 패스키·인증 앱 등록 화면으로 이어져요.')).toBeVisible();
+        fireEvent.click(action);
+        expect(proof).toHaveBeenCalledOnce();
+        expect(fixture.post).not.toHaveBeenCalled();
+    });
     it('소셜 확인 복귀는 같은 계정의 관리 폼을 한 번만 열어요', async () => {
         const resumeRequest = { key: 'fixture-return', memberId: 7, revision: 1 };
         const props = { loginMethods: { ...methods, socialProofFresh: true }, resumeRequest };
@@ -148,10 +160,10 @@ describe('계정별 인증 관리', () => {
     it('소셜 확인이 오래됐으면 위의 본인 확인을 안내하고 변경하지 않아요', async () => {
         show({ ...methods, passwordEnabled: false });
         fireEvent.click(await screen.findByRole('button', { name: '패스키·인증 앱 관리' }));
-        expect(screen.getByText('연결된 소셜 계정으로 본인 확인을 먼저 진행해주세요.', { selector: '.ant-typography' })).toBeVisible();
-        const submit = within(screen.getByRole('form', { name: '패스키·인증 앱 관리' })).getByRole('button', { name: '패스키·인증 앱 관리' });
-        expect(submit).toHaveAttribute('aria-disabled', 'true');
-        fireEvent.click(submit);
+        expect(screen.getByText('연결된 소셜 계정으로 본인 확인 후 인증 수단 관리 화면으로 이어져요.', { selector: '.ant-typography' })).toBeVisible();
+        const form = screen.getByRole('form', { name: '패스키·인증 앱 관리' });
+        expect(within(form).queryByRole('button', { name: '패스키·인증 앱 관리' })).toBeNull();
+        fireEvent.submit(form);
         expect(fixture.post).not.toHaveBeenCalled();
     });
     it('이전 계정의 늦은 실패와 관리 화면을 새 계정에 표시하지 않아요', async () => {
@@ -179,14 +191,15 @@ describe('계정별 인증 관리', () => {
         fireEvent.click(await screen.findByRole('button', { name: '패스키·인증 앱 관리' }));
         const form = screen.getByRole('form', { name: '패스키·인증 앱 관리' });
         const panel = form.closest('.reserve-login-security-panel');
-        expect(screen.queryByRole('button', { name: '닫기' })).toBeNull();
-        fireEvent.click(screen.getAllByRole('button', { name: '패스키·인증 앱 관리' })[0]);
+        const close = screen.getByRole('button', { name: '닫기', exact: true });
+        expect(close.closest('.reserve-login-panel-heading')).toHaveTextContent('패스키·인증 앱 관리');
+        fireEvent.click(close);
         expect(panel).toHaveAttribute('inert');
         expect(form).toBeInTheDocument();
         await waitFor(() => expect(form).not.toBeInTheDocument());
         expect(fixture.post).not.toHaveBeenCalled();
     });
-    it('등록 +의 같은 SVG를 회전하고 재클릭하면 포커스를 되돌려 닫아요', async () => {
+    it('등록 도구는 열린 상태에도 같은 SVG를 쓰고 재클릭하면 포커스를 되돌려 닫아요', async () => {
         fixture.get.mockResolvedValue({ ...connected, enabled: false, credentials: [] });
         show();
         const plus = await screen.findByRole('button', { name: '패스키·인증 앱 등록' });

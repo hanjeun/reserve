@@ -16,6 +16,7 @@ public class AdvertisementResponse {
 
     private Long id;
     private Long storeId;
+    private String storePublicId;
     private String storeName;
     private String adType;
     private List<String> imageUrls;
@@ -33,6 +34,7 @@ public class AdvertisementResponse {
         return AdvertisementResponse.builder()
                 .id(ad.getId())
                 .storeId(ad.getStore().getId())
+                .storePublicId(ad.getStore().getPublicId())
                 .storeName(ad.getStore().getName())
                 .adType(ad.getAdType().name())
                 .imageUrls(ad.getImageUrlList())

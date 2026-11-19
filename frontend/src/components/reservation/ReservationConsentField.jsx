@@ -1,9 +1,10 @@
-import { useLayoutEffect } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Checkbox, Form, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation, useNavigationType } from 'react-router-dom';
 import api from '../../api/axios';
+import { reservationKeys } from '../../hooks/queryKeys';
 import useAuthStore from '../../store/useAuthStore';
 import Button from '../common/Button';
 import TextLink from '../common/TextLink';
@@ -37,6 +38,7 @@ ConsentChoice.propTypes = { value: PropTypes.object, onChange: PropTypes.func, n
 
 function ConsentQueryField({ storeId, member, revision }) {
     const form = Form.useFormInstance();
+    const consent = Form.useWatch('legalConsent', form);
     const location = useLocation();
     const navigationType = useNavigationType();
     useLayoutEffect(() => {
@@ -57,13 +59,19 @@ function ConsentQueryField({ storeId, member, revision }) {
         pendingReturn = { member, revision, key: location.key, createdAt: Date.now(), values: form.getFieldsValue(true) };
     };
     const query = useQuery({
-        queryKey: ['reservation-consent', member, revision, storeId],
+        queryKey: reservationKeys.consent(member, revision, storeId),
         queryFn: ({ signal }) => api.get('/api/reservations/notices/' + storeId, { signal }),
         enabled: true,
         staleTime: 30_000, retry: false,
     });
+    const consentComplete = Boolean(query.data?.enabled && !query.isPending && !query.isError
+        && consent?.conditionsAccepted && consent?.privacyAccepted && consent.noticeHash === query.data.hash);
+    useEffect(() => {
+        if (consentComplete && form.getFieldError('legalConsent').length)
+            form.setFields([{ name: 'legalConsent', errors: [] }]);
+    }, [consentComplete, form]);
     if (query.data?.enabled === false) return null;
-    return <Form.Item name="legalConsent" rules={[{ validator: (_, value) => {
+    return <Form.Item name="legalConsent" validateTrigger={[]} rules={[{ validator: (_, value) => {
         if (query.isPending || query.isError || !query.data?.enabled) return Promise.reject(new Error('예약 안내를 먼저 확인해주세요.'));
         if (!value?.privacyAccepted || !value?.conditionsAccepted || value.noticeHash !== query.data.hash)
             return Promise.reject(new Error('예약 조건과 개인정보 제공 안내를 확인하고 동의해주세요.'));

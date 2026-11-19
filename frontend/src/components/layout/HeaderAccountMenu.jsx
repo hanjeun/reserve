@@ -3,8 +3,8 @@ import { Dropdown, Typography } from 'antd';
 import {
     CalendarOutlined,
     ExclamationCircleOutlined,
-    HeartOutlined,
     FolderOutlined,
+    HeartOutlined,
     LogoutOutlined,
     PlusOutlined,
     ScheduleOutlined,
@@ -23,7 +23,6 @@ import { colors, fontSize, fontWeight, radius } from '../../styles/tokens';
 import Avatar from '../common/Avatar';
 import Tooltip from '../common/Tooltip';
 import { SpinIndicator } from '../common/Loading';
-import { APP_ORIGIN, LEGACY_ORIGIN } from '../../config/siteUrls';
 
 const { Text } = Typography;
 
@@ -93,22 +92,22 @@ const HeaderAccountMenu = () => {
             { type: 'divider' },
             { key: 'my-reservations', icon: <CalendarOutlined />, label: '내 예약 확인', onClick: () => navigate('/my-reservations') },
             { key: 'my-favorites', icon: <HeartOutlined />, label: '즐겨찾기', onClick: () => navigate('/my-favorites') },
+            { key: 'drafts', icon: <FolderOutlined />, label: '임시보관함', onClick: () => navigate('/drafts') },
         ];
 
-        if (user?.role === 'ADMIN') {
-            items.push(
-                { type: 'divider' },
-                { key: 'admin', icon: <SettingOutlined />, label: '관리자 패널', onClick: () => navigate('/admin') },
-            );
+        const isAdmin = user?.role === 'ADMIN';
+        const canManageStores = hasOwnerAccess(user?.role);
+        if (isAdmin || canManageStores) items.push({ type: 'divider' });
+        if (isAdmin) {
+            items.push({ key: 'admin', icon: <SettingOutlined />, label: '관리자 패널', onClick: () => navigate('/admin') });
         }
 
-        if (hasOwnerAccess(user?.role)) {
+        if (canManageStores) {
             items.push(
                 { key: 'business', icon: <ScheduleOutlined />, label: '사업자 패널', onClick: () => navigate('/business') },
                 { type: 'divider' },
                 { key: 'my-stores', icon: <ShopOutlined />, label: '내 가게 관리', onClick: () => navigate('/my-stores') },
                 { key: 'store-register', icon: <PlusOutlined />, label: '새 가게 등록', onClick: () => navigate('/store/register') },
-                ...(APP_ORIGIN !== LEGACY_ORIGIN ? [{ key: 'draft-transfer', icon: <FolderOutlined />, label: '가게 초안 옮기기', onClick: () => navigate('/drafts/transfer') }] : []),
             );
         }
 

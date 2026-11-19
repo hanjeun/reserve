@@ -1,6 +1,5 @@
 package kr.it.reserve.reservation.scheduler;
 
-import kr.it.reserve.config.updates.EntityUpdates;
 import kr.it.reserve.payment.service.PaymentService;
 import kr.it.reserve.payment.service.RefundDispatchService;
 import kr.it.reserve.reservation.entity.Reservation;
@@ -34,6 +33,7 @@ public class ReservationElapsedProcessor {
         Result result;
         if (reservation.getStatus() == Reservation.ReservationStatus.PENDING) {
             reservation.setStatus(Reservation.ReservationStatus.CANCELLED);
+            reservation.setCancellationActor(Reservation.CancellationActor.SYSTEM);
             reservation.setCancelReason("예약 시간이 지나도록 승인되지 않아 자동 취소됐어요.");
             if (Boolean.TRUE.equals(reservation.getDepositPaid())) {
                 dispatch.afterCommit(payments.prepareFullRefundByStoreDecision(
@@ -44,7 +44,10 @@ public class ReservationElapsedProcessor {
             reservation.setStatus(Reservation.ReservationStatus.UNCONFIRMED);
             result = Result.UNCONFIRMED;
         }
-        if (updates != null) updates.changed(reservation, EntityUpdates.Operation.UPDATED);
+        if (updates != null) {
+            if (result == Result.CANCELLED) updates.cancelled(reservation);
+            else updates.updated(reservation);
+        }
         return result;
     }
 

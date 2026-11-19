@@ -1,7 +1,9 @@
 import PropTypes from 'prop-types';
+import { useState } from 'react';
 import Bone from '../../components/common/Bone';
 import DataState from '../../components/common/DataState';
 import LoadingStatus from '../../components/common/LoadingStatus';
+import LoadingImage from '../../components/common/LoadingImage';
 import TextLink from '../../components/common/TextLink';
 import { searchCorrections } from '../../utils/searchUnderstanding';
 import { CalendarOutlined, ClockCircleOutlined, MessageOutlined, NotificationOutlined, SearchOutlined, ShopOutlined } from '../../components/common/icons';
@@ -33,6 +35,16 @@ function ResultSkeleton() {
     </LoadingStatus>;
 }
 
+function StoreThumbnail({ src }) {
+    const [failed, setFailed] = useState(null);
+    return <span className="reserve-search-store-thumbnail" aria-hidden="true">
+        {src && failed !== src ? <LoadingImage key={src} src={src} alt="" width={36} height={36}
+            loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(src)} />
+            : <ShopOutlined />}
+    </span>;
+}
+StoreThumbnail.propTypes = { src: PropTypes.string };
+
 function ResultGroup({ group, items, hasMore = false, onChoose }) {
     if (!items.length) return null;
     return <section aria-labelledby={`search-group-${group.key}`} style={styles.group}>
@@ -43,7 +55,7 @@ function ResultGroup({ group, items, hasMore = false, onChoose }) {
                 return <li key={item.id} className="reserve-search-recent-item">
                     <TextLink to={item.path} className="reserve-search-recent-term" aria-label={item.aliasMatched ? item.title : undefined}
                         aria-describedby={item.aliasMatched && item.description ? 'search-description-' + item.id : undefined} onClick={event => onChoose(event, item.path)}>
-                        <Icon aria-hidden="true" />
+                        {group.key === 'stores' ? <StoreThumbnail src={item.thumbnailUrl} /> : <Icon aria-hidden="true" />}
                         <span className="reserve-messenger-row-copy" style={styles.copy}>
                             <span className="reserve-messenger-row-line"><strong>{item.title}</strong></span>
                             {item.description && <span id={item.aliasMatched ? 'search-description-' + item.id : undefined} className="reserve-messenger-row-preview">{item.description}</span>}
@@ -58,7 +70,8 @@ function ResultGroup({ group, items, hasMore = false, onChoose }) {
 ResultGroup.propTypes = {
     group: PropTypes.shape({ key: PropTypes.string.isRequired, title: PropTypes.string.isRequired, icon: PropTypes.elementType }).isRequired,
     items: PropTypes.arrayOf(PropTypes.shape({ id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-        title: PropTypes.string.isRequired, description: PropTypes.string, path: PropTypes.string.isRequired, icon: PropTypes.elementType, aliasMatched: PropTypes.bool })).isRequired,
+        title: PropTypes.string.isRequired, description: PropTypes.string, path: PropTypes.string.isRequired, icon: PropTypes.elementType,
+        thumbnailUrl: PropTypes.string, aliasMatched: PropTypes.bool })).isRequired,
     hasMore: PropTypes.bool, onChoose: PropTypes.func.isRequired,
 };
 

@@ -11,6 +11,7 @@ import kr.it.reserve.config.jwt.entity.RefreshToken;
 import kr.it.reserve.config.jwt.repository.LoginSessionAuthentication;
 import kr.it.reserve.config.jwt.repository.RefreshTokenRepository;
 import kr.it.reserve.config.service.TokenService;
+import kr.it.reserve.config.updates.EntityUpdates;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.repository.MemberRepository;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -30,6 +31,7 @@ public final class JwtSessionFixture {
     public final JwtProperties properties = properties();
     public final MemberRepository members = mock(MemberRepository.class);
     public final RefreshTokenRepository sessions = mock(RefreshTokenRepository.class);
+    public final EntityUpdates updates = mock(EntityUpdates.class);
     public final EntityManager entityManager = mock(EntityManager.class);
     public final Map<String, RefreshToken> devices = new ConcurrentHashMap<>();
     public final TokenProvider tokens;
@@ -41,7 +43,7 @@ public final class JwtSessionFixture {
     public JwtSessionFixture(Member member) {
         this.member = member;
         tokens = new TokenProvider(properties, members, sessions);
-        service = new TokenService(tokens, sessions, members, properties);
+        service = new TokenService(tokens, sessions, members, updates);
         ReflectionTestUtils.setField(tokens, "entityManager", entityManager);
         ReflectionTestUtils.setField(service, "entityManager", entityManager);
         setNow(startedAt);

@@ -1,41 +1,57 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
-import { PaperClipOutlined, CloseOutlined } from '../common/icons';
-import { animation, colors, radius } from '../../styles/tokens';
+import { DeleteOutlined, EyeOutlined, FileTextOutlined, PaperClipOutlined } from '../common/icons';
+import { animation } from '../../styles/tokens';
 import useExitAnimation from '../../hooks/useExitAnimation';
+import useImagePreview from '../../hooks/useImagePreview';
+import useReducedMotion from '../../hooks/useReducedMotion';
 import useAuthStore from '../../store/useAuthStore';
+import { chatAttachmentKind, formatChatFileSize, CHAT_DOCUMENT_ACCEPT, CHAT_PHOTO_ACCEPT } from '../../utils/chatAttachments';
 import LoadingImage from '../common/LoadingImage';
-import ChatAttachmentThumbnail from './ChatAttachmentThumbnail';
 
-const IMAGE_TYPES = 'image/jpeg,image/png,image/webp,image/gif';
 const IMAGE_LABELS = { 'image/jpeg': 'JPG', 'image/png': 'PNG', 'image/webp': 'WEBP', 'image/gif': 'GIF' };
-
 const EMPTY_FILES = [];
 
 function AnimatedAttachment({ file, active, disabled, onRemove, itemKey, onExited, label }) {
+    const photo = chatAttachmentKind(file) === 'photo';
     const [url, setUrl] = useState(null);
-    const [ready, setReady] = useState(false);
-    const imageReady = useCallback(() => setReady(true), []);
-    const { shouldRender, isClosing } = useExitAnimation(active, 200);
+    const { previewOpen, handlePreview, handleCancel, previewNode } = useImagePreview();
+    const reduced = useReducedMotion();
+    const { shouldRender, isClosing } = useExitAnimation(active, reduced ? 0 : 200);
     useEffect(() => {
         if (!shouldRender) onExited(itemKey);
     }, [shouldRender, itemKey, onExited]);
     useEffect(() => {
+        if (!photo) return undefined;
         const objectUrl = URL.createObjectURL(file);
         let mounted = true;
         queueMicrotask(() => { if (mounted) setUrl(objectUrl); });
         return () => { mounted = false; URL.revokeObjectURL(objectUrl); };
-    }, [file]);
+    }, [file, photo]);
     if (!shouldRender) return null;
-    return <div className="reserve-chat-attachment" inert={!active ? true : undefined}
-        data-ready={ready}
-        style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 92, height: 44,
-            opacity: active && !ready ? 0 : undefined,
-            animation: isClosing || !active ? animation.slideUpOut : ready ? animation.slideUpIn : 'none' }}>
-        {url && (active ? <ChatAttachmentThumbnail key={url} file={file} url={url} onReady={imageReady} />
-            : <LoadingImage src={url} alt="" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: radius.md }} />)}
-        <button type="button" className="reserve-chat-tool" aria-label={label}
-            disabled={disabled || !active} onClick={onRemove}><CloseOutlined /></button>
+    return <div className={`reserve-chat-attachment reserve-chat-draft-${photo ? 'photo' : 'file'}`} inert={!active || undefined}
+        style={{ animation: isClosing || !active ? animation.slideUpOut : animation.slideUpIn }}>
+        {photo ? (url && <LoadingImage src={url} alt={active ? '첨부 사진' : ''} draggable={false}
+            className="reserve-chat-draft-image" />) : <>
+            <FileTextOutlined aria-hidden="true" />
+            <span className="reserve-chat-draft-file-copy">
+                <span title={file.name}>{file.name}</span>
+                <small>{formatChatFileSize(file.size)}</small>
+            </span>
+        </>}
+        <div className="reserve-chat-draft-tools">
+            {photo && active && url && <>
+                <button type="button" className="reserve-chat-tool" aria-label="첨부 사진 크게 보기"
+                    onClick={() => handlePreview({ url })}
+                    onKeyDown={event => {
+                        if (event.key === 'Escape' && previewOpen) { event.stopPropagation(); handleCancel(); }
+                    }}><EyeOutlined aria-hidden="true" /></button>
+                <span className="reserve-chat-draft-divider" aria-hidden="true" />
+            </>}
+            <button type="button" className="reserve-chat-tool" aria-label={label}
+                disabled={disabled || !active} onClick={onRemove}><DeleteOutlined aria-hidden="true" /></button>
+        </div>
+        {active && previewNode}
     </div>;
 }
 AnimatedAttachment.propTypes = { file: PropTypes.object.isRequired, active: PropTypes.bool.isRequired,
@@ -44,12 +60,22 @@ AnimatedAttachment.propTypes = { file: PropTypes.object.isRequired, active: Prop
 
 export default function ChatImagePicker({ file, onChange, disabled, enabled, onFilesChange,
     files, onRemoveFile, maxFiles = 3, renderContent,
-    accept = IMAGE_TYPES, maxBytes = 8 * 1024 * 1024 }) {
-    const revision = useAuthStore(state => state.sessionRevision);
+    accept = CHAT_PHOTO_ACCEPT, maxBytes = 8 * 1024 * 1024,
+    allowDocuments = false, onStageFiles, draftScope }) {
+    const sessionRevision = useAuthStore(state => state.sessionRevision);
+    const revision = draftScope ?? sessionRevision;
     const input = useRef(null);
+    const attach = useRef(null);
+    const restoreAttachFocus = useRef(false);
     const selecting = useRef(false);
     const [error, setError] = useState('');
     const selectedFiles = files ?? (file ? [file] : EMPTY_FILES);
+    const limitReached = Boolean(files && files.length >= maxFiles);
+    useLayoutEffect(() => {
+        if (!restoreAttachFocus.current || disabled || limitReached) return;
+        restoreAttachFocus.current = false;
+        attach.current?.focus({ preventScroll: true });
+    }, [disabled, limitReached, selectedFiles.length]);
     const [retained, setRetained] = useState(() => ({ revision, files: selectedFiles,
         entries: selectedFiles.map((image, key) => ({ file: image, key })), next: selectedFiles.length }));
     if (revision !== retained.revision) {
@@ -65,7 +91,8 @@ export default function ChatImagePicker({ file, onChange, disabled, enabled, onF
     const select = async event => {
         const selected = Array.from(event.target.files || []);
         event.target.value = '';
-        if (!selected.length || disabled || selecting.current) return;
+        if (!selected.length || disabled || limitReached || selecting.current) return;
+        if (onStageFiles) { onStageFiles(selected); return; }
         if (files && selected.length + files.length > maxFiles) { setError(`사진은 ${maxFiles}장까지 첨부할 수 있어요.`); return; }
         const types = accept.split(',').map(type => type.trim());
         if (selected.some(image => !types.includes(image.type))) {
@@ -78,27 +105,38 @@ export default function ChatImagePicker({ file, onChange, disabled, enabled, onF
         finally { selecting.current = false; }
     };
     if (!enabled) return renderContent ? renderContent(null, null) : null;
+    const attachmentLabel = allowDocuments ? '파일' : '사진';
     const control = <>
-        <input ref={input} type="file" accept={accept} multiple={Boolean(onFilesChange)}
-            onChange={select} disabled={disabled} hidden aria-label="첨부할 사진 선택" />
-        <button type="button" className="reserve-chat-tool" aria-label="사진 첨부"
-            disabled={disabled || Boolean(files && files.length >= maxFiles)} onClick={() => input.current?.click()}><PaperClipOutlined /></button>
+        <input ref={input} type="file" accept={allowDocuments ? accept + ',' + CHAT_DOCUMENT_ACCEPT : accept}
+            multiple={Boolean(onStageFiles || onFilesChange)} onChange={select} disabled={disabled || limitReached}
+            hidden aria-label={`첨부할 ${attachmentLabel} 선택`} />
+        <button ref={attach} type="button" className="reserve-chat-tool" aria-label={`${attachmentLabel} 첨부`}
+            disabled={disabled || limitReached}
+            onClick={() => input.current?.click()}><PaperClipOutlined aria-hidden="true" /></button>
     </>;
-    const previews = retained.entries.length || error ? <div className="reserve-chat-attachments" aria-label="첨부 사진">
-        {retained.revision === revision && retained.entries.map(entry => <AnimatedAttachment key={`${revision}:${entry.key}`}
-            itemKey={entry.key} onExited={retire} file={entry.file} active={selectedFiles.includes(entry.file)} disabled={disabled}
-            label={files ? `첨부 사진 제거: ${entry.file.name}` : '첨부 사진 제거'}
-            onRemove={() => { setError(''); if (onRemoveFile) onRemoveFile(entry.file); else onChange(null); }} />)}
-        {error && <span role="alert" style={{ color: colors.error.main, fontSize: 12, flexBasis: '100%' }}>{error}</span>}
-    </div> : null;
-    if (renderContent) return renderContent(control, previews);
-    return <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
+    const previews = retained.entries.length || error ? <>
+        <div className="reserve-chat-attachments" aria-label={`첨부 ${attachmentLabel}`}>
+            {retained.entries.map(entry => <AnimatedAttachment key={`${revision}:${entry.key}`}
+                itemKey={entry.key} onExited={retire} file={entry.file} active={selectedFiles.includes(entry.file)} disabled={disabled}
+                label={files ? `${chatAttachmentKind(entry.file) === 'document' ? '첨부 파일' : '첨부 사진'} 제거: ${entry.file.name}` : '첨부 사진 제거'}
+                onRemove={event => {
+                    if (event.currentTarget === document.activeElement) restoreAttachFocus.current = true;
+                    setError('');
+                    if (onRemoveFile) onRemoveFile(entry.file);
+                    else onChange(null);
+                }} />)}
+        </div>
+        {error && <span role="alert" className="reserve-chat-attachment-error">{error}</span>}
+    </> : null;
+    if (renderContent) return renderContent(control, previews, Boolean(selectedFiles.length || error));
+    return <div className="reserve-chat-picker">
         {control}{previews}
     </div>;
 }
 ChatImagePicker.propTypes = {
     file: PropTypes.object, onChange: PropTypes.func,
     disabled: PropTypes.bool, enabled: PropTypes.bool,
+    allowDocuments: PropTypes.bool, onStageFiles: PropTypes.func, draftScope: PropTypes.string,
     onFilesChange: PropTypes.func, accept: PropTypes.string, maxBytes: PropTypes.number,
     files: PropTypes.arrayOf(PropTypes.object), onRemoveFile: PropTypes.func, maxFiles: PropTypes.number, renderContent: PropTypes.func,
 };

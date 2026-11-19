@@ -3,6 +3,8 @@ package kr.it.reserve.waiting.service;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import kr.it.reserve.config.jwt.TokenProvider;
+import kr.it.reserve.config.updates.EntityUpdates;
+import kr.it.reserve.config.updates.RedisEntityUpdateRelay;
 import kr.it.reserve.config.updates.UpdateStreamAccess;
 import kr.it.reserve.member.entity.AuthProvider;
 import kr.it.reserve.member.entity.Member;
@@ -21,6 +23,30 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 class WaitingEventStreamTest {
+    @Test
+    void relayChecksRevokedWaitingSessionWithoutSendingAnUpdateToTheActiveDevice() throws Exception {
+        UpdateStreamAccess access = mock(UpdateStreamAccess.class);
+        when(access.current(any())).thenReturn(true);
+        SseEmitter revoked = mock(SseEmitter.class), active = mock(SseEmitter.class);
+        var emitters = List.of(revoked, active).iterator();
+        WaitingEventStream stream = new WaitingEventStream(access, emitters::next);
+        stream.subscribe(member(1), null, "PASSWORD", "revoked");
+        stream.subscribe(member(1), null, "PASSWORD", "active");
+        clearInvocations(revoked, active);
+        when(access.current(any())).thenAnswer(call ->
+                !"revoked".equals(call.<UpdateStreamAccess.Identity>getArgument(0).sessionId()));
+        var change = new EntityUpdates.Change(EntityUpdates.Domain.SESSION, 0L, null, null,
+                EntityUpdates.Operation.INVALIDATED, null, false, Set.of(), false);
+        stream.remoteSessionChanged(new RedisEntityUpdateRelay.RemoteChanged(change, id -> id.equals(1L)));
+
+        var ended = org.mockito.ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
+        verify(revoked).send(ended.capture());
+        assertThat(ended.getValue().build().stream().map(SseEmitter.DataWithMediaType::getData).toList().toString())
+                .contains("session-ended").doesNotContain("waiting-changed");
+        verify(revoked).complete();
+        verifyNoInteractions(active);
+    }
+
     @Test
     void failedHeartbeatDropsOnlyTheClosedStreamWithoutCompletingItsFailedResponseAgain() throws Exception {
         UpdateStreamAccess access = mock(UpdateStreamAccess.class);

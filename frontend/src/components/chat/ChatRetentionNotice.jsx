@@ -13,7 +13,7 @@ export default function ChatRetentionNotice({ visible }) {
         inert={!visible ? true : undefined}>
         <div className="reserve-chat-retention-notice-inner">
             <p className="reserve-chat-retention-notice">
-                일반 글·사진은 90일 보관해요. 신고·분쟁 자료는 별도 보관하며,
+                일반 글과 첨부 파일은 90일 보관해요. 신고·분쟁 자료는 별도 보관하며,
                 정책 고지 후 30일 유예를 거쳐 적용해요. <TextLink to="/privacy" onClick={event => {
                     if (!event.defaultPrevented && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) closePanel();
                 }}>보관 정책 보기</TextLink>

@@ -7,6 +7,7 @@ import chatService from '../../services/chatService';
 import useAuthStore from '../../store/useAuthStore';
 import ChatReportDialog from './ChatReportDialog';
 import { downloadChatImage } from '../../utils/chatImageTransfer';
+import { requestChatImageBlob } from '../../utils/chatImageRequests';
 import Tooltip from '../common/Tooltip';
 
 export default function ChatMessageActions({ message: item, roomId, onRetracted, onHidden = onRetracted, reportRole, timestamp = '' }) {
@@ -87,7 +88,8 @@ export default function ChatMessageActions({ message: item, roomId, onRetracted,
         };
         setBusyScope(scope);
         try {
-            await downloadChatImage(item.imageUrl, controller.signal, isCurrent, item.imageOriginalFilename);
+            await downloadChatImage(item.imageUrl, controller.signal, isCurrent, item.imageOriginalFilename,
+                (url, signal, current) => requestChatImageBlob(url, signal, current, revision + ':' + roomId));
         } catch (error) {
             if (!controller.signal.aborted && isCurrent()) message.error(error.message || '사진을 내려받지 못했어요.');
         } finally {

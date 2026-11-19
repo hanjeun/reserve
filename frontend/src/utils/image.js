@@ -29,3 +29,7 @@ export const getThumbnailUrl = (url) => getImageUrl(url, FALLBACKS.thumbnail);
 
 /** 프로필 이미지 */
 export const getProfileImageUrl = (url) => getImageUrl(url, FALLBACKS.profile);
+
+export const resolveProfileAvatar = (profile, accountImage) => (
+    profile?.avatarSource === 'CUSTOM' ? profile.avatarUrl : accountImage || profile?.avatarUrl
+);

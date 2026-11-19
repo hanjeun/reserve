@@ -14,6 +14,7 @@ import kr.it.reserve.store.entity.StoreStatus;
 import kr.it.reserve.waiting.entity.*;
 import kr.it.reserve.waiting.error.WaitingException;
 import kr.it.reserve.waiting.service.CustomerWaitingService;
+import kr.it.reserve.waiting.service.WaitingService;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -31,6 +32,7 @@ class SearchPersistenceTest {
     @Autowired SearchQueries queries;
     @Autowired SearchService service;
     @Autowired CustomerWaitingService waitingService;
+    @Autowired WaitingService waitingStaff;
     @Autowired EntityManager em;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager manager;
@@ -87,9 +89,19 @@ class SearchPersistenceTest {
             var deletedOwner = member(Role.BUSINESS); deletedOwner.setDeletedAt(utc()); store(deletedOwner, needle + " 탈퇴");
         });
         var input = SearchQuery.from(needle, 5);
-        assertThat(queries.stores(input)).extracting(SearchResponse.Item::id).containsExactly(store.getId());
-        assertThat(queries.benefits(input)).extracting(SearchResponse.Item::id).containsExactly(expected[0]);
-        assertThat(queries.feed(input)).extracting(SearchResponse.Item::id).containsExactly(expected[1]);
+        assertThat(queries.stores(input))
+                .extracting(SearchResponse.Item::id, SearchResponse.Item::publicId, SearchResponse.Item::path)
+                .containsExactly(tuple(store.getId(), store.getPublicId(), "/store/" + store.getPublicId()));
+        assertThat(queries.benefits(input)).singleElement().satisfies(result -> {
+            assertThat(result.id()).isEqualTo(expected[0]);
+            assertThat(java.util.UUID.fromString(result.publicId()).version()).isEqualTo(4);
+            assertThat(result.path()).isEqualTo("/benefits/" + result.publicId());
+        });
+        assertThat(queries.feed(input)).singleElement().satisfies(result -> {
+            assertThat(result.id()).isEqualTo(expected[1]);
+            assertThat(java.util.UUID.fromString(result.publicId()).version()).isEqualTo(4);
+            assertThat(result.path()).isEqualTo("/feed/posts/" + result.publicId());
+        });
         String body = json.writeValueAsString(service.publicSearch(needle, 5));
         assertThat(body).doesNotContain("private-image-marker", "imageUrl", "senderMemberId", "email", "phone");
     }
@@ -106,6 +118,46 @@ class SearchPersistenceTest {
         assertThat(group.items()).hasSize(5); assertThat(group.hasMore()).isTrue();
         assertThat(queries.stores(SearchQuery.from("100%_!", 5))).extracting(SearchResponse.Item::id).containsExactly(literal[0]);
         assertThat(queries.stores(SearchQuery.from("%' OR 1=1 --", 5))).isEmpty();
+    }
+
+    @Test void hidingOwnCancelledWaitingChangesOnlyPersonalReads() {
+        var sample = Objects.requireNonNull(tx.execute(status -> {
+            var cancelled = waiting(customer, true);
+            var active = waiting(customer, false);
+            var seated = waiting(customer, false);
+            seated.changeStatus(WaitingStatus.CALLED, utc());
+            seated.changeStatus(WaitingStatus.SEATED, utc());
+            return List.of(cancelled, active, seated, waiting(other, true));
+        }));
+        Long cancelledId = sample.get(0).getId();
+        var storeBoard = waitingStaff.getBoard(owner, store.getId());
+        assertThat(storeBoard.entries()).anyMatch(entry -> cancelledId.equals(entry.id()));
+        assertThat(waitingService.personalEntry(customer, cancelledId).entry().id()).isEqualTo(cancelledId);
+        assertThatThrownBy(() -> waitingService.hideCancelled(other, cancelledId)).isInstanceOfSatisfying(WaitingException.class,
+                failure -> assertThat(failure.getStatus().value()).isEqualTo(404));
+        for (var entry : sample.subList(1, 3)) {
+            assertThatThrownBy(() -> waitingService.hideCancelled(customer, entry.getId())).isInstanceOfSatisfying(WaitingException.class,
+                    failure -> assertThat(failure.getStatus().value()).isEqualTo(409));
+        }
+
+        waitingService.hideCancelled(customer, cancelledId);
+        var hiddenAt = jdbc.queryForObject("SELECT customer_hidden_at FROM waiting_entry WHERE waiting_entry_id = ?", Timestamp.class, cancelledId);
+        assertThat(hiddenAt).isNotNull();
+        waitingService.hideCancelled(customer, cancelledId);
+        assertThat(jdbc.queryForObject("SELECT customer_hidden_at FROM waiting_entry WHERE waiting_entry_id = ?", Timestamp.class, cancelledId))
+                .isEqualTo(hiddenAt);
+
+        var mine = waitingService.mine(customer, 0, 20);
+        assertThat(mine.getTotalElements()).isEqualTo(2);
+        assertThat(mine.getContent()).extracting(row -> row.entry().id())
+                .containsExactlyInAnyOrder(sample.get(1).getId(), sample.get(2).getId());
+        assertThat(waitingService.mine(customer, 0, 1, needle, "CANCELLED", "oldest").getTotalElements()).isZero();
+        assertThat(queries.waiting(SearchQuery.from(needle, 5), customer.getId())).extracting(SearchResponse.Item::id)
+                .containsExactlyInAnyOrder(sample.get(1).getId(), sample.get(2).getId());
+        assertThatThrownBy(() -> waitingService.personalEntry(customer, cancelledId)).isInstanceOfSatisfying(WaitingException.class,
+                failure -> assertThat(failure.getStatus().value()).isEqualTo(404));
+        assertThat(waitingService.personalEntry(other, sample.get(3).getId()).entry().id()).isEqualTo(sample.get(3).getId());
+        assertThat(waitingStaff.getBoard(owner, store.getId())).isEqualTo(storeBoard);
     }
 
     @Test void reservationAndWaitingSearchStayOwnedAndKeepTheExistingPersonalWindow() throws Exception {

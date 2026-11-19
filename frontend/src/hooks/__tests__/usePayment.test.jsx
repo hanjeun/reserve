@@ -4,16 +4,20 @@ import usePayment from '../usePayment';
 import useAuthStore from '../../store/useAuthStore';
 import { configuredPaymentMethods } from '../../utils/paymentMethods';
 import { clearPaymentReturns, consumePaymentReturn } from '../../utils/paymentReturnContext';
-const fixture = vi.hoisted(() => ({ prepare: vi.fn(), verify: vi.fn(), sdk: vi.fn(), choose: vi.fn(), navigate: vi.fn(), error: vi.fn(), notice: vi.fn() }));
-vi.mock('../../services/paymentService', () => ({ default: { prepare: fixture.prepare, verify: fixture.verify } }));
+import { PAYMENT_EXPIRED_MESSAGE } from '../../utils/reservationPayment';
+const fixture = vi.hoisted(() => ({ prepare: vi.fn(), verify: vi.fn(), checkReturn: vi.fn(), sdk: vi.fn(), choose: vi.fn(),
+    navigate: vi.fn(), error: vi.fn(), notice: vi.fn(), queryClient: { invalidateQueries: vi.fn() }, location: null }));
+vi.mock('../../services/paymentService', () => ({ default: { prepare: fixture.prepare, verify: fixture.verify, checkReturn: fixture.checkReturn } }));
+vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => fixture.queryClient }));
 vi.mock('@portone/browser-sdk/v2', () => ({ default: { requestPayment: fixture.sdk } }));
 vi.mock('../usePaymentMethodDialog', () => ({ default: () => ({ choosePayment: fixture.choose, paymentDialog: null }) }));
 vi.mock('../useMessage', () => ({ default: () => ({ message: { error: fixture.error }, modal: { info: fixture.notice } }) }));
 vi.mock('react-router-dom', () => ({ useNavigate: () => fixture.navigate,
-    useLocation: () => ({ pathname: '/my-reservations', search: '?page=2&view=list' }) }));
+    useLocation: () => fixture.location }));
 const reservation = { id: 7, storeName: '합성 가게', depositAmount: 99999 };
 const buyer = { name: '합성 회원', email: 'preview@example.test' };
 const prepared = { merchantUid: 'synthetic-order-7', storeId: 'synthetic-store', amount: 10000, productName: '합성 보증금', buyerName: buyer.name, buyerEmail: buyer.email };
+const tossRejection = { code: 'PGProviderError', pgCode: 'COMMON_INVALID_PARAMETER', pgMessage: '가맹점 정보를 찾을 수 없습니다.' };
 const cardCodes = ['KOOKMIN_CARD', 'SHINHAN_CARD', 'SAMSUNG_CARD', 'HYUNDAI_CARD', 'LOTTE_CARD', 'HANA_CARD',
     'WOORI_CARD', 'NH_CARD', 'BC_CARD', 'CITI_CARD', 'GWANGJU_CARD', 'JEONBUK_CARD', 'SUHYUP_CARD'];
 const cardRoutes = [
@@ -25,7 +29,7 @@ describe('선택한 예약 결제 경로', () => {
     it.each(['response', 'exception'])('KCP Web Close는 모바일과 같은 주문 결과 화면으로 이동해요 (%s)', async kind => {
         const order = { ...prepared, merchantUid: 'ORDsynthetic7' };
         const closed = { code: 'PGProviderError', pgCode: '3001', message: '[3001] 사용자 Web Close' };
-        fixture.prepare.mockResolvedValueOnce(order);
+        fixture.prepare.mockResolvedValue(order);
         fixture.choose.mockResolvedValueOnce({ ...configuredPaymentMethods()[0], pgProvider: 'kcp_v2', cardCompany: 'SHINHAN_CARD' });
         if (kind === 'response') fixture.sdk.mockResolvedValueOnce(closed);
         else fixture.sdk.mockRejectedValueOnce(closed);
@@ -91,7 +95,8 @@ describe('선택한 예약 결제 경로', () => {
     });
     it('이전 계정의 늦은 응답은 새 결제의 로딩과 중복 방지를 해제하지 않아요', async () => {
         let oldResponse, newResponse;
-        fixture.prepare.mockResolvedValueOnce(prepared).mockResolvedValueOnce({ ...prepared, merchantUid: 'new-account-order' });
+        fixture.prepare.mockResolvedValueOnce(prepared).mockResolvedValueOnce(prepared)
+            .mockResolvedValue({ ...prepared, merchantUid: 'new-account-order' });
         fixture.sdk.mockImplementationOnce(() => new Promise(resolve => { oldResponse = resolve; }))
             .mockImplementationOnce(() => new Promise(resolve => { newResponse = resolve; }));
         const { result } = renderHook(() => usePayment()); let oldAttempt, newAttempt;
@@ -101,13 +106,15 @@ describe('선택한 예약 결제 경로', () => {
         await act(async () => { oldResponse({ paymentId: prepared.merchantUid }); await oldAttempt; });
         expect(result.current.paying).toBe(true);
         await act(async () => { await result.current.pay(reservation, buyer); });
-        expect(fixture.prepare).toHaveBeenCalledTimes(2);
+        expect(fixture.prepare).toHaveBeenCalledTimes(4);
         await act(async () => { newResponse({ code: 'PAY_PROCESS_CANCELED' }); await newAttempt; });
         expect(result.current.paying).toBe(false); expect(fixture.verify).not.toHaveBeenCalled();
     });
 
     beforeEach(() => {
         vi.clearAllMocks(); clearPaymentReturns(); useAuthStore.setState({ sessionRevision: 1, user: { id: 7 } });
+        fixture.location = { pathname: '/my-reservations', search: '?page=2&view=list' };
+        fixture.checkReturn.mockReset();
         vi.stubEnv('VITE_PORTONE_NAVERPAY_CHANNEL_KEY', '');
         vi.stubEnv('VITE_PORTONE_NAVERPAY_TEST_CHANNEL_KEY', '');
         vi.stubEnv('VITE_PORTONE_PAYMENT_ENV', '');
@@ -115,10 +122,131 @@ describe('선택한 예약 결제 경로', () => {
         vi.stubEnv('VITE_PORTONE_TOSS_CHANNEL_KEY', 'channel-key-11111111-1111-4111-8111-111111111111');
         vi.stubEnv('VITE_PORTONE_CHANNEL_KEY', 'channel-key-22222222-2222-4222-8222-222222222222');
         vi.stubEnv('VITE_PORTONE_TOSS_EASY_PAY_PROVIDERS', '');
+        vi.stubEnv('VITE_PORTONE_TOSSPAY_CHANNEL_KEY', '');
         fixture.prepare.mockResolvedValue(prepared); fixture.verify.mockResolvedValue({ status: 'PAID' });
         fixture.choose.mockResolvedValue({ ...configuredPaymentMethods()[0], cardCompany: 'SHINHAN_CARD' }); fixture.sdk.mockResolvedValue({ paymentId: prepared.merchantUid });
     });
-    afterEach(() => vi.unstubAllEnvs());
+    afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
+    it.each([
+        ['/my-reservations', 'response'],
+        ['/store/00000000-0000-4000-8000-000000000012', 'exception'],
+    ])('토스페이에서 가맹점을 찾지 못한 미납 건은 %s에서 바로 안내해요', async (pathname, kind) => {
+        fixture.location = { pathname, search: '' };
+        vi.stubEnv('VITE_PORTONE_TOSSPAY_CHANNEL_KEY', 'channel-key-33333333-3333-4333-8333-333333333333');
+        fixture.choose.mockResolvedValueOnce(configuredPaymentMethods().find(method => method.id === 'TOSSPAY'));
+        if (kind === 'response') fixture.sdk.mockResolvedValueOnce(tossRejection);
+        else fixture.sdk.mockRejectedValueOnce(tossRejection);
+        fixture.checkReturn.mockResolvedValueOnce({ merchantUid: prepared.merchantUid, outcome: 'INCOMPLETE',
+            storePublicId: '00000000-0000-4000-8000-000000000012' });
+        const { result } = renderHook(() => usePayment());
+        await act(async () => { expect(await result.current.pay(reservation, buyer)).toEqual({ success: false }); });
+        expect(fixture.checkReturn).toHaveBeenCalledExactlyOnceWith(prepared.merchantUid);
+        expect(fixture.error).toHaveBeenCalledWith('토스페이 가맹점 정보를 확인하지 못했어요. 결제 기한 안에는 다른 수단으로 이어갈 수 있어요.');
+        expect(fixture.navigate).not.toHaveBeenCalled();
+        expect(fixture.verify).not.toHaveBeenCalled();
+        expect(fixture.queryClient.invalidateQueries).toHaveBeenCalled();
+        expect(result.current.paying).toBe(false);
+    });
+    it('토스페이 거절 뒤 결과가 미확정이면 같은 주문의 결과 화면을 유지해요', async () => {
+        vi.stubEnv('VITE_PORTONE_TOSSPAY_CHANNEL_KEY', 'channel-key-33333333-3333-4333-8333-333333333333');
+        fixture.choose.mockResolvedValueOnce(configuredPaymentMethods().find(method => method.id === 'TOSSPAY'));
+        fixture.sdk.mockResolvedValueOnce(tossRejection);
+        fixture.checkReturn.mockResolvedValueOnce({ merchantUid: prepared.merchantUid, outcome: 'REVIEW_REQUIRED' });
+        const { result } = renderHook(() => usePayment());
+        await act(async () => { await result.current.pay(reservation, buyer); });
+        expect(fixture.navigate).toHaveBeenCalledExactlyOnceWith('/payment/result?checkout_return=true&merchant_uid=' + prepared.merchantUid);
+        expect(fixture.verify).not.toHaveBeenCalled();
+        expect(fixture.error).not.toHaveBeenCalled();
+    });
+    it('기한 직전까지 같은 예약과 주문으로 결제를 이어가요', async () => {
+        const deadline = Date.parse('2026-11-14T03:15:00Z');
+        vi.spyOn(Date, 'now').mockReturnValue(deadline - 1);
+        const payable = { ...reservation, status: 'PENDING', allowLatePayment: false, depositPaid: false,
+            paymentDeadline: '2026-11-14T03:15:00Z' };
+        const { result } = renderHook(() => usePayment());
+        await act(async () => { expect((await result.current.pay(payable, buyer)).success).toBe(true); });
+        expect(fixture.prepare).toHaveBeenCalledTimes(2);
+        expect(fixture.prepare.mock.calls[1]).toEqual(fixture.prepare.mock.calls[0]);
+        expect(fixture.sdk).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ paymentId: prepared.merchantUid }));
+    });
+    it.each([0, 1])('기한에 도달하면 준비 요청과 결제창을 열지 않아요 (%dms)', async elapsed => {
+        const deadline = '2026-11-14T03:15:00+09:00';
+        vi.spyOn(Date, 'now').mockReturnValue(Date.parse(deadline) + elapsed);
+        const { result } = renderHook(() => usePayment());
+        await act(async () => { await result.current.pay({ ...reservation, status: 'PENDING', paymentDeadline: deadline }, buyer); });
+        expect(fixture.prepare).not.toHaveBeenCalled(); expect(fixture.choose).not.toHaveBeenCalled();
+        expect(fixture.sdk).not.toHaveBeenCalled(); expect(fixture.navigate).not.toHaveBeenCalled();
+        expect(fixture.error).toHaveBeenCalledExactlyOnceWith(PAYMENT_EXPIRED_MESSAGE);
+        expect(result.current.paying).toBe(false);
+    });
+    it('수단 선택창을 열어둔 채 기한이 지나면 결제 버튼을 눌러도 현재 화면에서 안내해요', async () => {
+        const deadline = '2026-11-14T03:15:00Z';
+        const now = vi.spyOn(Date, 'now').mockReturnValue(Date.parse(deadline) - 1);
+        fixture.choose.mockImplementationOnce(async () => {
+            now.mockReturnValue(Date.parse(deadline));
+            return { ...configuredPaymentMethods()[0], cardCompany: 'SHINHAN_CARD' };
+        });
+        const { result } = renderHook(() => usePayment());
+        await act(async () => { await result.current.pay({ ...reservation, status: 'PENDING', paymentDeadline: deadline }, buyer); });
+        expect(fixture.prepare).toHaveBeenCalledOnce();
+        expect(fixture.sdk).not.toHaveBeenCalled(); expect(fixture.navigate).not.toHaveBeenCalled();
+        expect(fixture.error).toHaveBeenCalledExactlyOnceWith(PAYMENT_EXPIRED_MESSAGE);
+    });
+    it.each(['결제 기한이 지났어요.', '이미 결제가 완료된 예약이에요.', '취소되거나 종료된 예약은 결제할 수 없어요.'])(
+    '확인 버튼 직전 서버가 거절하면 PG 중단으로 오인하지 않아요: %s', async message => {
+        fixture.prepare.mockResolvedValueOnce(prepared).mockRejectedValueOnce(new Error(message));
+        const { result } = renderHook(() => usePayment());
+        await act(async () => { await result.current.pay(reservation, buyer); });
+        expect(fixture.choose).toHaveBeenCalledOnce(); expect(fixture.prepare).toHaveBeenCalledTimes(2);
+        expect(fixture.sdk).not.toHaveBeenCalled(); expect(fixture.verify).not.toHaveBeenCalled();
+        expect(fixture.navigate).not.toHaveBeenCalled(); expect(fixture.error).toHaveBeenCalledExactlyOnceWith(message);
+    });
+    it('PG 호출 전 결제 수단 검증 오류는 미결제 복귀 안내로 보내지 않아요', async () => {
+        fixture.choose.mockResolvedValueOnce({ ...configuredPaymentMethods()[0], cardCompany: 'UNSUPPORTED' });
+        const { result } = renderHook(() => usePayment());
+        await act(async () => { await result.current.pay(reservation, buyer); });
+        expect(fixture.prepare).toHaveBeenCalledOnce(); expect(fixture.sdk).not.toHaveBeenCalled();
+        expect(fixture.navigate).not.toHaveBeenCalled(); expect(fixture.error).toHaveBeenCalledExactlyOnceWith('지원하는 카드사를 선택해주세요.');
+    });
+    it.each([{ amount: 20000 }, { merchantUid: 'changed-order' }, { storeId: 'changed-store' }])(
+    '재확인한 금액이나 주문이 달라지면 이전 동의로 결제하지 않아요: %j', async changed => {
+        fixture.prepare.mockResolvedValueOnce(prepared).mockResolvedValueOnce({ ...prepared, ...changed });
+        const { result } = renderHook(() => usePayment());
+        await act(async () => { await result.current.pay(reservation, buyer); });
+        expect(fixture.sdk).not.toHaveBeenCalled(); expect(fixture.navigate).not.toHaveBeenCalled();
+        expect(fixture.error).toHaveBeenCalledExactlyOnceWith('결제 정보가 변경됐어요. 다시 확인해주세요.');
+    });
+    it('최종 재확인 중 계정이 바뀌면 이전 계정의 결제를 시작하지 않아요', async () => {
+        fixture.prepare.mockResolvedValueOnce(prepared).mockImplementationOnce(async () => {
+            useAuthStore.setState({ sessionRevision: 2 });
+            return prepared;
+        });
+        const { result } = renderHook(() => usePayment());
+        await act(async () => { expect((await result.current.pay(reservation, buyer)).stale).toBe(true); });
+        expect(fixture.sdk).not.toHaveBeenCalled(); expect(fixture.navigate).not.toHaveBeenCalled();
+        expect(fixture.error).not.toHaveBeenCalled();
+    });
+    it('최종 재확인 중 화면을 떠나면 결제창을 뒤늦게 열지 않아요', async () => {
+        let confirm;
+        fixture.prepare.mockResolvedValueOnce(prepared).mockImplementationOnce(() => new Promise(resolve => { confirm = resolve; }));
+        const { result, unmount } = renderHook(() => usePayment());
+        let pending;
+        await act(async () => { pending = result.current.pay(reservation, buyer); });
+        unmount();
+        await act(async () => { confirm(prepared); expect((await pending).stale).toBe(true); });
+        expect(fixture.sdk).not.toHaveBeenCalled(); expect(fixture.navigate).not.toHaveBeenCalled();
+    });
+    it.each(['KAKAOPAY', 'TOSSPAY'])('%s도 기한 안에서는 동일 주문을 재확인하고 간편결제창을 열어요', async brand => {
+        vi.stubEnv('VITE_PORTONE_TOSSPAY_CHANNEL_KEY', 'channel-key-33333333-3333-4333-8333-333333333333');
+        const method = configuredPaymentMethods().find(item => item.brand === brand);
+        fixture.choose.mockResolvedValueOnce(method);
+        const { result } = renderHook(() => usePayment());
+        await act(async () => { expect((await result.current.pay(reservation, buyer)).success).toBe(true); });
+        expect(fixture.prepare).toHaveBeenCalledTimes(2);
+        expect(fixture.sdk).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ payMethod: 'EASY_PAY', channelKey: method.channelKey,
+            paymentId: prepared.merchantUid, totalAmount: prepared.amount }));
+        expect(fixture.navigate).toHaveBeenCalledExactlyOnceWith(expect.stringContaining('success=true'));
+    });
     it('카드는 서버 금액과 주문으로 요청하고 서버 검증 후 이동해요', async () => {
         const { result } = renderHook(() => usePayment());
         await act(async () => { await result.current.pay(reservation, buyer); });
@@ -133,7 +261,7 @@ describe('선택한 예약 결제 경로', () => {
         vi.stubEnv('VITE_PORTONE_PAYMENT_ENV', 'TEST');
         vi.stubEnv('VITE_PORTONE_KCP_TEST_CHANNEL_KEY', 'channel-key-33333333-3333-4333-8333-333333333333');
         const order = { ...prepared, merchantUid: 'ORDsyntheticCard7' };
-        fixture.prepare.mockResolvedValueOnce(order);
+        fixture.prepare.mockResolvedValue(order);
         const method = configuredPaymentMethods(import.meta.env, order)[0];
         expect(method.pgProvider).toBe(provider);
         fixture.choose.mockResolvedValueOnce({ ...method, cardCompany });
@@ -155,7 +283,7 @@ describe('선택한 예약 결제 경로', () => {
         if (kcp) expect(request.bypass).toEqual({ kcp_v2: { site_name: 'RESERVE' } });
         else expect(request).not.toHaveProperty('bypass');
         expect(result.current.paying).toBe(false);
-        expect(fixture.prepare).toHaveBeenCalledOnce();
+        expect(fixture.prepare).toHaveBeenCalledTimes(2);
         expect(fixture.error).not.toHaveBeenCalled();
         if (outcome === 'paid') {
             expect(payment.success).toBe(true);
@@ -181,7 +309,7 @@ describe('선택한 예약 결제 경로', () => {
     it.each(['paid', 'cancelled'])('네이버 단독 경로도 서버 준비 금액과 기존 결과 확인을 유지해요 (%s)', async outcome => {
         vi.stubEnv('VITE_PORTONE_NAVERPAY_CHANNEL_KEY', 'channel-key-55555555-5555-4555-8555-555555555555');
         const order = { ...prepared, reservationId: 7 };
-        fixture.prepare.mockResolvedValueOnce(order);
+        fixture.prepare.mockResolvedValue(order);
         fixture.choose.mockResolvedValueOnce(configuredPaymentMethods(import.meta.env, order).find(method => method.brand === 'NAVERPAY'));
         if (outcome === 'cancelled') fixture.sdk.mockResolvedValueOnce({ code: 'PAY_PROCESS_CANCELED' });
         const { result } = renderHook(() => usePayment());
@@ -206,7 +334,7 @@ describe('선택한 예약 결제 경로', () => {
         expect(result.current.paying).toBe(false);
     });
     it('준비 중 중복 클릭으로 주문을 다시 만들지 않아요', async () => {
-        let ready; fixture.prepare.mockImplementation(() => new Promise(resolve => { ready = resolve; }));
+        let ready; fixture.prepare.mockImplementationOnce(() => new Promise(resolve => { ready = resolve; }));
         const { result } = renderHook(() => usePayment()); let first;
         await act(async () => { first = result.current.pay(reservation, buyer); await result.current.pay(reservation, buyer); });
         expect(fixture.prepare).toHaveBeenCalledTimes(1);
@@ -225,7 +353,7 @@ describe('선택한 예약 결제 경로', () => {
         await act(async () => { await result.current.pay(reservation, buyer); });
         expect(result.current.paying).toBe(true);
         await act(async () => { await result.current.pay(reservation, buyer); });
-        expect(fixture.prepare).toHaveBeenCalledTimes(1); expect(fixture.sdk).toHaveBeenCalledTimes(1);
+        expect(fixture.prepare).toHaveBeenCalledTimes(2); expect(fixture.sdk).toHaveBeenCalledTimes(1);
         expect(fixture.verify).not.toHaveBeenCalled();
     });
     it('SDK가 다른 주문을 반환하면 준비한 주문만 다시 확인해요', async () => {

@@ -25,7 +25,7 @@ public class SearchController {
             @RequestParam(required = false) String term, @RequestParam(defaultValue = "") String date,
             @RequestParam(defaultValue = "") String region, HttpServletRequest request, jakarta.servlet.http.HttpServletResponse response) {
         response.setHeader("Cache-Control", "no-store");
-        limited("search-public:ip:" + IpExtractor.extract(request));
+        limited(IpExtractor.extract(request), RateLimiter.Policy.SEARCH_PUBLIC_IP);
         SearchFilter filter = SearchFilter.parse(scope, term, date, region);
         return response(filter == null ? searches.publicSearch(keyword, limit) : searches.publicSearch(keyword, limit, filter));
     }
@@ -36,13 +36,13 @@ public class SearchController {
             @RequestParam(defaultValue = "") String region, HttpServletRequest request, jakarta.servlet.http.HttpServletResponse response) {
         response.setHeader("Cache-Control", "no-store");
         var member = SecurityUtil.getCurrentMember();
-        limited("search-personal:member:" + member.getId());
-        limited("search-personal:ip:" + IpExtractor.extract(request));
+        limited(member.getId().toString(), RateLimiter.Policy.SEARCH_PERSONAL_MEMBER);
+        limited(IpExtractor.extract(request), RateLimiter.Policy.SEARCH_PERSONAL_IP);
         SearchFilter filter = SearchFilter.parse(scope, term, date, region);
         return response(filter == null ? searches.personalSearch(keyword, limit, member) : searches.personalSearch(keyword, limit, member, filter));
     }
-    private void limited(String key) {
-        if (!limiter.tryConsume(key, RateLimiter.Policy.PROFILE_READ))
+    private void limited(String key, RateLimiter.Policy policy) {
+        if (!limiter.tryConsume(key, policy))
             throw new BusinessException("검색 요청이 많아요. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
     }
     private ResponseEntity<ApiResponse<SearchResponse>> response(SearchResponse result) {

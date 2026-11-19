@@ -12,6 +12,7 @@ import useGoBack from '../../hooks/useGoBack';
 import useListQueryNormalization from '../../hooks/useListQueryNormalization';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
 import { httpStatusOf } from '../../utils/listErrorMessage';
+import { postCommentsPath } from '../../utils/feed';
 import { isBlockingListReadError, refetchFailedReads } from '../../hooks/liveUpdateQueries';
 import useMessage from '../../hooks/useMessage';
 import service from '../../services/feedInteractionService';
@@ -70,7 +71,7 @@ export default function FeedNotifications() {
         if (!list.data?.content?.length) return <DataState state="empty" kind="notification" title={view === 'unread' ? '안 읽은 알림이 없어요.' : '아직 새 알림이 없어요.'} />;
         return <ul className="reserve-feed-notification-list" aria-busy={list.isFetching}>
             {list.data.content.map(item => <li key={item.id} data-list-item-id={`notification:${item.id}`} className={item.read ? '' : 'is-unread'}>
-                <Link to={`/feed/posts/${item.postId}#comment-${item.commentId}`} onClick={() => { if (!item.read) mark.mutate({ id: item.id, session: currentSession().epoch }); }}>
+                <Link to={postCommentsPath(item.postPublicId, item.commentPublicId) ?? '/feed'} onClick={() => { if (!item.read) mark.mutate({ id: item.id, session: currentSession().epoch }); }}>
                     <Avatar src={item.actor?.avatarUrl} size={36} referrerPolicy="no-referrer" />
                     <span><strong>{item.actor?.nickname || '회원'}</strong><span>{actionText(item.kind)}</span>
                         <time dateTime={item.createdAt} title={feedDate(item.createdAt)}>{feedRelativeDate(item.createdAt)}</time></span>

@@ -17,14 +17,17 @@ const current = node => node.querySelector('.slick-active').getAttribute('data-i
 it('horizontal pointer swipe changes one photo while vertical scroll leaves the photo unchanged', async () => {
     const { container } = renderGallery();
     const gallery = container.querySelector('.reserve-store-gallery');
+    expect(gallery).not.toHaveAttribute('data-photo-dots-visible');
     fireEvent.pointerDown(gallery, { clientX: 150, clientY: 40, button: 0 });
     fireEvent.pointerMove(gallery, { clientX: 146, clientY: 145 });
     fireEvent.pointerUp(gallery, { clientX: 146, clientY: 145 });
     expect(current(container)).toBe('0');
+    expect(gallery).not.toHaveAttribute('data-photo-dots-visible');
     fireEvent.pointerDown(gallery, { clientX: 150, clientY: 40, button: 0 });
-    fireEvent.pointerMove(gallery, { clientX: 50, clientY: 43 });
-    fireEvent.pointerUp(gallery, { clientX: 50, clientY: 43 });
+    fireEvent.pointerMove(gallery, { clientX: 129, clientY: 43 });
+    fireEvent.pointerUp(gallery, { clientX: 129, clientY: 43 });
     await waitFor(() => expect(current(container)).toBe('1'));
+    expect(gallery).toHaveAttribute('data-photo-dots-visible');
 });
 it('hands focus out of the outgoing photo before its slide becomes hidden', async () => {
     const slideChanged = vi.fn();
@@ -77,6 +80,16 @@ it('opens the gallery preview in the iframe and keeps its keyboard and focus in 
 
         fireEvent.keyDown(dialog, { key: 'ArrowRight' });
         await waitFor(() => expect(dialog.querySelector('img')).toHaveAttribute('src', '/two.png'));
+        const pointer = (type, clientX) => {
+            const event = new frameWindow.MouseEvent(type, { bubbles: true, button: 0, clientX, clientY: 44 });
+            fireEvent(dialog.querySelector('img'), Object.assign(event, { isPrimary: true, pointerId: 1, pointerType: 'touch' }));
+        };
+        pointer('pointerdown', 120);
+        pointer('pointercancel', 141);
+        expect(dialog.querySelector('img')).toHaveAttribute('src', '/two.png');
+        pointer('pointerdown', 120);
+        pointer('pointerup', 141);
+        await waitFor(() => expect(dialog.querySelector('img')).toHaveAttribute('src', '/one.png'));
         const enlargedPhoto = dialog.querySelector('img');
         Object.defineProperties(enlargedPhoto, {
             width: { value: 200, configurable: true },

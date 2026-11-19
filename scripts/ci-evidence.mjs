@@ -11,7 +11,7 @@ const VERSION = 1;
 const MAX_AGE_MS = 7 * 86_400_000;
 const scopes = {
     backend: ['backend', 'frontend/index.html', 'scripts/java/kr/it/reserve/tools/VerifyDatabaseSchema.java', 'scripts/java/kr/it/reserve/tools/VerifyChatImageRecovery.java', 'scripts/tests/kr/it/reserve/tools/VerifyChatImageRecoveryTest.java', 'scripts/java/kr/it/reserve/tools/PrepareAdmissionCampaign.java', 'scripts/java/kr/it/reserve/tools/PrepareServiceAdmission.java', 'scripts/tests/kr/it/reserve/tools/PrepareServiceAdmissionTest.java', 'scripts/test-backend-isolated.sh', 'scripts/ci-evidence.mjs', 'scripts/resolve-bin.mjs', 'scripts/coverage.init.gradle', 'scripts/dependency-notices.gradle',
-        '.github/workflows/CI.yml', '.gitattributes', 'infra/compose/docker-compose-blue.yml', 'infra/compose/docker-compose-green.yml'],
+        '.github/workflows/CI.yml', 'scripts/tests/release-compatibility.test.mjs', 'scripts/check-release-compatibility-image.sh', '.gitattributes', 'infra/compose/docker-compose-blue.yml', 'infra/compose/docker-compose-green.yml'],
     frontend: ['frontend', 'backend/src/main', 'scripts', '.github', '.gitattributes', 'nginx', 'monitoring', 'docs/design-system/snapshots'],
 };
 function componentConfig(requested) {
@@ -183,11 +183,13 @@ async function restoreWithCoverageWait(component, key, runtime) {
 }
 
 export async function main(mode, requestedComponent) {
-    if (mode !== 'restore' && mode !== 'record') throw new Error('Expected restore or record');
+    if (!['restore', 'record', 'key'].includes(mode)) throw new Error('Expected restore, record or key');
     const { component, directory } = componentConfig(requestedComponent);
     const runtime = runtimeIdentity(component);
     const key = keyAt(component, 'HEAD', runtime);
-    if (mode === 'restore') {
+    if (mode === 'key') {
+        output({ key });
+    } else if (mode === 'restore') {
         output({ key, reused: false });
         const proof = await restoreWithCoverageWait(component, key, runtime);
         if (proof) {
@@ -195,6 +197,10 @@ export async function main(mode, requestedComponent) {
             summary(`${component}: reused identical-input successful tests from run ${proof.runId} (original ${proof.originRunId}).`);
         } else summary(`${component}: tests required (new inputs, expired evidence, or forced run).`);
     } else if (mode === 'record') {
+        if (process.env.EVIDENCE_EXPECTED_KEY && process.env.EVIDENCE_EXPECTED_KEY !== key) {
+            summary(`${component}: runner identity changed; no reusable evidence recorded.`);
+            return;
+        }
         const originRunId = process.env.EVIDENCE_ORIGIN || process.env.GITHUB_RUN_ID;
         if (!/^\d+$/.test(originRunId || '')) throw new Error('Missing evidence run ID');
         const executedAt = process.env.EVIDENCE_EXECUTED_AT || new Date().toISOString();

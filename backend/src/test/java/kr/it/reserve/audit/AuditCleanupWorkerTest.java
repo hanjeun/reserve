@@ -4,10 +4,13 @@ import kr.it.reserve.advertisement.repository.AdvertisementRepository;
 import kr.it.reserve.audit.entity.AuditLog;
 import kr.it.reserve.audit.repository.AuditLogRepository;
 import kr.it.reserve.audit.service.AuditCleanupWorker;
+import kr.it.reserve.global.trash.ReceivedInquiryTrash;
 import kr.it.reserve.mailbox.repository.AdminSentMailRepository;
 import kr.it.reserve.payment.repository.PaymentRepository;
 import kr.it.reserve.reservation.repository.ReservationRepository;
+import kr.it.reserve.review.entity.Review;
 import kr.it.reserve.review.repository.ReviewRepository;
+import kr.it.reserve.review.service.ReviewPhotos;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,6 +23,7 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -33,10 +37,24 @@ class AuditCleanupWorkerTest {
     @Mock private AdminSentMailRepository adminSentMailRepository;
     @Mock private ReservationRepository reservationRepository;
     @Mock private ReviewRepository reviewRepository;
+    @Mock private ReviewPhotos reviewPhotos;
     @Mock private AdvertisementRepository advertisementRepository;
     @Mock private PaymentRepository paymentRepository;
+    @Mock private ReceivedInquiryTrash inquiryTrash;
 
     @InjectMocks private AuditCleanupWorker worker;
+
+    @Test
+    void expiredReceivedInquiryUsesTheTrashResource() {
+        var now = LocalDateTime.of(2026, 11, 12, 12, 0);
+        var record = AuditLog.builder().entityType(ReceivedInquiryTrash.TYPE).entityId(9L)
+                .action("SOFT_DELETE").expiresAt(now.minusMinutes(1)).build();
+        when(auditLogRepository.findByIdForUpdate(3L)).thenReturn(Optional.of(record));
+
+        assertThat(worker.deleteOneItem(3L, now)).isTrue();
+        verify(inquiryTrash).purge(9L);
+        verify(auditLogRepository).deleteSoftDeleteLog(ReceivedInquiryTrash.TYPE, 9L);
+    }
 
     @Test
     @DisplayName("결제와 연결된 예약은 30일이 지나도 물리 삭제하지 않고 보존 홀드로 전환한다")
@@ -105,10 +123,15 @@ class AuditCleanupWorkerTest {
                 .expiresAt(now.minusSeconds(1))
                 .build();
         when(auditLogRepository.findByIdForUpdate(3L)).thenReturn(Optional.of(softDelete));
+        Review review = Review.builder().id(41L).build();
+        when(reviewRepository.findById(41L)).thenReturn(Optional.of(review));
 
         assertThat(worker.deleteOneItem(3L, now)).isTrue();
 
-        verify(reviewRepository).deleteById(41L);
+        var deletion = inOrder(reviewRepository, reviewPhotos);
+        deletion.verify(reviewRepository).findById(41L);
+        deletion.verify(reviewPhotos).enqueueDeletion(review.getPhotos(), 41L);
+        deletion.verify(reviewRepository).deleteById(41L);
         verify(auditLogRepository).findByIdForUpdate(3L);
         verify(auditLogRepository).deleteSoftDeleteLog("REVIEW", 41L);
         ArgumentCaptor<AuditLog> saved = ArgumentCaptor.forClass(AuditLog.class);

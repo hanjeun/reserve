@@ -47,6 +47,14 @@ const getStatusMessage = (status) => {
     return '요청에 실패했어요.';
 };
 
+const transportFailure = (message, error) => {
+    const failure = new Error(message);
+    if (error.request || ['ECONNABORTED', 'ETIMEDOUT', 'ERR_NETWORK'].includes(error.code)) {
+        failure.isResponseUnconfirmed = true;
+    }
+    return failure;
+};
+
 const expireRequestSession = request => {
     const scope = request._sessionEpoch;
     assertCurrentSession(scope);
@@ -106,9 +114,13 @@ instance.interceptors.response.use(
         // 인증·세션 관문을 통과한 사진 다운로드만 binary 본문을 반환한다.
         if (response.config.responseType === 'blob' && response.data instanceof Blob) return response.data;
         const res = response.data;
-        if (!res || typeof res !== 'object') throw new Error('서버 응답 형식을 확인할 수 없어요.');
+        if (!res || typeof res !== 'object') {
+            throw Object.assign(new Error('서버 응답 형식을 확인할 수 없어요.'), { isResponseUnconfirmed: true });
+        }
         if (res.success) return res.data;
-        throw new Error(res.message ?? '요청에 실패했어요.');
+        const failure = new Error(res.message ?? '요청에 실패했어요.');
+        if (res.success !== false) failure.isResponseUnconfirmed = true;
+        throw failure;
     },
     async (error) => {
         if (error instanceof StaleSessionError || error?.isServiceAdmissionRequired || error?.isOverloadRateLimited || error?.name === 'AbortError') throw error;
@@ -135,17 +147,12 @@ instance.interceptors.response.use(
         if (
             error.response?.status === 401 &&
             originalRequest &&
-            !originalRequest._retry &&
             !originalRequest.skipAuthRefresh &&
             canonicalApiPath(originalRequest.url) !== '/api/auth/refresh' &&
             !isAuthEndpoint(originalRequest.url)
         ) {
+            if (originalRequest._retry) throw expireRequestSession(originalRequest);
             return handle401(originalRequest);
-        }
-
-        if (error.response?.status === 401 && originalRequest?._retry && !originalRequest.skipAuthRefresh
-            && canonicalApiPath(originalRequest.url) !== '/api/auth/refresh' && !isAuthEndpoint(originalRequest.url)) {
-            throw expireRequestSession(originalRequest);
         }
 
         if (error.response) {
@@ -163,16 +170,16 @@ instance.interceptors.response.use(
                 /*
                  * 응답이 없으면 취소·시간 초과·오프라인을 구분한다. navigator.onLine은 false일 때만 오프라인 근거로 사용하며 그 밖의 원인은 단정하지 않는다.
                  */
-        if (error.code === 'ECONNABORTED') {
+        if (['ECONNABORTED', 'ETIMEDOUT'].includes(error.code)) {
             // 30초(timeout) 초과. 서버는 살아 있는데 느린 것이므로 회선 얘기를 꺼내면 안 된다.
-            throw new Error('응답이 너무 늦어요. 잠시 후 다시 시도해주세요.');
+            throw transportFailure('응답이 너무 늦어요. 잠시 후 다시 시도해주세요.', error);
         }
         if (globalThis.navigator?.onLine === false) {
-            throw new Error('인터넷 연결이 끊겼어요.');
+            throw transportFailure('인터넷 연결이 끊겼어요.', error);
         }
         // 서버 다운 · 연결 거부 · DNS · CORS — 원인이 어디든 "연결이 안 됐다"는 사실은 참이다.
         // 범인을 지목하지 않으면서 다음 행동은 알려주는 문장.
-        throw new Error('서버에 연결할 수 없어요. 잠시 후 다시 시도해주세요.');
+        throw transportFailure('서버에 연결할 수 없어요. 잠시 후 다시 시도해주세요.', error);
     }
 );
 

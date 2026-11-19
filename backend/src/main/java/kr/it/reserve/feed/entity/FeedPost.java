@@ -10,9 +10,13 @@ import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
-@Table(name = "feed_post", uniqueConstraints = @UniqueConstraint(name = "uk_feed_post_request", columnNames = {"profile_id", "client_request_id"}), indexes = {
+@Table(name = "feed_post", uniqueConstraints = {
+    @UniqueConstraint(name = "uk_feed_post_request", columnNames = {"profile_id", "client_request_id"}),
+    @UniqueConstraint(name = "uk_feed_post_public_id", columnNames = "public_id")
+}, indexes = {
     @Index(name = "ix_feed_post_public", columnList = "state,created_at,post_id"),
     @Index(name = "ix_feed_post_region", columnList = "region,state,created_at,post_id"),
     @Index(name = "ix_feed_post_author", columnList = "profile_id,state,created_at,post_id"),
@@ -29,6 +33,7 @@ public class FeedPost implements kr.it.reserve.promotion.entity.NewsPublication 
         throw new IllegalStateException("Unsupported news publication entity mapping");
     }
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) @Column(name = "post_id") private Long id;
+    @Column(name = "public_id", length = 36, updatable = false) private String publicId;
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "profile_id", nullable = false) private FeedProfile profile;
     @Column(nullable = false, columnDefinition = "TEXT") private String content;
     @Column(length = 50) private String region;
@@ -42,6 +47,9 @@ public class FeedPost implements kr.it.reserve.promotion.entity.NewsPublication 
     @Column(name = "created_at", nullable = false) private LocalDateTime createdAt;
     @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt;
     @Column(name = "deleted_at") private LocalDateTime deletedAt;
+    @PrePersist
+    private void assignPublicId() { publicId = UUID.randomUUID().toString(); }
+
     public static FeedPost create(FeedProfile profile, String clientRequestId, LocalDateTime now) {
         FeedPost post = new FeedPost(); post.profile = profile; post.clientRequestId = clientRequestId; post.createdAt = now; return post;
     }

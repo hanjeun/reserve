@@ -15,7 +15,7 @@ export const scenarioPath = mode => mode === 'signup' ? '/signup?preview=signup'
     : mode === 'news' ? '/benefits?preview=news'
     : mode === 'login' ? '/login?preview=login'
     : ['settlement', 'settlementoff'].includes(mode) ? '/business?tab=settlements&preview=' + mode
-        : mode === 'messenger' ? '/store/81?preview=messenger'
+        : mode === 'messenger' ? '/store/00000000-0000-4000-8000-000000000081?preview=messenger'
     : mode === 'payment' ? '/my-reservations?preview=payment'
     : ['settings', 'manage', 'optional', 'unregistered'].includes(mode) ? '/my-page?preview=' + mode
         : '/login?mfa=1&preview=' + mode;
@@ -28,13 +28,14 @@ export async function installAccountSecurityPreview(page, origin, { theme = 'lig
     store.detailImageUrls = [store.mainImageUrl];
     const base = await installReleasePreview(page, { port: new URL(origin).port, theme });
     const newsPhoto = await readFile(new URL('../../public/og-image.png', import.meta.url));
-    const newsItems = ['STANDARD', 'PHOTO', 'COMPACT'].map((design, index) => ({ id: 901 + index, storeId: 81,
+    const newsItems = ['STANDARD', 'PHOTO', 'COMPACT'].map((design, index) => ({ id: 901 + index, publicId: '00000000-0000-4000-8000-' + String(901 + index).padStart(12, '0'),
+        storeId: 81, storePublicId: '00000000-0000-4000-8000-000000000081',
         storeName: '미리보기 가게', title: '가게에서 전하는 안내', excerpt: '밝은 배경에서도 읽을 수 있는 소식이에요.',
         content: '편안하게 방문해주세요.', newsType: 'NEWS', state: 'PUBLISHED', benefitState: 'APPROVED', design,
         images: [{ id: 901 + index, url: '/api/store-news/media/' + (901 + index), width: 1200, height: 630 }],
         createdAt: '2026-10-27T00:00:00Z', revision: 0 }));
     const state = { mode: null, registered: false, verified: false, authenticated: false, paid: false, sdkCalls: 0 };
-    const reservation = { id: 701, storeId: 81, storeName: '서촌 도예공방', storeMainImageUrl: origin + '/og-image.png', reservationCode: 'DEMO-RESERVATION-701',
+    const reservation = { id: 701, storeId: 81, storePublicId: '00000000-0000-4000-8000-000000000081', storeName: '서촌 도예공방', storeMainImageUrl: origin + '/og-image.png', reservationCode: 'DEMO-RESERVATION-701',
         reservationDate: '2026-10-28', reservationTime: '14:00:00', guestCount: 2, depositAmount: 10000,
         depositPaid: false, status: 'PENDING', attendanceRefundEnabled: true, canCancel: true,
         canEdit: true, memberId: account.id, memberName: account.name, createdAt: new Date().toISOString(),
@@ -62,7 +63,7 @@ export async function installAccountSecurityPreview(page, origin, { theme = 'lig
         if (path === '/api/store-news/config') return ok(route, { enabled: true, benefitApprovalEnabled: true,
             benefitDesignEnabled: true, benefitEventsEnabled: false, imageEnabled: true, maxImages: 6, maxImageBytes: 7340032 });
         if (path === '/api/promotions/public') return ok(route, pageOf(newsItems));
-        if (path === '/api/store-news/stores') return ok(route, [{ ...store, ownerId: account.id }, { ...store, id: 82, name: '다른 미리보기 가게', ownerId: account.id }]);
+        if (path === '/api/store-news/stores') return ok(route, [{ ...store, ownerId: account.id }, { ...store, id: 82, publicId: '00000000-0000-4000-8000-000000000082', name: '다른 미리보기 가게', ownerId: account.id }]);
         if (path === '/api/store-news/me') return ok(route, pageOf(newsItems));
         if (/^\/api\/store-news\/media\/\d+$/.test(path)) return route.fulfill({ contentType: 'image/png', body: newsPhoto });
         if (/^\/api\/store-news\/\d+$/.test(path)) return ok(route, newsItems.find(item => item.id === Number(path.split('/').at(-1))));

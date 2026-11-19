@@ -17,6 +17,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -38,7 +40,8 @@ class PublicPromotionSecurityTest {
 
     @Test
     void onlyThePublicListAndDetailAreAccessibleWithoutAuthentication() throws Exception {
-        when(news.publicList(0, 12, null, null, "ONGOING")).thenReturn(Page.empty(PageRequest.of(0, 12)));
+        when(limiter.tryConsume(anyString(), eq(RateLimiter.Policy.PUBLIC_DIRECTORY_READ))).thenReturn(true);
+        when(news.publicList(0, 12, null, null, "ONGOING", null)).thenReturn(Page.empty(PageRequest.of(0, 12)));
         when(news.publicDetail(7L)).thenReturn(PromotionDto.PublicPromotionDetailResponse.builder()
                 .id(7L).storeId(3L).title("가게 안내").content("plain text").build());
 

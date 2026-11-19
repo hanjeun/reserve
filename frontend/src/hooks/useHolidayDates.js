@@ -2,21 +2,28 @@ import { useEffect, useState } from 'react';
 import holidayService from '../services/holidayService';
 
 const EMPTY = new Set();
+const MAX_MONTHS = 64;
+const CACHE_MS = 24 * 60 * 60 * 1000;
 
 // 공통 입력은 Provider 없이도 동작한다. 조회하지 못한 달은 다음 요청에서 다시 시도한다.
 const cache = new Map();
 
 const load = month => {
-    if (!cache.has(month)) {
-        const request = holidayService.getMonth(month)
-            .then(dates => new Set(Array.isArray(dates) ? dates : []))
-            .catch(() => {
-                cache.delete(month);
-                return EMPTY;
-            });
-        cache.set(month, request);
+    const cached = cache.get(month);
+    cache.delete(month);
+    if (cached && cached.expiresAt > Date.now()) {
+        cache.set(month, cached);
+        return cached.request;
     }
-    return cache.get(month);
+    const request = holidayService.getMonth(month)
+        .then(dates => new Set(Array.isArray(dates) ? dates : []))
+        .catch(() => {
+            if (cache.get(month)?.request === request) cache.delete(month);
+            return EMPTY;
+        });
+    if (cache.size >= MAX_MONTHS) cache.delete(cache.keys().next().value);
+    cache.set(month, { request, expiresAt: Date.now() + CACHE_MS });
+    return request;
 };
 
 /**

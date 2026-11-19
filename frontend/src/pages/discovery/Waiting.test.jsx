@@ -97,6 +97,23 @@ it('keeps server count adjacent to the view icon and applies status and sorting 
     expect(currentParams().get('page')).toBe('1');
 });
 
+it('기존 웨이팅 가게를 정렬 응답까지 유지해요', async () => {
+    const request = deferred();
+    waitingService.getStores.mockResolvedValueOnce(page('이전 순서 가게')).mockReturnValue(request.promise);
+    show('/waiting?view=list');
+    await screen.findByText('이전 순서 가게');
+    const sort = screen.getByRole('button', { name: '가게 정렬' });
+    fireEvent.click(sort);
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: '리뷰순' }));
+    await waitFor(() => expect(sort).toHaveAttribute('aria-busy', 'true'));
+    expect(sort).toHaveFocus();
+    expect(screen.getByText('이전 순서 가게')).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: '웨이팅 가게를 불러오는 중' })).toBeNull();
+    await act(async () => request.resolve({ content: [{ id: 2, name: '새 순서 가게' }], page: { totalElements: 1 } }));
+    expect(await screen.findByText('새 순서 가게')).toBeInTheDocument();
+    expect(sort).not.toHaveAttribute('aria-busy');
+});
+
 it('restores the selected region on a same-tab revisit and sends it to the waiting query', async () => {
     waitingService.getStores.mockResolvedValue(page('안산 가게'));
     show(); await screen.findByText('안산 가게');
@@ -117,6 +134,9 @@ it('retains the focused search field during a new query without normalizing its 
     show(); await screen.findByText('이전 가게');
     const input = screen.getByPlaceholderText('웨이팅 가게 검색'); input.focus();
     fireEvent.change(input, { target: { value: '새 가게' } });
+    expect(screen.getByText('이전 가게')).toBeInTheDocument();
+    expect(waitingService.getStores).toHaveBeenCalledTimes(1);
+    fireEvent.submit(input.form);
     expect(screen.getByRole('status', { name: '웨이팅 가게를 불러오는 중' })).toBeInTheDocument();
     expect(screen.queryByText('이전 가게')).toBeNull();
     await waitFor(() => expect(waitingService.getStores).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: '새 가게', page: 0 }), expect.any(AbortSignal)));
@@ -129,7 +149,10 @@ it('reuses cached search results immediately and preserves rows during backgroun
     waitingService.getStores.mockResolvedValue(page('초기 가게'));
     const { client } = show('/waiting', { gcTime: 60_000 }); await screen.findByText('초기 가게');
     client.setQueryData(['waiting-stores', '기억한 검색', '', 'ALL', 'recommended', 0], page('캐시 가게'));
-    fireEvent.change(screen.getByPlaceholderText('웨이팅 가게 검색'), { target: { value: '기억한 검색' } });
+    const input = screen.getByPlaceholderText('웨이팅 가게 검색');
+    fireEvent.change(input, { target: { value: '기억한 검색' } });
+    expect(screen.getByText('초기 가게')).toBeInTheDocument();
+    fireEvent.submit(input.form);
     expect(screen.getByText('캐시 가게')).toBeInTheDocument();
     expect(screen.queryByRole('status', { name: '웨이팅 가게를 불러오는 중' })).toBeNull();
     await waitFor(() => expect(client.getQueryCache().find({ queryKey: ['waiting-stores', '기억한 검색', '', 'ALL', 'recommended', 0] }).isActive()).toBe(true));
@@ -139,7 +162,8 @@ it('reuses cached search results immediately and preserves rows during backgroun
     expect(screen.queryByRole('status', { name: '웨이팅 가게를 불러오는 중' })).toBeNull();
     await act(async () => refresh.resolve(page('갱신 가게')));
     expect(await screen.findByText('갱신 가게')).toBeInTheDocument();
-    fireEvent.change(screen.getByPlaceholderText('웨이팅 가게 검색'), { target: { value: '' } });
+    fireEvent.change(input, { target: { value: '' } });
+    fireEvent.submit(input.form);
     expect(screen.getByText('초기 가게')).toBeInTheDocument();
     expect(screen.queryByRole('status', { name: '웨이팅 가게를 불러오는 중' })).toBeNull();
     client.clear();

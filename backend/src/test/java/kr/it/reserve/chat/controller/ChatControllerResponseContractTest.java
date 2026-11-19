@@ -15,8 +15,10 @@ import kr.it.reserve.global.common.ApiResponse;
 import kr.it.reserve.global.error.MemberException;
 import kr.it.reserve.global.ratelimit.RateLimiter;
 import kr.it.reserve.member.entity.Member;
+import kr.it.reserve.notification.service.ReservationNotificationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -89,20 +91,28 @@ class ChatControllerResponseContractTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("loginRequiredEndpoints")
     void missingAuthenticationUsesExistingMessageWithoutBusinessCalls(
-            String endpoint, boolean sendLimitBeforeAuthentication, Consumer<Fixture> invoke) {
-        if (sendLimitBeforeAuthentication) {
-            fixture.allowSend();
-        }
-
+            String endpoint, Consumer<Fixture> invoke) {
         assertThatThrownBy(() -> invoke.accept(fixture))
                 .isExactlyInstanceOf(MemberException.class)
                 .hasMessage(EXPECTED_LOGIN_REQUIRED);
 
-        verifyNoInteractions(fixture.chatService, fixture.moderationService, fixture.imageService);
-        if (sendLimitBeforeAuthentication) {
-            verify(fixture.rateLimiter).tryConsume(CLIENT_IP, RateLimiter.Policy.CHAT_SEND);
-        }
+        verifyNoInteractions(fixture.chatService, fixture.moderationService, fixture.imageService, fixture.rateLimiter);
+    }
+
+    @Test
+    void memberLimitStopsTextAndImageBeforeEitherSavesAMessage() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(fixture.member, null, List.of()));
+        var images = new ChatImageController(fixture.imageService, fixture.rateLimiter);
+
+        assertThat(fixture.chat.send(fixture.sendRequest, fixture.httpRequest).getStatusCode())
+                .isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(images.send(ROOM_ID, null, null, fixture.httpRequest).getStatusCode())
+                .isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        verify(fixture.rateLimiter, org.mockito.Mockito.times(2))
+                .tryConsume(ACTOR_ID.toString(), RateLimiter.Policy.CHAT_MEMBER_SEND);
         verifyNoMoreInteractions(fixture.rateLimiter);
+        verifyNoInteractions(fixture.chatService, fixture.imageService);
     }
 
     private static Stream<Arguments> authenticatedResponses() {
@@ -133,11 +143,13 @@ class ChatControllerResponseContractTest {
                     verify(f.chatService).getNewMessagesAsAdmin(ROOM_ID, AFTER_ID, ACTOR_ID);
                 }),
                 success("AdminChat.reply", f -> {
+                    f.allowMemberSend();
                     when(f.chatService.sendAsAdmin(f.member, ROOM_ID, CONTENT, CLIENT_MESSAGE_ID))
                             .thenReturn(f.message);
                     assertSuccess(f.admin.reply(ROOM_ID, f.sendRequest), f.message, EXPECTED_SEND_SUCCESS);
                     verify(f.chatService).sendAsAdmin(
                             same(f.member), eq(ROOM_ID), eq(CONTENT), eq(CLIENT_MESSAGE_ID));
+                    f.verifyMemberSend();
                 }),
                 success("AdminChat.waitingCount", f -> {
                     when(f.chatService.adminWaitingRoomCount()).thenReturn(11L);
@@ -178,7 +190,10 @@ class ChatControllerResponseContractTest {
                 }),
                 success("ChatApi.totalUnread", f -> {
                     when(f.chatService.totalUnreadCount(f.member)).thenReturn(13L);
-                    assertSuccess(f.chat.totalUnread(), 13L, EXPECTED_QUERY_SUCCESS);
+                    when(f.reservationNotifications.unread(f.member)).thenReturn(2L);
+                    var response = f.chat.totalUnread();
+                    assertSuccess(response, 15L, EXPECTED_QUERY_SUCCESS);
+                    assertThat(response.getHeaders().getCacheControl()).isEqualTo("no-store");
                     verify(f.chatService).totalUnreadCount(same(f.member));
                 }),
                 success("ChatApi.poll", f -> {
@@ -198,6 +213,7 @@ class ChatControllerResponseContractTest {
                     assertSuccess(f.chat.sendSupport(f.sendRequest, f.httpRequest), f.message, EXPECTED_SEND_SUCCESS);
                     verify(f.chatService).sendAsMember(same(f.member), eq(CONTENT), eq(CLIENT_MESSAGE_ID));
                     verify(f.rateLimiter).tryConsume(CLIENT_IP, RateLimiter.Policy.CHAT_SEND);
+                    f.verifyMemberSend();
                 }),
                 success("ChatApi.sendStoreMessage", f -> {
                     f.allowSend();
@@ -208,6 +224,7 @@ class ChatControllerResponseContractTest {
                     verify(f.chatService).sendAsMemberToStore(
                             same(f.member), eq(STORE_ID), eq(CONTENT), eq(CLIENT_MESSAGE_ID));
                     verify(f.rateLimiter).tryConsume(CLIENT_IP, RateLimiter.Policy.CHAT_SEND);
+                    f.verifyMemberSend();
                 }),
                 success("ChatApi.replyStoreMessage", f -> {
                     f.allowSend();
@@ -218,6 +235,7 @@ class ChatControllerResponseContractTest {
                     verify(f.chatService).sendAsOwner(
                             same(f.member), eq(ROOM_ID), eq(CONTENT), eq(CLIENT_MESSAGE_ID));
                     verify(f.rateLimiter).tryConsume(CLIENT_IP, RateLimiter.Policy.CHAT_SEND);
+                    f.verifyMemberSend();
                 }),
                 success("ChatApi.send", f -> {
                     f.allowSend();
@@ -225,6 +243,7 @@ class ChatControllerResponseContractTest {
                     assertSuccess(f.chat.send(f.sendRequest, f.httpRequest), f.message, EXPECTED_SEND_SUCCESS);
                     verify(f.chatService).sendAsMember(same(f.member), eq(CONTENT), eq(CLIENT_MESSAGE_ID));
                     verify(f.rateLimiter).tryConsume(CLIENT_IP, RateLimiter.Policy.CHAT_SEND);
+                    f.verifyMemberSend();
                 }),
                 success("ChatApi.setVisibility hidden", f -> {
                     assertSuccess(f.chat.setVisibility(ROOM_ID, "OWNER", true), null, "내 목록에서 숨겼어요.");
@@ -239,39 +258,39 @@ class ChatControllerResponseContractTest {
 
     private static Stream<Arguments> loginRequiredEndpoints() {
         return Stream.of(
-                login("AdminChat.messages", false, f -> f.admin.messages(ROOM_ID)),
-                login("AdminChat.openRoom", false, f -> f.admin.openRoom(ROOM_ID)),
-                login("AdminChat.poll", false, f -> f.admin.poll(ROOM_ID, AFTER_ID)),
-                login("AdminChat.reply", false, f -> f.admin.reply(ROOM_ID, f.sendRequest)),
-                login("AdminChat.reportContext", false, f -> f.admin.reportContext(REPORT_ID)),
-                login("AdminChat.reviewReport", false, f -> f.admin.reviewReport(REPORT_ID, f.reviewRequest)),
-                login("AdminChat.reportImage", false, f -> f.admin.reportImage(REPORT_ID, MESSAGE_ID)),
-                login("ChatApi.conversations", false, f -> f.chat.conversations(PAGE, true)),
-                login("ChatApi.support", false, f -> f.chat.support()),
-                login("ChatApi.openSupport", false, f -> f.chat.openSupport()),
-                login("ChatApi.sendSupport", true, f -> f.chat.sendSupport(f.sendRequest, f.httpRequest)),
-                login("ChatApi.storeConversation", false, f -> f.chat.storeConversation(STORE_ID)),
-                login("ChatApi.openStoreConversation", false, f -> f.chat.openStoreConversation(STORE_ID)),
-                login("ChatApi.sendStoreMessage", true,
+                login("AdminChat.messages", f -> f.admin.messages(ROOM_ID)),
+                login("AdminChat.openRoom", f -> f.admin.openRoom(ROOM_ID)),
+                login("AdminChat.poll", f -> f.admin.poll(ROOM_ID, AFTER_ID)),
+                login("AdminChat.reply", f -> f.admin.reply(ROOM_ID, f.sendRequest)),
+                login("AdminChat.reportContext", f -> f.admin.reportContext(REPORT_ID)),
+                login("AdminChat.reviewReport", f -> f.admin.reviewReport(REPORT_ID, f.reviewRequest)),
+                login("AdminChat.reportImage", f -> f.admin.reportImage(REPORT_ID, MESSAGE_ID)),
+                login("ChatApi.conversations", f -> f.chat.conversations(PAGE, true)),
+                login("ChatApi.support", f -> f.chat.support()),
+                login("ChatApi.openSupport", f -> f.chat.openSupport()),
+                login("ChatApi.sendSupport", f -> f.chat.sendSupport(f.sendRequest, f.httpRequest)),
+                login("ChatApi.storeConversation", f -> f.chat.storeConversation(STORE_ID)),
+                login("ChatApi.openStoreConversation", f -> f.chat.openStoreConversation(STORE_ID)),
+                login("ChatApi.sendStoreMessage",
                         f -> f.chat.sendStoreMessage(STORE_ID, f.sendRequest, f.httpRequest)),
-                login("ChatApi.storeInbox", false, f -> f.chat.storeInbox(PAGE, true)),
-                login("ChatApi.openStoreInbox", false, f -> f.chat.openStoreInbox(ROOM_ID)),
-                login("ChatApi.markStoreInboxOpened", false, f -> f.chat.markStoreInboxOpened(ROOM_ID)),
-                login("ChatApi.replyStoreMessage", true,
+                login("ChatApi.storeInbox", f -> f.chat.storeInbox(PAGE, true)),
+                login("ChatApi.openStoreInbox", f -> f.chat.openStoreInbox(ROOM_ID)),
+                login("ChatApi.markStoreInboxOpened", f -> f.chat.markStoreInboxOpened(ROOM_ID)),
+                login("ChatApi.replyStoreMessage",
                         f -> f.chat.replyStoreMessage(ROOM_ID, f.sendRequest, f.httpRequest)),
-                login("ChatApi.pollConversation", false, f -> f.chat.pollConversation(ROOM_ID, AFTER_ID)),
-                login("ChatApi.conversationHistory", false, f -> f.chat.conversationHistory(ROOM_ID, MESSAGE_ID, 37)),
-                login("ChatApi.markConversationRead", false, f -> f.chat.markConversationRead(ROOM_ID, "OWNER", null)),
-                login("ChatApi.setConversationBlocked", false,
+                login("ChatApi.pollConversation", f -> f.chat.pollConversation(ROOM_ID, AFTER_ID)),
+                login("ChatApi.conversationHistory", f -> f.chat.conversationHistory(ROOM_ID, MESSAGE_ID, 37)),
+                login("ChatApi.markConversationRead", f -> f.chat.markConversationRead(ROOM_ID, "OWNER", null)),
+                login("ChatApi.setConversationBlocked",
                         f -> f.chat.setConversationBlocked(ROOM_ID, "MEMBER", true)),
-                login("ChatApi.setVisibility", false, f -> f.chat.setVisibility(ROOM_ID, "OWNER", true)),
-                login("ChatApi.reportConversation", false,
+                login("ChatApi.setVisibility", f -> f.chat.setVisibility(ROOM_ID, "OWNER", true)),
+                login("ChatApi.reportConversation",
                         f -> f.chat.reportConversation(ROOM_ID, "MEMBER", f.createReportRequest)),
-                login("ChatApi.totalUnread", false, f -> f.chat.totalUnread()),
-                login("ChatApi.openMy", false, f -> f.chat.openMy()),
-                login("ChatApi.send", false, f -> f.chat.send(f.sendRequest, f.httpRequest)),
-                login("ChatApi.poll", false, f -> f.chat.poll(ROOM_ID, AFTER_ID)),
-                login("ChatApi.unread", false, f -> f.chat.unread())
+                login("ChatApi.totalUnread", f -> f.chat.totalUnread()),
+                login("ChatApi.openMy", f -> f.chat.openMy()),
+                login("ChatApi.send", f -> f.chat.send(f.sendRequest, f.httpRequest)),
+                login("ChatApi.poll", f -> f.chat.poll(ROOM_ID, AFTER_ID)),
+                login("ChatApi.unread", f -> f.chat.unread())
         );
     }
 
@@ -279,9 +298,8 @@ class ChatControllerResponseContractTest {
         return Arguments.of(endpoint, contract);
     }
 
-    private static Arguments login(String endpoint, boolean sendLimitBeforeAuthentication,
-                                   Consumer<Fixture> invoke) {
-        return Arguments.of(endpoint, sendLimitBeforeAuthentication, invoke);
+    private static Arguments login(String endpoint, Consumer<Fixture> invoke) {
+        return Arguments.of(endpoint, invoke);
     }
 
     private static <T> void assertSuccess(ResponseEntity<ApiResponse<T>> response, T data, String message) {
@@ -298,8 +316,9 @@ class ChatControllerResponseContractTest {
         private final ChatModerationService moderationService = mock(ChatModerationService.class);
         private final ChatImageService imageService = mock(ChatImageService.class);
         private final RateLimiter rateLimiter = mock(RateLimiter.class);
-        private final AdminChatController admin = new AdminChatController(chatService, moderationService, imageService);
-        private final ChatApiController chat = new ChatApiController(chatService, moderationService, rateLimiter);
+        private final ReservationNotificationService reservationNotifications = mock(ReservationNotificationService.class);
+        private final AdminChatController admin = new AdminChatController(chatService, moderationService, imageService, rateLimiter);
+        private final ChatApiController chat = new ChatApiController(chatService, moderationService, rateLimiter, reservationNotifications);
         private final Member member = Member.builder().id(ACTOR_ID).name("계약 검사")
                 .email("chat-contract@example.test").build();
         private final SendMessageRequest sendRequest = new SendMessageRequest();
@@ -330,7 +349,16 @@ class ChatControllerResponseContractTest {
         }
 
         private void allowSend() {
+            allowMemberSend();
             when(rateLimiter.tryConsume(CLIENT_IP, RateLimiter.Policy.CHAT_SEND)).thenReturn(true);
+        }
+
+        private void allowMemberSend() {
+            when(rateLimiter.tryConsume(ACTOR_ID.toString(), RateLimiter.Policy.CHAT_MEMBER_SEND)).thenReturn(true);
+        }
+
+        private void verifyMemberSend() {
+            verify(rateLimiter).tryConsume(ACTOR_ID.toString(), RateLimiter.Policy.CHAT_MEMBER_SEND);
         }
     }
 }

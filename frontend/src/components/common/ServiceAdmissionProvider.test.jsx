@@ -52,6 +52,23 @@ describe('lightweight service admission shell', () => {
         expect(screen.getByRole('textbox')).toHaveValue('작성 중');
     });
 
+    it('does not open or poll service admission during login completion and preserves the child when resuming', async () => {
+        const layout = enabled => <MemoryRouter><ServiceAdmissionProvider enabled={enabled}>
+            <input aria-label="예약 내용" defaultValue="작성 중" />
+        </ServiceAdmissionProvider></MemoryRouter>;
+        const view = render(layout(false));
+        views.push(view);
+        const input = screen.getByRole('textbox');
+        await flush();
+        expect(service.status).not.toHaveBeenCalled();
+        view.rerender(layout(true));
+        expect(service.status).toHaveBeenCalledTimes(1);
+        const signal = service.status.mock.lastCall[0];
+        view.rerender(layout(false));
+        expect(signal.aborted).toBe(true);
+        expect(screen.getByRole('textbox')).toBe(input);
+    });
+
     it('replays a pending gate after lazy loading while retaining the exact child form and controller mount', async () => {
         const mounted = vi.fn();
         function Form() {

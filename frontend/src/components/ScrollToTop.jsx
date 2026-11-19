@@ -2,20 +2,23 @@ import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { isDiscoveryRootPath } from '../constants/discovery';
 import { discoveryScrollPosition, rememberDiscoveryLocation } from '../utils/discoveryNavigation';
+import { STORE_DETAIL_PATH } from '../utils/storePublicAddress';
 
 const PAGE_LOADING = '.reserve-route-skeleton, .reserve-skeleton-block:not(.reserve-skeleton-block--local)';
 const RESTORE_WAIT_MS = 8000;
 const isMessagesPath = pathname => /^\/messages\/?$/.test(pathname);
+const isProfilePath = pathname => /^\/feed\/u\/[^/]+\/?$/.test(pathname ?? '');
 const currentPosition = () => ({ left: window.scrollX, top: window.scrollY });
 const scrollInstantly = position => window.scrollTo({ ...position, behavior: 'instant' });
 
-/* 탐색 탭과 메시지 아래의 같은 히스토리 항목은 스크롤 위치를 보존한다. */
+/* 탐색 탭과 검색·메시지·프로필에서 돌아오는 화면의 스크롤 위치를 보존한다. */
 function ScrollToTop() {
     const location = useLocation();
     const current = useRef(null);
     const position = useRef(currentPosition());
     const restoring = useRef(false);
     const messengerReturn = useRef(null);
+    const profileReturn = useRef(null);
 
     useEffect(() => {
         const previousRestoration = window.history.scrollRestoration;
@@ -41,7 +44,16 @@ function ScrollToTop() {
         const previous = current.current;
         if (previous && !restoring.current) rememberDiscoveryLocation(previous, position.current);
         current.current = location;
-        let saved = discoveryScrollPosition(location);
+        if (STORE_DETAIL_PATH.test(previous?.pathname ?? '') && isProfilePath(location.pathname)) {
+            profileReturn.current = { key: previous.key, ...position.current };
+        }
+        let origin = null;
+        if (isProfilePath(previous?.pathname)) origin = profileReturn.current;
+        else if (/^\/search\/?$/.test(previous?.pathname ?? '') && previous.state?.searchEntry === true) {
+            origin = previous.state.searchOrigin;
+        }
+        const returningToOrigin = origin?.key === location.key && Number.isFinite(origin.left) && Number.isFinite(origin.top);
+        let saved = returningToOrigin ? { left: Math.max(0, origin.left), top: Math.max(0, origin.top) } : discoveryScrollPosition(location);
         let returningFromMessages = false;
         if (isMessagesPath(location.pathname)) {
             if (previous && !isMessagesPath(previous.pathname)) {
@@ -62,7 +74,8 @@ function ScrollToTop() {
             restoring.current = false;
             return undefined;
         }
-        if ((!returningFromMessages && !isDiscoveryRootPath(location.pathname, location.search)) || !saved || saved.top === 0) {
+        if ((!returningToOrigin && !returningFromMessages && !isDiscoveryRootPath(location.pathname, location.search))
+            || !saved || (saved.top === 0 && saved.left === 0)) {
             position.current = { left: 0, top: 0 };
             restoring.current = false;
             scrollInstantly(position.current);

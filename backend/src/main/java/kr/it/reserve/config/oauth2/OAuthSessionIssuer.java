@@ -44,6 +44,7 @@ public class OAuthSessionIssuer {
         if (authentication == null || authentication.memberId() == null) throw reauthenticate();
         OAuthSubjectSecurity subject = subjects.lock(authentication.provider(), authentication.providerId());
         Member current = members.findActiveByIdForUpdate(authentication.memberId()).orElseThrow(this::reauthenticate);
+        if (current.isAccountProtected()) throw new OAuth2AuthenticationException("account_protected");
         if (current.getProvider() != authentication.provider()
                 || !authentication.providerId().equals(current.getProviderId())
                 || current.getAuthVersion() != authentication.authVersion() || current.isSuspended()) throw reauthenticate();

@@ -2,6 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { businessTabSearch } from './businessTabQuery';
 
 describe('businessTabSearch', () => {
+    it('keeps no-show filters separate from reservation and settlement filters', () => {
+        const opened = new URLSearchParams(businessTabSearch('?tab=reservations&reservationPage=4&settlementPage=2',
+            'no-show', 'noShowStore=7&noShowStatus=NO_SHOW&noShowPage=3'));
+        expect(opened.get('tab')).toBe('no-show');
+        expect(opened.get('noShowStatus')).toBe('NO_SHOW');
+        expect(opened.get('noShowPage')).toBe('3');
+        expect(opened.has('reservationPage')).toBe(false);
+        expect(opened.has('settlementPage')).toBe(false);
+        const closed = new URLSearchParams(businessTabSearch(opened, 'settlements'));
+        expect(closed.has('noShowStatus')).toBe(false);
+        expect(closed.has('noShowStore')).toBe(false);
+    });
     it('keeps the originating work filters through QR open, reload and close', () => {
         const original = '?tab=waiting&waitingStore=5&waitingSearch=손님&waitingStatus=SEATED&view=cards&utm_source=review';
         const open = new URLSearchParams(businessTabSearch(original, 'qr-checkin'));
@@ -11,7 +23,7 @@ describe('businessTabSearch', () => {
         expect(businessTabSearch(open, 'qr-checkin')).toBe(open.toString());
         const closed = new URLSearchParams(businessTabSearch(open, 'waiting'));
         expect(closed.get('tab')).toBe('waiting');
-        expect(closed.get('waitingSearch')).toBe('손님');
+        expect(closed.has('waitingSearch')).toBe(false);
         expect(closed.get('view')).toBe('cards');
         expect(closed.has('qrReturn')).toBe(false);
         expect(closed.get('utm_source')).toBe('review');
@@ -44,11 +56,18 @@ describe('businessTabSearch', () => {
         expect(result.has('statisticsRange')).toBe(false);
     });
 
+    it('keeps the news view with its filters and restores it separately from waiting', () => {
+        const news = 'tab=news&newsStore=7&newsState=PUBLISHED&newsPage=2&view=cards';
+        expect(businessTabSearch(news, 'news')).toBe(news);
+        expect(businessTabSearch(news, 'waiting')).toBe('tab=waiting');
+        expect(businessTabSearch('?tab=waiting&view=list', 'news', news)).toBe(news);
+    });
+
     it('keeps waiting selection and view only in tabs that use them', () => {
         const waiting = new URLSearchParams(businessTabSearch('?waitingStore=5&waitingSearch=손님&waitingStatus=SEATED&view=cards&reservationPage=2', 'waiting'));
         expect(waiting.get('tab')).toBe('waiting');
         expect(waiting.get('waitingStore')).toBe('5');
-        expect(waiting.get('waitingSearch')).toBe('손님');
+        expect(waiting.has('waitingSearch')).toBe(false);
         expect(waiting.get('waitingStatus')).toBe('SEATED');
         expect(waiting.get('view')).toBe('cards');
         expect(waiting.has('reservationPage')).toBe(false);

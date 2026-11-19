@@ -8,16 +8,19 @@ import { getThumbnailUrl } from '../../utils';
 import PhotoGallery from '../common/PhotoGallery';
 import IconTool from '../common/IconTool';
 import InterfaceIcon from '../common/InterfaceIcon';
+import { CalendarOutlined, ShopOutlined } from '../common/icons';
 import { feedDate, feedMediaUrl } from '../../utils/feed';
 import { storeNewsPeriodLabel, storeNewsTypeLabel } from '../../utils/storeNews';
+import { benefitPath } from '../../utils/publicAddress';
+import { storeDetailPath } from '../../utils/storePublicAddress';
 import { BENEFIT_IMAGE_FALLBACK, formatBenefitDate, getBenefitImageUrl } from '../../pages/discovery/benefitPresentation';
 
 export function StoreNewsMetadata({ item }) {
     if ((!item.newsType || item.newsType === 'NEWS') && !item.periodStatus && !item.startsAt && !item.endsAt) return null;
-    return <div className="reserve-store-news-meta">{item.newsType && item.newsType !== 'NEWS' && <span>{storeNewsTypeLabel(item.newsType)}</span>}
+    return <span className="reserve-store-news-meta">{item.newsType && item.newsType !== 'NEWS' && <span>{storeNewsTypeLabel(item.newsType)}</span>}
         {item.periodStatus && <span className={item.periodStatus === 'ENDED' ? 'is-ended' : ''}>{storeNewsPeriodLabel(item.periodStatus)}</span>}
         {(item.startsAt || item.endsAt) && <span>{item.startsAt ? feedDate(item.startsAt) : '시작 미정'} ~ {item.endsAt ? feedDate(item.endsAt) : '종료 미정'} (한국 시간)</span>}
-    </div>;
+    </span>;
 }
 StoreNewsMetadata.propTypes = { item: PropTypes.object.isRequired };
 
@@ -34,7 +37,7 @@ function BannerImage({ imageUrl, imageSize, square = false }) {
 BannerImage.propTypes = { imageUrl: PropTypes.string.isRequired, square: PropTypes.bool,
     imageSize: PropTypes.shape({ width: PropTypes.number, height: PropTypes.number }) };
 
-export function BenefitRow({ item, preview = false }) {
+export function BenefitRow({ item, preview = false, actions }) {
     const imageUrl = feedMediaUrl(item.images?.[0]?.url) || getBenefitImageUrl(item.mainImageUrl);
     const design = ['PHOTO', 'COMPACT'].includes(item.design) ? item.design.toLowerCase() : 'standard';
     const className = `reserve-benefit-row reserve-benefit-row--${design}`;
@@ -45,10 +48,16 @@ export function BenefitRow({ item, preview = false }) {
         <span className="reserve-benefit-title-badge"><span>{item.title}</span></span>
         <StoreNewsMetadata item={item} />
     </div></>;
-    return preview ? <div className={className} aria-label={`${item.storeName} · ${item.title} 소식 미리보기`}>{content}</div>
-        : <Link to={`/benefits/${item.id}`} className={className} data-list-item-id={item.id} aria-label={`${item.storeName} · ${item.title} 소식 보기`}>{content}</Link>;
+    const path = benefitPath(item.publicId);
+    if (preview || !path) return <div className={className} aria-label={`${item.storeName} · ${item.title} 소식 미리보기`}>{content}</div>;
+    const link = <Link to={path} className={`${className} reserve-card-link`} data-list-item-id={actions ? undefined : item.id}
+        aria-label={`${item.storeName} · ${item.title} 소식 보기`}>{content}</Link>;
+    if (!actions) return link;
+    return <article className={`reserve-store-list-row reserve-benefit-entry reserve-benefit-entry--${design}`} data-list-item-id={item.id}>
+        {link}<div className="reserve-store-list-row-favorite reserve-benefit-entry-actions">{actions}</div>
+    </article>;
 }
-BenefitRow.propTypes = { item: PropTypes.object.isRequired, preview: PropTypes.bool };
+BenefitRow.propTypes = { item: PropTypes.object.isRequired, preview: PropTypes.bool, actions: PropTypes.node };
 
 function BenefitPhotos({ pictures }) {
     return <div className="reserve-benefit-photos">
@@ -59,22 +68,26 @@ function BenefitPhotos({ pictures }) {
 }
 BenefitPhotos.propTypes = { pictures: PropTypes.array.isRequired };
 
-export function BenefitDetailContent({ item, preview = false, actions, status, notice }) {
+export function BenefitDetailContent({ item, preview = false, actions, status, notice, photoAttempt = 0 }) {
     const pictures = (item.images || []).map(image => ({ ...image, src: feedMediaUrl(image.url) })).filter(image => image.src);
     const mainImage = getBenefitImageUrl(item.mainImageUrl);
     const design = ['PHOTO', 'COMPACT'].includes(item.design) ? item.design.toLowerCase() : 'standard';
-    const store = preview ? <span className="reserve-benefits-text-link reserve-text-link">{item.storeName}</span>
-        : <Link to={`/store/${item.storeId}`} className="reserve-benefits-text-link reserve-text-link">{item.storeName}</Link>;
+    const storePath = storeDetailPath({ publicId: item.storePublicId });
+    const storeName = <><ShopOutlined aria-hidden="true" />{item.storeName}</>;
+    const store = preview || !storePath ? <span className="reserve-benefits-text-link reserve-text-link">{storeName}</span>
+        : <Link to={storePath} className="reserve-benefits-text-link reserve-text-link">{storeName}</Link>;
     return <article className={`reserve-benefits-page reserve-benefit-detail reserve-benefit-detail--${design}`} aria-label={preview ? `${item.title} 가게 소식 미리보기` : undefined} aria-labelledby={preview ? undefined : 'benefit-detail-title'}>
         <header className="reserve-benefits-heading"><div>
             <PageTitle level={preview ? 2 : 1} id={preview ? undefined : 'benefit-detail-title'}>{item.title || '제목 없는 소식'}</PageTitle>
-            <div className="reserve-benefit-heading-row"><div className="reserve-benefit-byline">{store}{item.createdAt && <time dateTime={item.createdAt}>{formatBenefitDate(item.createdAt)}</time>}{status && <span className="reserve-benefit-review-status">{status}</span>}</div>
+            <div className="reserve-benefit-heading-row"><div className="reserve-benefit-byline">{store}{item.createdAt && <time dateTime={item.createdAt}>
+                <CalendarOutlined aria-hidden="true" />{formatBenefitDate(item.createdAt)}
+            </time>}{status && <span className="reserve-benefit-review-status">{status}</span>}</div>
                 {!preview && <div className="reserve-benefit-detail-actions">
-                    <IconTool label="가게 보기" icon={<InterfaceIcon name="store" />} to={`/store/${item.storeId}`} />{actions}
+                    {storePath && <IconTool label="가게 보기" icon={<InterfaceIcon name="store" />} to={storePath} />}{actions}
                 </div>}
             </div>
             <StoreNewsMetadata item={item} /></div></header>
-        {pictures.length ? <BenefitPhotos key={pictures.map(image => image.src).join('|')} pictures={pictures} />
+        {pictures.length ? <BenefitPhotos key={photoAttempt + ':' + pictures.map(image => image.src).join('|')} pictures={pictures} />
             : <LoadingImage className={`reserve-benefit-detail-image${mainImage === BENEFIT_IMAGE_FALLBACK ? ' reserve-benefit-detail-image--placeholder' : ''}`}
                 src={mainImage} alt={mainImage === BENEFIT_IMAGE_FALLBACK ? '가게 사진이 등록되지 않았어요' : `${item.storeName} 가게 사진`}
                 onError={event => { if (!event.currentTarget.src.endsWith(BENEFIT_IMAGE_FALLBACK)) { event.currentTarget.src = BENEFIT_IMAGE_FALLBACK; event.currentTarget.alt = '가게 사진을 불러오지 못했어요'; event.currentTarget.classList.add('reserve-benefit-detail-image--placeholder'); } }} />}
@@ -83,4 +96,4 @@ export function BenefitDetailContent({ item, preview = false, actions, status, n
         {notice}
     </article>;
 }
-BenefitDetailContent.propTypes = { item: PropTypes.object.isRequired, preview: PropTypes.bool, actions: PropTypes.node, status: PropTypes.string, notice: PropTypes.node };
+BenefitDetailContent.propTypes = { item: PropTypes.object.isRequired, preview: PropTypes.bool, actions: PropTypes.node, status: PropTypes.string, notice: PropTypes.node, photoAttempt: PropTypes.number };

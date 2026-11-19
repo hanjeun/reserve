@@ -12,6 +12,9 @@ let nextVersion = 0;
 let epoch = -1;
 let timer;
 
+export const chatParticipantImageId = url => typeof url === 'string'
+    ? /^\/api\/(?:v1\/)?chat\/images\/([1-9]\d*)(?:\/thumbnail)?$/.exec(url)?.[1] : undefined;
+
 export function clearChatImageCache() {
     clearTimeout(timer);
     entries.clear();
@@ -36,7 +39,7 @@ export function chatImageCacheScope(url) {
         epoch = session.epoch;
         session.signal.addEventListener('abort', clearChatImageCache, { once: true });
     }
-    const messageId = typeof url === 'string' ? /^\/api\/(?:v1\/)?chat\/images\/([1-9]\d*)$/.exec(url)?.[1] : undefined;
+    const messageId = chatParticipantImageId(url);
     let version = 0;
     if (messageId) {
         version = versions.get(messageId) ?? ++nextVersion;

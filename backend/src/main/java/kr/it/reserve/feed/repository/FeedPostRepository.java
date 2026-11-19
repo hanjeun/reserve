@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface FeedPostRepository extends JpaRepository<FeedPost, Long>, JpaSpecificationExecutor<FeedPost> {
+    Optional<FeedPost> findByPublicId(String publicId);
     Optional<FeedPost> findByProfile_Member_IdAndClientRequestId(Long memberId, String clientRequestId);
     Optional<FeedPost> findByNewsPromotion_Id(Long promotionId);
     @Query("SELECT p.newsPromotion.id FROM FeedPost p WHERE p.id = :id")

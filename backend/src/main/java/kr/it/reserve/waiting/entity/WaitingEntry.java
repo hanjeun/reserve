@@ -90,6 +90,10 @@ public class WaitingEntry {
     @Column(name = "finished_at")
     private LocalDateTime finishedAt;
 
+    // 가게의 접수 상태 변경과 독립적으로 본인 목록의 표시 여부를 관리한다.
+    @Column(name = "customer_hidden_at", insertable = false, updatable = false)
+    private LocalDateTime customerHiddenAt;
+
     public static WaitingEntry create(Long storeId, LocalDate businessDate, int entryNumber,
                                       String displayName, int partySize, String clientRequestId,
                                       LocalDateTime nowUtc) {

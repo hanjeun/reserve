@@ -16,6 +16,7 @@ import kr.it.reserve.reservation.dto.SlotAvailabilityResponse;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.reservation.service.ReservationEditQueryService;
+import kr.it.reserve.reservation.service.ReservationNoShowRestriction;
 import kr.it.reserve.reservation.service.ReservationService;
 import kr.it.reserve.reservation.util.QrCheckinTokenProvider;
 import kr.it.reserve.store.dto.StoreResponse;
@@ -36,6 +37,7 @@ import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -58,15 +60,15 @@ class ReservationEditQueryServiceTest {
 
     @ParameterizedTest
     @EnumSource(value = Reservation.ReservationStatus.class, names = {"PENDING", "CONFIRMED"})
-    void editableMemberGetsOnlyTheExistingPublicReadResultsWithoutMutations(Reservation.ReservationStatus status) {
+    void editableMemberGetsAvailabilityExcludingTheirReservationWithoutMutations(Reservation.ReservationStatus status) {
         givenReservation();
         reservation.setStatus(status);
         StoreResponse publicStore = StoreResponse.builder().id(10L).name("공개 가게").build();
         List<SlotAvailabilityResponse> slots = List.of(new SlotAvailabilityResponse("12:00", false));
         List<CalendarDayResponse> days = List.of(new CalendarDayResponse("2030-01-10", "FULL", 1, 0, false));
         when(storeService.getStore(10L)).thenReturn(publicStore);
-        when(reservationService.getAvailability(10L, date)).thenReturn(slots);
-        when(reservationService.getMonthCalendar(10L, month)).thenReturn(days);
+        when(reservationService.getAvailability(10L, date, 23L)).thenReturn(slots);
+        when(reservationService.getMonthCalendar(10L, month, 23L)).thenReturn(days);
 
         assertThat(queries.getEditStore(23L, 10L, member)).isSameAs(publicStore);
         assertThat(queries.getEditAvailability(23L, 10L, date, member)).isSameAs(slots);
@@ -74,8 +76,8 @@ class ReservationEditQueryServiceTest {
 
         verify(reservations, times(3)).findById(23L);
         verify(storeService).getStore(10L);
-        verify(reservationService).getAvailability(10L, date);
-        verify(reservationService).getMonthCalendar(10L, month);
+        verify(reservationService).getAvailability(10L, date, 23L);
+        verify(reservationService).getMonthCalendar(10L, month, 23L);
         verifyNoMoreInteractions(reservations, storeService, reservationService);
         assertThat(reservation.getStatus()).isEqualTo(status);
         assertThat(reservation.getDepositPaid()).isFalse();
@@ -87,6 +89,24 @@ class ReservationEditQueryServiceTest {
         givenReservation();
         denyEveryRead(Member.builder().id(8L).role(role).build(), 10L, HttpStatus.FORBIDDEN);
         verifyNoInteractions(storeService, reservationService);
+    }
+
+    @Test
+    void uuidReservationLinkChecksTheSameMemberAndStore() {
+        givenReservation();
+        UUID publicId = UUID.randomUUID();
+        org.springframework.test.util.ReflectionTestUtils.setField(store, "publicId", publicId.toString());
+        StoreResponse publicStore = StoreResponse.builder().id(10L).publicId(publicId.toString()).build();
+        when(storeService.getStore(10L)).thenReturn(publicStore);
+
+        assertThat(queries.getEditStoreByPublicId(23L, publicId, member)).isSameAs(publicStore);
+        assertThatThrownBy(() -> queries.getEditStoreByPublicId(23L, publicId, owner))
+                .isInstanceOfSatisfying(ReservationException.class, error -> assertThat(error.getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
+        assertThatThrownBy(() -> queries.getEditStoreByPublicId(23L, UUID.randomUUID(), member))
+                .isInstanceOfSatisfying(ReservationException.class, error -> assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+        verify(storeService).getStore(10L);
+        verifyNoMoreInteractions(storeService);
+        verifyNoInteractions(reservationService);
     }
 
     @Test
@@ -176,7 +196,7 @@ class ReservationEditQueryServiceTest {
         PaymentService payments = mock(PaymentService.class);
         ReservationService mutations = new ReservationService(reservations, stores, mock(HolidayService.class), payments,
                 mock(EmailService.class), mock(MemberRepository.class), mock(AuditLogService.class),
-                mock(QrCheckinTokenProvider.class), mock(ReservationCreationGuard.class), org.mockito.Mockito.mock(kr.it.reserve.reservation.service.ReservationConsentService.class));
+                mock(QrCheckinTokenProvider.class), mock(ReservationCreationGuard.class), org.mockito.Mockito.mock(kr.it.reserve.reservation.service.ReservationConsentService.class), mock(ReservationNoShowRestriction.class));
         when(reservations.findByIdForUpdate(23L)).thenReturn(Optional.of(reservation));
         assertThatThrownBy(() -> mutations.updateReservation(23L, new ReservationUpdateRequest(), member))
                 .isInstanceOfSatisfying(ReservationException.class, error -> assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));

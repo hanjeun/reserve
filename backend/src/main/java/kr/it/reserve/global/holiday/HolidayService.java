@@ -3,6 +3,7 @@ package kr.it.reserve.global.holiday;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.it.reserve.global.common.ServiceTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -43,6 +44,8 @@ public class HolidayService {
 
     /** 한 달 특일이 100개를 넘을 일은 없다. 기본값 10 이라 안 주면 잘린다. */
     private static final int NUM_OF_ROWS = 100;
+    private static final int MONTHS_BEFORE = 12;
+    private static final int MONTHS_AFTER = 36;
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
@@ -58,8 +61,13 @@ public class HolidayService {
     private final Map<YearMonth, Set<LocalDate>> cache = new ConcurrentHashMap<>();
 
     public Set<LocalDate> holidaysOf(YearMonth month) {
-        if (!StringUtils.hasText(apiKey)) return Set.of();
+        if (!supports(month) || !StringUtils.hasText(apiKey)) return Set.of();
         return cache.computeIfAbsent(month, this::fetch);
+    }
+
+    static boolean supports(YearMonth month) {
+        YearMonth current = YearMonth.from(ServiceTime.today());
+        return !month.isBefore(current.minusMonths(MONTHS_BEFORE)) && !month.isAfter(current.plusMonths(MONTHS_AFTER));
     }
 
     /** 매일 새벽에 비운다 — 임시공휴일 지정이 반영되도록. 다른 스케줄러와 시간이 겹치지 않게 4:50. */
@@ -79,34 +87,25 @@ public class HolidayService {
                     .queryParam("solMonth", String.format("%02d", month.getMonthValue()))
                     .queryParam("numOfRows", NUM_OF_ROWS)
                     .queryParam("_type", "json")
-                    // true = "값은 이미 인코딩돼 있다". 이게 없으면 %2B 가 %252B 로 망가진다.
+                    // 이미 인코딩된 키의 %2B 등이 이중 인코딩되지 않게 한다.
                     .build(true)
                     .toUri();
 
             return parse(restTemplate.getForObject(uri, String.class));
         } catch (Exception e) {
-            // 던지지 않는다 — 위 클래스 주석 참고. 달력은 그대로 뜨고 일요일만 빨갛게 나온다.
+            // 공휴일 조회 실패가 예약 달력 조회를 중단하지 않게 한다.
             log.warn("Holiday lookup failed; only Sundays will be highlighted: month={}, errorType={}",
                     month, e.getClass().getSimpleName());
             return Set.of();
         }
     }
 
-    /**
-     * Encoding 키({@code %2B...})면 그대로, Decoding 키({@code +...})면 우리가 인코딩한다.
-     * {@code %} 하나로 구분되는 이유: Decoding 키는 base64 라 {@code %} 가 나올 수 없다.
-     *
-     * <p>이 한 줄이 없으면 어느 쪽 키를 붙여넣었는지에 따라 되기도 하고 안 되기도 한다.
-     * 되는 쪽을 찾을 때까지 두 번 배포하게 되는 종류의 버그다.
-     */
+    /** 원본 Base64 키에는 %가 없으므로, 이미 인코딩된 키만 그대로 사용한다. */
     private String encodedKey() {
         return apiKey.contains("%") ? apiKey : URLEncoder.encode(apiKey, StandardCharsets.UTF_8);
     }
 
-    /**
-     * 주의: {@code _type=json} 을 줘도 <b>에러일 때는 XML 이 온다</b>(키 미등록, 트래픽 초과 등).
-     * 그래서 JSON 인지부터 확인하고, 아니면 예외로 보내 위에서 빈 집합이 되게 한다.
-     */
+    /** {@code _type=json} 요청도 오류 시 XML을 반환할 수 있어 JSON 여부를 먼저 확인한다. */
     private Set<LocalDate> parse(String body) throws JsonProcessingException {
         if (body == null || !body.stripLeading().startsWith("{")) {
             throw new IllegalStateException("JSON 이 아닌 응답: " + abbreviate(body));

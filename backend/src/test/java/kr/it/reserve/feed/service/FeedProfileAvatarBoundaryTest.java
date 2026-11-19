@@ -77,6 +77,19 @@ class FeedProfileAvatarBoundaryTest {
         assertThat(result.avatarSource()).isEqualTo(FeedDto.AvatarSource.NONE);
         assertThat(result.avatarUrl()).isNull();
         assertThat(profile.isUseAccountAvatar()).isFalse();
+        verify(profiles, never()).existsByNicknameKeyAndMember_IdNot(any(), any());
+        verifyNoInteractions(storage, fileDeletions);
+    }
+
+    @Test void changedNicknameChecksTheNormalizedKeyBeforeSaving() {
+        FeedProfile profile = configured(writer());
+        when(profiles.findByMember_Id(7L)).thenReturn(Optional.of(profile));
+        when(profiles.existsByNicknameKeyAndMember_IdNot("reserve", 7L)).thenReturn(true);
+
+        assertThatThrownBy(() -> feeds.updateProfile(7L, new FeedDto.ProfileRequest("ＲＥＳＥＲＶＥ", "소개", false)))
+                .isInstanceOf(FeedException.class).hasMessage("이미 사용 중인 닉네임이에요.");
+
+        verify(profiles, never()).saveAndFlush(any());
         verifyNoInteractions(storage, fileDeletions);
     }
 
@@ -204,7 +217,7 @@ class FeedProfileAvatarBoundaryTest {
         FeedProfile profile = configured(writer()); profile.changeAvatar(false, ACCOUNT, NOW);
         when(profiles.findByMember_Id(7L)).thenReturn(Optional.of(profile));
 
-        assertThat(feeds.profileDto(profile).avatarUrl()).isNull();
+        assertThat(feeds.profileDto(profile, null).avatarUrl()).isNull();
         assertThatThrownBy(() -> feeds.updateProfile(7L, request(FeedDto.AvatarSource.CUSTOM))).isInstanceOf(FeedException.class);
         feeds.deleteProfileAvatar(7L);
 
@@ -224,6 +237,52 @@ class FeedProfileAvatarBoundaryTest {
         assertThat(profile.isUseAccountAvatar()).isFalse();
         assertThat(profile.isHidden()).isTrue();
         verifyNoInteractions(policy);
+    }
+
+    @Test void savingVisibilityPromotesTheExistingVisiblePhotoToTheOneAccountPhoto() {
+        Member member = writer();
+        FeedProfile profile = custom(member);
+        String selected = "https://cdn.example.test/" + OLD;
+        when(profiles.findByMember_Id(7L)).thenReturn(Optional.of(profile));
+        when(storage.isManagedFileUnderPrefix(anyString(), anyString())).thenAnswer(call ->
+                call.<String>getArgument(0).contains("/" + call.getArgument(1) + "/"));
+        when(storage.getPublicUrl(OLD)).thenReturn(selected);
+
+        var result = feeds.updateProfile(7L, unified(FeedProfile.Visibility.MEMBERS, false));
+
+        assertThat(result.avatarUrl()).isEqualTo(selected);
+        assertThat(result.visibility()).isEqualTo(FeedProfile.Visibility.MEMBERS);
+        assertThat(profile.getCustomAvatarKey()).isNull();
+        assertThat(member.getProfileImage()).isEqualTo(selected);
+        assertThat(member.isProfileImageLocked()).isTrue();
+        assertThat(feeds.profileDto(profile, null).avatarUrl()).isNull();
+        verify(fileDeletions).enqueue(ACCOUNT, "MEMBER_PROFILE_IMAGE", 7L);
+        verify(fileDeletions, never()).enqueue(eq(OLD), any(), any());
+    }
+
+    @Test void uploadAndScopeUseTheSameSaveAndOnePhoto() {
+        Member member = writer();
+        FeedProfile profile = configured(member);
+        when(profiles.findByMember_Id(7L)).thenReturn(Optional.of(profile));
+        MockMultipartFile image = image();
+        String prefix = FileStoragePaths.userProfile(7L);
+        String key = "local/" + prefix + "/next.png";
+        String selected = "https://cdn.example.test/" + key;
+        when(storage.storeFile(image, prefix)).thenReturn(key);
+        when(storage.getPublicUrl(key)).thenReturn(selected);
+        when(storage.isManagedFileUnderPrefix(anyString(), anyString())).thenAnswer(call ->
+                call.<String>getArgument(0).contains("/" + call.getArgument(1) + "/"));
+
+        var updated = feeds.updateProfile(7L, unified(FeedProfile.Visibility.PUBLIC, false), image);
+
+        assertThat(updated.avatarUrl()).isEqualTo(member.getProfileImage()).isEqualTo(selected);
+        assertThat(feeds.profileDto(profile, null).avatarUrl()).isEqualTo(selected);
+        assertThat(profile.getCustomAvatarKey()).isNull();
+        verify(profiles).saveAndFlush(profile);
+    }
+
+    private static FeedDto.ProfileRequest unified(FeedProfile.Visibility scope, boolean resetPhoto) {
+        return new FeedDto.ProfileRequest("공개 이름", "소개", null, null, scope, resetPhoto);
     }
 
     private Member writer() {

@@ -2,6 +2,7 @@ import PropTypes from 'prop-types';
 import MessengerAvatar from './MessengerAvatar';
 import { conversationTitle, useSupportIdentity } from './messengerIdentity';
 import { SupportAvatar } from './SupportIdentity';
+import ConversationRowActions from './ConversationRowActions';
 
 const formatWhen = (iso) => {
     if (!iso) return '';
@@ -13,7 +14,7 @@ const formatWhen = (iso) => {
     return `${date.getMonth() + 1}.${date.getDate()}`;
 };
 
-export default function MessengerConversationRow({ row, selected = false, owner = false, onSelect }) {
+export default function MessengerConversationRow({ row, selected = false, owner = false, onSelect, hidden = false, onVisibilityChange, onLeave }) {
     const supportIdentity = useSupportIdentity();
     const title = conversationTitle(row, supportIdentity.name);
     const preview = row.lastMessagePreview || '아직 메시지가 없어요.';
@@ -27,7 +28,7 @@ export default function MessengerConversationRow({ row, selected = false, owner 
     } else {
         icon = <MessengerAvatar imageSrc={row.storeImageUrl} variant="store" className="reserve-messenger-row-icon" />;
     }
-    return (
+    const content = (
         <button type="button" className={`reserve-messenger-row${selected ? ' is-selected' : ''}`}
             onClick={onSelect} aria-current={selected ? 'true' : undefined}>
             {icon}
@@ -42,6 +43,10 @@ export default function MessengerConversationRow({ row, selected = false, owner 
             {unread > 0 && <span className="reserve-messenger-unread" aria-label={`읽지 않은 메시지 ${unread}개`}>{unread > 99 ? '99+' : unread}</span>}
         </button>
     );
+    return onVisibilityChange ? <ConversationRowActions title={title} hidden={hidden}
+        onVisibilityChange={value => onVisibilityChange(row, value)} onLeave={onLeave && (() => onLeave(row))}>
+        {content}
+    </ConversationRowActions> : content;
 }
 
 MessengerConversationRow.propTypes = {
@@ -49,4 +54,7 @@ MessengerConversationRow.propTypes = {
     selected: PropTypes.bool,
     owner: PropTypes.bool,
     onSelect: PropTypes.func.isRequired,
+    hidden: PropTypes.bool,
+    onVisibilityChange: PropTypes.func,
+    onLeave: PropTypes.func,
 };

@@ -11,10 +11,14 @@ import kr.it.reserve.global.ratelimit.IpExtractor;
 import kr.it.reserve.member.entity.AuthProvider;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.service.LoginMethodService;
+import kr.it.reserve.member.service.RegisteredDeviceService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -28,6 +32,7 @@ public class LoginMethodController {
 
     @org.springframework.beans.factory.annotation.Autowired private kr.it.reserve.member.mfa.MfaService mfa;
     @org.springframework.beans.factory.annotation.Autowired private kr.it.reserve.config.util.CookieUtil cookies;
+    @org.springframework.beans.factory.annotation.Autowired private RegisteredDeviceService devices;
     public record Confirmation(@NotNull kr.it.reserve.member.mfa.MfaService.SensitiveAction action, @Size(max = 64) String password) {
         @Override public String toString() { return "Confirmation[redacted]"; }
     }
@@ -43,7 +48,7 @@ public class LoginMethodController {
 
     @GetMapping
     public ApiResponse<LoginMethodService.Status> status() {
-        return ApiResponse.success(methods.status(SecurityUtil.getCurrentMember(), SecurityUtil.getOAuthAuthenticationAt()), "로그인 방법 조회 성공");
+        return ApiResponse.success(methods.status(SecurityUtil.getCurrentMember(), SecurityUtil.getOAuthAuthenticationAt(), SecurityUtil.getLoginMethod()), "로그인 방법 조회 성공");
     }
 
     @PostMapping("/confirm")
@@ -63,6 +68,33 @@ public class LoginMethodController {
         mfa.forgetBrowser(member);
         mfa.writeBrowserCookie(request, response);
         return ApiResponse.success(null, "이 브라우저의 기억을 해제했어요.");
+    }
+
+    @GetMapping("/devices")
+    public ResponseEntity<ApiResponse<List<RegisteredDeviceService.Device>>> devices(HttpServletRequest request) {
+        Member member = limited(request, RateLimiter.Policy.MFA_LIFECYCLE_ACCOUNT);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(
+                ApiResponse.success(devices.list(member, SecurityUtil.getSessionId()), "로그인 기기를 불러왔어요."));
+    }
+
+    @PostMapping("/devices")
+    public ApiResponse<Void> registerDevice(HttpServletRequest request, jakarta.servlet.http.HttpServletResponse response) {
+        Member member = limited(request, RateLimiter.Policy.LOGIN_METHOD_CHANGE);
+        devices.register(member, SecurityUtil.getSessionId(), kr.it.reserve.config.util.CookieUtil.getCookie(request, "mfa_ticket"));
+        mfa.writeBrowserCookie(request, response);
+        return ApiResponse.success(null, "이 기기 등록을 완료했어요.");
+    }
+
+    @DeleteMapping("/devices/{id:[a-f0-9]{64}}")
+    public ApiResponse<Void> forgetDevice(HttpServletRequest request, @PathVariable String id) {
+        devices.forget(limited(request, RateLimiter.Policy.LOGIN_METHOD_CHANGE), id);
+        return ApiResponse.success(null, "기기 등록을 해제했어요.");
+    }
+
+    @PostMapping("/devices/{id:[a-f0-9]{64}}/sign-out")
+    public ApiResponse<Void> signOutDevice(HttpServletRequest request, @PathVariable String id) {
+        devices.signOut(limited(request, RateLimiter.Policy.LOGIN_METHOD_CHANGE), SecurityUtil.getSessionId(), id);
+        return ApiResponse.success(null, "선택한 기기의 로그인을 종료했어요.");
     }
 
     @PostMapping("/oauth")

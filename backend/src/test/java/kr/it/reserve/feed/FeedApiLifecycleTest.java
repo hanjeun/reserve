@@ -37,6 +37,10 @@ class FeedApiLifecycleTest {
         Member owner = actor(Role.USER), other = actor(Role.USER);
         var created = success(owner, post("/api/feed/posts"), postBody("첫 초안", true, 0));
         long id = created.path("id").asLong();
+        String shared = "/api/v1/feed/posts/" + created.path("publicId").asText();
+        mvc.perform(get(shared)).andExpect(status().isNotFound());
+        mvc.perform(as(other, get(shared))).andExpect(status().isNotFound());
+        mvc.perform(as(owner, get(shared))).andExpect(status().isOk()).andExpect(jsonPath("$.data.id").value(id));
         for (int i = 0; i < 2; i++) {
             mvc.perform(as(owner, get("/api/feed/posts/" + id))).andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.state").value("DRAFT")).andExpect(jsonPath("$.data.content").value("첫 초안"));
@@ -54,8 +58,19 @@ class FeedApiLifecycleTest {
 
     @Test void commentsSupportOwnEditDeleteAndOneReplyLevelWithoutAllowingOtherUsersEdits() throws Exception {
         Member owner = actor(Role.USER), other = actor(Role.USER);
-        long postId = success(owner, post("/api/feed/posts"), postBody("공개 글", false, 0)).path("id").asLong();
-        long root = success(owner, post("/api/feed/posts/" + postId + "/comments"), comment("첫 댓글", null, 0)).path("id").asLong();
+        var published = success(owner, post("/api/feed/posts"), postBody("공개 글", false, 0));
+        long postId = published.path("id").asLong();
+        String postPublicId = published.path("publicId").asText();
+        String sharedPost = "/api/v1/feed/posts/" + postPublicId.toUpperCase(java.util.Locale.ROOT);
+        mvc.perform(get(sharedPost)).andExpect(status().isOk()).andExpect(jsonPath("$.data.id").value(postId));
+        mvc.perform(as(other, put(sharedPost)).contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsBytes(postBody("다른 회원 수정", false, 0)))).andExpect(status().isMethodNotAllowed());
+        var first = success(owner, post("/api/feed/posts/" + postId + "/comments"), comment("첫 댓글", null, 0));
+        long root = first.path("id").asLong();
+        String sharedComment = "/api/v1/feed/comments/" + first.path("publicId").asText();
+        mvc.perform(get(sharedComment)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.postPublicId").value(postPublicId))
+                .andExpect(jsonPath("$.data.id").value(root));
         long reply = success(other, post("/api/feed/posts/" + postId + "/comments"), comment("답글", root, 0)).path("id").asLong();
         mvc.perform(as(other, put("/api/feed/comments/" + root)).contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsBytes(comment("다른 회원 수정", null, 0)))).andExpect(status().isNotFound());
@@ -66,6 +81,9 @@ class FeedApiLifecycleTest {
                 .content(mapper.writeValueAsBytes(comment("2단계 답글", reply, 0)))).andExpect(status().isBadRequest());
         success(owner, put("/api/feed/comments/" + root), comment("수정한 댓글", null, 0));
         mvc.perform(as(owner, delete("/api/feed/comments/" + root))).andExpect(status().isOk());
+        mvc.perform(get(sharedComment)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content").value(""))
+                .andExpect(jsonPath("$.data.author").doesNotExist());
         mvc.perform(get("/api/feed/comments/" + root + "/replies")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].content").value("답글"));
         mvc.perform(get("/api/feed/posts/" + postId + "/comments")).andExpect(status().isOk())
@@ -106,14 +124,22 @@ class FeedApiLifecycleTest {
         request.put("clientRequestId", UUID.randomUUID().toString());
         var submitted = success(owner, post("/api/store-news"), request);
         long id = submitted.path("id").asLong();
+        String publicId = submitted.path("publicId").asText();
+        String shared = "/api/v1/promotions/public/" + publicId;
+        mvc.perform(get(shared)).andExpect(status().isNotFound());
         org.assertj.core.api.Assertions.assertThat(submitted.path("benefitState").asText()).isEqualTo("PENDING");
         mvc.perform(get("/api/promotions/public/" + id)).andExpect(status().isNotFound());
         var approved = success(admin, patch("/api/admin/promotions/applications/" + id),
                 Map.of("revision", submitted.path("revision").asLong(), "approved", true, "note", "사진과 조건 확인"));
         mvc.perform(get("/api/promotions/public/" + id)).andExpect(status().isOk());
+        mvc.perform(get(shared)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.publicId").value(publicId))
+                .andExpect(jsonPath("$.data.storePublicId").value(store.getPublicId()));
         mvc.perform(get("/api/feed/posts")).andExpect(status().isOk()).andExpect(jsonPath("$.data.content").isEmpty());
         request.put("title", "수정한 혜택"); request.put("revision", approved.path("revision").asLong());
         var edited = success(owner, put("/api/store-news/" + id), request);
+        org.assertj.core.api.Assertions.assertThat(edited.path("publicId").asText()).isEqualTo(publicId);
+        mvc.perform(get(shared)).andExpect(status().isNotFound());
         org.assertj.core.api.Assertions.assertThat(edited.path("benefitState").asText()).isEqualTo("PENDING");
         mvc.perform(get("/api/promotions/public/" + id)).andExpect(status().isNotFound());
         mvc.perform(as(admin, patch("/api/admin/promotions/applications/" + id)).contentType(MediaType.APPLICATION_JSON)

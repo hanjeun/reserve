@@ -1,5 +1,6 @@
 import React from 'react';
 import { App } from 'antd';
+import { swipeMessageApi } from './messageSwipe';
 
 /*
  * 문자열 본문은 문장별 블록으로 나눠 좁은 화면에서도 문장 경계를 유지한다. 직접 전달된 ReactNode는 그대로 사용한다.
@@ -35,7 +36,7 @@ const splitIntoSentenceLines = (content) => {
 const useMessage = () => {
     const { message, modal, notification } = App.useApp();
     return {
-        message,
+        message: React.useMemo(() => swipeMessageApi(message), [message]),
         modal,
         notification,
         confirm: (options) => modal.confirm({

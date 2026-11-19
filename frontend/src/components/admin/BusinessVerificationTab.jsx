@@ -10,14 +10,14 @@ import {
     CheckOutlined, CloseOutlined, StopOutlined, EyeOutlined, ExclamationCircleFilled,
 } from '../common/icons';
 import {
-    Button, AdminTableSkeleton, DataState, FilterToolbar, FormTextArea, FormField, DataTable, ModalLoading,
+    Button, AdminTableSkeleton, DataState, FilterToolbar, FormTextArea, FormField, PagedDataTable, ModalLoading,
 } from '../common';
 import { ModalActionGroup } from '../common/ModalActions';
 import ResponsiveModal from '../common/ResponsiveModal';
 import useWorkspaceDraftGuard from '../../hooks/useWorkspaceDraftGuard';
 import { useMessage, useQueryParamsState } from '../../hooks';
-import useDebounce from '../../hooks/useDebounce';
 import { adminKeys } from '../../hooks/queryKeys';
+import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
 import { invalidateAdminData } from '../../hooks/invalidateAfterWrite';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
@@ -161,22 +161,22 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
     const detailRequestRef = React.useRef(0);
     const [rejectTarget, setRejectTarget]   = useState(/** @type {{id: number, memberName: string} | null} */ (null));
     const [rejectOpen, setRejectOpen]       = useState(false);
-    const [{ search, page: pageStr }, setQuery] = useQueryParamsState(QUERY_DEFAULTS);
-    const debouncedSearch = useDebounce(search, 300);
+    const [{ search, page: pageStr }, setQuery] = useQueryParamsState(QUERY_DEFAULTS, { privateKeys: ['search'] });
     const page = Number(pageStr) || 1;
     const setPage = (p) => setQuery({ page: String(p) });
 
     const { data, isLoading, isFetching, isPlaceholderData, error, refetch } = useQuery({
-        queryKey: [...adminKeys.businessVerifications(), mode, page, debouncedSearch],
-        queryFn: async () => {
+        queryKey: [...adminKeys.businessVerifications(), mode, page, search],
+        queryFn: async ({ signal }) => {
             const endpoint = mode === 'pending'
                 ? API_ENDPOINTS.BUSINESS.ADMIN_PENDING
                 : API_ENDPOINTS.BUSINESS.ADMIN_LIST;
             const result = await api.get(endpoint, {
+                signal,
                 params: {
                     page: page - 1,
                     size: PAGE_SIZE,
-                    ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}),
+                    ...(search.trim() ? { search: search.trim() } : {}),
                 },
             });
             return {
@@ -271,7 +271,7 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
     };
 
     // 검색은 서버 전체 신청 집합에서 수행한다. 검색어 변경 시 페이지를 초기화한다.
-    const handleSearchChange = (e) => setQuery({ search: e.target.value, page: '1' });
+    const handleSearchChange = search => setQuery({ search, page: '1' });
 
     const columns = [
         {
@@ -330,25 +330,17 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
 
     // 목록 영역 — 오류 / 첫 로딩·페이지 전환 스켈레톤 / 표
     let tableBody;
-    if (error) {
+    if (isBlockingListReadError(error, items)) {
         tableBody = (
             <DataState state="error" kind="member" subject="사업자 인증 신청" error={error}
                 onRetry={refetch} retrying={isFetching} />
         );
-    } else if (isLoading || isPlaceholderData || search.trim() !== debouncedSearch.trim()) {
-        tableBody = (
-            <AdminTableSkeleton
-                rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
-                cols={SKELETON_COLS}
-                headers={SKELETON_HEADERS}
-                actionBtns={3}
-                stackFirstCol
-                pagination={totalElements ? { current: page, pageSize: PAGE_SIZE, total: totalElements } : null}
-            />
-        );
     } else {
         tableBody = (
-            <DataTable
+            <PagedDataTable
+                placeholder={(isLoading || isPlaceholderData) && <AdminTableSkeleton
+                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
+                    cols={SKELETON_COLS} headers={SKELETON_HEADERS} actionBtns={3} stackFirstCol />}
                 columns={columns}
                 dataSource={items}
                 rowKey="id"
@@ -421,7 +413,7 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
             <FilterToolbar
                 search={{
                     value: search,
-                    onChange: handleSearchChange,
+                    onSubmit: handleSearchChange,
                     placeholder: '이름, 이메일, 상호명으로 검색',
                 }}
                 count={totalElements}
@@ -430,6 +422,8 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
                 initialLoading={isLoading}
             />
 
+            {error && !isBlockingListReadError(error, items) && <DataState compact state="error" kind="member"
+                subject="사업자 인증 신청 갱신" error={error} onRetry={refetch} retrying={isFetching} />}
             {tableBody}
 
             {/* 사업자 인증 상세 */}

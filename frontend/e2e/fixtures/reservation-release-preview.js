@@ -1,11 +1,13 @@
 import { readFileSync } from 'node:fs';
 
 export const PUBLIC_ID = 'f3dd7675-84a3-4339-9e3e-2334cbe762c2';
+export const STORE_PUBLIC_ID = '00000000-0000-4000-8000-000000000081';
+export const POST_PUBLIC_ID = '00000000-0000-4000-8000-000000000501';
 export const TICKET = '11111111-1111-4111-8111-111111111111';
 export const account = { id: 41, name: '미리보기 회원', email: 'preview@example.test', role: 'BUSINESS',
     termsAgreed: true, emailNotificationEnabled: true, marketingAgreed: false,
     profileImageUrl: 'http://127.0.0.1:4173/__release-preview__/avatar.svg' };
-export const store = { id: 81, name: '서촌 도예공방', category: '공방', serviceDomain: 'CLASS',
+export const store = { id: 81, publicId: STORE_PUBLIC_ID, name: '서촌 도예공방', category: '공방', serviceDomain: 'CLASS',
     description: '일상의 속도를 잠시 늦추고, 나만의 도자기를 만드는 작은 공방이에요.',
     address: '서울 종로구 미리보기길 12', phone: '02-0000-0000', ownerId: 8, status: 'ACTIVE',
     mainImageUrl: 'http://127.0.0.1:4173/og-image.png', mainImageWidth: 1200, mainImageHeight: 630,
@@ -55,7 +57,7 @@ export async function installReleasePreview(page, { port = '4173', theme = 'ligh
             serverTime: Date.now(), pollAfterSeconds: admitted || state.serviceMode === 'OFF' ? 60 : 4,
             heartbeatTimeoutSeconds: admitted ? 900 : 90, continuityId: live ? 'a'.repeat(64) : null };
     };
-    const post = () => ({ id: 501, state: 'PUBLISHED', revision: 0, mine: false, createdAt: new Date().toISOString(),
+    const post = () => ({ id: 501, publicId: POST_PUBLIC_ID, state: 'PUBLISHED', revision: 0, mine: false, createdAt: new Date().toISOString(),
         author: { ...state.profile }, content: '작은 그릇 하나를 완성했어요. 손으로 만드는 시간을 함께 나눠요.',
         images: [{ id: 1, url: '/api/feed/media/501', width: 960, height: 640 }], store: null, promotion: null });
     await page.route('**/*', async route => {
@@ -85,7 +87,7 @@ export async function installReleasePreview(page, { port = '4173', theme = 'ligh
         if (pathname.startsWith('/api/member/login-methods/') && method !== 'GET') {
             return failure(route, 409, '미리보기에서는 로그인 방법을 저장하지 않아요.');
         }
-        if (pathname === '/api/stores/81') return ok(route, store);
+        if (pathname === '/api/stores/81' || pathname === '/api/stores/' + STORE_PUBLIC_ID) return ok(route, store);
         if (pathname === '/api/stores/my') return ok(route, []);
         if (pathname === '/api/stores') {
             state.storeListCalls += 1;
@@ -153,13 +155,13 @@ export async function installReleasePreview(page, { port = '4173', theme = 'ligh
         if (pathname === '/api/reservations/requests/result' && method === 'POST') {
             const payload = request.postDataJSON();
             const previous = state.reservations.find(value => value.requestId === payload.requestId);
-            return ok(route, previous ? { id: 901, status: 'PENDING', storeId: store.id, storeName: store.name,
+            return ok(route, previous ? { id: 901, status: 'PENDING', storeId: store.id, storePublicId: STORE_PUBLIC_ID, storeName: store.name,
                 ...previous, paymentStatus: 'NONE', noShowDeposit: 0 } : null);
         }
         if (pathname === '/api/reservations' && method === 'POST') {
             if (state.admissionState !== 'ADMITTED') return failure(route, 409, '입장 상태를 확인한 뒤 예약해주세요.');
             state.reservations.push(request.postDataJSON());
-            return ok(route, { id: 901, status: 'PENDING', storeId: store.id, storeName: store.name,
+            return ok(route, { id: 901, status: 'PENDING', storeId: store.id, storePublicId: STORE_PUBLIC_ID, storeName: store.name,
                 ...request.postDataJSON(), paymentStatus: 'NONE', noShowDeposit: 0 });
         }
         if (/^\/api\/reservations\/my\/store\/\d+\/completed$/.test(pathname)) return ok(route, null);
@@ -196,7 +198,7 @@ export async function installReleasePreview(page, { port = '4173', theme = 'ligh
         }
         if (pathname === `/api/feed/authors/${PUBLIC_ID}`) return ok(route, state.profile);
         if (pathname === '/api/feed/posts' || pathname === '/api/feed/me/posts' || pathname.endsWith(`/authors/${PUBLIC_ID}/posts`)) return ok(route, pageOf([post()]));
-        if (pathname === '/api/feed/posts/501') return ok(route, post());
+        if (pathname === '/api/feed/posts/501' || pathname === '/api/feed/posts/' + POST_PUBLIC_ID) return ok(route, post());
         if (pathname === '/api/feed/media/501') return route.fulfill({ contentType: 'image/svg+xml', body: svg(false, false) });
         if (pathname.startsWith('/api/feed/likes/')) return ok(route, { likeCount: 12, commentCount: 3, liked: false });
         if (pathname === '/api/feed/regions') return ok(route, []);

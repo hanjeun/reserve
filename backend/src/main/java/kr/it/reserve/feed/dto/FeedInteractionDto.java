@@ -22,7 +22,13 @@ public final class FeedInteractionDto {
     }
     public record Comment(Long id, Long postId, Long parentId, String content, FeedDto.Profile author,
                           String state, boolean mine, long revision, long replyCount, OffsetDateTime createdAt, OffsetDateTime updatedAt,
-                          List<FeedDto.Image> images, boolean liked, long likeCount) {
+                          List<FeedDto.Image> images, boolean liked, long likeCount, String publicId, String postPublicId) {
+        public Comment(Long id, Long postId, Long parentId, String content, FeedDto.Profile author, String state, boolean mine,
+                       long revision, long replyCount, OffsetDateTime createdAt, OffsetDateTime updatedAt,
+                       List<FeedDto.Image> images, boolean liked, long likeCount) {
+            this(id, postId, parentId, content, author, state, mine, revision, replyCount, createdAt, updatedAt,
+                    images, liked, likeCount, null, null);
+        }
         public Comment { images = images == null ? List.of() : List.copyOf(images); }
         public Comment(Long id, Long postId, Long parentId, String content, FeedDto.Profile author, String state, boolean mine,
                        long revision, long replyCount, OffsetDateTime createdAt, OffsetDateTime updatedAt) {
@@ -37,6 +43,7 @@ public final class FeedInteractionDto {
     public record CommentVisibility(boolean hidden, @NotBlank @Size(max = 500) String reason, @PositiveOrZero Long revision) {}
     public record CommentReport(Long id, Long commentId, Long postId, String reason, String detail, String status,
                                 boolean hold, String note, OffsetDateTime createdAt, Comment comment, long revision) {}
-    public record Notification(Long id, String kind, Long postId, Long commentId, FeedDto.Profile actor, boolean read, OffsetDateTime createdAt) {}
+    public record Notification(Long id, String kind, Long postId, Long commentId, FeedDto.Profile actor, boolean read,
+                               OffsetDateTime createdAt, String postPublicId, String commentPublicId) {}
     public record NotificationCount(long unread) {}
 }

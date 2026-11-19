@@ -26,8 +26,12 @@ export const reservationKeys = {
     my:     () => ['reservations', 'my'],
     myPage: (params) => ['reservations', 'my', params],
     manage: () => ['reservations', 'manage'],
+    customers: (ownerId, session) => [...reservationKeys.manage(), 'customers', ownerId, session],
     managePage: (params) => ['reservations', 'manage', 'owned', params],
+    noShowMembers: (ownerId, storeId, params) => [...reservationKeys.manage(), 'no-show-members', ownerId, storeId, params],
     qrToken: (id) => ['reservations', 'qrToken', id],
+    availability: (storeId, date, reservationId) => ['reservations', 'availability', storeId, date, reservationId],
+    consent: (member, revision, storeId) => ['reservation-consent', member, revision, storeId],
     // 달력 — 달을 넘길 때마다 다른 응답이므로 month 가 키에 들어가야 한다.
     // 그래야 뒤로 갔을 때 캐시에서 즉시 그려지고, 같은 달을 두 번 안 부른다.
     calendar: (storeId, month) => ['reservations', 'calendar', storeId, month],
@@ -62,12 +66,15 @@ export const favoriteKeys = {
 // 관리자 패널 — 회원/가게/전체예약/휴지통/감사로그/메일함/사업자인증/광고(adKeys.admin과 별개로 관리)
 export const adminKeys = {
     all:                  () => ['admin'],
+    reportQueue:          () => ['admin', 'report-queue'],
     members:             () => ['admin', 'members'],
     stores:               () => ['admin', 'stores'],
     reservations:         () => ['admin', 'reservations'],
     trash:                () => ['admin', 'trash'],
     auditLogs:            () => ['admin', 'auditLogs'],
     sentMails:            () => ['admin', 'sentMails'],
+    receivedInquiries:    () => ['admin', 'receivedInquiries'],
+    mailPhotos:          (received, id) => ['admin', 'mailPhotos', received, id],
     businessVerifications: () => ['admin', 'businessVerifications'],
     dashboardStats:       () => ['admin', 'dashboardStats'],
     chatRooms:            () => ['admin', 'chatRooms'],
@@ -87,6 +94,7 @@ export const chatKeys = {
     adminInbox:    () => ['chat', 'admin-support-inbox'],
     thread:        (key) => ['chat', 'thread', key],
     unread:        () => ['chat', 'unread'],
+    notifications: (before) => ['chat', 'notifications', before],
     // 채팅 첫 안내 — scope: 'support' | 'store:{id}'. 설정 화면과 손님 메신저가 같은 키를 쓴다.
     intro:         (scope) => ['chat', 'intro', scope],
 };

@@ -94,7 +94,7 @@ function PersonalSearchHandoffBody() {
     </div>;
     if (!data) return <LoadingStatus aria-label="선택한 검색 항목 확인 중" aria-busy="true"><Bone width="65%" height={14} pageLoading={false} /></LoadingStatus>;
     return request.kind === 'reservation'
-        ? <ReservationDetailModal reservation={data} open={!closed} onClose={close} />
+        ? <ReservationDetailModal reservation={data} open={!closed} onClose={close} showPaymentHistory />
         : <WaitingDetailModal detail={data} open={!closed} onClose={close} />;
 }
 

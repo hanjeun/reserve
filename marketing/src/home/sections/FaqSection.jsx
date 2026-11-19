@@ -62,13 +62,10 @@ const faqItems = FAQS.map((faq, i) => ({
 }));
 
 export default function FaqSection({ isMobile }) {
-    // 부모에서 전달한 반응형 분기로 간격을 선택한다.
-
     return (
         <section className="marketing-scene marketing-scene--faq"
             id="section-faq"
             style={{
-                background: colors.gray[50],
                 minHeight: `calc(100svh - ${heights.header})`,
                 display: 'flex',
                 flexDirection: 'column',

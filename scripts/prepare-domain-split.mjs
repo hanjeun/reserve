@@ -19,10 +19,11 @@ function block(source, marker) {
     }
     throw new Error(`Unclosed nginx contract: ${marker}`);
 }
-const headers = `add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+const responseHeaders = (framing = 'DENY') => `add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     add_header X-Content-Type-Options "nosniff" always;
-    add_header X-Frame-Options "DENY" always;
+    add_header X-Frame-Options "${framing}" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;`;
+const headers = responseHeaders();
 
 /** 새 호스트의 인증서 발급 전에 HTTP-01 경로를 준비하며 기존 호스트 설정은 유지한다. */
 export function domainSplitHttpNginx(source) {
@@ -55,7 +56,7 @@ export function domainSplitNginx(source) {
     const oauth = block(source, 'location /oauth2/authorization/ {');
     const callback = block(source, 'location /login/oauth2/ {');
     const csp = source.match(/add_header Content-Security-Policy-Report-Only "[^\n]+;[\r]?/);
-    if (!csp) throw new Error('Current app CSP policy is required for legacy draft recovery');
+    if (!csp) throw new Error('Current app CSP policy is required for legacy OAuth callbacks');
     return `${app}
 map $args $reserve_legacy_home_selection { default 0; ~(^|&)region(=|&|$) 1; }
 # 복구용 기존 앱 릴리스는 html/legacy-domain.current에 유지한다.
@@ -82,8 +83,16 @@ server {
     ${api}
     ${oauth}
     ${callback}
-    # 진행 중인 OAuth와 계정별 초안 내보내기는 기존 출처를 유지한다.
-    location ~ ^/(drafts/transfer|login|signup/social|oauth2/callback)/?$ { try_files /does-not-exist @legacy_spa; }
+    location ~ ^/login/?$ {
+        if ($request_method !~ ^(GET|HEAD)$) { return 405; }
+        return 302 https://app.reserve.it.kr/login;
+    }
+    location ~ ^/drafts/transfer/?$ {
+        if ($request_method !~ ^(GET|HEAD)$) { return 405; }
+        return 302 https://app.reserve.it.kr/my-stores;
+    }
+    # 진행 중인 OAuth 콜백과 가입은 기존 출처를 유지한다.
+    location ~ ^/(signup/social|oauth2/callback)/?$ { try_files /does-not-exist @legacy_spa; }
     location @legacy_spa {
         root /usr/share/nginx/html/legacy-domain.current;
         ${headers}
@@ -100,6 +109,13 @@ server {
     }
     location ^~ /images/ { root /usr/share/nginx/html/legacy-domain.current; try_files $uri =404; }
     location ^~ /icons/ { root /usr/share/nginx/html/legacy-domain.current; try_files $uri =404; }
+    location ^~ /service-preview/ {
+        ${responseHeaders('SAMEORIGIN')}
+        add_header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'" always;
+        add_header X-Robots-Tag "noindex, nofollow" always;
+        add_header Cache-Control "no-cache";
+        try_files $uri $uri/ =404;
+    }
     # QR 프래그먼트와 쿼리 선택값을 리다이렉트에서도 보존한다.
     location ~ ^/(stores|store|waiting|benefits|feed|my-page|my-stores|my-favorites|my-reservations|business|admin|messages|payment|search|signup|forgot-password|terms|privacy|content-sources|operation-guide|guide)(/|$) {
         if ($request_method !~ ^(GET|HEAD)$) { return 405; }

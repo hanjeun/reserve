@@ -3,6 +3,11 @@ export const AD_TYPE_LABELS = Object.freeze({
     BANNER: '배너형',
 });
 
+export const AD_DAILY_PRICE = Object.freeze({ BADGE: 1_000, BANNER: 5_000 });
+export const AD_PRICE_SUMMARY = Object.entries(AD_DAILY_PRICE)
+    .map(([type, price]) => `${AD_TYPE_LABELS[type]} ${price.toLocaleString('ko-KR')}원/일`)
+    .join(' · ');
+
 export const BANNER_COPY_PRESETS = [
     {
         value: 'AVAILABLE_NOW',

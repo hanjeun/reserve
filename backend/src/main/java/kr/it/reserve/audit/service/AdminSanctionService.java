@@ -38,7 +38,7 @@ public class AdminSanctionService {
     @Transactional
     public void suspendMember(Long id, int days, String rawReason) {
         validateDays(days);
-        Member member = memberRepository.findByIdAndDeletedAtIsNull(id)
+        Member member = memberRepository.findActiveByIdForUpdate(id)
                 .orElseThrow(MemberException::notFound);
         requireSanctionable(member);
         String reason = normalize(rawReason);
@@ -52,7 +52,7 @@ public class AdminSanctionService {
 
     @Transactional
     public void banMember(Long id, String rawReason) {
-        Member member = memberRepository.findByIdAndDeletedAtIsNull(id)
+        Member member = memberRepository.findActiveByIdForUpdate(id)
                 .orElseThrow(MemberException::notFound);
         requireSanctionable(member);
         String reason = normalize(rawReason);
@@ -65,7 +65,7 @@ public class AdminSanctionService {
 
     @Transactional
     public void unbanMember(Long id) {
-        Member member = memberRepository.findByIdAndDeletedAtIsNull(id)
+        Member member = memberRepository.findActiveByIdForUpdate(id)
                 .orElseThrow(MemberException::notFound);
         member.unban();
         publicContentChanged();

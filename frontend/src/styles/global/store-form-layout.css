@@ -2,6 +2,39 @@
 
 /* 폼 골격은 AntD Form 없이도 실제 필드·라벨·안내의 크기를 유지한다. 반응형 변수와 바깥 PageContainer는 실제 폼과 공유한다. */
 .reserve-route-skeleton.reserve-route-skeleton--store-form { max-width: none; padding: 0; }
+.reserve-draft-overview { display: grid; gap: 28px; }
+.reserve-draft-section { min-width: 0; }
+.reserve-draft-section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    border-bottom: 1px solid var(--c-border-light);
+}
+.reserve-draft-section-heading h2 { margin: 0; font-size: 17px; font-weight: 700; }
+.reserve-draft-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.reserve-draft-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px 20px;
+    min-height: 64px;
+    padding-block: 10px;
+    border-bottom: 1px solid var(--c-border-light);
+}
+.reserve-draft-row-copy { flex: 1 1 160px; min-width: 0; overflow-wrap: anywhere; }
+.reserve-draft-row p { margin: 4px 0 0; color: var(--c-text-secondary); }
+.reserve-draft-row > .reserve-text-link,
+.reserve-draft-section-heading > .reserve-text-link { display: inline-flex; align-items: center; min-height: 44px; }
+.reserve-draft-skeleton-copy { display: grid; flex: 1; gap: 6px; }
+.reserve-draft-empty { margin: 12px 0 0; color: var(--c-text-secondary); }
+
 .reserve-store-form-skeleton {
     --reserve-store-form-skeleton-radius: 14px;
     --reserve-store-form-skeleton-button-radius: 16px;

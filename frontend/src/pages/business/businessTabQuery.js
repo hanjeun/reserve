@@ -7,7 +7,6 @@ export const BUSINESS_TAB_QUERY_KEYS = Object.freeze({
         'reservationStatus',
         'reservationSort',
         'reservationStore',
-        'reservationSearch',
         'reservationPage',
     ]),
     ads: Object.freeze([
@@ -20,10 +19,13 @@ export const BUSINESS_TAB_QUERY_KEYS = Object.freeze({
         'statisticsRange',
     ]),
     settlements: Object.freeze(['settlementStore', 'settlementPage']),
+    customers: Object.freeze(['customerStore', 'customerPage']),
+    'no-show': Object.freeze(['noShowStore', 'noShowStatus', 'noShowPage', 'noShowView', 'noShowSort', 'noShowSection',
+        'noShowMemberStore', 'noShowMemberFilter', 'noShowMemberSort', 'noShowMemberPage']),
     'qr-checkin': Object.freeze([]),
     'chat-intro': Object.freeze(['chatIntroStore']),
-    waiting: Object.freeze(['waitingStore', 'waitingSearch', 'waitingStatus', 'view']),
-    news: Object.freeze(['newsStore', 'newsState', 'newsPage']),
+    waiting: Object.freeze(['waitingStore', 'waitingStatus', 'view']),
+    news: Object.freeze(['newsStore', 'newsState', 'newsPage', 'view']),
 });
 
 const ALL_SCOPED_KEYS = Object.freeze([...new Set(Object.values(BUSINESS_TAB_QUERY_KEYS).flat())]);
@@ -31,7 +33,9 @@ const ALL_SCOPED_KEYS = Object.freeze([...new Set(Object.values(BUSINESS_TAB_QUE
 /** 활성 탭에 속하지 않는 사업자 패널 전용 URL 상태만 제거한다. */
 export const businessTabSearch = (search, tab, remembered) => {
     const params = new URLSearchParams(search);
+    ['reservationSearch', 'noShowSearch', 'noShowMemberSearch', 'waitingSearch'].forEach(key => params.delete(key));
     const normalized = resolveBusinessTab(tab);
+    if (normalized !== 'reservations') params.delete('notification');
     const requestedReturn = params.get('qrReturn') || params.get('tab');
     const previous = resolveBusinessTab(requestedReturn);
     const returnTab = previous === 'qr-checkin' ? 'reservations' : previous;

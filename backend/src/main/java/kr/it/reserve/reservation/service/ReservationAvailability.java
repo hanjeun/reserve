@@ -5,6 +5,7 @@ import kr.it.reserve.global.holiday.HolidayService;
 import kr.it.reserve.global.error.ReservationException;
 import kr.it.reserve.reservation.dto.CalendarDayResponse;
 import kr.it.reserve.reservation.dto.SlotAvailabilityResponse;
+import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.store.repository.StoreRepository;
 import kr.it.reserve.store.entity.Store;
@@ -31,23 +32,27 @@ final class ReservationAvailability {
     private static final String STORE_NOT_FOUND_MESSAGE = "가게를 찾을 수 없어요.";
     ReservationAvailability(ReservationRepository reservations, StoreRepository stores, HolidayService holidays) { reservationRepository=reservations; storeRepository=stores; holidayService=holidays; }
 
-    public List<SlotAvailabilityResponse> getAvailability(Long storeId, LocalDate date) {
+    public List<SlotAvailabilityResponse> getAvailability(Long storeId, LocalDate date, Long excludeReservationId) {
         Store store = storeRepository.findById(storeId)
                 .orElseThrow(() -> new ReservationException(STORE_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
 
+        LocalDateTime now = ServiceTime.now();
+        List<LocalTime> offered = offeredTimes(store, date, now, originalSlot(store, excludeReservationId, now));
+        if (offered.isEmpty()) return List.of();
+
         Map<LocalTime, Long> guestSumByTime = reservationRepository
-                .sumActiveGuestsGroupedByTime(storeId, date).stream()
+                .sumActiveGuestsGroupedByTime(storeId, date, excludeReservationId).stream()
                 .collect(Collectors.toMap(
                         row -> (LocalTime) row[0],
                         row -> ((Number) row[1]).longValue()
                 ));
         Integer capacity = store.getMaxCapacityPerSlot();
 
-        return bookableSlotTimesNow(store, date).stream()
+        return offered.stream()
                 .map(t -> {
                     long booked = guestSumByTime.getOrDefault(t, 0L);
-                    boolean available = capacity == null || capacity <= 0 || booked < capacity;
-                    return new SlotAvailabilityResponse(t.toString().substring(0, 5), available);
+                    Integer remaining = capacity == null || capacity <= 0 ? null : (int) Math.max(0, capacity - booked);
+                    return new SlotAvailabilityResponse(t.toString().substring(0, 5), remaining == null || remaining > 0, remaining);
                 })
                 .toList();
     }
@@ -75,8 +80,9 @@ final class ReservationAvailability {
      * 구조적 목록은 가게가 제공하는 시간을, 이 목록은 현재 선택할 수 있는 시간을 나타낸다.
      * 제출 검증은 실패 사유를 구분하도록 구조적 목록과 현재 시각·마감을 각각 검사한다.
      */
-    private List<LocalTime> bookableSlotTimesNow(Store store, LocalDate date) {
-        LocalDateTime now = ServiceTime.now();
+    private List<LocalTime> offeredTimes(Store store, LocalDate date, LocalDateTime now, Reservation original) {
+        boolean pending = store.bookingOpeningPending(date, now);
+        if (pending && (original == null || !date.equals(original.getReservationDate()))) return List.of();
         Integer deadlineHours = store.getBookingDeadlineHours();
         Integer maxAdvance = store.getMaxAdvanceBookingDays();
         if (date != null && maxAdvance != null && maxAdvance > 0
@@ -86,6 +92,7 @@ final class ReservationAvailability {
 
         return bookableSlotTimes(store, date).stream()
                 .filter(t -> {
+                    if (pending && !t.equals(original.getReservationTime())) return false;
                     LocalDateTime slotAt = LocalDateTime.of(date, t);
                     if (!slotAt.isAfter(now)) return false;
                     if (deadlineHours == null || deadlineHours <= 0) return true;
@@ -94,8 +101,15 @@ final class ReservationAvailability {
                 .toList();
     }
 
+    private Reservation originalSlot(Store store, Long excludeReservationId, LocalDateTime now) {
+        var opening = store.getBookingOpening();
+        if (excludeReservationId == null || opening == null || !now.isBefore(opening.getOpensAt())) return null;
+        return reservationRepository.findById(excludeReservationId)
+                .filter(row -> row.getStore().getId().equals(store.getId())).orElse(null);
+    }
+
     /** 달력도 쓰기 검증과 같은 순서로 지난날→휴무→운영 기간→예약 범위→정원을 판정한다. 월별 예약 합계는 한 번에 조회한다. */
-    public List<CalendarDayResponse> getMonthCalendar(Long storeId, YearMonth month) {
+    public List<CalendarDayResponse> getMonthCalendar(Long storeId, YearMonth month, Long excludeReservationId) {
         Store store = storeRepository.findById(storeId)
                 .orElseThrow(() -> new ReservationException(STORE_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
 
@@ -104,7 +118,7 @@ final class ReservationAvailability {
 
         // [날짜][시각] -> 이미 잡힌 인원
         Map<LocalDate, Map<LocalTime, Long>> bookedByDate = new HashMap<>();
-        for (Object[] row : reservationRepository.sumActiveGuestsGroupedByDateAndTime(storeId, from, to)) {
+        for (Object[] row : reservationRepository.sumActiveGuestsGroupedByDateAndTime(storeId, from, to, excludeReservationId)) {
             bookedByDate
                     .computeIfAbsent((LocalDate) row[0], d -> new HashMap<>())
                     .put((LocalTime) row[1], ((Number) row[2]).longValue());
@@ -112,7 +126,9 @@ final class ReservationAvailability {
 
         Integer capacity = store.getMaxCapacityPerSlot();
 
-        LocalDate today = ServiceTime.today();
+        LocalDateTime now = ServiceTime.now();
+        LocalDate today = now.toLocalDate();
+        Reservation original = originalSlot(store, excludeReservationId, now);
         Integer maxAdvance = store.getMaxAdvanceBookingDays();
         // null 또는 0 = 제한 없음. 기존 가게의 동작을 그대로 둔다(validateReservationSlot 과 같은 규칙).
         LocalDate lastBookable = (maxAdvance != null && maxAdvance > 0) ? today.plusDays(maxAdvance) : null;
@@ -122,19 +138,19 @@ final class ReservationAvailability {
 
         List<CalendarDayResponse> days = new ArrayList<>();
         for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {
-            days.add(describeDay(store, date, today, lastBookable, capacity,
+            days.add(describeDay(store, date, now, lastBookable, capacity, original,
                     bookedByDate.getOrDefault(date, Map.of()), holidays.contains(date)));
         }
         return days;
     }
 
     /** 달력 한 칸. 순서가 곧 사유의 우선순위다 — {@link #getMonthCalendar} 주석 참고. */
-    private CalendarDayResponse describeDay(Store store, LocalDate date, LocalDate today,
-                                            LocalDate lastBookable, Integer capacity,
+    private CalendarDayResponse describeDay(Store store, LocalDate date, LocalDateTime now,
+                                            LocalDate lastBookable, Integer capacity, Reservation original,
                                             Map<LocalTime, Long> booked, boolean holiday) {
         String ymd = date.toString();
 
-        if (date.isBefore(today)) {
+        if (date.isBefore(now.toLocalDate())) {
             return new CalendarDayResponse(ymd, CalendarDayResponse.DayStatus.PAST.name(), 0, 0, holiday);
         }
         // 휴무를 운영기간보다 먼저 본다 — validateReservationSlot 의 문구 분기와 같은 순서다.
@@ -144,13 +160,16 @@ final class ReservationAvailability {
         if (!store.isBookableOn(date)) {
             return new CalendarDayResponse(ymd, CalendarDayResponse.DayStatus.OUT_OF_PERIOD.name(), 0, 0, holiday);
         }
+        if (store.bookingOpeningPending(date, now) && (original == null || !date.equals(original.getReservationDate()))) {
+            return new CalendarDayResponse(ymd, CalendarDayResponse.DayStatus.NOT_OPEN_YET.name(), 0, 0, holiday);
+        }
         if (lastBookable != null && date.isAfter(lastBookable)) {
             return new CalendarDayResponse(ymd, CalendarDayResponse.DayStatus.TOO_FAR.name(), 0, 0, holiday);
         }
 
         boolean capped = capacity != null && capacity > 0;
         int total = bookableSlotTimes(store, date).size();
-        long open = bookableSlotTimesNow(store, date).stream()
+        long open = offeredTimes(store, date, now, original).stream()
                 .filter(t -> !capped || booked.getOrDefault(t, 0L) < capacity)
                 .count();
 

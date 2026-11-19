@@ -36,24 +36,45 @@ export default function WorkspaceNavigationProvider({ children }) {
             return false;
         }
         if (!affected.length) { action(); return true; }
+        const canSave = affected.some(item => item.onSave);
+        const hasDiscard = affected.some(item => !item.onSave);
         let settle;
         const decision = new Promise(resolve => { settle = resolve; });
         const dialog = dialogs.current.confirm({
             title: '작성 중인 내용이 있어요',
-            content: '저장하지 않은 변경을 버리고 이동할까요? 계속 작성하려면 이 화면에 머물러주세요.',
-            okText: '변경 버리고 이동', cancelText: '계속 작성',
+            content: canSave ? (hasDiscard ? '메일은 임시저장하고 다른 변경은 버리고 이동할까요?'
+                : '작성 중인 내용을 이 브라우저에 임시저장할까요?')
+                : '저장하지 않은 변경을 버리고 이동할까요? 계속 작성하려면 이 화면에 머물러주세요.',
+            okText: canSave ? (discard ? '임시저장하고 이동' : '임시저장') : '변경 버리고 이동',
+            cancelText: '계속 작성',
             zIndex: zIndex.modal + 200,
             onOk: () => settle(true), onCancel: () => settle(false),
         });
-        pendingConfirmation.current = { settle, dialog };
-        const accepted = await decision;
-        pendingConfirmation.current = null;
-        if (!accepted) return false;
-        const latest = only ? [only()] : states();
-        if (latest.some(item => item.busy)) return false;
-        if (discard) affected.forEach(item => { discardedStates.current.add(item); item.onDiscard?.(); });
-        action();
-        return true;
+        const pending = { settle, dialog };
+        pendingConfirmation.current = pending;
+        try {
+            if (!await decision) return false;
+            const latest = only ? [only()] : states();
+            if (latest.some(item => item.busy)) return false;
+            if (canSave) {
+                if (!hasDiscard && latest.some(item => item.dirty && !item.onSave)) return false;
+                try { await Promise.all(latest.filter(item => item.dirty && item.onSave).map(item => item.onSave())); }
+                catch {
+                    dialogs.current.message.error('임시저장하지 못했어요. 다시 시도해주세요.');
+                    return false;
+                }
+                if (pendingConfirmation.current !== pending) return false;
+            }
+            if (discard) (canSave ? states() : affected).forEach(item => {
+                discardedStates.current.add(item);
+                item.onDiscard?.();
+            });
+            pendingConfirmation.current = null;
+            action();
+            return true;
+        } finally {
+            if (pendingConfirmation.current === pending) pendingConfirmation.current = null;
+        }
     }, [states]);
 
     const register = useCallback((id, read) => {
@@ -90,6 +111,7 @@ export default function WorkspaceNavigationProvider({ children }) {
             window.removeEventListener('beforeunload', beforeUnload);
             document.removeEventListener('click', onClick, true);
             const pending = pendingConfirmation.current;
+            pendingConfirmation.current = null;
             pending?.settle(false); pending?.dialog?.destroy();
         };
     }, [states, requestLeave]);

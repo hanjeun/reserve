@@ -2,7 +2,7 @@ const EMPTY_ALL_FILTERS = new Set(['domain', 'type']);
 const ALL_FILTERS = new Set([
     ...EMPTY_ALL_FILTERS,
     'region', 'status', 'store', 'waitingStatus', 'newsType', 'period',
-    'reservationStatus', 'reservationStore', 'advertisementStore', 'newsStore', 'newsState',
+    'reservationStatus', 'reservationStore', 'noShowMemberStore', 'advertisementStore', 'newsStore', 'newsState',
     'chatReportStatus', 'reportStatus', 'commentReportStatus', 'reportAuditAction', 'benefitState',
 ]);
 

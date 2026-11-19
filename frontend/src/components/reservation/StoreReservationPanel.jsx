@@ -1,13 +1,18 @@
 import LoadingStatus from '../../components/common/LoadingStatus';
 import React from 'react';
 import { Form } from 'antd';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import BookingOpeningNotice from './BookingOpeningNotice';
 import { PlusOutlined, MinusOutlined, ClockCircleOutlined } from '../../components/common/icons';
 import { Button, DataState, FormTextArea, Bone } from '../../components/common';
 import { BookingCalendar } from '../../components/store';
 import StoreActionPanel from '../../components/store/StoreActionPanel';
 import { formatTime } from '../../utils/date';
-import { colors, radius, fontWeight, fontSize, heights, animation, field, transitions } from '../../styles/tokens';
-import { VALIDATION_RULES } from '../../utils/validation';
+import { colors, radius, fontWeight, fontSize, animation, field, transitions } from '../../styles/tokens';
+import { MAX_RESERVATION_GUESTS, MAX_RESERVATION_REQUEST_LENGTH, VALIDATION_RULES } from '../../utils/validation';
+import { reservationKeys } from '../../hooks/queryKeys';
+import useExitAnimation from '../../hooks/useExitAnimation';
+import useReducedMotion from '../../hooks/useReducedMotion';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import RollingFieldValue from '../../components/common/RollingFieldValue';
@@ -15,9 +20,10 @@ import ReservationEntryNotice from './ReservationEntryNotice';
 import ReservationConsentField from './ReservationConsentField';
 import reservationService from '../../services/reservationService';
 
-const GuestCountInput = ({ id, value = 1, onChange, disabled = false, 'aria-labelledby': labelledBy, 'aria-describedby': describedBy, 'aria-invalid': invalid }) => {
+const GuestCountInput = ({ id, value = 1, max, onChange, disabled = false, 'aria-labelledby': labelledBy, 'aria-describedby': describedBy, 'aria-invalid': invalid }) => {
     const dec = () => { if (value > 1) onChange?.(value - 1); };
-    const inc = () => { if (value < 99) onChange?.(value + 1); };
+    const atLimit = value >= max;
+    const inc = () => { if (!atLimit) onChange?.(value + 1); };
     return (
         <div id={id} role="group" aria-labelledby={labelledBy} aria-describedby={describedBy} aria-invalid={invalid} style={inputStyles.wrapper}>
             <span style={inputStyles.count}><RollingFieldValue value={value}>{`${value}명`}</RollingFieldValue></span>
@@ -25,7 +31,7 @@ const GuestCountInput = ({ id, value = 1, onChange, disabled = false, 'aria-labe
                 <button type="button" className="rsv-tap-btn reserve-guest-count-step" aria-label="인원 줄이기" onClick={dec} disabled={disabled || value <= 1} style={{ ...inputStyles.btn, opacity: value <= 1 ? 0.35 : undefined }}>
                     <MinusOutlined style={{ fontSize: 12 }} />
                 </button>
-                <button type="button" className="rsv-tap-btn reserve-guest-count-step" aria-label="인원 늘리기" onClick={inc} disabled={disabled || value >= 99} style={{ ...inputStyles.btn, opacity: value >= 99 ? 0.35 : undefined }}>
+                <button type="button" className="rsv-tap-btn reserve-guest-count-step" aria-label="인원 늘리기" onClick={inc} disabled={disabled || atLimit} style={{ ...inputStyles.btn, opacity: atLimit ? 0.35 : undefined }}>
                     <PlusOutlined style={{ fontSize: 12 }} />
                 </button>
             </div>
@@ -36,10 +42,10 @@ const GuestCountInput = ({ id, value = 1, onChange, disabled = false, 'aria-labe
 const inputStyles = {
     wrapper: {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        background: colors.gray[50], borderRadius: radius.lg,
-        padding: '0 14px', height: heights.input, border: 'none',
+        background: field.bg, borderRadius: field.radius,
+        paddingInline: field.paddingInline, height: field.height, border: 'none',
     },
-    count: { fontSize: fontSize.base, color: colors.text.primary, fontWeight: fontWeight.medium },
+    count: { ...field.textStyle, color: colors.text.primary, fontWeight: fontWeight.medium },
     btnGroup: { display: 'flex', gap: 8 },
     btn: {
         width: 32, height: 32, borderRadius: radius.md,
@@ -56,7 +62,12 @@ const isExistingReservationSlot = (slot, storeId, dateKey, editingReservation) =
     && formatTime(editingReservation.reservationTime) === slot.time
 );
 const isSelectableSlot = (slot, storeId, dateKey, editingReservation) =>
-    slot.available === true || isExistingReservationSlot(slot, storeId, dateKey, editingReservation);
+    slot.available === true || (slot.remainingCapacity === undefined && isExistingReservationSlot(slot, storeId, dateKey, editingReservation));
+
+const guestLimit = (store, slot) => {
+    const storeLimit = store?.maxCapacityPerSlot > 0 ? store.maxCapacityPerSlot : MAX_RESERVATION_GUESTS;
+    return Math.min(MAX_RESERVATION_GUESTS, storeLimit, slot?.remainingCapacity ?? MAX_RESERVATION_GUESTS);
+};
 
 // DAY 예약 안내 문구 — 기존 예약 날짜 > 마감 > 기본 안내 순서로 고른다.
 const dayBookingNotice = (existingSelection, onlySlot) => {
@@ -86,72 +97,48 @@ const clearUnofferedTime = (form, data, storeId, dateKey, editingReservation) =>
     }
 };
 
-// 날짜별 잔여 슬롯 조회 + 날짜 변경 시 시간 초기화 — TimeSlotPicker 에서 분리.
+const EMPTY_SLOTS = [];
+const SLOT_EXIT_MS = 160;
+
 const useTimeSlotAvailability = ({ store, dateValue, form, onAvailabilityChange, editingReservation }) => {
-    const [availability, setAvailability] = React.useState({ key: null, status: 'idle', slots: [] });
-    const [retryCount, setRetryCount] = React.useState(0);
-    const dateKey = dateValue ? dateValue.format('YYYY-MM-DD') : null;
+    const dateKey = dateValue?.format('YYYY-MM-DD');
     const storeId = store?.id;
+    const reservationId = editingReservation?.id;
     const requestKey = dateKey && storeId ? `${storeId}:${dateKey}` : null;
-    const request = React.useMemo(() => ({ key: requestKey, form, editingReservation, onAvailabilityChange }),
-        [requestKey, form, editingReservation, onAvailabilityChange]);
-    const isCurrent = requestKey != null && availability.request === request;
-    const loading = requestKey != null && (!isCurrent || availability.status === 'loading');
-    const slots = isCurrent && availability.status === 'success' ? availability.slots : [];
-    const failed = isCurrent && availability.status === 'error';
-    // 표시 상태와 제출 검증은 같은 시간 조회 상태를 사용한다.
-    const commitAvailability = React.useCallback(next => {
-        onAvailabilityChange?.(next);
-        setAvailability({ ...next, request });
-    }, [onAvailabilityChange, request]);
+    const { data, error, fetchStatus, refetch } = useQuery({
+        queryKey: reservationKeys.availability(storeId, dateKey, reservationId),
+        enabled: Boolean(requestKey),
+        retry: false,
+        staleTime: 0,
+        queryFn: async ({ signal }) => {
+            const slots = reservationId != null
+                ? await reservationService.getEditAvailability(reservationId, storeId, dateKey, { signal })
+                : await api.get(API_ENDPOINTS.RESERVATION.AVAILABILITY, { params: { storeId, date: dateKey }, signal });
+            if (!Array.isArray(slots)) throw new Error('Invalid availability results');
+            return slots;
+        },
+    });
+    const status = !requestKey ? 'idle' : error ? 'error' : fetchStatus !== 'idle' || !data ? 'loading' : 'success';
+    const slots = requestKey && !error ? data ?? EMPTY_SLOTS : EMPTY_SLOTS;
+    const availability = React.useMemo(() => ({ key: requestKey, status, slots }), [requestKey, status, slots]);
 
+    const previousDate = React.useRef(null);
     React.useEffect(() => {
-        if (!requestKey) return;
-        let cancelled = false;
-        const controller = new AbortController();
-        // 로딩은 요청 키로 판별하고 외부 폼 검증기에만 변경을 알린다.
-        onAvailabilityChange?.({ key: requestKey, status: 'loading', slots: [] });
-        const lookup = editingReservation?.id != null
-            ? reservationService.getEditAvailability(editingReservation.id, storeId, dateKey, { signal: controller.signal })
-            : api.get(API_ENDPOINTS.RESERVATION.AVAILABILITY, { params: { storeId, date: dateKey }, signal: controller.signal });
-        lookup
-            .then((data) => {
-                if (cancelled) return;
-                if (!Array.isArray(data)) throw new Error('Invalid availability results');
-                // 수정 초기값은 조회 성공 뒤에도 서버가 허용한 시간일 때만 유지한다.
-                clearUnofferedTime(form, data, storeId, dateKey, editingReservation);
-                commitAvailability({ key: requestKey, status: 'success', slots: data });
-            })
-            .catch(error => {
-                if (cancelled) return;
-                form?.setFields([{ name: 'reservationTime', value: undefined, errors: [] }]);
-                commitAvailability({ key: requestKey, status: 'error', slots: [], error });
-            });
-        return () => { cancelled = true; controller.abort(); };
-    }, [dateKey, storeId, requestKey, retryCount, form, editingReservation, commitAvailability, onAvailabilityChange]);
-
-    // 날짜가 바뀌면 이전 시간 선택을 초기화한다.
-
-    // 빈 선택은 폼에서 값 삭제로 처리할 수 있도록 전달한다.
-
-    // 서로 다른 날짜로 바뀔 때만 선택 시간을 초기화한다.
-    // 첫 날짜 선택·수정 초기값 주입에서는 시간 값을 유지한다.
-
-    const prevDateKeyRef = React.useRef(null);
-    React.useEffect(() => {
-        const prev = prevDateKeyRef.current;
-        prevDateKeyRef.current = dateKey;
-        if (prev != null && prev !== dateKey) {
+        const before = previousDate.current;
+        previousDate.current = dateKey;
+        if (before != null && before !== dateKey) {
             form?.setFields([{ name: 'reservationTime', value: undefined, errors: [] }]);
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dateKey]);
+    }, [dateKey, form]);
 
-    const retry = () => {
-        commitAvailability({ key: requestKey, status: 'loading', slots: [] });
-        setRetryCount(count => count + 1);
-    };
-    return { dateKey, storeId, loading, slots, failed, error: isCurrent ? availability.error : undefined, retry };
+    React.useEffect(() => {
+        onAvailabilityChange?.(availability);
+        if (status === 'success') clearUnofferedTime(form, slots, storeId, dateKey, editingReservation);
+        if (status === 'error') form?.setFields([{ name: 'reservationTime', value: undefined, errors: [] }]);
+    }, [availability, onAvailabilityChange, status, slots, form, storeId, dateKey, editingReservation]);
+
+    // 갱신 중에는 기존 시간을 유지해 마감된 칸만 퇴장할 수 있게 한다.
+    return { dateKey, storeId, slots, loading: status === 'loading' && !data, failed: status === 'error', error, retry: () => refetch() };
 };
 
 export const TimeSlotPicker = props => <div id={props.id} role="group" aria-labelledby={props['aria-labelledby']}
@@ -200,59 +187,60 @@ const TimeSlotPickerContent = ({ store, dateValue, value, onChange, form, onAvai
         );
     }
 
-    const am = slots.filter((s) => Number(s.time.split(':')[0]) < 12);
-    const pm = slots.filter((s) => Number(s.time.split(':')[0]) >= 12);
-
-    return (
-        <div>
-            {existingSelection && <ExistingTimeNotice />}
-            {am.length > 0 && (
-                <TimeSlotGroup label="오전" labelStyle={timeSlotStyles.groupLabel} slots={am} value={value}
-                    onChange={onChange} storeId={storeId} dateKey={dateKey} editingReservation={editingReservation} />
-            )}
-            {pm.length > 0 && (
-                <TimeSlotGroup label="오후" labelStyle={{ ...timeSlotStyles.groupLabel, marginTop: am.length > 0 ? 14 : 0 }}
-                    slots={pm} value={value}
-                    onChange={onChange} storeId={storeId} dateKey={dateKey} editingReservation={editingReservation} />
-            )}
-        </div>
-    );
+    return <div>
+        {existingSelection && <ExistingTimeNotice />}
+        <TimeSlotChoices key={dateKey} slots={slots} value={value} onChange={onChange}
+            storeId={storeId} dateKey={dateKey} editingReservation={editingReservation} />
+    </div>;
 };
 
 const TimeSlotLoading = () => (
     <LoadingStatus aria-label="예약 가능한 시간을 불러오는 중" aria-busy="true">
         <div style={timeSlotStyles.grid} aria-hidden="true">
-            {[1, 2, 3, 4].map(key => <Bone key={key} pageLoading={false} height={38} borderRadius={radius.md} />)}
+            {[1, 2, 3, 4].map(key => <Bone key={key} pageLoading={false} height={44} borderRadius={radius.pill} />)}
         </div>
     </LoadingStatus>
 );
 
-// 오전/오후 한 묶음 — 라벨 한 줄 + pill 그리드.
-const TimeSlotGroup = ({ label, labelStyle, slots, value, onChange, storeId, dateKey, editingReservation }) => (
-    <>
-        <div style={labelStyle}>{label}</div>
-        <div style={timeSlotStyles.grid}>
-            {slots.map((s, i) => (
-                <TimeSlotPill key={s.time} slot={s} selected={value === s.time}
-                    selectable={isSelectableSlot(s, storeId, dateKey, editingReservation)}
-                    onClick={() => onChange?.(s.time)} delay={i * 40} />
-            ))}
-        </div>
-    </>
-);
+const TimeSlotChoices = ({ slots, value, onChange, storeId, dateKey, editingReservation }) => {
+    const reducedMotion = useReducedMotion();
+    const selectable = slot => isSelectableSlot(slot, storeId, dateKey, editingReservation);
+    const hasChoice = slots.some(selectable);
+    const { shouldRender } = useExitAnimation(hasChoice, SLOT_EXIT_MS, !reducedMotion);
+    if (!hasChoice && (reducedMotion || !shouldRender)) return <TimePlaceholder text="이 날은 예약이 마감됐어요" />;
 
-const TimeSlotPill = ({ slot, selected, selectable, onClick, delay }) => (
-    <button type="button"
-        className={`rsv-tap-btn rsv-time-pill${selected ? ' rsv-selected' : ''}`}
-        disabled={!selectable} onClick={onClick}
+    const groups = [
+        { label: '오전', slots: slots.filter(slot => slot.time < '12:00') },
+        { label: '오후', slots: slots.filter(slot => slot.time >= '12:00') },
+    ];
+    return <div>
+        {groups.map(({ label, slots: group }) => group.length > 0 && (
+            <div key={label} className="reserve-time-slot-group">
+                <div style={timeSlotStyles.groupLabel}>{label}</div>
+                <div style={timeSlotStyles.grid}>
+                    {group.map((slot, index) => <TimeSlotPill key={slot.time} time={slot.time} selected={value === slot.time}
+                        selectable={selectable(slot)} reducedMotion={reducedMotion} delay={index * 40}
+                        onClick={() => onChange?.(slot.time)} />)}
+                </div>
+            </div>
+        ))}
+    </div>;
+};
+
+const TimeSlotPill = ({ time, selected, selectable, onClick, reducedMotion, delay }) => {
+    const { shouldRender } = useExitAnimation(selectable, SLOT_EXIT_MS, !reducedMotion);
+    if (!selectable && (reducedMotion || !shouldRender)) return null;
+
+    return <button type="button"
+        className={`rsv-tap-btn rsv-time-pill${selected && selectable ? ' rsv-selected' : ''}`}
+        disabled={!selectable} aria-hidden={!selectable || undefined} aria-pressed={selectable && selected} onClick={onClick}
         style={{
-            ...timeSlotStyles.pill,
-            animation: animation.scaleSpringIn,
-            animationDelay: `${delay}ms`,
+            animation: reducedMotion ? 'none' : selectable ? animation.scaleSpringIn : `reserve-time-slot-exit ${SLOT_EXIT_MS}ms ease-in both`,
+            animationDelay: selectable ? `${delay}ms` : undefined,
         }}>
-        {slot.time}
-    </button>
-);
+        {time}
+    </button>;
+};
 
 /*
  * 기본 Picker가 아닌 표면은 Form.Item.useStatus로 필드 검증 상태를 반영한다.
@@ -270,7 +258,7 @@ const TimePlaceholderField = ({ text }) => {
             <span>{text}</span>
             <ClockCircleOutlined style={{
                 ...timeSlotStyles.placeholderIcon,
-                color: isError ? colors.error.main : colors.text.placeholder,
+                color: isError ? colors.error.main : field.selectionHintColor,
             }} />
         </div>
     );
@@ -281,40 +269,45 @@ const TimePlaceholder = props => <Form.Item noStyle><TimePlaceholderField {...pr
 const timeSlotStyles = {
     placeholder: {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        height: heights.input, padding: '0 11px', boxSizing: 'border-box',
-        // 색을 하드코딩하지 말 것 — 여기 rgba(0,0,0,0.25)가 박혀 있어서 다크모드에서
-        //   배경만 어두워지고 글자는 검은색 그대로라 "날짜를 먼저 선택해주세요"가 안 보였다.
-        //   colors.*는 var(--c-...) 문자열이라 브라우저가 페인트 시점에 테마별로 해석한다.
-        //   colors.text.placeholder는 AntD의 colorTextPlaceholder와 같은 값이라
-        //   바로 옆 BookingCalendar의 "날짜 선택"과 톤이 정확히 일치한다.
-        ...field.textStyle, color: field.placeholderColor,
-        background: colors.gray[50], borderRadius: radius.lg,
+        height: field.height, paddingInline: field.paddingInline, boxSizing: 'border-box',
+        ...field.textStyle, color: field.selectionHintColor,
+        background: field.bg, borderRadius: field.radius,
         transition: 'box-shadow 0.2s',
     },
-    /* AntD picker 의 suffix 아이콘과 같은 크기(16px). 14px 이면 날짜 칸보다 작아 보였다. */
-    placeholderIcon: { fontSize: field.iconSize, color: field.placeholderColor },
+    placeholderIcon: { fontSize: field.iconSize, color: field.selectionHintColor },
     groupLabel: { fontSize: fontSize.sm, color: colors.text.tertiary, fontWeight: fontWeight.medium, marginBottom: 8 },
-    grid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 },
-    pill: {
-        padding: '9px 0', borderRadius: radius.md, border: 'none',
-        fontSize: fontSize.sm, fontWeight: fontWeight.medium, cursor: 'pointer',
-    },
+    grid: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8 },
 };
 
 export const ReservationPanel = ({
     store, form, onFinish, paying, isPC, isEditMode, editingReservation,
     reservationEntry = null,
-    editLoadError = null, editRetrying = false, onRetryEditLoad, preview = false, bookingSectionRef,
+    editLoadError = null, editRetrying = false, onRetryEditLoad, preview = false, bookingSectionRef, openingObservedAt,
 }) => {
     const labelPrefix = React.useId();
+    const queryClient = useQueryClient();
+    const storeId = store?.id;
+    const refreshOpening = React.useCallback(() => {
+        if (preview || !storeId) return;
+        void queryClient.invalidateQueries({ queryKey: reservationKeys.availability(storeId).slice(0, 3) });
+        void queryClient.invalidateQueries({ queryKey: reservationKeys.calendar(storeId).slice(0, 3) });
+    }, [queryClient, preview, storeId]);
     const dateValue = Form.useWatch('reservationDate', form);
     const timeValue = Form.useWatch('reservationTime', form);
     const entry = reservationEntry?.slot === `${store?.id}:${dateValue?.format('YYYY-MM-DD')}:${formatTime(timeValue)}` ? reservationEntry : null;
     const reservationStore = React.useMemo(() => preview ? { ...store, id: undefined } : store, [preview, store]);
-    const timeAvailabilityRef = React.useRef({ key: /** @type {string | null} */ (null), status: 'idle', slots: [] });
-    // DAY 자동 입력과 조회 완료가 같은 효과 배치에 있어 완료 상태를 검증에 즉시 반영한다.
-
-    const handleAvailabilityChange = React.useCallback(next => { timeAvailabilityRef.current = next; }, []);
+    const [timeAvailability, setTimeAvailability] = React.useState({ key: null, status: 'idle', slots: EMPTY_SLOTS });
+    const timeAvailabilityRef = React.useRef(timeAvailability);
+    const dateKey = dateValue?.format('YYYY-MM-DD');
+    const selectedSlot = timeAvailability.key === `${store?.id}:${dateKey}`
+        ? timeAvailability.slots.find(slot => slot.time === timeValue && isSelectableSlot(slot, store?.id, dateKey, editingReservation)) : undefined;
+    const maxGuests = guestLimit(store, selectedSlot);
+    const guestLimitText = `최대 ${maxGuests}명까지 예약할 수 있어요.`;
+    // 날짜 단위 예약의 자동 선택 전에 제출 검증도 새 조회 결과를 읽는다.
+    const handleAvailabilityChange = React.useCallback(next => {
+        timeAvailabilityRef.current = next;
+        setTimeAvailability(next);
+    }, []);
     let submitLabel = isEditMode ? '예약 변경하기' : '예약 신청하기';
     if (paying) submitLabel = '처리 중...';
     const FieldsContainer = isPC ? 'div' : React.Fragment;
@@ -333,6 +326,7 @@ export const ReservationPanel = ({
             ) : (
                 <>
                     <FieldsContainer {...(isPC ? { className: 'reserve-booking-panel-fields', role: 'region', 'aria-label': '예약 입력 영역', tabIndex: 0 } : {})}>
+                    {store?.bookingOpening && <BookingOpeningNotice opening={store.bookingOpening} observedAt={openingObservedAt} onOpen={refreshOpening} />}
                     <Form.Item label="예약 날짜" name="reservationDate"
                         rules={[{ required: true, message: '날짜를 선택해주세요.' }]}>
                         {/*
@@ -371,11 +365,25 @@ export const ReservationPanel = ({
                         })]}>
                         <TimeSlotPicker aria-labelledby={`${labelPrefix}-time`} store={reservationStore} dateValue={dateValue} form={form} onAvailabilityChange={handleAvailabilityChange} editingReservation={editingReservation} />
                     </Form.Item>
-                    <Form.Item htmlFor={null} label={<span id={`${labelPrefix}-guests`}>인원 수</span>} name="guestCount" rules={VALIDATION_RULES.guestCount}>
-                        <GuestCountInput aria-labelledby={`${labelPrefix}-guests`} disabled={preview} />
+                    <Form.Item htmlFor={null} label={<span id={`${labelPrefix}-guests`}>인원 수</span>} name="guestCount"
+                        extra={!preview && maxGuests < MAX_RESERVATION_GUESTS ? guestLimitText : undefined}
+                        rules={[...VALIDATION_RULES.guestCount, ({ getFieldValue }) => ({
+                            validator: (_, guests) => {
+                                const date = getFieldValue('reservationDate')?.format('YYYY-MM-DD');
+                                const time = getFieldValue('reservationTime');
+                                const current = timeAvailabilityRef.current;
+                                const slot = current.key === `${store?.id}:${date}` && current.slots.find(item => item.time === time);
+                                const limit = guestLimit(store, slot);
+                                return guests > limit ? Promise.reject(new Error(`최대 ${limit}명까지 예약할 수 있어요.`)) : Promise.resolve();
+                            },
+                        })]}>
+                        <GuestCountInput aria-labelledby={`${labelPrefix}-guests`} max={maxGuests} disabled={preview} />
                     </Form.Item>
-                    <Form.Item label="요청 사항" name="specialRequest">
-                        <FormTextArea rows={3} placeholder="요청 사항을 입력하세요." disabled={preview} />
+                    <Form.Item className="reserve-booking-request" label="요청 사항" name="specialRequest"
+                        rules={VALIDATION_RULES.specialRequest.map(rule => ({
+                            ...rule, transform: value => value === editingReservation?.specialRequest ? undefined : value,
+                        }))}>
+                        <FormTextArea rows={3} placeholder="요청 사항을 입력하세요." maxLength={MAX_RESERVATION_REQUEST_LENGTH} disabled={preview} />
                     </Form.Item>
                     {!isEditMode && <ReservationConsentField storeId={store?.id} disabled={preview} />}
                     </FieldsContainer>

@@ -1,6 +1,7 @@
 package kr.it.reserve.feed.news.service;
 
 import kr.it.reserve.config.updates.EntityUpdates;
+
 import kr.it.reserve.feed.FeedException;
 import kr.it.reserve.feed.news.StoreNewsAvailability;
 import kr.it.reserve.member.entity.Member;
@@ -14,7 +15,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
 import java.io.IOException;
 import java.util.Map;
 import java.util.Set;

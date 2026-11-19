@@ -8,15 +8,17 @@ import usePaymentIncompleteNotice from '../../hooks/usePaymentIncompleteNotice.j
 import { clearPaymentReturns, rememberPaymentReturn } from '../../utils/paymentReturnContext';
 import { createLoadingPresentation, LoadingPresentationContext } from '../../components/layout/loadingPresentation';
 
-const fixture = vi.hoisted(() => ({ user: { id: 1 }, getStatus: vi.fn(), checkReturn: vi.fn(), invalidateReservations: vi.fn(), invalidateAds: vi.fn() }));
-vi.mock('../../services/paymentService', () => ({ default: { getStatus: fixture.getStatus, checkReturn: fixture.checkReturn } }));
+const fixture = vi.hoisted(() => ({ user: { id: 1 }, getStatus: vi.fn(), getReservationStatus: vi.fn(), getReceipt: vi.fn(), checkReturn: vi.fn(),
+    invalidateReservations: vi.fn(), invalidateAds: vi.fn() }));
+vi.mock('../../services/paymentService', () => ({ default: {
+    getStatus: fixture.getStatus, getReservationStatus: fixture.getReservationStatus, getReceipt: fixture.getReceipt, checkReturn: fixture.checkReturn,
+} }));
 vi.mock('../../store/useAuthStore', () => ({ default: selector => selector({ user: fixture.user }) }));
 vi.mock('../../hooks/invalidateAfterWrite', () => ({ invalidateReservationData: fixture.invalidateReservations, invalidateAdData: fixture.invalidateAds }));
 vi.mock('../../hooks/useDocumentTitle', () => ({ default: () => {} }));
-vi.mock('../../components/common/StateIllustration', () => ({ default: () => null }));
 
 const paid = extra => ({ type: 'reservation', merchantUid: 'ORDER-fixture', status: 'PAID', amount: 10000, payMethod: 'PaymentMethodCard',
-    refundedAmount: 0, reservation: { storeName: '합성 가게', reservationCode: 'R-fixture', reservationDate: '2026-11-01',
+    refundedAmount: 0, reservation: { id: 17, storeName: '합성 가게', reservationCode: 'R-fixture', reservationDate: '2026-11-01',
         reservationTime: '17:00:00', guestCount: 2, memberName: '합성 예약자' }, ...extra });
 function ReturnStore() { usePaymentIncompleteNotice(); return <h1>원래 가게</h1>; }
 function ReturnReservations() { usePaymentIncompleteNotice(); return <h1>예약 목록</h1>; }
@@ -26,24 +28,74 @@ const show = (query = 'success=true&merchant_uid=ORDER-fixture', { documentEntry
     render(<QueryClientProvider client={client}><LoadingPresentationContext.Provider value={createLoadingPresentation('fixture', { documentEntry })}><MemoryRouter initialEntries={['/payment/result?' + query]}><AntApp><LocationProbe /><Routes>
         <Route path="/payment/result" element={<PaymentResult />} /><Route path="/my-reservations" element={<ReturnReservations />} />
         <Route path="/stores" element={<h1>가게 목록</h1>} /><Route path="/business" element={<h1>광고 목록</h1>} />
-        <Route path="/store/12" element={<ReturnStore />} />
+        <Route path="/store/00000000-0000-4000-8000-000000000012" element={<ReturnStore />} />
     </Routes></AntApp></MemoryRouter></LoadingPresentationContext.Provider></QueryClientProvider>);
     return client;
 };
 
 beforeEach(() => {
     vi.resetAllMocks(); fixture.user = { id: 1 }; clearPaymentReturns();
-    rememberPaymentReturn('ORDER-fixture', 1, { pathname: '/store/12' });
+    fixture.getReceipt.mockImplementation(async (type, merchantUid) => ({ type, merchantUid, receiptUrl: null }));
+    rememberPaymentReturn('ORDER-fixture', 1, { pathname: '/store/00000000-0000-4000-8000-000000000012' });
 });
 describe('결제 결과와 예약 요약', () => {
+    it('지난 예약의 영수증을 확인된 주문의 결제 수단 아래에 표시해요', async () => {
+        fixture.getReservationStatus.mockResolvedValue(paid({ status: 'REFUNDED', refundedAmount: 10000 }));
+        fixture.getReceipt.mockResolvedValue({ type: 'reservation', merchantUid: 'ORDER-fixture', receiptUrl: 'https://receipts.example.test/view' });
+        show('reservation_id=17');
+        const receipt = await screen.findByRole('link', { name: '영수증 보기' });
+        expect(receipt).toHaveAttribute('href', 'https://receipts.example.test/view');
+        expect(receipt).toHaveAttribute('rel', 'noopener noreferrer');
+        expect(receipt).toHaveClass('reserve-text-link');
+        expect(receipt.closest('section')).toHaveTextContent(/결제 수단.*카드결제.*영수증 보기/);
+        expect(fixture.getReceipt).toHaveBeenCalledExactlyOnceWith('reservation', 'ORDER-fixture', expect.anything());
+    });
+
+    it('광고 영수증을 다른 주문의 주소나 안전하지 않은 링크로 표시하지 않아요', async () => {
+        fixture.getStatus.mockResolvedValue({ type: 'ad', merchantUid: 'ORDER-fixture', status: 'ACTIVE', amount: 10000 });
+        fixture.getReceipt.mockResolvedValueOnce({ type: 'ad', merchantUid: 'OTHER-ORDER', receiptUrl: 'https://receipts.example.test/other' })
+            .mockResolvedValueOnce({ type: 'ad', merchantUid: 'ORDER-fixture', receiptUrl: 'javascript:void(0)' });
+        show('type=ad&merchant_uid=ORDER-fixture');
+        const retry = await screen.findByRole('button', { name: '영수증 다시 확인' });
+        expect(screen.queryByRole('link', { name: '영수증 보기' })).not.toBeInTheDocument();
+        fireEvent.click(retry);
+        await waitFor(() => expect(fixture.getReceipt).toHaveBeenCalledTimes(2));
+        await waitFor(() => expect(screen.queryByRole('button', { name: '영수증 다시 확인' })).not.toBeInTheDocument());
+        expect(screen.queryByRole('link', { name: '영수증 보기' })).not.toBeInTheDocument();
+    });
+
+    it('지난 예약은 결제 상태만 조회하고 확정된 환불 기록을 보여줘요', async () => {
+        fixture.getReservationStatus.mockResolvedValue(paid({ status: 'REFUNDED', refundedAmount: 10000 }));
+        show('reservation_id=17&checkout_return=true');
+        const heading = await screen.findByRole('heading', { name: '환불 완료' });
+        expect(heading.querySelector('.reserve-payment-result__icon--success')).toHaveAttribute('aria-hidden', 'true');
+        expect(screen.getByText('환불 금액')).toBeInTheDocument();
+        expect(fixture.getReservationStatus).toHaveBeenCalledExactlyOnceWith(17);
+        expect(fixture.getStatus).not.toHaveBeenCalled();
+        expect(fixture.checkReturn).not.toHaveBeenCalled();
+        expect(fixture.invalidateReservations).not.toHaveBeenCalled();
+    });
+    it('다른 예약 번호가 담긴 결제 응답을 상세에 표시하지 않아요', async () => {
+        fixture.getReservationStatus.mockResolvedValue(paid());
+        show('reservation_id=23');
+        await screen.findByRole('heading', { name: '결제 상태를 불러오지 못했어요' });
+        expect(screen.queryByText('합성 가게')).not.toBeInTheDocument();
+    });
+    it('예약에 해당하는 결제가 없으면 미확정 결제로 표시하지 않아요', async () => {
+        fixture.getReservationStatus.mockRejectedValue({ status: 404 });
+        show('reservation_id=17');
+        await screen.findByRole('heading', { name: '결제 내역이 없어요' });
+        expect(screen.queryByRole('button', { name: '다시 확인' })).not.toBeInTheDocument();
+    });
     it('내 예약에서 시작한 미결제는 목록 조건을 유지하고 목록에서 모달을 한 번 표시해요', async () => {
         rememberPaymentReturn('ORDER-fixture', 1, { pathname: '/my-reservations', search: '?page=2&status=PENDING' });
-        fixture.checkReturn.mockResolvedValue({ merchantUid: 'ORDER-fixture', outcome: 'INCOMPLETE', storeId: 12 });
+        fixture.checkReturn.mockResolvedValue({ merchantUid: 'ORDER-fixture', outcome: 'INCOMPLETE', storeId: 12, storePublicId: '00000000-0000-4000-8000-000000000012' });
         show('checkout_return=true&merchant_uid=ORDER-fixture');
         await screen.findByRole('heading', { name: '예약 목록' });
         const dialogs = await screen.findAllByRole('dialog');
         expect(dialogs).toHaveLength(1);
         expect(dialogs[0]).toHaveAccessibleName('결제가 완료되지 않았어요');
+        expect(dialogs[0]).toHaveTextContent('이 예약은 결제 대기 중이에요.');
         const location = JSON.parse(screen.getByTestId('payment-location').textContent);
         expect(location.search).toBe('?status=PENDING&page=2');
         expect(location.state.reserveRouteMotion).toBe('from-left');
@@ -51,7 +103,7 @@ describe('결제 결과와 예약 요약', () => {
     });
     it('복귀 위치가 없으면 임의의 가게 대신 내 예약에서 안내해요', async () => {
         clearPaymentReturns();
-        fixture.checkReturn.mockResolvedValue({ merchantUid: 'ORDER-fixture', outcome: 'INCOMPLETE', storeId: 12 });
+        fixture.checkReturn.mockResolvedValue({ merchantUid: 'ORDER-fixture', outcome: 'INCOMPLETE', storeId: 12, storePublicId: '00000000-0000-4000-8000-000000000012' });
         show('checkout_return=true&merchant_uid=ORDER-fixture');
         await screen.findByRole('heading', { name: '예약 목록' });
         expect(await screen.findByRole('dialog')).toHaveAccessibleName('결제가 완료되지 않았어요');
@@ -68,7 +120,7 @@ describe('결제 결과와 예약 요약', () => {
         expect(JSON.parse(screen.getByTestId('payment-location').textContent).state.reserveRouteMotion).toBe('from-left');
     });
     it.each(['success=false&', ''])('선결제 미완료만 원래 가게의 짧은 모달로 안내해요 (%s)', async prefix => {
-        fixture.checkReturn.mockResolvedValue({ merchantUid: 'ORDER-fixture', outcome: 'INCOMPLETE', storeId: 12 });
+        fixture.checkReturn.mockResolvedValue({ merchantUid: 'ORDER-fixture', outcome: 'INCOMPLETE', storeId: 12, storePublicId: '00000000-0000-4000-8000-000000000012' });
         show(prefix + 'checkout_return=true&merchant_uid=ORDER-fixture');
         await screen.findByRole('heading', { name: '원래 가게' });
         const dialog = await screen.findByRole('dialog');
@@ -77,7 +129,7 @@ describe('결제 결과와 예약 요약', () => {
         expect(fixture.invalidateReservations).toHaveBeenCalledOnce();
         expect(screen.queryByRole('button', { name: '내 예약', exact: true })).toBeNull();
         expect(fixture.getStatus).not.toHaveBeenCalled();
-        fireEvent.click(within(dialog).getByRole('button', { name: '확인' }));
+        fireEvent.click(within(dialog).getByRole('button', { name: '내 예약 보기' }));
         expect(screen.getByRole('heading', { name: '원래 가게' })).toBeInTheDocument();
         await waitFor(() => expect(dialog).toHaveClass('ant-zoom-leave-active'));
         // jsdom은 AnimationEvent 지원 여부에 따라 접두사 이벤트를 사용해요.
@@ -86,14 +138,14 @@ describe('결제 결과와 예약 요약', () => {
         expect(JSON.parse(screen.getByTestId('payment-location').textContent).state).toEqual({ refetch: true, reserveRouteMotion: 'from-right' });
     });
     it.each(['STATUS', 'REVIEW_REQUIRED'])('복귀 결과 %s는 미결제 모달로 오인하지 않아요', async outcome => {
-        fixture.checkReturn.mockResolvedValue({ merchantUid: 'ORDER-fixture', outcome, storeId: 12 });
+        fixture.checkReturn.mockResolvedValue({ merchantUid: 'ORDER-fixture', outcome, storeId: 12, storePublicId: '00000000-0000-4000-8000-000000000012' });
         fixture.getStatus.mockResolvedValue(paid({ status: outcome === 'STATUS' ? 'PAID' : 'FAILED' }));
         show('checkout_return=true&merchant_uid=ORDER-fixture');
         await screen.findByRole('heading', { name: outcome === 'STATUS' ? '결제 완료' : '결제 내역 확인이 필요해요' });
         expect(screen.queryByRole('dialog')).toBeNull();
     });
     it.each([
-        { merchantUid: 'OTHER', outcome: 'INCOMPLETE', storeId: 12 },
+        { merchantUid: 'OTHER', outcome: 'INCOMPLETE', storeId: 12, storePublicId: '00000000-0000-4000-8000-000000000012' },
         { merchantUid: 'ORDER-fixture', outcome: 'INCOMPLETE', storeId: 'https://external.invalid' },
     ])('복귀 주문·가게가 잘못된 응답으로 이동하지 않아요 (%j)', async response => {
         fixture.checkReturn.mockResolvedValue(response);

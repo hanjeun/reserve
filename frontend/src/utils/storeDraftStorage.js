@@ -1,10 +1,9 @@
 import dayjs from 'dayjs';
+import { deleteDraftRecord, LOCAL_DRAFT_TTL_MS, runDraftTransaction } from './localDraftDatabase';
+import { isLegacyStoreId } from './storePublicAddress';
 
-const DATABASE_NAME = 'reserve-local-drafts';
-const DATABASE_VERSION = 1;
 const OBJECT_STORE = 'store-forms';
 const DRAFT_SCHEMA_VERSION = 1;
-const DRAFT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 const DATE_LIST_FIELDS = {
     closedDates: 'YYYY-MM-DD',
@@ -12,65 +11,19 @@ const DATE_LIST_FIELDS = {
     sessionTimes: 'HH:mm',
     times: 'HH:mm',
     breakTimes: 'HH:mm',
+    bookingOpeningPeriod: 'YYYY-MM-DD',
 };
+const DATE_FIELDS = { bookingOpeningDate: 'YYYY-MM-DD', bookingOpeningTime: 'YYYY-MM-DDTHH:mm' };
 
-let databasePromise;
+const runTransaction = (mode, operation) => runDraftTransaction(OBJECT_STORE, mode, operation);
 
-const openDatabase = () => {
-    if (typeof indexedDB === 'undefined') {
-        return Promise.reject(new Error('이 브라우저에서는 로컬 임시저장을 지원하지 않아요.'));
-    }
-    if (databasePromise) return databasePromise;
-
-    databasePromise = new Promise((resolve, reject) => {
-        const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
-        request.onupgradeneeded = () => {
-            const database = request.result;
-            if (!database.objectStoreNames.contains(OBJECT_STORE)) {
-                database.createObjectStore(OBJECT_STORE, { keyPath: 'key' });
-            }
-        };
-        request.onsuccess = () => {
-            const database = request.result;
-            database.onversionchange = () => {
-                database.close();
-                databasePromise = undefined;
-            };
-            resolve(database);
-        };
-        request.onerror = () => {
-            databasePromise = undefined;
-            reject(request.error ?? new Error('로컬 임시저장소를 열지 못했어요.'));
-        };
-        request.onblocked = () => {
-            databasePromise = undefined;
-            reject(new Error('다른 탭에서 임시저장소를 사용 중이에요. 열려 있는 RESERVE 탭을 확인해주세요.'));
-        };
-    });
-
-    return databasePromise;
-};
-
-const runTransaction = async (mode, operation) => {
-    const database = await openDatabase();
-    return new Promise((resolve, reject) => {
-        const transaction = database.transaction(OBJECT_STORE, mode);
-        const store = transaction.objectStore(OBJECT_STORE);
-        let result;
-
-        transaction.oncomplete = () => resolve(result);
-        transaction.onerror = () => reject(transaction.error ?? new Error('로컬 임시저장 처리에 실패했어요.'));
-        transaction.onabort = () => reject(transaction.error ?? new Error('로컬 임시저장이 중단됐어요.'));
-
-        result = operation(store, transaction);
-    });
-};
+const storeDraftPrefix = userId => `member:${String(userId)}:store:`;
 
 export const makeStoreDraftKey = ({ userId, mode, storeId }) => {
     if (userId == null) return null;
     const target = mode === 'edit' ? String(storeId ?? '') : 'new';
     if (mode === 'edit' && !target) return null;
-    return `member:${String(userId)}:store:${mode}:${target}`;
+    return `${storeDraftPrefix(userId)}${mode}:${target}`;
 };
 
 export const serializeStoreFormValues = (values = {}) => {
@@ -79,6 +32,9 @@ export const serializeStoreFormValues = (values = {}) => {
     // 속성이 함께 복제돼 용량이 커지고, 브라우저별 structured-clone 차이도 생긴다.
     delete serialized.mainImage;
     delete serialized.detailImages;
+    for (const [name, format] of Object.entries(DATE_FIELDS)) {
+        if (values[name]?.format) serialized[name] = values[name].format(format);
+    }
 
     Object.entries(DATE_LIST_FIELDS).forEach(([fieldName, format]) => {
         if (!Object.hasOwn(values, fieldName)) return;
@@ -100,6 +56,9 @@ export const serializeStoreFormValues = (values = {}) => {
 
 export const hydrateStoreFormValues = (values = {}) => {
     const hydrated = { ...values };
+    for (const name of Object.keys(DATE_FIELDS)) {
+        if (values[name]) hydrated[name] = dayjs(values[name]);
+    }
     Object.entries(DATE_LIST_FIELDS).forEach(([fieldName, format]) => {
         if (!Object.hasOwn(values, fieldName)) return;
         const fieldValue = values[fieldName];
@@ -204,7 +163,7 @@ export const saveStoreDraft = async ({ key, values, mainImage, detailImages, bas
         key,
         schemaVersion: DRAFT_SCHEMA_VERSION,
         savedAt,
-        expiresAt: savedAt + DRAFT_TTL_MS,
+        expiresAt: savedAt + LOCAL_DRAFT_TTL_MS,
         baseFingerprint: baseFingerprint ?? null,
         values: serializeStoreFormValues(values),
         mainImage: serializeDraftImages(mainImage),
@@ -251,27 +210,36 @@ export const readStoreDraft = async key => {
     return resolved;
 };
 
-export const deleteStoreDraft = async key => {
-    if (!key || typeof indexedDB === 'undefined') return;
-    await runTransaction('readwrite', store => store.delete(key));
-};
-
-export const STORE_DRAFT_TTL_DAYS = DRAFT_TTL_MS / (24 * 60 * 60 * 1000);
-
-/* 같은 계정 범위의 저장소를 사용하며 내보내기·가져오기에서 최초 만료 시각을 유지한다. */
 export const listStoreDrafts = async userId => {
     if (userId == null) return [];
-    return runTransaction('readonly', store => new Promise((resolve, reject) => {
-        const request = store.getAll();
-        request.onsuccess = () => resolve(request.result.filter(record => record.key.startsWith(`member:${userId}:store:`)
-            && record.schemaVersion === DRAFT_SCHEMA_VERSION && record.expiresAt > Date.now()).sort((a, b) => b.savedAt - a.savedAt));
-        request.onerror = () => reject(request.error);
-    }));
+    const prefix = storeDraftPrefix(userId);
+    const now = Date.now();
+    const drafts = [];
+    await runTransaction('readonly', store => {
+        const request = store.openCursor(IDBKeyRange.bound(prefix, `${prefix}\uffff`));
+        request.onsuccess = () => {
+            const cursor = request.result;
+            if (!cursor) return;
+            const record = cursor.value;
+            const target = record.key.slice(prefix.length);
+            const storeId = target.startsWith('edit:') ? target.slice('edit:'.length) : null;
+            if ((target === 'create:new' || isLegacyStoreId(storeId)) && record.schemaVersion === DRAFT_SCHEMA_VERSION
+                && record.expiresAt > now && Number.isFinite(record.savedAt)) {
+                const name = typeof record.values?.name === 'string' ? record.values.name.trim() : '';
+                drafts.push({ key: record.key, storeId, name, savedAt: record.savedAt });
+            }
+            cursor.continue();
+        };
+    });
+    return drafts.sort((left, right) => right.savedAt - left.savedAt);
 };
-export const importStoreDraftRecords = async (records, overwrite = false, guard = () => {}) => runTransaction('readwrite', store => {
-    guard();
-    for (const record of records) {
-        if (overwrite) store.put(record);
-        else { const request = store.get(record.key); request.onsuccess = () => { if (!request.result || request.result.expiresAt <= Date.now()) store.put(record); }; }
-    }
-});
+
+export const deleteStoreDraft = async key => {
+    if (!key || typeof indexedDB === 'undefined') return;
+    return deleteDraftRecord(OBJECT_STORE, key);
+};
+
+export const deleteSavedStoreDraft = (userId, key, expectedSavedAt) => userId != null && key.startsWith(storeDraftPrefix(userId))
+    ? deleteDraftRecord(OBJECT_STORE, key, expectedSavedAt) : false;
+
+export const STORE_DRAFT_TTL_DAYS = LOCAL_DRAFT_TTL_MS / (24 * 60 * 60 * 1000);

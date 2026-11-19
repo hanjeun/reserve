@@ -1,7 +1,5 @@
 package kr.it.reserve.reservation.scheduler;
 
-import kr.it.reserve.config.updates.EntityUpdates;
-
 import kr.it.reserve.payment.service.PaymentService;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
@@ -72,7 +70,8 @@ public class ReservationExpiryProcessor {
                 reservation.getCreatedAt(),
                 expireAt);
         reservation.setStatus(Reservation.ReservationStatus.CANCELLED);
-        if (updates != null) updates.changed(reservation, EntityUpdates.Operation.UPDATED);
+        reservation.setCancellationActor(Reservation.CancellationActor.SYSTEM);
+        if (updates != null) updates.cancelled(reservation);
         return ExpiryResult.CANCELLED;
     }
 

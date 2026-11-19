@@ -33,7 +33,7 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:10.2.0
+    image: grafana/grafana:12.4.15@sha256:2894082f6cf7081aefdc1389265c04000812309208c190d75e8c65f7a30e4b7e
     container_name: grafana
     # nginx도 같은 app-network에서 grafana:3000으로 프록시한다. 외부 공개는 nginx만 담당한다.
     expose:

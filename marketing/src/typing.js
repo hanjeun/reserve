@@ -48,8 +48,9 @@ export function installMarketingTyping(document, motion, hangul) {
         const stop = () => {
             view.clearTimeout(timer);
             nodes.forEach((node, index) => { paint(node, lines[index], fullText(lines[index])); delete node.dataset.typingActive; });
+            if (!hero) heading.dataset.typingState = 'complete';
         };
-        const allowed = () => visible && !hidden && !suspended && !motion.matches;
+        const allowed = () => visible && !hidden && !suspended && !motion.matches && !heading.closest('[inert]');
         const sequence = (node, line, values, speed, next) => {
             let index = 0;
             const step = () => {
@@ -66,7 +67,9 @@ export function installMarketingTyping(document, motion, hangul) {
             timer = view.setTimeout(typeHero, 160);
         });
         const typeSection = index => {
-            if (index >= lines.length || !allowed()) return;
+            if (index >= lines.length) { heading.dataset.typingState = 'complete'; return; }
+            if (!allowed()) return;
+            heading.dataset.typingState = 'typing';
             const node = nodes[index];
             node.dataset.typingActive = 'true';
             sequence(node, lines[index], frames(fullText(lines[index])), TYPE_SPEED, () => {
@@ -81,6 +84,7 @@ export function installMarketingTyping(document, motion, hangul) {
                 lineIndex = 0;
                 timer = view.setTimeout(eraseHero, 1000);
             } else {
+                heading.dataset.typingState = 'pending';
                 nodes.forEach((node, index) => paint(node, lines[index], ''));
                 timer = view.setTimeout(() => typeSection(0), 180);
             }
@@ -93,14 +97,18 @@ export function installMarketingTyping(document, motion, hangul) {
     }, { threshold: [0, 0.6], rootMargin: `-${heights.header} 0px 0px 0px` }) : null;
     for (const [heading, controller] of controllers) {
         if (observer) observer.observe(heading);
-        else if (heading.hasAttribute('data-marketing-typing')) controller.setVisible(true);
+        else controller.setVisible(Boolean(heading.getClientRects().length));
     }
     const refresh = () => controllers.forEach(controller => controller.refresh());
+    const onStageChange = event => {
+        for (const [heading, controller] of controllers) if (event.target.contains?.(heading)) controller.refresh();
+    };
     const onVisibility = () => { hidden = document.hidden; refresh(); };
     const onHide = () => { suspended = true; refresh(); };
     const onShow = () => { suspended = false; hidden = document.hidden; refresh(); };
     motion.addEventListener('change', refresh);
     document.addEventListener('visibilitychange', onVisibility);
+    document.addEventListener('reserve:marketing-stage-change', onStageChange);
     view.addEventListener('pagehide', onHide);
     view.addEventListener('pageshow', onShow);
     return () => {
@@ -108,6 +116,7 @@ export function installMarketingTyping(document, motion, hangul) {
         controllers.forEach(controller => controller.stop());
         motion.removeEventListener('change', refresh);
         document.removeEventListener('visibilitychange', onVisibility);
+        document.removeEventListener('reserve:marketing-stage-change', onStageChange);
         view.removeEventListener('pagehide', onHide);
         view.removeEventListener('pageshow', onShow);
     };

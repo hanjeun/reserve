@@ -1,8 +1,9 @@
 package kr.it.reserve.feed.service;
 
 import kr.it.reserve.config.updates.EntityUpdates;
-import kr.it.reserve.feed.FeedException;
+
 import kr.it.reserve.feed.FeedInteractionPolicy;
+import kr.it.reserve.feed.FeedException;
 import kr.it.reserve.feed.dto.FeedInteractionDto;
 import kr.it.reserve.feed.entity.*;
 import kr.it.reserve.feed.repository.FeedNotificationRepository;
@@ -16,7 +17,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.*;
-
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Objects;
@@ -53,7 +53,8 @@ public class FeedNotificationService {
         policy.requireEnabled(); feeds.activeReader(member);
         return notifications.list(member, unread, LocalDateTime.now(), PageRequests.bounded(page, size)).map(item ->
             new FeedInteractionDto.Notification(item.getId(), item.getKind(), item.getComment().getPost().getId(), item.getComment().getId(),
-                feeds.profileDto(item.getActor()), item.getReadAt() != null, item.getCreatedAt().atOffset(ZoneOffset.UTC)));
+                feeds.profileDto(item.getActor(), member), item.getReadAt() != null, item.getCreatedAt().atOffset(ZoneOffset.UTC),
+                item.getComment().getPost().getPublicId(), item.getComment().getPublicId()));
     }
     public FeedInteractionDto.NotificationCount count(Long member) {
         policy.requireEnabled(); feeds.activeReader(member); return new FeedInteractionDto.NotificationCount(notifications.unread(member, LocalDateTime.now()));

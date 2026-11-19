@@ -10,6 +10,7 @@ import kr.it.reserve.reservation.dto.CalendarDayResponse;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.reservation.service.ReservationService;
 import kr.it.reserve.store.entity.Store;
+import kr.it.reserve.store.entity.BookingOpening;
 import kr.it.reserve.store.repository.StoreRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,7 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
@@ -50,7 +52,7 @@ class ReservationCalendarTest {
     @InjectMocks
     private ReservationService reservationService;
 
-    /** 이번 달 안에서 검사하면 "오늘 이전"이 섞여 판정이 흐려진다. 다음 달을 본다. */
+    /** 과거 방문일 제약과 분리해 달력 규칙을 검증하도록 다음 달을 사용한다. */
     private static final YearMonth NEXT_MONTH = YearMonth.from(ServiceTime.today()).plusMonths(1);
 
     private Store openStore() {
@@ -67,7 +69,7 @@ class ReservationCalendarTest {
     private Map<String, CalendarDayResponse> calendar(Store store) {
         when(storeRepository.findById(anyLong())).thenReturn(Optional.of(store));
         lenient().when(reservationRepository.sumActiveGuestsGroupedByDateAndTime(
-                        anyLong(), any(LocalDate.class), any(LocalDate.class)))
+                        anyLong(), any(LocalDate.class), any(LocalDate.class), isNull()))
                 .thenReturn(List.of());
         return reservationService.getMonthCalendar(1L, NEXT_MONTH).stream()
                 .collect(Collectors.toMap(CalendarDayResponse::getDate, Function.identity()));
@@ -75,6 +77,23 @@ class ReservationCalendarTest {
 
     private static String ymd(LocalDate d) {
         return d.toString();
+    }
+
+    @Test
+    void scheduledOpeningIsSharedByCalendarAndSlotReadsAndIncludesItsBoundary() {
+        Store store = openStore();
+        var start = NEXT_MONTH.atDay(7);
+        var end = start.plusDays(1);
+        var opens = ServiceTime.now().plusHours(1);
+        store.setBookingOpening(new BookingOpening(opens, start, end));
+
+        var days = calendar(store);
+        assertThat(days.get(ymd(start)).getStatus()).isEqualTo("NOT_OPEN_YET");
+        assertThat(days.get(ymd(end)).getOpenSlots()).isZero();
+        assertThat(days.get(ymd(end.plusDays(1))).getStatus()).isEqualTo("OPEN");
+        assertThat(reservationService.getAvailability(store.getId(), start)).isEmpty();
+        assertThat(store.bookingOpeningPending(start, opens.minusNanos(1))).isTrue();
+        assertThat(store.bookingOpeningPending(start, opens)).isFalse();
     }
 
     @Test
@@ -191,7 +210,7 @@ class ReservationCalendarTest {
 
         when(storeRepository.findById(anyLong())).thenReturn(Optional.of(store));
         when(reservationRepository.sumActiveGuestsGroupedByDateAndTime(
-                anyLong(), any(LocalDate.class), any(LocalDate.class)))
+                anyLong(), any(LocalDate.class), any(LocalDate.class), isNull()))
                 .thenReturn(List.<Object[]>of(
                         new Object[]{full, LocalTime.of(9, 0), 4L},
                         new Object[]{full, LocalTime.of(10, 0), 5L}   // 초과분도 마감이다
@@ -218,7 +237,7 @@ class ReservationCalendarTest {
 
         when(storeRepository.findById(anyLong())).thenReturn(Optional.of(store));
         when(reservationRepository.sumActiveGuestsGroupedByDateAndTime(
-                anyLong(), any(LocalDate.class), any(LocalDate.class)))
+                anyLong(), any(LocalDate.class), any(LocalDate.class), isNull()))
                 .thenReturn(List.<Object[]>of(new Object[]{partial, LocalTime.of(9, 0), 4L}));
 
         CalendarDayResponse day = reservationService.getMonthCalendar(1L, NEXT_MONTH).stream()
@@ -244,7 +263,7 @@ class ReservationCalendarTest {
         Store store = openStore();
         when(storeRepository.findById(anyLong())).thenReturn(Optional.of(store));
         lenient().when(reservationRepository.sumActiveGuestsGroupedByDateAndTime(
-                        anyLong(), any(LocalDate.class), any(LocalDate.class)))
+                        anyLong(), any(LocalDate.class), any(LocalDate.class), isNull()))
                 .thenReturn(List.of());
 
         YearMonth lastMonth = YearMonth.from(ServiceTime.today()).minusMonths(1);

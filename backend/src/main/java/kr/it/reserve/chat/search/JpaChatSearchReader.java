@@ -37,9 +37,10 @@ class JpaChatSearchReader implements ChatSearchReader {
                    AND
                 """ + MemberSearchAccess.EXISTS + """
 
-                   AND ((room.member.id = :memberId AND room.memberHiddenAt IS NULL)
+                   AND ((room.member.id = :memberId AND room.memberHiddenAt IS NULL AND room.memberLeftAt IS NULL)
                      OR (:business = true AND room.type = kr.it.reserve.chat.entity.ChatRoom.RoomType.STORE
                        AND (room.ownerHiddenAt IS NULL OR room.ownerHiddenByMemberId <> :memberId)
+                       AND (room.ownerLeftByMemberId IS NULL OR room.ownerLeftByMemberId <> :memberId)
                        AND EXISTS (SELECT store.id FROM Store store WHERE store.id = room.storeId
                             AND store.owner.id = :memberId AND store.owner.role = kr.it.reserve.member.entity.Role.BUSINESS)))
                    AND LOWER(message.content) LIKE :keyword ESCAPE '!'

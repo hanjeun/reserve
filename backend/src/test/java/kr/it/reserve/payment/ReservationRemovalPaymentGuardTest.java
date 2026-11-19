@@ -1,6 +1,7 @@
 package kr.it.reserve.payment;
 
 import jakarta.persistence.EntityManager;
+import kr.it.reserve.global.persistence.CurrentLockedStateTestSupport;
 import kr.it.reserve.global.error.ReservationException;
 import kr.it.reserve.payment.entity.Payment;
 import kr.it.reserve.payment.entity.RefundAttempt;
@@ -10,6 +11,7 @@ import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -22,6 +24,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ReservationRemovalPaymentGuardTest {
+    @BeforeEach void financialPersistence() { CurrentLockedStateTestSupport.managedEntities(entities); }
     @Mock PaymentRepository repository;
     @Mock ReservationRepository reservations;
     @Mock MemberRepository members;

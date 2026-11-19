@@ -18,7 +18,9 @@ import kr.it.reserve.global.ratelimit.IpExtractor;
 import kr.it.reserve.global.ratelimit.RateLimiter;
 import kr.it.reserve.config.util.SecurityUtil;
 import kr.it.reserve.member.entity.Member;
+import kr.it.reserve.notification.service.ReservationNotificationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -45,6 +47,7 @@ public class ChatApiController {
     private final ChatService chatService;
     private final ChatModerationService moderationService;
     private final RateLimiter rateLimiter;
+    private final ReservationNotificationService reservationNotifications;
 
     /** MessengerShell 목록. 빈 고객지원 방은 만들지 않고 실제 대화만 반환한다. */
     @PreAuthorize("isAuthenticated()")
@@ -77,8 +80,8 @@ public class ChatApiController {
     public ResponseEntity<ApiResponse<ChatMessageResponse>> sendSupport(
             @Valid @RequestBody SendMessageRequest request,
             HttpServletRequest httpRequest) {
-        if (!canSend(httpRequest)) return tooManyRequests();
         Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
+        if (!canSend(me, httpRequest)) return tooManyRequests();
         return ResponseEntity.ok(ApiResponse.success(
                 chatService.sendAsMember(me, request.getContent(), request.getClientMessageId()), SEND_SUCCESS_MESSAGE));
     }
@@ -105,8 +108,8 @@ public class ChatApiController {
             @PathVariable Long storeId,
             @Valid @RequestBody SendMessageRequest request,
             HttpServletRequest httpRequest) {
-        if (!canSend(httpRequest)) return tooManyRequests();
         Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
+        if (!canSend(me, httpRequest)) return tooManyRequests();
         return ResponseEntity.ok(ApiResponse.success(
                 chatService.sendAsMemberToStore(
                         me, storeId, request.getContent(), request.getClientMessageId()), SEND_SUCCESS_MESSAGE));
@@ -144,8 +147,8 @@ public class ChatApiController {
             @PathVariable Long roomId,
             @Valid @RequestBody SendMessageRequest request,
             HttpServletRequest httpRequest) {
-        if (!canSend(httpRequest)) return tooManyRequests();
         Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
+        if (!canSend(me, httpRequest)) return tooManyRequests();
         return ResponseEntity.ok(ApiResponse.success(
                 chatService.sendAsOwner(
                         me, roomId, request.getContent(), request.getClientMessageId()), SEND_SUCCESS_MESSAGE));
@@ -206,6 +209,13 @@ public class ChatApiController {
     }
 
     @PreAuthorize("isAuthenticated()")
+    @PutMapping("/rooms/{roomId}/leave")
+    public ResponseEntity<ApiResponse<Void>> leaveConversation(@PathVariable Long roomId, @RequestParam String viewerRole) {
+        moderationService.leave(SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE), roomId, viewerRole);
+        return ResponseEntity.ok(ApiResponse.success(null, "채팅방에서 나갔어요."));
+    }
+
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/rooms/{roomId}/reports")
     public ResponseEntity<ApiResponse<ChatReportResponse>> reportConversation(
             @PathVariable Long roomId,
@@ -221,11 +231,26 @@ public class ChatApiController {
     }
 
     @PreAuthorize("isAuthenticated()")
-    @GetMapping("/unread")
+    @GetMapping(value = "/unread", params = "!split")
     public ResponseEntity<ApiResponse<Long>> totalUnread() {
-        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
-        return ResponseEntity.ok(ApiResponse.success(chatService.totalUnreadCount(me), QUERY_SUCCESS_MESSAGE));
+        UnreadCounts unread = unreadCounts();
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(ApiResponse.success(unread.messages() + unread.notifications(), QUERY_SUCCESS_MESSAGE));
     }
+
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping(value = "/unread", params = "split")
+    public ResponseEntity<ApiResponse<UnreadCounts>> splitUnread() {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(ApiResponse.success(unreadCounts(), QUERY_SUCCESS_MESSAGE));
+    }
+
+    private UnreadCounts unreadCounts() {
+        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
+        return new UnreadCounts(chatService.totalUnreadCount(me), reservationNotifications.unread(me));
+    }
+
+    public record UnreadCounts(long messages, long notifications) {}
 
     /** 내 대화 열기 — 방이 없으면 만들고, 최근 메시지를 주고, 안 읽음을 0으로. */
     @PreAuthorize("isAuthenticated()")
@@ -251,10 +276,7 @@ public class ChatApiController {
             @Valid @RequestBody SendMessageRequest request,
             HttpServletRequest httpRequest) {
         Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
-        if (!rateLimiter.tryConsume(IpExtractor.extract(httpRequest), RateLimiter.Policy.CHAT_SEND)) {
-            return ResponseEntity.status(429)
-                    .body(ApiResponse.error("메시지를 너무 빠르게 보내고 있어요. 잠시 후 다시 시도해주세요."));
-        }
+        if (!canSend(me, httpRequest)) return tooManyRequests();
         return ResponseEntity.ok(ApiResponse.success(
                 chatService.sendAsMember(me, request.getContent(), request.getClientMessageId()), SEND_SUCCESS_MESSAGE));
     }
@@ -282,8 +304,9 @@ public class ChatApiController {
         return ResponseEntity.ok(ApiResponse.success(chatService.myUnreadCount(me), QUERY_SUCCESS_MESSAGE));
     }
 
-    private boolean canSend(HttpServletRequest request) {
-        return rateLimiter.tryConsume(IpExtractor.extract(request), RateLimiter.Policy.CHAT_SEND);
+    private boolean canSend(Member member, HttpServletRequest request) {
+        return rateLimiter.tryConsume(member.getId().toString(), RateLimiter.Policy.CHAT_MEMBER_SEND)
+                && rateLimiter.tryConsume(IpExtractor.extract(request), RateLimiter.Policy.CHAT_SEND);
     }
 
     private ResponseEntity<ApiResponse<ChatMessageResponse>> tooManyRequests() {

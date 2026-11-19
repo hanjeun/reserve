@@ -49,8 +49,11 @@ class SecurityCompletionSettlementMySqlTest extends SecurityCompletionSettlement
                 + "DROP COLUMN attendance_refund_enabled, DROP COLUMN service_duration_minutes, DROP COLUMN usage_ends_at");
         jdbc.execute("ALTER TABLE payment DROP COLUMN verified_channel_type, DROP COLUMN verified_channel_id, "
                 + "DROP COLUMN verified_store_id, DROP COLUMN verified_disputed");
+        jdbc.execute("ALTER TABLE member DROP COLUMN security_contact_email, DROP COLUMN account_recovery_digest, "
+                + "DROP COLUMN account_recovery_expires_at, DROP COLUMN account_recovery_mfa_required");
         jdbc.execute((ConnectionCallback<Void>) connection -> {
             ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/manual/mfa-completion-settlement.sql"));
+            ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/manual/account-protection.sql"));
             return null;
         });
         assertThat(jdbc.queryForList("SELECT member_id, auth_version FROM member ORDER BY member_id")).isEqualTo(membersBefore);
@@ -58,6 +61,9 @@ class SecurityCompletionSettlementMySqlTest extends SecurityCompletionSettlement
         assertThat(jdbc.queryForList("SELECT payment_id, status, amount FROM payment ORDER BY payment_id")).isEqualTo(paymentsBefore);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM reservation WHERE auto_completion_enabled <> FALSE OR attendance_refund_enabled <> FALSE", Integer.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment WHERE verified_channel_type IS NOT NULL", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM member WHERE security_contact_email IS NOT NULL "
+                + "OR account_recovery_digest IS NOT NULL OR account_recovery_expires_at IS NOT NULL "
+                + "OR account_recovery_mfa_required <> FALSE", Integer.class)).isZero();
         factory.unwrap(SessionFactory.class).getSchemaManager().validateMappedObjects();
         verifyJdbcEvidenceWithRestrictedRole();
     }

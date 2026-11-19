@@ -8,6 +8,7 @@ import java.util.regex.Pattern;
 public final class ApiPaths {
     public static final String LEGACY_PREFIX = "/api";
     public static final String V1_PREFIX = "/api/v1";
+    public static final String RESEND_INBOUND = "/api/inquiries/inbound/resend";
     private static final Pattern VERSION_SEGMENT = Pattern.compile("v[0-9]+");
 
     private ApiPaths() {

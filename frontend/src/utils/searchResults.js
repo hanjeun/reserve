@@ -1,4 +1,7 @@
 import { SEARCH_GROUP_LIMIT } from '../constants/searchCatalog';
+import { storeDetailPath } from './storePublicAddress';
+import { publicStoreImageUrl } from './storeImages';
+import { benefitPath, publicPath } from './publicAddress';
 
 export const positiveSearchId = value => typeof value === 'string' && /^[1-9]\d*$/.test(value)
     && Number.isSafeInteger(Number(value)) ? Number(value) : null;
@@ -7,9 +10,9 @@ const titles = { stores: '가게', benefits: '혜택', feed: '피드', reservati
 
 export function isSearchResultPath(key, item, role) {
     if (!Number.isSafeInteger(item?.id) || item.id <= 0 || typeof item.path !== 'string' || item.type !== types[key]) return false;
-    if (key === 'stores') return item.path === `/store/${item.id}`;
-    if (key === 'benefits') return item.path === `/benefits/${item.id}`;
-    if (key === 'feed') return item.path === `/feed/posts/${item.id}`;
+    if (key === 'stores') return item.path === storeDetailPath(item);
+    if (key === 'benefits') return item.path === benefitPath(item.publicId);
+    if (key === 'feed') return item.path === publicPath('/feed/posts/', item.publicId);
     if (key === 'reservations') return item.path === `/my-reservations?reservationId=${item.id}`;
     if (key === 'waiting') return item.path === `/my-reservations?tab=waiting&entryId=${item.id}`;
     if (key !== 'messages') return false;
@@ -35,8 +38,11 @@ export function normalizeSearchResponse(response, keyword, keys, role) {
         if (malformed) return { key, title: titles[key], items: [], hasMore: false,
             error: { status: 503, message: '검색 결과를 확인할 수 없어요. 다시 시도해주세요.' } };
         return { key, title: titles[key], hasMore: group.hasMore, error: group.error ? { status: 503 } : null,
-            items: group.items.map(item => ({ id: item.id, type: item.type, title: item.title,
-                description: item.description?.slice(0, 200) ?? '', path: item.path })) };
+            items: group.items.map(item => {
+                const thumbnailUrl = key === 'stores' ? publicStoreImageUrl(item.thumbnailUrl, item.id, { thumbnailOnly: true }) : null;
+                return { id: item.id, type: item.type, title: item.title,
+                    description: item.description?.slice(0, 200) ?? '', path: item.path, ...(thumbnailUrl && { thumbnailUrl }) };
+            }) };
     }) };
 }
 

@@ -63,7 +63,7 @@ class ServiceAdmissionBudgetConfigurationTest {
             assertThat(service.get("command")).isEqualTo(command);
             assertThat(service.get("mem_limit")).isEqualTo("128m");
             assertThat(service.get("memswap_limit")).isEqualTo("128m");
-            assertThat(service.get("image").toString()).matches("redis:8\\.2\\.9-alpine@sha256:[0-9a-f]{64}");
+            assertThat(service.get("image").toString()).matches("redis:8\\.2\\.11-alpine@sha256:[0-9a-f]{64}");
             assertThat(service.get("read_only")).isEqualTo(true);
             var volumes = ((List<?>) service.get("volumes")).stream().map(value -> (Map<?, ?>) value).toList();
             assertThat(volumes).hasSize(production ? 2 : 1);

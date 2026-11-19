@@ -64,6 +64,7 @@ const chatService = {
         API_ENDPOINTS.CHAT.ROOM_BLOCK(roomId), undefined, { params: { viewerRole, blocked } }),
     setHidden: (roomId, viewerRole, hidden) => api.put(`/api/chat/rooms/${roomId}/visibility`, undefined,
         { params: { viewerRole, hidden } }),
+    leave: (roomId, viewerRole) => api.put(`/api/chat/rooms/${roomId}/leave`, undefined, { params: { viewerRole } }),
     reportConversation: (roomId, viewerRole, report) => api.post(
         API_ENDPOINTS.CHAT.ROOM_REPORTS(roomId), report, { params: { viewerRole } }),
     listReports: (page, status) => api.get(
@@ -71,7 +72,10 @@ const chatService = {
     getReportContext: (reportId) => api.get(API_ENDPOINTS.CHAT.ADMIN_REPORT_CONTEXT(reportId)),
     reviewReport: (reportId, review) => api.patch(
         API_ENDPOINTS.CHAT.ADMIN_REPORT(reportId), review),
-    getUnread: () => api.get(API_ENDPOINTS.CHAT.UNREAD),
+    getUnread: ({ signal } = {}) => api.get(API_ENDPOINTS.CHAT.UNREAD, { params: { split: true }, signal }),
+    getReservationNotifications: (before, signal) => api.get('/api/chat/notifications', { params: { before }, signal }),
+    readReservationNotifications: (ids) => api.post('/api/chat/notifications/read?split=true', { ids }),
+    getNotificationReservation: (id, signal) => api.get(`/api/chat/notifications/${id}/reservation`, { signal }),
     getImageConfig: () => api.get('/api/chat/images/config'),
     sendImage: (roomId, file, content, clientMessageId, config) => {
         const form = new FormData();
@@ -80,6 +84,14 @@ const chatService = {
         form.append('clientMessageId', clientMessageId);
         return api.post(`/api/chat/rooms/${roomId}/images`, form, config);
     },
+    sendFile: (roomId, file, content, clientMessageId, config) => {
+        const form = new FormData();
+        form.append('file', file);
+        form.append('content', content || '');
+        form.append('clientMessageId', clientMessageId);
+        return api.post(`/api/chat/rooms/${roomId}/files`, form, config);
+    },
+    getFile: (url, signal) => api.get(url, { responseType: 'blob', signal }),
     checkImageAccess: (url, signal) => api.head(url, { signal }),
     getImage: (url, signal) => api.get(url, { responseType: 'blob', signal }),
     getSupportIntro: () => api.get(API_ENDPOINTS.CHAT.INTRO_SUPPORT),

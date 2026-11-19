@@ -6,7 +6,8 @@ import App from './App';
 // 앱 셸을 실제 라우터(BrowserRouter)로 띄우되, 네트워크·무거운 레이아웃은 가볍게 바꾼다.
 // 확인하려는 것은 "라우트 표 + 오류 경계 + SEO 관문"의 연결이다.
 const { authState, pageState } = vi.hoisted(() => ({
-    authState: { user: null, isLoggedIn: false, sessionRevision: 0, initializeAuth: async () => {} },
+    authState: { user: null, isLoggedIn: false, sessionRevision: 0, initializeAuth: async () => {},
+        browserRegistrationReference: null, clearBrowserRegistration: vi.fn() },
     pageState: { termsThrows: false },
 }));
 vi.mock('./store/useAuthStore', () => ({
@@ -54,6 +55,8 @@ describe('app route table fallbacks', () => {
         authState.user = null;
         authState.isLoggedIn = false;
         authState.initializeAuth = async () => {};
+        authState.browserRegistrationReference = null;
+        authState.clearBrowserRegistration.mockReset();
         vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
     });
     afterEach(() => { vi.restoreAllMocks(); });
@@ -64,7 +67,7 @@ describe('app route table fallbacks', () => {
         expect(screen.getByRole('navigation', { name: '서비스 탐색' })).toBeVisible();
     });
 
-    it.each(['/store/3', '/benefits/3', '/feed/posts/3', '/business', '/admin', '/search'])('does not promote detail or workspace search %s to a discovery tab', path => {
+    it.each(['/store/3', '/benefits/3', '/feed/posts/3', '/business', '/admin', '/drafts', '/search'])('does not promote detail or workspace search %s to a discovery tab', path => {
         authState.initializeAuth = () => new Promise(() => {});
         renderAt(path + '?keyword=' + encodeURIComponent('공방'));
         expect(screen.queryByRole('navigation', { name: '서비스 탐색' })).toBeNull();
@@ -85,16 +88,34 @@ describe('app route table fallbacks', () => {
         expect(document.querySelector('header, footer')).toBeNull();
     });
 
-    it('keeps anonymous message entry protected and restores the normal login frame', async () => {
-        renderAt('/messages?storeId=14#conversation');
+    it('drops an optional device registration on route exit and keeps the authenticated user', async () => {
+        authState.user = { id: 1, role: 'USER', termsAgreed: true };
+        authState.isLoggedIn = true;
+        authState.browserRegistrationReference = 'a'.repeat(64);
+        authState.clearBrowserRegistration.mockImplementation(() => { authState.browserRegistrationReference = null; });
+        renderAt('/login');
+        await screen.findByRole('heading', { name: '로그인 화면' });
+        expect(authState.clearBrowserRegistration).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('link', { name: '다른 곳으로' }));
+        await screen.findByRole('heading', { name: '페이지를 찾을 수 없어요' });
+        expect(authState.clearBrowserRegistration).toHaveBeenCalledTimes(1);
+        expect(authState.browserRegistrationReference).toBeNull();
+        expect(authState.user.id).toBe(1);
+    });
+
+    it.each([
+        ['/messages', '?storeId=14', '#conversation', '메시지 화면'],
+        ['/drafts', '?tab=posts', '', '임시보관함'],
+    ])('protects anonymous entry to %s and keeps the return address', async (path, search, hash, title) => {
+        renderAt(path + search + hash);
         expect(await screen.findByRole('heading', { name: '로그인 화면' })).toBeInTheDocument();
         expect(window.location.pathname).toBe('/login');
-        expect(screen.queryByRole('heading', { name: '메시지 화면' })).toBeNull();
+        expect(screen.queryByRole('heading', { name: title })).toBeNull();
         expect(document.querySelector('header')).toBeInTheDocument();
         expect(screen.getByText('푸터')).toBeInTheDocument();
-        expect(window.history.state.usr.from.pathname).toBe('/messages');
-        expect(window.history.state.usr.from.search).toBe('?storeId=14');
-        expect(window.history.state.usr.from.hash).toBe('#conversation');
+        expect(window.history.state.usr.from.pathname).toBe(path);
+        expect(window.history.state.usr.from.search).toBe(search);
+        expect(window.history.state.usr.from.hash).toBe(hash);
     });
 
     it.each([

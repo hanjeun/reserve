@@ -59,6 +59,20 @@ class FileStorageTransactionCompensationTest {
     }
 
     @Test
+    void reviewThumbnailAndOriginalAreBothRemovedOnRollback() {
+        String key = fileStorageService.storeEncryptedReviewImage(new byte[36], new byte[33], "users/1/reviews/images");
+        String thumbnail = FileStoragePaths.reviewThumbnailKey(key);
+        assertThat(thumbnail).isNotNull();
+        verify(s3Client).putObject(argThat((PutObjectRequest request) -> thumbnail.equals(request.key())), any(RequestBody.class));
+        verify(s3Client).putObject(argThat((PutObjectRequest request) -> key.equals(request.key())), any(RequestBody.class));
+        for (TransactionSynchronization transaction : TransactionSynchronizationManager.getSynchronizations()) {
+            transaction.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK);
+        }
+        verify(s3Client).deleteObject(argThat((DeleteObjectRequest request) -> thumbnail.equals(request.key())));
+        verify(s3Client).deleteObject(argThat((DeleteObjectRequest request) -> key.equals(request.key())));
+    }
+
+    @Test
     @DisplayName("DB 트랜잭션이 롤백되면 방금 업로드한 S3 객체를 보상 삭제한다")
     void deletesNewObjectAfterRollback() {
         String key = fileStorageService.storeFile(image(), "users/1/profiles");

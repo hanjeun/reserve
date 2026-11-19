@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 /** 피드의 unique/version 충돌만 안전한 409로 변환한다. SQL·회원 정보는 응답하지 않는다. */
 @RestControllerAdvice(assignableTypes = {FeedController.class, AdminFeedController.class,
+        FeedInteractionController.class, AdminFeedCommentController.class,
         kr.it.reserve.feed.news.controller.StoreNewsController.class, kr.it.reserve.feed.news.controller.PromotionApiController.class,
         kr.it.reserve.feed.news.controller.AdminStoreNewsController.class})
 @Order(Ordered.HIGHEST_PRECEDENCE)

@@ -2,15 +2,16 @@ import api from '../api/axios';
 import { API_ENDPOINTS } from '../constants';
 
 const reservationService = {
-    getMyReservations:   (params = {})  => api.get(API_ENDPOINTS.RESERVATION.MY_RESERVATIONS, { params }),
-    getMyCompletedForStore: (storeId)   => api.get(API_ENDPOINTS.RESERVATION.MY_COMPLETED_FOR_STORE(storeId)),
-    getStoreReservations:(params = {})  => api.get(API_ENDPOINTS.RESERVATION.STORE_RESERVATIONS, { params }),
+    getMyReservations:   (params = {}, signal) => api.get(API_ENDPOINTS.RESERVATION.MY_RESERVATIONS, { params, ...(signal ? { signal } : {}) }),
+    getMyCompletedForStore: (storeId, reservationId, signal) => api.get(API_ENDPOINTS.RESERVATION.MY_COMPLETED_FOR_STORE(storeId),
+        { signal, ...(reservationId != null ? { params: { reservationId } } : {}) }),
+    getStoreReservations:(params = {}, signal) => api.get(API_ENDPOINTS.RESERVATION.STORE_RESERVATIONS, { params, ...(signal ? { signal } : {}) }),
     removeReservation:   (id)           => api.delete(API_ENDPOINTS.RESERVATION.REMOVE(id)),
     getReservation:      (id)           => api.get(API_ENDPOINTS.RESERVATION.DETAIL(id)),
-    getEditStore:        (id, storeId, config = {}) => api.get(`/api/reservations/${id}/edit-store`, { ...config, params: { storeId } }),
+    getEditStore:        (id, storePublicId, config = {}) => api.get(`/api/reservations/${id}/edit-store`, { ...config, params: { storePublicId } }),
     getEditAvailability: (id, storeId, date, config = {}) => api.get(`/api/reservations/${id}/availability`, { ...config, params: { storeId, date } }),
     getEditCalendar:     (id, storeId, month, config = {}) => api.get(`/api/reservations/${id}/calendar`, { ...config, params: { storeId, month } }),
-    createReservation:   (data)         => api.post(API_ENDPOINTS.RESERVATION.CREATE, data),
+    createReservation:   (data, config) => api.post(API_ENDPOINTS.RESERVATION.CREATE, data, config),
     recoverReservation:  (data, config = {}) => api.post('/api/reservations/requests/result', data, config),
     updateReservation:   (id, data)     => api.patch(API_ENDPOINTS.RESERVATION.UPDATE(id), data),
     cancelReservation:   (id)           => api.patch(API_ENDPOINTS.RESERVATION.CANCEL(id)),
@@ -22,6 +23,13 @@ const reservationService = {
     undoApprove:         (id)           => api.patch(API_ENDPOINTS.RESERVATION.UNDO_APPROVE(id)),
     undoComplete:        (id)           => api.patch(API_ENDPOINTS.RESERVATION.UNDO_COMPLETE(id)),
     noShowReservation:   (id)           => api.patch(API_ENDPOINTS.RESERVATION.NO_SHOW(id)),
+    undoNoShow:          (id)           => api.patch(API_ENDPOINTS.RESERVATION.UNDO_NO_SHOW(id)),
+    getNoShowMembers:    (storeId, params, signal) => api.get(API_ENDPOINTS.RESERVATION.NO_SHOW_MEMBERS(storeId), { params, signal }),
+    getBusinessCustomers: (params, signal) => api.get('/api/reservations/store/customers', { params, signal }),
+    getBusinessCustomerHistory: (storeId, memberId, section, params, signal) => api.get(
+        `/api/reservations/store/customers/${storeId}/${memberId}/${section}`, { params, signal }),
+    restrictNoShowMember: (storeId, memberId, payload) => api.put(API_ENDPOINTS.RESERVATION.LIMIT_NO_SHOW_MEMBER(storeId, memberId), payload),
+    releaseNoShowMember:  (storeId, id)  => api.delete(API_ENDPOINTS.RESERVATION.RELEASE_NO_SHOW_MEMBER(storeId, id)),
     getQrToken:          (id)           => api.get(API_ENDPOINTS.RESERVATION.QR_TOKEN(id)),
     checkInByQr:         (token)        => api.post(API_ENDPOINTS.RESERVATION.QR_CHECKIN, { token }),
 };

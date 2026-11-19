@@ -2,47 +2,54 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import dayjs from 'dayjs';
 import {
     readStoreDraft,
+    deleteSavedStoreDraft,
     saveStoreDraft,
     fingerprintStoreDraftBase,
     hydrateStoreFormValues,
+    listStoreDrafts,
     makeStoreDraftKey,
     purgeExpiredStoreDrafts,
     serializeDraftImages,
     serializeStoreFormValues,
 } from '../storeDraftStorage';
+import { deleteMailDraft, listMailDrafts, readMailDraft, saveMailDraft } from '../mailDraftStorage';
 
 const records = new Map();
+const mailRecords = new Map();
 
 beforeAll(() => {
+    const stores = new Map([['store-forms', records]]);
+    let installedVersion = 1;
     const database = {
-        objectStoreNames: { contains: () => true },
-        createObjectStore: () => undefined,
+        objectStoreNames: { contains: name => stores.has(name) },
+        createObjectStore: name => stores.set(name, mailRecords),
         close: () => undefined,
-        transaction: () => {
+        transaction: name => {
+            const entriesByKey = stores.get(name);
             const transaction = {
                 objectStore: () => ({
                     put: (record) => {
-                        records.set(record.key, record);
+                        entriesByKey.set(record.key, record);
                         queueMicrotask(() => transaction.oncomplete?.());
                         return {};
                     },
                     get: (key) => {
                         const request = {};
                         queueMicrotask(() => {
-                            request.result = records.get(key);
+                            request.result = entriesByKey.get(key);
                             request.onsuccess?.();
                             queueMicrotask(() => transaction.oncomplete?.());
                         });
                         return request;
                     },
                     delete: (key) => {
-                        records.delete(key);
+                        entriesByKey.delete(key);
                         queueMicrotask(() => transaction.oncomplete?.());
                         return {};
                     },
-                    openCursor: () => {
+                    openCursor: (range) => {
                         const request = {};
-                        const entries = [...records.entries()];
+                        const entries = [...entriesByKey.entries()].filter(([key]) => !range || (key >= range.lower && key <= range.upper));
                         let index = 0;
                         const advance = () => {
                             if (index >= entries.length) {
@@ -54,7 +61,7 @@ beforeAll(() => {
                             const [key, value] = entries[index];
                             request.result = {
                                 value,
-                                delete: () => records.delete(key),
+                                delete: () => entriesByKey.delete(key),
                                 continue: () => {
                                     index += 1;
                                     queueMicrotask(advance);
@@ -73,18 +80,57 @@ beforeAll(() => {
     Object.defineProperty(globalThis, 'indexedDB', {
         configurable: true,
         value: {
-            open: () => {
+            open: (name, version) => {
+                expect(name).toBe('reserve-local-drafts');
                 const request = { result: database };
-                queueMicrotask(() => request.onsuccess?.());
+                queueMicrotask(() => {
+                    if (installedVersion < version) {
+                        request.onupgradeneeded?.();
+                        installedVersion = version;
+                    }
+                    request.onsuccess?.();
+                });
                 return request;
             },
         },
+    });
+    Object.defineProperty(globalThis, 'IDBKeyRange', {
+        configurable: true,
+        value: { bound: (lower, upper) => ({ lower, upper }) },
     });
 });
 
 afterEach(() => {
     records.clear();
+    mailRecords.clear();
     vi.useRealTimers();
+});
+
+it('preserves the store forms and keeps local mail bodies and photos scoped by administrator', async () => {
+    const key = 'member:7:store:create:new';
+    const savedAt = Date.now();
+    records.set(key, { key, schemaVersion: 1, savedAt, expiresAt: savedAt + 60_000, values: { name: '기존 가게 초안' } });
+    const photos = [new Blob(['mail-photo'], { type: 'image/png' })];
+    const form = { toEmail: 'guest@example.test', subject: '새 메일 초안', body: '작성 중인 내용', marketing: true };
+    await saveMailDraft(7, { id: 'compose', form, photos });
+    await saveMailDraft(8, { id: 'compose', form: { ...form, subject: '다른 관리자' }, photos: [] });
+    expect(await readStoreDraft(key)).toMatchObject({ values: { name: '기존 가게 초안' } });
+    expect(await readMailDraft(7, 'compose')).toMatchObject({ form, photos });
+    expect(await listMailDrafts(7)).toEqual([{
+        id: 'compose', toEmail: form.toEmail, subject: form.subject, bodyPreview: form.body, savedAt: expect.any(Number),
+    }]);
+    expect(await deleteMailDraft(7, 'compose', savedAt - 1)).toBe(false);
+    expect(await readMailDraft(7, 'compose')).toMatchObject({ form, photos });
+    expect(await deleteSavedStoreDraft(8, key, savedAt)).toBe(false);
+    expect(await deleteSavedStoreDraft(7, key, savedAt - 1)).toBe(false);
+    expect(await readStoreDraft(key)).not.toBeNull();
+    await deleteMailDraft(7, 'compose', (await readMailDraft(7, 'compose')).savedAt);
+    expect(await readMailDraft(7, 'compose')).toBeNull();
+    expect(await readMailDraft(8, 'compose')).toMatchObject({ form: { subject: '다른 관리자' } });
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(savedAt + 31 * 86_400_000);
+    expect(await listMailDrafts(8)).toEqual([]);
+    expect(mailRecords.size).toBe(0);
 });
 
 describe('storeDraftStorage', () => {
@@ -167,5 +213,28 @@ describe('storeDraftStorage', () => {
         expect(await purgeExpiredStoreDrafts()).toBe(1);
         expect(records.has(oldKey)).toBe(false);
         expect(records.has(currentKey)).toBe(true);
+    });
+
+    it('lists only the current member’s live draft metadata in most recent order', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-09-11T00:00:00Z'));
+        const expiredKey = makeStoreDraftKey({ userId: 7, mode: 'edit', storeId: 2 });
+        await saveStoreDraft({ key: expiredKey, values: { name: '만료 초안' } });
+
+        vi.setSystemTime(new Date('2026-10-12T00:00:00Z'));
+        const create = await saveStoreDraft({
+            key: makeStoreDraftKey({ userId: 7, mode: 'create' }), values: { name: '등록 초안', address: '임시 주소' },
+        });
+        await saveStoreDraft({ key: makeStoreDraftKey({ userId: 70, mode: 'create' }), values: { name: '다른 회원 초안' } });
+        vi.setSystemTime(new Date('2026-10-12T00:01:00Z'));
+        const edit = await saveStoreDraft({
+            key: makeStoreDraftKey({ userId: 7, mode: 'edit', storeId: 31 }), values: { name: '수정 초안' },
+        });
+
+        expect(await listStoreDrafts(7)).toEqual([
+            { key: edit.key, storeId: '31', name: '수정 초안', savedAt: edit.savedAt },
+            { key: create.key, storeId: null, name: '등록 초안', savedAt: create.savedAt },
+        ]);
+        expect(records.has(expiredKey)).toBe(true);
     });
 });

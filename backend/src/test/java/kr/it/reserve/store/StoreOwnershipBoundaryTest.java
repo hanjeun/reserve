@@ -11,6 +11,7 @@ import kr.it.reserve.promotion.repository.PromotionRepository;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.store.dto.StoreUpdateRequest;
 import kr.it.reserve.store.entity.Store;
+import kr.it.reserve.store.entity.StoreStatus;
 import kr.it.reserve.store.repository.StoreRepository;
 import kr.it.reserve.store.service.StoreService;
 import org.junit.jupiter.api.Test;
@@ -34,7 +35,7 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class StoreOwnershipBoundaryTest {
-    private enum Operation { UPDATE, AUTO_APPROVAL, RESERVATION_COUNT, CLOSURE_READINESS, CLOSE }
+    private enum Operation { EDIT_READ, UPDATE, AUTO_APPROVAL, RESERVATION_COUNT, CLOSURE_READINESS, CLOSE }
 
     @Mock StoreRepository stores;
     @Mock ReservationRepository reservations;
@@ -49,8 +50,18 @@ class StoreOwnershipBoundaryTest {
     @ParameterizedTest
     @EnumSource(Operation.class)
     void ownerlessStoreDoesNotGrantBusinessMemberAccess(Operation operation) {
+        assertDenied(operation, null);
+    }
+
+    @ParameterizedTest
+    @EnumSource(Operation.class)
+    void anotherBusinessCannotAccessOwnerOperations(Operation operation) {
+        assertDenied(operation, Member.builder().id(10L).role(Role.BUSINESS).build());
+    }
+
+    private void assertDenied(Operation operation, Member owner) {
         var actor = Member.builder().id(9L).role(Role.BUSINESS).build();
-        var store = Store.builder().id(31L).name("원래 가게").autoApprovalEnabled(false).build();
+        var store = Store.builder().id(31L).owner(owner).name("원래 가게").autoApprovalEnabled(false).build();
         if (operation == Operation.UPDATE || operation == Operation.CLOSE) {
             when(stores.findByIdForUpdate(31L)).thenReturn(Optional.of(store));
         } else {
@@ -71,6 +82,21 @@ class StoreOwnershipBoundaryTest {
     }
 
     @Test
+    void publicDetailHidesClosedAndBannedStores() {
+        var closed = Store.builder().id(31L).build();
+        closed.softDelete();
+        var banned = Store.builder().id(32L).status(StoreStatus.BANNED).build();
+        when(stores.findById(31L)).thenReturn(Optional.of(closed));
+        when(stores.findById(32L)).thenReturn(Optional.of(banned));
+
+        for (Long id : new Long[]{31L, 32L}) {
+            assertThatThrownBy(() -> service.getStore(id))
+                    .isInstanceOfSatisfying(StoreException.class,
+                            error -> assertThat(error.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+        }
+    }
+
+    @Test
     void actualOwnerCanStillReadReservationCount() {
         var owner = Member.builder().id(9L).role(Role.BUSINESS).build();
         var store = Store.builder().id(31L).owner(owner).build();
@@ -82,6 +108,7 @@ class StoreOwnershipBoundaryTest {
 
     private void request(Operation operation, Member actor) {
         switch (operation) {
+            case EDIT_READ -> service.getStoreForEdit(31L, actor);
             case UPDATE -> {
                 var request = new StoreUpdateRequest();
                 request.setName("변경 시도");

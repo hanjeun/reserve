@@ -1,22 +1,31 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import PortOne from '@portone/browser-sdk/v2';
 import paymentService from '../services/paymentService';
 import useMessage from './useMessage';
 import usePaymentMethodDialog from './usePaymentMethodDialog';
 import useAuthStore from '../store/useAuthStore';
 import usePaymentHandoff, { PAYMENT_HANDOFF } from './usePaymentHandoff';
-import { configuredPaymentMethods, paymentMethodRequest, paymentWasCancelled } from '../utils/paymentMethods';
-import { clearPaymentReturns, rememberPaymentReturn } from '../utils/paymentReturnContext';
+import { invalidateReservationData } from './invalidateAfterWrite';
+import { configuredPaymentMethods, paymentMethodRequest, paymentWasCancelled, tossMerchantUnavailable } from '../utils/paymentMethods';
+import { clearPaymentReturns, consumePaymentReturn, rememberPaymentReturn } from '../utils/paymentReturnContext';
+import { requirePaymentTime } from '../utils/reservationPayment';
 
 const usePayment = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const queryClient = useQueryClient();
     const { message } = useMessage();
     const { choosePayment, paymentDialog } = usePaymentMethodDialog();
     const [paying, setPaying] = useState(false);
     const active = useRef(false);
+    const mounted = useRef(true);
     const attempt = useRef(0);
+    useEffect(() => {
+        mounted.current = true;
+        return () => { mounted.current = false; };
+    }, []);
     useEffect(() => useAuthStore.subscribe((state, before) => {
         if (state.sessionRevision !== before.sessionRevision) {
             clearPaymentReturns(); attempt.current++; active.current = false; setPaying(false);
@@ -32,35 +41,58 @@ const usePayment = () => {
         const operation = ++attempt.current;
         setPaying(true);
         const revision = useAuthStore.getState().sessionRevision;
-        const current = () => revision === useAuthStore.getState().sessionRevision;
+        const current = () => mounted.current && revision === useAuthStore.getState().sessionRevision;
         let handedOff = false;
         let checkoutUid = null;
         try {
+            requirePaymentTime(reservation);
             if (!configuredPaymentMethods().length) throw new Error('사용 가능한 결제 수단을 불러오지 못했어요.');
-            const prepared = await paymentService.prepare({
+            const prepareRequest = {
                 reservationId: reservation.id, amount: reservation.depositAmount,
                 productName: reservation.storeName + ' 예약금',
                 buyerName: buyer.name, buyerEmail: buyer.email, buyerTel: buyer.phone || '',
-            });
+            };
+            const prepared = await paymentService.prepare(prepareRequest);
             if (!current()) return { success: false, stale: true };
             const method = await choosePayment(prepared, { ...reservation, kind: 'RESERVATION' });
             if (!method || !current()) return { success: false, cancelled: true };
-            const { merchantUid, storeId, amount, productName, buyerName, buyerEmail, buyerTel } = prepared;
+            requirePaymentTime(reservation);
+            // 입력 오류는 외부 결제 중단과 구분하고 현재 화면에서 안내해요.
+            paymentMethodRequest(method, prepared);
+            // 수단을 고르는 동안 만료·취소·결제됐을 수 있어 같은 예약의 READY 주문을 다시 확인해요.
+            const confirmed = await paymentService.prepare(prepareRequest);
+            if (!current()) return { success: false, stale: true };
+            if (confirmed.merchantUid !== prepared.merchantUid || confirmed.amount !== prepared.amount || confirmed.storeId !== prepared.storeId)
+                throw new Error('결제 정보가 변경됐어요. 다시 확인해주세요.');
+            const methodRequest = paymentMethodRequest(method, confirmed);
+            const { merchantUid, storeId, amount, productName, buyerName, buyerEmail, buyerTel } = confirmed;
             checkoutUid = merchantUid;
             rememberPaymentReturn(merchantUid, useAuthStore.getState().user?.id, location);
             const payment = await beginHandoff({ merchantUid }, () => PortOne.requestPayment({
                 storeId, paymentId: merchantUid, orderName: productName, totalAmount: amount, currency: 'KRW',
-                ...paymentMethodRequest(method, prepared),
+                ...methodRequest,
                 customer: { fullName: buyerName, email: buyerEmail, phoneNumber: buyerTel || undefined },
                 redirectUrl: window.location.origin + '/api/payment/mobile-redirect',
             })).catch(error => {
                 if (paymentWasCancelled(error, method)) return { code: 'PAY_PROCESS_CANCELED' };
+                if (tossMerchantUnavailable(error, method)) return error;
                 throw error;
             });
             if (payment === PAYMENT_HANDOFF) return { success: false, interrupted: true };
             if (!current()) return { success: false, stale: true };
             if (payment == null) { handedOff = true; beginHandoff({ merchantUid }); return { success: false, redirected: true }; }
-            if (payment.code !== undefined) {
+            const merchantUnavailable = tossMerchantUnavailable(payment, method);
+            if (merchantUnavailable) {
+                const checked = await paymentService.checkReturn(merchantUid).catch(() => null);
+                if (!current()) return { success: false, stale: true };
+                if (checked?.merchantUid === merchantUid && checked.outcome === 'INCOMPLETE') {
+                    consumePaymentReturn(merchantUid, useAuthStore.getState().user?.id, checked.storePublicId);
+                    void invalidateReservationData(queryClient);
+                    message.error('토스페이 가맹점 정보를 확인하지 못했어요. 결제 기한 안에는 다른 수단으로 이어갈 수 있어요.');
+                    return { success: false };
+                }
+            }
+            if (payment.code !== undefined || merchantUnavailable) {
                 const cancelled = paymentWasCancelled(payment, method);
                 navigate('/payment/result?checkout_return=true&merchant_uid=' + encodeURIComponent(merchantUid));
                 return { success: false, cancelled };
@@ -82,8 +114,8 @@ const usePayment = () => {
                 else message.error(error instanceof Error ? error.message : '결제를 준비하지 못했어요.');
             }
             return { success: false };
-        } finally { if (!handedOff && operation === attempt.current) { active.current = false; setPaying(false); } }
-    }, [navigate, location, message, choosePayment, beginHandoff]);
+        } finally { if (mounted.current && !handedOff && operation === attempt.current) { active.current = false; setPaying(false); } }
+    }, [navigate, location, queryClient, message, choosePayment, beginHandoff]);
     return { pay, paying, paymentDialog };
 };
 export default usePayment;

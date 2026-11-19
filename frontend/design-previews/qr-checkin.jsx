@@ -1,12 +1,10 @@
-import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ConfigProvider, App as AntApp, QRCode } from 'antd';
 import koKR from 'antd/locale/ko_KR';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
-import QrScannerSheet from '../src/components/reservation/QrScannerSheet';
-import QrScanResult from '../src/components/reservation/QrScanResult';
+import QrCheckinPreview from './QrCheckinPreview';
 import reservationService from '../src/services/reservationService';
 import waitingService from '../src/services/waitingService';
 import useAuthStore from '../src/store/useAuthStore';
@@ -32,7 +30,7 @@ const mockCheckin = async () => {
 reservationService.checkInByQr = mockCheckin;
 waitingService.checkInByQr = mockCheckin;
 
-// Only this isolated entry replaces the camera. Never imports into the production app.
+// 실제 카메라를 대체하는 코드는 격리된 개발 진입점에서만 실행한다.
 Html5Qrcode.prototype.start = async function (_camera, _config, success, failure) {
     if (fixture.cameraError) throw new DOMException('Example camera failure', fixture.cameraError);
     if (fixture.starting) return new Promise(() => {});
@@ -77,27 +75,7 @@ if (fixture?.tracking) Object.defineProperty(window, 'BarcodeDetector', { config
 } });
 else delete window.BarcodeDetector;
 
-function Overview() {
-    return <main style={{ padding: 24, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 24 }}>
-        {QR_PREVIEW_CASES.filter(item => item.response || item.error || item.pending).map(item => <article key={item.key}
-            style={{ padding: 16, border: '1px solid var(--c-border-light)', borderRadius: 16 }}>
-            <p style={{ margin: 0, color: 'var(--c-text-tertiary)', fontSize: 12 }}>{item.label}</p>
-            <QrScanResult result={{ kind: item.kind || 'reservation', state: item.pending ? 'checking' : item.error ? 'error' : item.response.alreadyCheckedIn ? 'duplicate' : 'success',
-                error: item.error, data: item.kind === 'waiting' ? item.response?.entry : item.response?.reservation }} />
-        </article>)}
-    </main>;
-}
-function Preview() {
-    const [open, setOpen] = useState(true);
-    return <>
-        <header style={{ padding: '20px 24px', borderBottom: '1px solid var(--c-border-light)' }}>
-            <strong style={{ fontSize: 24, color: 'var(--c-primary)' }}>RESERVE</strong>
-            <p style={{ margin: '8px 0 0', fontSize: 14, color: 'var(--c-text-secondary)' }}>{fixture?.label || 'QR 결과 모음'} · 예시 카메라와 접수 데이터</p>
-        </header>
-        {scenario === 'overview' ? <Overview /> : <QrScannerSheet open={open} onClose={() => setOpen(false)} />}
-    </>;
-}
 const client = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } });
 createRoot(document.getElementById('root')).render(<ConfigProvider locale={koKR} theme={{ token: { colorPrimary: '#3182f6', fontFamily: 'inherit' } }}>
-    <AntApp><QueryClientProvider client={client}><MemoryRouter><Preview /></MemoryRouter></QueryClientProvider></AntApp>
+    <AntApp><QueryClientProvider client={client}><MemoryRouter><QrCheckinPreview fixture={fixture} scenario={scenario} /></MemoryRouter></QueryClientProvider></AntApp>
 </ConfigProvider>);

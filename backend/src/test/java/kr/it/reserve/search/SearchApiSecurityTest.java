@@ -62,6 +62,23 @@ class SearchApiSecurityTest {
                 .andExpect(status().isBadRequest());
         verifyNoInteractions(sources);
     }
+    @Test void publicSearchUsesItsOwnIpLimitBeforeDatabaseQueries() throws Exception {
+        when(limiter.tryConsume(anyString(), eq(RateLimiter.Policy.SEARCH_PUBLIC_IP))).thenReturn(false);
+        mvc.perform(get("/api/v1/search").param("keyword", "공방"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")));
+        verifyNoInteractions(sources);
+    }
+    @Test void personalSearchUsesBothPrincipalAndIpLimitsBeforeDatabaseQueries() throws Exception {
+        var member = Member.builder().id(7L).role(Role.USER).build();
+        var auth = new UsernamePasswordAuthenticationToken(member, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        when(limiter.tryConsume(anyString(), eq(RateLimiter.Policy.SEARCH_PERSONAL_IP))).thenReturn(false);
+        mvc.perform(get("/api/search/me").with(authentication(auth)).param("keyword", "예약").param("memberId", "99"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")));
+        verify(limiter).tryConsume("7", RateLimiter.Policy.SEARCH_PERSONAL_MEMBER);
+        verifyNoInteractions(sources);
+    }
     @Test void scopedPrivateSearchStillUsesOnlyThePrincipalAndRejectsUnsupportedFilters() throws Exception {
         var member = Member.builder().id(7L).role(Role.USER).build();
         var auth = new UsernamePasswordAuthenticationToken(member, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));

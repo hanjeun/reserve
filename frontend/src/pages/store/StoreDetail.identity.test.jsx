@@ -41,15 +41,15 @@ describe('store detail identity rating', () => {
         const identity = container.querySelector('.reserve-store-identity');
         expect(Array.from(identity.children).map(child => child.className)).toEqual([
             'reserve-store-identity-title-row',
-            'reserve-store-identity-rating',
-            'reserve-store-identity-summary',
             'reserve-store-identity-tags',
         ]);
+        expect(identity.querySelector('.reserve-store-identity-heading')).toContainElement(identity.querySelector('.reserve-store-identity-rating'));
         expect(identity).not.toHaveClass('reserve-store-identity--has-contact-actions');
         expect(identity.querySelector('.reserve-store-identity-actions').parentElement).toHaveClass('reserve-store-identity-title-row');
         expect(identity.querySelector('.reserve-store-identity-actions [aria-label="즐겨찾기 추가"]')).toHaveAttribute('data-appearance', 'plain');
         expect(identity.querySelector('.reserve-store-identity-text')).toHaveTextContent('맛집우리동네');
         expect(identity.querySelector('.reserve-store-identity-summary')).toHaveTextContent('맛집우리동네·소개');
+        expect(identity.querySelector('.reserve-store-identity-summary').parentElement).toHaveClass('reserve-store-identity-title-row');
         expect(identity.querySelector('.reserve-store-identity-tags')).toHaveTextContent('주차');
         expect(screen.getByRole('button', { name: '가게에 채팅 문의하기' })).toBeInTheDocument();
         expect(screen.getByRole('link', { name: '가게에 전화하기 02-1234-5678' })).toHaveAttribute('href', 'tel:0212345678');

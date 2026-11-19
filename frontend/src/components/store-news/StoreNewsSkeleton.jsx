@@ -1,6 +1,8 @@
 import Bone from '../common/Bone';
 import PropTypes from 'prop-types';
 import IconToolSkeleton from '../common/IconToolSkeleton';
+import StoreCardSkeleton from '../common/StoreCardSkeleton';
+import StoreListRowSkeleton from '../store/StoreListRowSkeleton';
 import { FilterMenuSkeleton } from '../common/FilterToolbarSkeleton';
 import { STORE_NEWS_STATES, STORE_NEWS_TYPES } from '../../utils/storeNews';
 
@@ -25,16 +27,21 @@ export function StoreNewsPublicToolbarSkeleton({ business = false, type = 'ALL',
 }
 StoreNewsPublicToolbarSkeleton.propTypes = { business: PropTypes.bool, type: PropTypes.string, period: PropTypes.string, showRefresh: PropTypes.bool };
 
-export default function StoreNewsSkeleton({ contentOnly = false, showRefresh = true }) {
+export default function StoreNewsSkeleton({ contentOnly = false, showRefresh = true, view = 'list' }) {
     return <section className="reserve-store-news-management" aria-label="내 가게 소식을 불러오는 중" aria-busy="true">
         {!contentOnly && <>
-            <div className="reserve-explore-filters reserve-store-news-manage-toolbar" aria-hidden="true"><StoreNewsActionSkeleton /><span className="reserve-explore-count"><Bone width={52} height={16} /></span>
+            <div className="reserve-explore-filters reserve-store-news-manage-toolbar" aria-hidden="true">
+                <div className="reserve-store-news-actions">
+                    <IconToolSkeleton /><IconToolSkeleton /><IconToolSkeleton />
+                    <span className="reserve-explore-count"><Bone width={52} height={16} /></span>
+                </div>
                 <div className="reserve-explore-filter-controls"><FilterMenuSkeleton select={{ value: 'ALL', options: [{ value: 'ALL', label: '전체 가게' }] }} />
                     <FilterMenuSkeleton select={{ value: 'ALL', options: STORE_NEWS_STATES }} />{showRefresh && <IconToolSkeleton />}</div></div></>}
-        <div className="reserve-store-news-manage-list" aria-hidden="true">
-            {[0, 1, 2].map(item => <div className="reserve-store-news-manage-row" key={item}><Bone width="70%" height={22} />
-                <Bone width="90%" height={16} style={{ marginTop: 14 }} /><Bone width={160} height={38} style={{ marginTop: 16 }} /></div>)}
+        <div className={view === 'cards' ? 'rsv-mystore-grid' : 'reserve-store-list-rows'} aria-hidden="true">
+            {view === 'cards' ? <StoreCardSkeleton count={3} showFavorite={false} withActions />
+                : <StoreListRowSkeleton count={3} className="reserve-mystore-list-row" showFavorite={false}
+                    extraTools={[0, 1, 2].map(key => <IconToolSkeleton key={key} />)} />}
         </div>
     </section>;
 }
-StoreNewsSkeleton.propTypes = { contentOnly: PropTypes.bool, showRefresh: PropTypes.bool };
+StoreNewsSkeleton.propTypes = { contentOnly: PropTypes.bool, showRefresh: PropTypes.bool, view: PropTypes.oneOf(['list', 'cards']) };

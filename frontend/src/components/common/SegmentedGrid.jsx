@@ -4,39 +4,46 @@
  */
 import React from 'react';
 import PropTypes from 'prop-types';
+import useRadioGroupNavigation from '../../hooks/useRadioGroupNavigation';
 
-const SegmentedGrid = ({ options, value, onChange, columns = 4, disabled = false }) => (
+const SegmentedGrid = ({ options, value, onChange, columns = 4, gap = 4, disabled = false, id, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy }) => {
+    const radioProps = useRadioGroupNavigation({ options, value, onChange, disabled });
+    return (
     <div
+        id={id}
         className="reserve-segmented"
         style={{
             display: 'grid',
             gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-            gap: 4,
+            gap,
             width: '100%',
         }}
         role="radiogroup"
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledBy}
+        aria-disabled={disabled || undefined}
     >
-        {options.map((opt) => {
+        {options.map((opt, index) => {
             const active = opt.value === value;
             return (
                 <button
                     key={opt.value}
+                    {...radioProps(index)}
                     type="button"
                     role="radio"
                     aria-checked={active}
                     disabled={disabled || opt.disabled}
                     onClick={() => onChange(opt.value)}
-                    // --wrap 은 세로 패딩을 키운다. 여러 줄 모드는 라벨이 짧은 경우가 많아
-                    // (문의 유형의 "예약"·"결제") 내용 폭만으로는 손가락으로 누르기 어렵다.
+                    // 짧은 라벨도 충분한 터치 영역을 갖도록 그리드용 여백을 사용한다.
                     className={`reserve-segmented-btn reserve-segmented-btn--wrap${active ? ' reserve-segmented-btn--active' : ''}`}
-                    // 폭은 그리드 칸이 정한다 — flex 계산을 넣으면 오히려 충돌한다.
                 >
                     {opt.label}
                 </button>
             );
         })}
     </div>
-);
+    );
+};
 
 SegmentedGrid.propTypes = {
     options: PropTypes.arrayOf(PropTypes.shape({
@@ -48,7 +55,11 @@ SegmentedGrid.propTypes = {
     onChange: PropTypes.func.isRequired,
     /** 줄당 버튼 개수. 항목 수를 이 값의 배수로 두면 줄 끝이 비지 않는다. */
     columns: PropTypes.number,
+    gap: PropTypes.number,
     disabled: PropTypes.bool,
+    id: PropTypes.string,
+    'aria-label': PropTypes.string,
+    'aria-labelledby': PropTypes.string,
 };
 
 export default SegmentedGrid;

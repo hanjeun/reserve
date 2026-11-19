@@ -1,21 +1,30 @@
-import React from 'react';
+import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { renderPaginationItem } from './paginationItem';
 import { Table } from 'antd';
 import DataState from './DataState';
+import AnimatedContent from './AnimatedContent';
+import Pagination from './Pagination';
 import { useWindowWidth } from '../../hooks/useWindowWidth';
 import { DEFAULT_PAGE_SIZE, MOBILE_PAGINATION_BREAKPOINT } from '../../constants/pagination';
 
 /*
  * 서버 전체 건수를 pagination.total로 전달한다. fitContent는 고정 너비 열만 있는 표, stickyFirstColumn은 명시적 너비의 식별 열에 사용한다.
  */
-const DataTable = ({ pageSize = DEFAULT_PAGE_SIZE, pagination, size = 'middle', fitContent = false, stickyFirstColumn = false, columns, className, locale, ...rest }) => {
+const DataTable = ({ pageSize = DEFAULT_PAGE_SIZE, pagination, size = 'middle', fitContent = false, stickyFirstColumn = false, columns, className, locale, onChange, ...rest }) => {
     const isMobile = useWindowWidth() < MOBILE_PAGINATION_BREAKPOINT;
+    const [changes, setChanges] = useState(0);
+    const page = pagination?.current;
+    const waiting = Boolean(rest.loading) && rest.loading?.spinning !== false;
+    const changeTable = (next, filters, sorter, extra) => {
+        if (extra?.action !== 'paginate' || page == null) setChanges(value => value + 1);
+        onChange?.(next, filters, sorter, extra);
+    };
 
     const paginationConfig = pagination === false ? false : {
         pageSize,
         showSizeChanger: false,
-        // 모바일에선 페이지 버튼 개수와 크기를 줄인다 (위 컨벤션 주석 참고)
+        // 모바일에서는 페이지 버튼 수를 줄여 가로 공간을 확보한다.
         showLessItems: isMobile,
         itemRender: renderPaginationItem,
         ...pagination,
@@ -32,7 +41,7 @@ const DataTable = ({ pageSize = DEFAULT_PAGE_SIZE, pagination, size = 'middle', 
         : emptyText;
 
     return (
-        <Table
+        <AnimatedContent className="reserve-data-table-motion" motionKey={`${page ?? ''}:${changes}`} ready={!waiting} motionTarget=".ant-table"><Table
             size={size}
             tableLayout="fixed"
             scroll={{ x: 'max-content' }}
@@ -40,8 +49,9 @@ const DataTable = ({ pageSize = DEFAULT_PAGE_SIZE, pagination, size = 'middle', 
             pagination={paginationConfig}
             columns={resolvedColumns}
             {...rest}
+            onChange={changeTable}
             locale={{ ...locale, emptyText: resolvedEmptyText }}
-        />
+        /></AnimatedContent>
     );
 };
 
@@ -53,7 +63,7 @@ DataTable.propTypes = {
     pageSize: PropTypes.number,
     /** false면 페이지네이션 비활성, 객체면 기본 설정에 병합 */
     pagination: PropTypes.oneOfType([PropTypes.bool, PropTypes.object]),
-    /** AntD Table size — 기본 middle로 통일(관리자/사업자 패널 간 여백 불일치 방지) */
+    /** 관리자·사업자 표의 기본 여백은 middle로 맞춘다. */
     size: PropTypes.oneOf(['small', 'middle', 'large']),
     /** 모든 열이 고정폭일 때 true — 테이블이 컨테이너 전체 폭을 차지하지 않게 함 */
     fitContent: PropTypes.bool,
@@ -64,6 +74,21 @@ DataTable.propTypes = {
     className: PropTypes.string,
     /** 문자열 빈 결과는 공통 DataState로 표시하고, 사용자 정의 노드·함수는 그대로 둔다 */
     locale: PropTypes.object,
+    onChange: PropTypes.func,
 };
 
 export default DataTable;
+
+/** 본문을 교체하는 서버 표에서도 페이지 버튼의 DOM과 포커스를 유지한다. */
+export function PagedDataTable({ placeholder, pagination, ...table }) {
+    const isMobile = useWindowWidth() < MOBILE_PAGINATION_BREAKPOINT;
+    return <>
+        <AnimatedContent motionKey={String(pagination.current ?? 1)} ready={!placeholder}
+            keepResultsHeight={pagination.total > (pagination.pageSize ?? DEFAULT_PAGE_SIZE)} aria-busy={Boolean(placeholder)}>
+            {placeholder || <DataTable {...table} pagination={false} />}
+        </AnimatedContent>
+        {pagination.total > 0 && <Pagination className="reserve-data-table-pagination" showLessItems={isMobile}
+            align="center" pageSize={DEFAULT_PAGE_SIZE} showSizeChanger={false} {...pagination} />}
+    </>;
+}
+PagedDataTable.propTypes = { placeholder: PropTypes.node, pagination: PropTypes.object.isRequired };

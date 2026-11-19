@@ -20,6 +20,7 @@ import kr.it.reserve.payment.entity.*;
 import kr.it.reserve.payment.repository.*;
 import kr.it.reserve.payment.service.*;
 import kr.it.reserve.reservation.entity.Reservation;
+import kr.it.reserve.reservation.entity.ReservationNoShowRecord;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.reservation.service.*;
 import kr.it.reserve.store.entity.Store;
@@ -112,7 +113,8 @@ class SecurityCompletionSettlementTest {
         assertThatThrownBy(() -> mfa.status(altered, null, null)).isInstanceOf(AuthException.class);
         var setup = mfa.beginTotp(pending.value(), null, null);
         String code = MfaCrypto.code(setup.secret(), Instant.now().getEpochSecond() / 30, 6);
-        mfa.confirmTotp(pending.value(), null, null, code);
+        var enrollment = mfa.confirmTotp(pending.value(), null, null, code);
+        assertThat(enrollment.session()).isNull();
         var result = mfa.finish(pending.value(), null, null).session();
         assertThat(result.persistent()).isEqualTo(persistent);
         assertThat(tokens.verifyAuthentication(result.accessToken()).persistent()).isEqualTo(persistent);
@@ -186,7 +188,7 @@ class SecurityCompletionSettlementTest {
     }
     @Test void anotherBusinessCannotReadOrSimulateTheStoreSettlement() {
         Member foreign=tx.execute(ignored->member(Role.BUSINESS));
-        assertThatThrownBy(()->settlement.page(storeId,foreign,0))
+        assertThatThrownBy(()->settlement.page(storeId,foreign,0,null))
                 .isInstanceOfSatisfying(kr.it.reserve.global.error.PaymentException.class,error->assertThat(error.getStatus()).isEqualTo(org.springframework.http.HttpStatus.FORBIDDEN));
         assertThatThrownBy(()->settlement.simulate(storeId,paymentId,UUID.randomUUID().toString(),foreign))
                 .isInstanceOfSatisfying(kr.it.reserve.global.error.PaymentException.class,error->assertThat(error.getStatus()).isEqualTo(org.springframework.http.HttpStatus.FORBIDDEN));
@@ -245,7 +247,7 @@ class SecurityCompletionSettlementTest {
         assertThat(mfa.status(manage.value(), current(owner), verified.sessionId()).verified()).isTrue();
         assertThatThrownBy(() -> mfa.disable(manage.value(), current(owner), "wrong-session")).isInstanceOf(AuthException.class);
         assertThatThrownBy(() -> mfa.deferEnrollment(manage.value(), current(owner), verified.sessionId())).isInstanceOf(AuthException.class);
-        mfa.disable(manage.value(), current(owner), verified.sessionId());
+        assertThat(mfa.disable(manage.value(), current(owner), verified.sessionId()).session()).isNull();
         assertThat(mfa.settings(current(owner)).enabled()).isFalse();
         assertThatThrownBy(() -> tokens.verifyAuthentication(enrollment.session().accessToken())).isInstanceOf(AuthException.class);
     }
@@ -472,7 +474,7 @@ class SecurityCompletionSettlementTest {
                 .isInstanceOf(OAuth2AuthenticationException.class);
         oauthSuccess.onAuthenticationSuccess(request, response,
                 UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities()));
-        assertThat(response.getRedirectedUrl()).endsWith(role == Role.ADMIN ? "/login?mfa=1" : "/oauth2/callback");
+        assertThat(response.getRedirectedUrl()).endsWith(role == Role.ADMIN ? "/login?mfa=1&remember=1" : "/oauth2/callback?remember=1");
         assertThat(response.getHeaders("Set-Cookie").stream().anyMatch(value -> value.startsWith("mfa_ticket=") && !value.contains("Max-Age=0")))
                 .isEqualTo(role == Role.ADMIN);
     }
@@ -706,6 +708,68 @@ class SecurityCompletionSettlementTest {
         assertThat(mfa.beginManage(current(owner), replacement.sessionId(), null, "fixture-password")).isNotNull();
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = Role.class, names = {"USER", "BUSINESS"})
+    void removingTheLastOptionalFactorKeepsOnlyTheConfirmedPrimaryLogin(Role role) {
+        tx.executeWithoutResult(ignored -> members.findById(owner.getId()).orElseThrow().setRole(role));
+        for (boolean disableAll : new boolean[]{false, true}) {
+            var manage = nameManagement(owner, true);
+            var other = tokens.issueVerifiedSession(current(owner), null, "PASSWORD_MFA", true);
+            String last = mfa.settings(current(owner)).credentials().getFirst().id();
+            var result = disableAll ? mfa.disable(manage.ticket().value(), current(owner), manage.sid(), true)
+                    : mfa.remove(manage.ticket().value(), current(owner), manage.sid(), last);
+            var replacement = tokens.verifyAuthentication(result.session().accessToken());
+            assertThat(replacement.loginMethod()).isEqualTo("PASSWORD");
+            assertThatThrownBy(() -> tokens.verifyAuthentication(manage.session().accessToken())).isInstanceOf(AuthException.class);
+            assertThatThrownBy(() -> tokens.verifyAuthentication(other.accessToken())).isInstanceOf(AuthException.class);
+            assertThat(mfa.settings(current(owner)).enabled()).isFalse();
+            assertThat(mfa.settings(current(owner)).credentials()).isEmpty();
+            assertThat(mfa.settings(current(owner)).recoveryCodes()).isZero();
+            assertThatThrownBy(() -> mfa.remove(manage.ticket().value(), current(owner), replacement.sessionId(), last)).isInstanceOf(AuthException.class);
+        }
+    }
+
+    @Test void lastPasskeyRemovalKeepsARecentlyConfirmedNaverLoginWithoutMakingItMfa() {
+        enroll(owner);
+        namedPasskey(owner, "패스키");
+        tx.executeWithoutResult(ignored -> {
+            var member = members.findById(owner.getId()).orElseThrow();
+            member.setProvider(AuthProvider.NAVER);
+            member.setProviderId("synthetic-naver-subject");
+            member.setOauthAuthenticatedAt(LocalDateTime.now(Clock.systemUTC()));
+        });
+        var at = current(owner).getOauthAuthenticatedAt();
+        var original = tokens.issueSession(current(owner), at, false);
+        String sid = tokens.getSessionId(original.accessToken());
+        var manage = mfa.beginManage(current(owner), sid, at, null, false);
+        String totp = mfa.settings(current(owner)).credentials().stream().filter(value -> "TOTP".equals(value.kind())).findFirst().orElseThrow().id();
+        var first = mfa.remove(manage.value(), current(owner), sid, totp).session();
+        String nextSid = tokens.getSessionId(first.accessToken());
+        var next = mfa.beginManage(current(owner), nextSid, at, null, false);
+        String passkey = mfa.settings(current(owner)).credentials().getFirst().id();
+        var result = mfa.remove(next.value(), current(owner), nextSid, passkey).session();
+        assertThat(tokens.verifyAuthentication(result.accessToken()).loginMethod()).isEqualTo("OAUTH");
+        assertThat(result.persistent()).isFalse();
+        assertThat(mfa.settings(current(owner)).enabled()).isFalse();
+        assertThatThrownBy(() -> tokens.verifyAuthentication(first.accessToken())).isInstanceOf(AuthException.class);
+    }
+
+    @Test void removingTheLastPasskeyWithoutAnIndependentPrimaryProofRequiresLoginAgain() {
+        var manage = nameManagement(owner, true);
+        namedPasskey(owner, "패스키");
+        String totp = mfa.settings(current(owner)).credentials().stream().filter(value -> "TOTP".equals(value.kind())).findFirst().orElseThrow().id();
+        mfa.remove(manage.ticket().value(), current(owner), manage.sid(), totp);
+        var session = tokens.issueVerifiedSession(current(owner), null, "PASSKEY", true);
+        String sid = tokens.getSessionId(session.accessToken());
+        var pending = mfa.beginManage(current(owner), sid, null, null);
+        tx.executeWithoutResult(ignored -> challenges.findById(MfaCrypto.digest(pending.value())).orElseThrow().verified());
+        String passkey = mfa.settings(current(owner)).credentials().getFirst().id();
+        var result = mfa.remove(pending.value(), current(owner), sid, passkey);
+        assertThat(result.session()).isNull();
+        assertThatThrownBy(() -> tokens.verifyAuthentication(session.accessToken())).isInstanceOf(AuthException.class);
+        assertThat(mfa.settings(current(owner)).enabled()).isFalse();
+    }
+
     @Test void localLastCredentialResetStillRequiresProofAndNewAdministratorEnrollment() {
         administrator(owner);
         var used = new java.util.concurrent.atomic.AtomicBoolean();
@@ -772,7 +836,7 @@ class SecurityCompletionSettlementTest {
         if (current(member).isAdmin()) assertThatThrownBy(()->tokens.issueSession(current(member),null)).isInstanceOf(AuthException.class);
         var setup=mfa.beginTotp(ticket.value(),authenticated,sid);
         String code=MfaCrypto.code(setup.secret(),Instant.now().getEpochSecond()/30,6);
-        var codes=mfa.confirmTotp(ticket.value(),authenticated,sid,code);
+        var codes=mfa.confirmTotp(ticket.value(),authenticated,sid,code).codes();
         var session=mfa.finish(ticket.value(),null,null).session();
         assertThat(codes).hasSize(10);
         assertThat(tokens.verifyAuthentication(session.accessToken()).loginMethod()).isEqualTo(current(member).isAdmin() ? "PASSWORD_MFA" : "PASSWORD");
@@ -915,7 +979,35 @@ class SecurityCompletionSettlementTest {
         assertThatThrownBy(()->settlement.simulate(storeId,paymentId,UUID.randomUUID().toString(),current(owner))).isInstanceOf(RuntimeException.class);
         tx.executeWithoutResult(ignored->{var payment=payments.findById(paymentId).orElseThrow();
             payment.setRefundAmount(10000); payment.setStatus(Payment.PaymentStatus.REFUNDED);});
-        assertThat(settlement.page(storeId,current(owner),0).content().getFirst().balance()).isEqualTo(-10000);
-        assertThatThrownBy(()->settlement.page(storeId,current(customer),0)).isInstanceOf(RuntimeException.class);
+        assertThat(settlement.page(storeId,current(owner),0,null).content().getFirst().balance()).isEqualTo(-10000);
+        assertThatThrownBy(()->settlement.page(storeId,current(customer),0,null)).isInstanceOf(RuntimeException.class);
+    }
+
+    @Test void monthlyTestSettlementUsesReservationMonthAndKeepsAdjustmentVisible() {
+        var month = YearMonth.of(2025, 11);
+        tx.executeWithoutResult(ignored -> {
+            var reservation = reservations.findById(reservationId).orElseThrow();
+            reservation.setReservationDate(month.atEndOfMonth());
+            reservation.setUsageEndsAt(month.atEndOfMonth().atTime(16, 0));
+            reservation.setStatus(Reservation.ReservationStatus.NO_SHOW);
+            em.persist(new ReservationNoShowRecord(reservationId, customer.getId(),
+                    storeId, month.atEndOfMonth().atTime(17, 0)));
+            payments.findById(paymentId).orElseThrow().refundPayment(2000, "fixture");
+            em.persist(new TestSettlementPayout("TEST:" + owner.getId() + ":" + UUID.randomUUID(), paymentId, storeId,
+                    owner.getId(), 10000, LocalDateTime.of(2025, 11, 30, 16, 15)));
+        });
+        var page = settlement.page(storeId, current(owner), 0, month);
+        assertThat(page.totalElements()).isEqualTo(1);
+        assertThat(page.content()).singleElement().satisfies(row -> {
+            assertThat(row.noShowConfirmedDate()).isEqualTo(month.atEndOfMonth());
+            assertThat(row.lastSimulatedDate()).isEqualTo(month.plusMonths(1).atDay(1));
+            assertThat(row.state()).isEqualTo(TestSettlementPolicy.State.ADJUSTMENT_REQUIRED);
+        });
+        assertThat(settlement.page(storeId, current(owner), 0, month.plusMonths(1)).totalElements()).isZero();
+        assertThat(settlement.monthly(storeId, current(owner), month)).isEqualTo(
+                new TestSettlementService.MonthlySummary("2025-11", 10000, 2000, 0, 10000, 2000, 1));
+        assertThat(settlement.monthlyCsv(storeId, current(owner), month)).contains(
+                ",2025-11-30,2025-11-30,10000,2000,0,0,10000,2025-12-01,2000,ADJUSTMENT_REQUIRED\r\n");
+        verifyNoInteractions(pg);
     }
 }

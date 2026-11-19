@@ -62,6 +62,10 @@ export const API_ENDPOINTS = {
         UNDO_APPROVE:        (id) => `/api/reservations/${id}/undo-approve`,
         UNDO_COMPLETE:       (id) => `/api/reservations/${id}/undo-complete`,
         NO_SHOW:             (id) => `/api/reservations/${id}/no-show`,
+        UNDO_NO_SHOW:        (id) => `/api/reservations/${id}/undo-no-show`,
+        NO_SHOW_MEMBERS:     (storeId) => '/api/reservations/store/no-show-members' + (storeId == null ? '' : `/${storeId}`),
+        LIMIT_NO_SHOW_MEMBER: (storeId, memberId) => `/api/reservations/store/no-show-members/${storeId}/${memberId}/restriction`,
+        RELEASE_NO_SHOW_MEMBER: (storeId, restrictionId) => `/api/reservations/store/no-show-members/${storeId}/restrictions/${restrictionId}`,
         AVAILABILITY:        '/api/reservations/availability',
         // 달력용 월 단위 조회 — 날짜마다 상태와 그 사유(휴무/기간밖/마감…)를 함께 준다.
         CALENDAR:            '/api/reservations/calendar',
@@ -121,6 +125,8 @@ export const API_ENDPOINTS = {
     PAYMENT: {
         CHECKOUT_RETURN: '/api/payment/checkout-return',
         STATUS:         '/api/payment/status',
+        RECEIPT:        '/api/payment/receipt',
+        RESERVATION_STATUS: id => `/api/payment/status/reservations/${id}`,
         CONFIG:         '/api/payment/config',
         PREPARE:        '/api/payment/prepare',
         VERIFY:         '/api/payment/verify',
@@ -129,6 +135,7 @@ export const API_ENDPOINTS = {
         REFUND_PREVIEW: (id) => `/api/payment/refund-preview/${id}`,
     },
     PAYMENT_OPERATIONS: {
+        RECEIPT_LOOKUP:    '/api/admin/payment-operations/receipts/lookup',
         STALE_READY:       '/api/admin/payment-operations/stale-ready',
         RECONCILE_READY:   (id) => `/api/admin/payment-operations/stale-ready/${id}/reconcile`,
         ISSUES:            '/api/admin/payment-operations/issues',
@@ -193,6 +200,7 @@ export const API_ENDPOINTS = {
         STORES: '/api/waiting/stores',
         RETENTION_POLICY: '/api/waiting/retention-policy',
         MY: '/api/waiting/my',
+        REMOVE: entryId => `/api/waiting/my/${entryId}`,
         JOIN: storeId => `/api/waiting/stores/${storeId}/entries`,
         CANCEL: entryId => `/api/waiting/entries/${entryId}/cancel`,
         ENTRY_QR: entryId => `/api/waiting/entries/${entryId}/qr`,
@@ -201,12 +209,15 @@ export const API_ENDPOINTS = {
         EVENTS: '/api/waiting/events',
     },
     MAIL: {
+        PREVIEW:      '/api/admin/mail/preview',
         COMPOSE:      '/api/admin/mail/compose',
         SENT:         '/api/admin/mail/sent',
         // 소프트 삭제(휴지통 이동). 보존 기간이 끝나면 서버 스케줄러가 자동 정리한다.
         TRASH_SENT:   (id) => `/api/admin/mail/sent/${id}`,
+        SENT_PHOTOS:  (id) => `/api/admin/mail/sent/${id}/photos`,
     },
     INQUIRY: {
+        PREVIEW:       '/api/inquiries/preview',
         MY:            '/api/inquiries/my',
         ADMIN_ALL:     '/api/inquiries/admin/all',
         DETAIL:        (id) => `/api/inquiries/${id}`,
@@ -214,6 +225,8 @@ export const API_ENDPOINTS = {
         CREATE:        '/api/inquiries',
         DELETE:        (id) => `/api/inquiries/${id}`,
         ADMIN_ANSWER:  (id) => `/api/inquiries/${id}/answer`,
+        ADMIN_REPLY:   (id) => `/api/inquiries/admin/${id}/reply`,
+        ADMIN_PHOTOS:  (id) => `/api/inquiries/admin/${id}/photos`,
         ADMIN_DELETE:  (id) => `/api/inquiries/admin/${id}`,
         PENDING_COUNT: '/api/inquiries/pending-count',
     },

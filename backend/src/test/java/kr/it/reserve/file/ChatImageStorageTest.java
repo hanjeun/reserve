@@ -21,6 +21,51 @@ class ChatImageStorageTest {
         ReflectionTestUtils.setField(storage, "envPrefix", "local");
         return storage;
     }
+
+    @Test void companionIsPrivateAndDeletedWithTheOriginal() {
+        var storage = storage();
+        String prefix = "users/1/chat/10";
+        String key = storage.storeEncryptedChatImage(new byte[90], new byte[32], prefix);
+        String previewKey = key.replace(".with-thumb.bin", ".thumb.bin");
+        var order = inOrder(s3);
+        order.verify(s3).putObject(argThat((PutObjectRequest request) -> request.key().equals(previewKey)
+                && "no-store".equals(request.cacheControl())), any(RequestBody.class));
+        order.verify(s3).putObject(argThat((PutObjectRequest request) -> request.key().equals(key)), any(RequestBody.class));
+
+        when(s3.getObject(any(GetObjectRequest.class))).thenReturn(new ResponseInputStream<>(
+                GetObjectResponse.builder().contentLength(32L).build(), new ByteArrayInputStream(new byte[32])));
+        assertThat(storage.readEncryptedChatThumbnail(key, prefix, () -> { throw new AssertionError(); })).hasSize(32);
+        verify(s3).getObject(argThat((GetObjectRequest request) -> request.key().equals(previewKey)));
+        verify(s3, never()).getObject(argThat((GetObjectRequest request) -> request.key().equals(key)));
+
+        storage.deleteFileRequired(key);
+        order.verify(s3).deleteObject(argThat((DeleteObjectRequest request) -> request.key().equals(previewKey)));
+        order.verify(s3).deleteObject(argThat((DeleteObjectRequest request) -> request.key().equals(key)));
+    }
+
+    @Test void restoredOriginalRemainsReadableWhenItsCompanionIsMissing() {
+        var storage = storage();
+        var key = "local/users/1/chat/10/29ae9dd3-f295-4d57-9c05-a95cf1f17db4.with-thumb.bin";
+        when(s3.getObject(any(GetObjectRequest.class))).thenThrow(NoSuchKeyException.builder().statusCode(404).build());
+        byte[] fallback = new byte[40];
+        assertThat(storage.readEncryptedChatThumbnail(key, "users/1/chat/10", () -> fallback)).isEqualTo(fallback);
+    }
+
+    @Test void documentsUseTheirScopedCiphertextPathAndHaveNoThumbnail() {
+        var storage = storage();
+        String prefix = "users/1/chat/10/documents";
+        String key = storage.storeEncryptedChatDocument(new byte[33], prefix);
+        assertThat(key).startsWith("local/" + prefix + "/").endsWith(".bin").doesNotContain(".with-thumb.");
+        verify(s3).putObject(argThat((PutObjectRequest request) -> key.equals(request.key())
+                && "no-store".equals(request.cacheControl()) && "application/octet-stream".equals(request.contentType())), any(RequestBody.class));
+        clearInvocations(s3);
+        assertThatThrownBy(() -> storage.readEncryptedChatDocument(key, "users/1/chat/11/documents")).isInstanceOf(FileException.class);
+        assertThatThrownBy(() -> storage.readEncryptedChatDocument(key, "users/1/chat/10")).isInstanceOf(FileException.class);
+        verifyNoInteractions(s3);
+        storage.deleteFileRequired(key);
+        verify(s3).deleteObject(argThat((DeleteObjectRequest request) -> request.key().equals(key)));
+        verifyNoMoreInteractions(s3);
+    }
     @Test void encryptedObjectsUseScopedKeysAndNeverPublicCacheMetadata() {
         var storage = storage();
         String key = storage.storeEncryptedChatImage(new byte[32], "users/1/chat/10");

@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { Profiler } from 'react';
+import process from 'node:process';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -7,20 +8,36 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import MessengerContent from './MessengerContent';
 import { chatService } from '../../services';
+import attachmentService from '../../services/chatService';
 import storeService from '../../services/storeService';
 import useAuthStore from '../../store/useAuthStore';
 import useMessengerStore, { messengerIdentityOf } from '../../store/useMessengerStore';
 
+const { profileMessages } = vi.hoisted(() => ({ profileMessages: vi.fn() }));
+vi.mock('./ChatBubbleList', async importOriginal => {
+    const { default: ChatBubbleList } = await importOriginal();
+    return { default: props => <Profiler id="말풍선 목록" onRender={profileMessages}><ChatBubbleList {...props} /></Profiler> };
+});
+
 vi.mock('../../services/storeService', () => ({ default: { getStores: vi.fn() } }));
+vi.mock('../../services/chatService', async importOriginal => {
+    const { default: service } = await importOriginal();
+    return { default: { ...service, getImageConfig: vi.fn(), getFile: vi.fn() } };
+});
 
 vi.mock('../../services', () => ({
     chatService: {
         search: vi.fn(),
+        getUnread: vi.fn().mockResolvedValue({ messages: 0, notifications: 0 }),
+        getReservationNotifications: vi.fn(),
+        readReservationNotifications: vi.fn(),
         getSearchContext: vi.fn(),
         listConversations: vi.fn(),
         listStoreInbox: vi.fn(),
         getSupport: vi.fn(),
         sendSupport: vi.fn(),
+        sendImage: vi.fn(),
+        sendFile: vi.fn(),
         getStore: vi.fn(),
         sendStore: vi.fn(),
         getStoreInboxRoom: vi.fn(),
@@ -36,6 +53,7 @@ vi.mock('../../services', () => ({
         markRead: vi.fn(),
         setBlocked: vi.fn(),
         setHidden: vi.fn(),
+        leave: vi.fn(),
         reportConversation: vi.fn(),
     },
 }));
@@ -44,6 +62,8 @@ const page = (content = []) => ({
     content,
     page: { number: 0, totalPages: 1, totalElements: content.length },
 });
+
+const profileLongChats = process.env.RESERVE_CHAT_PROFILE === 'true';
 
 const finishThreadAnimation = thread => {
     const animationName = thread.closest('.reserve-messenger').classList.contains('is-returning-to-list')
@@ -72,6 +92,8 @@ const renderMessenger = (props = {}) => {
 describe('MessengerContent', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        attachmentService.getImageConfig.mockResolvedValue({ enabled: false });
+        localStorage.removeItem('reserve:notification-conversation-hidden:v1:7');
         storeService.getStores.mockReset().mockResolvedValue(page());
         chatService.search.mockResolvedValue({ conversations: [], messages: [], moreConversations: false, moreMessages: false, page: 0 });
         Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1200 });
@@ -99,6 +121,7 @@ describe('MessengerContent', () => {
         chatService.markRead.mockResolvedValue({});
         chatService.setBlocked.mockResolvedValue({ blocked: false, blockedByMe: false });
         chatService.setHidden.mockResolvedValue(null);
+        chatService.getReservationNotifications.mockResolvedValue({ items: [], nextBefore: null });
         chatService.reportConversation.mockResolvedValue({ id: 5, status: 'OPEN' });
         chatService.getSupport.mockResolvedValue({
             roomId: 1,
@@ -112,6 +135,211 @@ describe('MessengerContent', () => {
     afterEach(() => {
         vi.unstubAllGlobals();
         vi.restoreAllMocks();
+    });
+
+    it('uses one local queue for picker, clipboard and files dropped on the thread, then restores only the unsent files', async () => {
+        attachmentService.getImageConfig.mockResolvedValue({ enabled: true, documentsEnabled: true });
+        vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:local-photo');
+        vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+        const photo = new File(['photo'], 'photo.png', { type: 'image/png' });
+        const note = new File(['설명'], 'note.txt', { type: 'text/plain' });
+        const pdf = new File(['%PDF-1.7'], 'guide.pdf', { type: 'application/pdf' });
+        const createdAt = new Date().toISOString();
+        chatService.sendImage.mockResolvedValue({ id: 8, senderRole: 'MEMBER', content: '첨부 자료예요.', createdAt });
+        chatService.sendFile.mockRejectedValueOnce({ status: 503 }).mockResolvedValueOnce({
+            id: 9, senderRole: 'MEMBER', content: '', fileUrl: '/api/chat/files/9', fileName: note.name, fileBytes: note.size, createdAt,
+        }).mockResolvedValueOnce({
+            id: 10, senderRole: 'MEMBER', content: '', fileUrl: '/api/chat/files/10', fileName: pdf.name, fileBytes: pdf.size, createdAt,
+        });
+        const { container } = renderMessenger();
+        const attach = await screen.findByRole('button', { name: '파일 첨부' });
+        await waitFor(() => expect(attach).toBeEnabled());
+        const input = screen.getByRole('textbox', { name: '메시지 입력' });
+        const thread = container.querySelector('.reserve-messenger-thread');
+        const body = thread.querySelector('.reserve-messenger-thread-body');
+        fireEvent.change(input, { target: { value: '첨부 자료예요.' } });
+        fireEvent.change(screen.getByLabelText('첨부할 파일 선택'), { target: { files: [photo] } });
+        expect(fireEvent.paste(input, { clipboardData: { items: [{ kind: 'file', getAsFile: () => note }] } })).toBe(false);
+        expect(fireEvent.paste(input, { clipboardData: { types: ['text/plain'], items: [] } })).toBe(true);
+        fireEvent.dragOver(body, { dataTransfer: { types: ['Files'] } });
+        expect(thread).toHaveAttribute('data-file-over', 'true');
+        expect(fireEvent.drop(body, { dataTransfer: { files: [pdf] } })).toBe(false);
+        expect(thread).not.toHaveAttribute('data-file-over');
+        const group = container.querySelector('.reserve-chat-composer-attachments');
+        expect(group).toHaveAttribute('data-expanded', 'true');
+        expect(group.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect([...group.querySelectorAll('button[aria-label*="제거"]')].map(button => button.getAttribute('aria-label')))
+            .toEqual(['첨부 사진 제거: photo.png', '첨부 파일 제거: note.txt', '첨부 파일 제거: guide.pdf']);
+        expect(attach).toBeDisabled();
+        fireEvent.drop(body, { dataTransfer: { files: [new File(['extra'], 'extra.txt', { type: 'text/plain' })] } });
+        expect(screen.getByText('첨부는 3개까지 할 수 있어요.')).toBeInTheDocument();
+        expect(chatService.sendImage).not.toHaveBeenCalled();
+        expect(chatService.sendFile).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole('button', { name: '보내기', exact: true }));
+        await waitFor(() => expect(chatService.sendFile).toHaveBeenCalledTimes(1));
+        expect(chatService.sendImage).toHaveBeenCalledWith(1, photo, '첨부 자료예요.', expect.stringMatching(/^attachments_/), expect.any(Object));
+        expect(chatService.sendFile.mock.calls[0].slice(0, 3)).toEqual([1, note, '']);
+        const firstFileId = chatService.sendFile.mock.calls[0][3];
+        await waitFor(() => expect(screen.getByRole('button', { name: '첨부 파일 제거: guide.pdf' })).toBeEnabled());
+        expect(attach).toBeEnabled();
+        await waitFor(() => expect(screen.queryByRole('button', { name: '첨부 사진 제거: photo.png' })).toBeNull());
+        expect(input).toHaveValue('');
+        fireEvent.click(screen.getByRole('button', { name: '보내기', exact: true }));
+        expect(await screen.findByRole('button', { name: '파일 내려받기: guide.pdf' })).toBeInTheDocument();
+        expect(chatService.sendFile.mock.calls[1].slice(0, 4)).toEqual([1, note, '', firstFileId]);
+        expect(chatService.sendFile.mock.calls[2].slice(0, 3)).toEqual([1, pdf, '']);
+        expect(chatService.sendImage).toHaveBeenCalledTimes(1);
+        expect(group).not.toHaveAttribute('data-expanded');
+        expect(attachmentService.getFile).not.toHaveBeenCalled();
+        attachmentService.getFile.mockResolvedValueOnce(new Blob(['%PDF-1.7'], { type: 'application/octet-stream' }));
+        const download = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+        fireEvent.click(screen.getByRole('button', { name: '파일 내려받기: guide.pdf' }));
+        await waitFor(() => expect(download).toHaveBeenCalledOnce());
+        expect(download.mock.instances[0].download).toBe('guide.pdf');
+        expect(attachmentService.getFile).toHaveBeenCalledWith('/api/chat/files/10', expect.any(AbortSignal));
+    });
+
+    it('omits the reservation bell on home and keeps it in the conversations list', async () => {
+        useMessengerStore.getState().showHome();
+        renderMessenger({ surface: 'page', onClose: vi.fn() });
+        expect(screen.queryByRole('button', { name: '알림 보기' })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '메시지 닫기' })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: '대화', exact: true }));
+        expect(await screen.findByRole('button', { name: '알림 대화 숨기기' })).toBeInTheDocument();
+    });
+
+    it.each(profileLongChats ? [50, 200, 500] : [50])(
+        'keeps %i loaded messages out of draft updates and sends the current text', async count => {
+            const createdAt = new Date().toISOString();
+            chatService.getSupport.mockResolvedValue({ roomId: 1, type: 'SUPPORT', viewerRole: 'MEMBER', canSend: true,
+                messages: Array.from({ length: count }, (_, i) => ({ id: i + 1, senderRole: 'ADMIN', content: `이전 ${i + 1}`, createdAt })) });
+            chatService.sendSupport.mockResolvedValue({ id: count + 1, senderRole: 'MEMBER', content: '보낼 메시지 8', createdAt });
+            renderMessenger();
+            await screen.findByText(`이전 ${count}`);
+            const input = screen.getByRole('textbox');
+            const mount = profileMessages.mock.calls.find(([, phase]) => phase === 'mount')?.[2];
+            expect(mount).toBeDefined();
+            profileMessages.mockClear();
+
+            for (let i = 1; i <= 8; i += 1) fireEvent.change(input, { target: { value: `보낼 메시지 ${i}` } });
+            const updates = profileMessages.mock.calls.map(([, , duration]) => duration).toSorted((a, b) => a - b);
+            if (profileLongChats) {
+                console.info(`Chat profile: ${count} messages, mount ${mount.toFixed(1)} ms, ${updates.length} list updates while typing, median ${(updates[Math.floor(updates.length / 2)] ?? 0).toFixed(1)} ms`);
+            }
+            expect(updates).toHaveLength(0);
+
+            fireEvent.click(screen.getByRole('button', { name: '보내기', exact: true }));
+            await waitFor(() => expect(chatService.sendSupport).toHaveBeenCalledTimes(1));
+            expect(chatService.sendSupport.mock.calls[0][0]).toBe('보낼 메시지 8');
+            expect(input).toHaveValue('');
+        },
+    );
+
+    it.skipIf(!profileLongChats)('keeps the scroll anchor when 50 earlier messages are prepended to a long thread', async () => {
+        const createdAt = new Date().toISOString();
+        const messagesFrom = (start, count) => Array.from({ length: count }, (_, i) => ({
+            id: start + i, senderRole: 'ADMIN', content: `이전 ${start + i}`, createdAt,
+        }));
+        chatService.getSupport.mockResolvedValue({ roomId: 1, type: 'SUPPORT', viewerRole: 'MEMBER', canSend: true,
+            hasOlderMessages: true, nextBeforeId: 51, messages: messagesFrom(51, 450) });
+        chatService.getHistory.mockResolvedValue({ messages: messagesFrom(1, 50), hasMore: false });
+        const { container } = renderMessenger();
+        await screen.findByText('이전 500');
+        const body = container.querySelector('.reserve-messenger-thread-body');
+        Object.defineProperty(body, 'scrollHeight', { get: () => body.querySelectorAll('[data-message-id]').length * 36 });
+        body.scrollTop = 180;
+        profileMessages.mockClear();
+
+        fireEvent.click(screen.getByRole('button', { name: '이전 메시지 보기' }));
+        await screen.findByText('이전 1');
+        expect(chatService.getHistory).toHaveBeenCalledExactlyOnceWith(1, 51, 50);
+        expect(body.scrollTop).toBe(180 + 50 * 36);
+        expect(body.querySelectorAll('[data-message-id]')).toHaveLength(500);
+        const total = profileMessages.mock.calls.reduce((sum, [, , duration]) => sum + duration, 0);
+        console.info(`Chat profile: prepend 50 to 450 messages, ${profileMessages.mock.calls.length} list updates, ${total.toFixed(1)} ms total`);
+    }, 20_000);
+
+    it('slides the notification row out and restores it with the same bell control', async () => {
+        useMessengerStore.getState().showConversations();
+        const { container } = renderMessenger({ surface: 'panel' });
+        const notificationRow = /^RESERVE 알림\s*예약 상태와 일정 안내/;
+        expect(screen.getByRole('button', { name: notificationRow })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: '알림 대화 숨기기' }));
+        const shortcut = screen.getByRole('button', { name: '알림 대화 표시하기' });
+        const rowMotion = document.getElementById(shortcut.getAttribute('aria-controls'));
+        expect(rowMotion).toHaveAttribute('data-closing', 'true');
+        expect(rowMotion).toHaveAttribute('inert');
+        expect(screen.queryByRole('button', { name: notificationRow })).not.toBeInTheDocument();
+        expect(localStorage.getItem('reserve:notification-conversation-hidden:v1:7')).toBe('true');
+        expect(chatService.readReservationNotifications).not.toHaveBeenCalled();
+        expect(chatService.setHidden).not.toHaveBeenCalled();
+        await waitFor(() => expect(rowMotion).toHaveAttribute('hidden'));
+        fireEvent.click(shortcut);
+        expect(screen.getByRole('button', { name: '알림 대화 숨기기' })).toBe(shortcut);
+        expect(chatService.getReservationNotifications).not.toHaveBeenCalled();
+        const restoredRow = screen.getByRole('button', { name: notificationRow });
+        fireEvent.click(restoredRow);
+        const thread = container.querySelector('.reserve-messenger-thread');
+        expect(await screen.findByRole('region', { name: 'RESERVE 알림' })).toBeInTheDocument();
+        finishThreadAnimation(thread);
+        fireEvent.click(screen.getByRole('button', { name: '대화 목록으로 돌아가기' }));
+        finishThreadAnimation(thread);
+        await waitFor(() => expect(screen.getByRole('button', { name: notificationRow })).toHaveFocus());
+        fireEvent.click(screen.getByRole('button', { name: '알림 대화 숨기기' }));
+        fireEvent.click(screen.getByRole('button', { name: '숨긴 대화 보기' }));
+        expect(screen.getByRole('button', { name: notificationRow })).toBeInTheDocument();
+        expect(screen.queryByText('숨긴 대화가 없어요.')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'RESERVE 알림 대화 메뉴' }));
+        fireEvent.click(screen.getByRole('button', { name: 'RESERVE 알림 복원' }));
+        fireEvent.click(screen.getByRole('button', { name: '일반 대화 보기' }));
+        expect(screen.getByRole('button', { name: notificationRow })).toBeInTheDocument();
+        expect(chatService.getSupport).not.toHaveBeenCalled();
+    });
+
+    it('filters customer, received, and unread conversations without fetching unrelated pages', async () => {
+        useAuthStore.setState({ user: { id: 7, role: 'BUSINESS', name: '사장님' }, isLoggedIn: true });
+        useMessengerStore.setState({ sessionIdentity: messengerIdentityOf(useAuthStore.getState()) });
+        useMessengerStore.getState().showConversations();
+        const mine = page([{ roomId: 31, storeId: 21, type: 'STORE', viewerRole: 'MEMBER', storeName: '내 예약 공방', unread: 0 }]);
+        mine.page.totalPages = 2;
+        chatService.listConversations.mockResolvedValue(mine);
+        chatService.listStoreInbox.mockResolvedValue(page([
+            { roomId: 77, storeId: 42, type: 'STORE', viewerRole: 'OWNER', counterpartName: '답변 기다리는 손님', unread: 2 },
+            { roomId: 78, storeId: 42, type: 'STORE', viewerRole: 'OWNER', counterpartName: '이미 읽은 손님', unread: 0 },
+        ]));
+        renderMessenger({ surface: 'panel' });
+        const inquiry = { name: /내 예약 공방(?! 대화 메뉴)/ };
+        const unread = { name: /답변 기다리는 손님(?! 대화 메뉴)/ };
+        const read = { name: /이미 읽은 손님(?! 대화 메뉴)/ };
+        await screen.findByRole('button', inquiry);
+        await screen.findByRole('button', read);
+        const filters = within(screen.getByRole('radiogroup', { name: '대화 목록 필터' }));
+        fireEvent.click(filters.getByRole('radio', { name: '내 문의' }));
+        expect(screen.getByRole('button', inquiry)).toBeInTheDocument();
+        expect(screen.queryByRole('button', unread)).toBeNull();
+        fireEvent.click(filters.getByRole('radio', { name: '받은 문의' }));
+        expect(screen.getByRole('button', read)).toBeInTheDocument();
+        expect(screen.queryByRole('button', inquiry)).toBeNull();
+        fireEvent.click(filters.getByRole('radio', { name: '안 읽음' }));
+        expect(filters.getByRole('radio', { name: '안 읽음' })).toBeChecked();
+        expect(screen.getByRole('button', unread)).toBeInTheDocument();
+        expect(screen.queryByRole('button', read)).toBeNull();
+        expect(screen.queryByRole('button', { name: '대화 더 보기' })).toBeNull();
+        expect(chatService.listConversations).toHaveBeenCalledExactlyOnceWith(0);
+    });
+
+    it('uses the existing server visibility action for a member conversation without opening the room', async () => {
+        useMessengerStore.getState().showConversations();
+        chatService.listConversations.mockImplementation((pageNumber, hidden) => Promise.resolve(page(hidden ? [] : [
+            { roomId: 31, storeId: 21, type: 'STORE', viewerRole: 'MEMBER', storeName: '테스트 공방' },
+        ])));
+        renderMessenger({ surface: 'panel' });
+        fireEvent.click(await screen.findByRole('button', { name: '테스트 공방 대화 메뉴' }));
+        fireEvent.click(await screen.findByRole('menuitem', { name: '숨기기' }));
+        await waitFor(() => expect(chatService.setHidden).toHaveBeenCalledExactlyOnceWith(31, 'MEMBER', true));
+        expect(chatService.getStore).not.toHaveBeenCalled();
+        expect(chatService.getSupport).not.toHaveBeenCalled();
     });
 
     it('searches through the conversation list without opening rooms and restores the selected result after a blocked conversation', async () => {
@@ -234,7 +462,7 @@ describe('MessengerContent', () => {
         fireEvent.click(await screen.findByRole('button', { name: '숨긴 대화 보기' }));
         expect(await screen.findByRole('button', { name: '일반 대화 보기' })).toHaveAttribute('aria-pressed', 'true');
         expect(screen.getByRole('heading', { name: '숨긴 대화' })).toBeInTheDocument();
-        fireEvent.click(await screen.findByRole('button', { name: /숨긴 가게/ }));
+        fireEvent.click(await screen.findByRole('button', { name: /숨긴 가게(?! 대화 메뉴)/ }));
         await waitFor(() => expect(chatService.listConversations).toHaveBeenCalledWith(0, true));
         fireEvent.click(await screen.findByRole('button', { name: '대화 관리' }));
         expect(await screen.findByText('대화 복원')).toBeInTheDocument();
@@ -331,12 +559,12 @@ describe('MessengerContent', () => {
         useMessengerStore.getState().showConversations();
         renderMessenger({ surface: 'panel' });
 
-        expect(await screen.findByRole('button', { name: /새로고침 검증 가게/ })).toBeVisible();
+        expect(await screen.findByRole('button', { name: /새로고침 검증 가게(?! 대화 메뉴)/ })).toBeVisible();
         await user.click(screen.getByRole('button', { name: '대화 목록 새로고침' }));
 
         expect(await screen.findByText('목록을 새로 불러오지 못했어요. 이전 내용을 보여드려요.'))
             .toBeVisible();
-        expect(screen.getByRole('button', { name: /새로고침 검증 가게/ })).toBeVisible();
+        expect(screen.getByRole('button', { name: /새로고침 검증 가게(?! 대화 메뉴)/ })).toBeVisible();
         expect(screen.getByRole('alert')).toHaveTextContent('목록을 새로 불러오지 못했어요. 이전 내용을 보여드려요.');
     });
 
@@ -424,7 +652,7 @@ describe('MessengerContent', () => {
         const adminRow = await screen.findByRole('button', { name: /한재은/ });
         expect(within(adminInbox).getAllByRole('button')).toEqual([adminRow]);
         const myConversations = screen.getByRole('region', { name: '내 문의' });
-        expect(within(myConversations).queryByRole('button', { name: /RESERVE 고객지원/ })).not.toBeInTheDocument();
+        expect(within(myConversations).queryByRole('button', { name: /RESERVE 고객지원(?! 대화 메뉴)/ })).not.toBeInTheDocument();
     });
 
     it('keeps a real 404 failure visible and permits an explicit retry to recover', async () => {
@@ -478,14 +706,14 @@ describe('MessengerContent', () => {
             roomId: storeId, storeId, type: 'STORE', title: `가게${storeId}`, viewerRole: 'MEMBER', canSend: true, messages: [],
         }));
         renderMessenger();
-        await user.click(await screen.findByRole('button', { name: /가게42/ }));
+        await user.click(await screen.findByRole('button', { name: /가게42(?! 대화 메뉴)/ }));
         await waitFor(() => expect(screen.getByRole('textbox')).not.toBeDisabled());
         await user.type(screen.getByRole('textbox'), '첫 가게 초안');
-        await user.click(screen.getByRole('button', { name: /가게43/ }));
+        await user.click(screen.getByRole('button', { name: /가게43(?! 대화 메뉴)/ }));
         await waitFor(() => expect(screen.getByRole('textbox')).not.toBeDisabled());
         expect(screen.getByRole('textbox')).toHaveValue('');
         await user.type(screen.getByRole('textbox'), '둘째 가게 초안');
-        await user.click(screen.getByRole('button', { name: /가게42/ }));
+        await user.click(screen.getByRole('button', { name: /가게42(?! 대화 메뉴)/ }));
         await waitFor(() => expect(screen.getByRole('textbox')).toHaveValue('첫 가게 초안'));
         expect(chatService.sendStore).not.toHaveBeenCalled();
     });
@@ -497,7 +725,7 @@ describe('MessengerContent', () => {
         renderMessenger({ surface: 'panel' });
         expect(screen.getAllByRole('navigation', { name: '메신저 화면' })).toHaveLength(1);
         expect(screen.queryByRole('button', { name: '고객지원에 문의' })).not.toBeInTheDocument();
-        await user.click(await screen.findByRole('button', { name: /RESERVE 고객지원/ }));
+        await user.click(await screen.findByRole('button', { name: /RESERVE 고객지원(?! 대화 메뉴)/ }));
         await waitFor(() => expect(chatService.getSupport).toHaveBeenCalledTimes(1));
         expect(screen.getAllByRole('navigation', { name: '메신저 화면' })).toHaveLength(1);
         expect(screen.getByRole('button', { name: '홈', exact: true })).toBeDisabled();
@@ -683,7 +911,7 @@ describe('MessengerContent', () => {
         const view = renderMessenger();
 
         expect(chatService.getSupport).not.toHaveBeenCalled();
-        fireEvent.click(await screen.findByRole('button', { name: /RESERVE 고객지원/ }));
+        fireEvent.click(await screen.findByRole('button', { name: /RESERVE 고객지원(?! 대화 메뉴)/ }));
         const messenger = view.container.querySelector('.reserve-messenger');
         expect(messenger).toHaveClass('has-mobile-thread');
 
@@ -713,7 +941,7 @@ describe('MessengerContent', () => {
             return { id: 2, senderRole: 'MEMBER', content, createdAt: '2026-09-15T12:00:00' };
         });
         const { container } = renderMessenger();
-        const row = await screen.findByRole('button', { name: /RESERVE 고객지원/ });
+        const row = await screen.findByRole('button', { name: /RESERVE 고객지원(?! 대화 메뉴)/ });
         expect(row.querySelector('.reserve-messenger-row-preview')).toHaveTextContent('이전 대화');
         expect(container.querySelector('.reserve-messenger-row-subtitle')).toBeNull();
         await user.type(screen.getByRole('textbox', { name: '메시지 입력' }), '새로 보낸 메시지');
@@ -747,7 +975,7 @@ describe('MessengerContent', () => {
         });
         renderMessenger();
 
-        const row = await screen.findByRole('button', { name: /회원7/ });
+        const row = await screen.findByRole('button', { name: /회원7(?! 대화 메뉴)/ });
         expect(screen.getByText('손님 문의')).toBeInTheDocument();
         await user.click(row);
         await waitFor(() => expect(chatService.getStoreInboxRoom).toHaveBeenCalledWith(77));
@@ -894,7 +1122,7 @@ describe('MessengerContent', () => {
         await screen.findByText('A 최근 메시지');
         await user.click(screen.getByRole('button', { name: '이전 메시지 보기' }));
         expect(chatService.getHistory).toHaveBeenNthCalledWith(1, 1, 51, 50);
-        await user.click(await screen.findByRole('button', { name: /가게42/ }));
+        await user.click(await screen.findByRole('button', { name: /가게42(?! 대화 메뉴)/ }));
         await screen.findByText('B 최근 메시지');
         await user.click(screen.getByRole('button', { name: '이전 메시지 보기' }));
         expect(chatService.getHistory).toHaveBeenNthCalledWith(2, 42, 151, 50);

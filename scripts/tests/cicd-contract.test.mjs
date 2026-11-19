@@ -16,9 +16,44 @@ const cd = require('js-yaml').load(read('.github/workflows/CD.yml'));
 const deployment = cd.jobs['deploy-backend'];
 const backendTests = workflow.jobs['test-backend'];
 const frontendTests = workflow.jobs['test-frontend'];
+const frontendCoreTests = workflow.jobs['test-frontend-core'];
+const prepareFrontendTests = workflow.jobs['prepare-frontend-tests'];
+const frontendBrowserTests = workflow.jobs['test-frontend-browser'];
 const staging = cd.jobs['stage-release'];
 const detectionScript = read('scripts/detect-active-upstream.sh');
 const step = (job, id) => job.steps.find(entry => entry.id === id);
+
+test('actual JAR review and profile compatibility is mandatory in image build, CI and both deployment boundaries', () => {
+    const dockerfile = read('backend/Dockerfile');
+    assert.match(dockerfile, /COPY --chown=appuser:appgroup tools\/VerifyReleaseCompatibility\.java/);
+    assert.match(dockerfile, /javac -d \/opt\/reserve\/compat/);
+    assert.match(dockerfile, /java -Xmx96m -cp \/opt\/reserve\/compat VerifyReleaseCompatibility \/app\.jar/);
+    assert.ok(read('backend/.dockerignore').includes('!tools/VerifyReleaseCompatibility.java'));
+    const build = backend.steps.findIndex(entry => entry.name === 'Build Docker image');
+    const probe = backend.steps.findIndex(entry => entry.name === 'Verify actual backend JAR compatibility');
+    const scan = backend.steps.findIndex(entry => entry.name === 'Scan backend image vulnerabilities');
+    assert.ok(build >= 0 && probe > build && scan > probe);
+    assert.match(backend.steps[probe].run, /IMAGE_ID=\$\(docker image inspect --format '\{\{\.Id\}\}'/);
+    assert.match(backend.steps[probe].run, /bash scripts\/check-release-compatibility-image\.sh "\$IMAGE_ID"/);
+    assert.equal(backend.steps[probe]['continue-on-error'], undefined);
+    const toolTests = backendTests.steps.find(entry => entry.name === 'Test actual JAR compatibility verifier');
+    assert.equal(toolTests.run, 'node --test scripts/tests/release-compatibility.test.mjs');
+    assert.equal(toolTests.if, "steps.evidence.outputs.reused != 'true'");
+    assert.match(detectionScript, /cat "\$\(dirname "\$0"\)\/check-release-compatibility-image\.sh"/);
+    assert.ok(detectionScript.indexOf('check_release_compatibility_image "$ACTIVE_IMAGE"') < detectionScript.indexOf('echo "DETECTED_UPSTREAM='));
+    const transfer = deployment.steps.find(entry => entry.name === 'Deploy deployment guards to EC2');
+    assert.ok(transfer.with.source.split(',').includes('scripts/check-release-compatibility-image.sh'));
+    const launch = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
+    const check = 'sudo bash /home/ubuntu/scripts/check-release-compatibility-image.sh';
+    assert.ok(launch.with.script.indexOf(check) > launch.with.script.indexOf('sudo docker pull'));
+    assert.ok(launch.with.script.indexOf(check) < launch.with.script.indexOf('sudo -E docker compose'));
+    assert.ok(launch.with.script.includes(check + ' "$RESERVE_IMAGE_REFERENCE" "$CURRENT_IMAGE"'));
+    const cutover = deployment.steps.find(entry => entry.name === 'Cut over frontend and backend');
+    assert.ok(cutover.with.script.includes(check + ' "$COMPATIBLE_IMAGE"'));
+    assert.ok(cutover.with.script.indexOf(check) < cutover.with.script.indexOf('trap rollback_cutover'));
+    for (const entry of [launch, cutover]) assert.equal(entry['continue-on-error'], undefined);
+});
+
 
 test('shared authentication activation refuses an unsupported recovery image before startup and again at cutover', () => {
     const launch = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
@@ -86,8 +121,90 @@ test('shared authentication activation requires Redis key epoch and a completed 
     assert.ok(ready < source.indexOf('sudo -E docker compose'));
 });
 
+test('production forwards reservation protection settings and validates them before starting the target', () => {
+    const launch = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
+    const prefix = 'RESERVE_RESERVATION_TURNSTILE_';
+    const shared = 'RESERVE_RESERVATION_SHARED_LIMITS_ENABLED';
+    const flags = [shared, prefix + 'ENABLED'];
+    const names = [...flags, prefix + 'SITE_KEY', prefix + 'SECRET_KEY', prefix + 'HOSTNAME'];
+    for (const name of flags) assert.ok(launch.env[name].includes('vars.' + name + " || 'false'"));
+    assert.ok(launch.env[prefix + 'SECRET_KEY'].includes('secrets.' + prefix + 'SECRET_KEY'));
+    for (const name of names) {
+        assert.ok(launch.with.envs.split(',').includes(name));
+        for (const side of ['blue', 'green']) {
+            const compose = read('infra/compose/docker-compose-' + side + '.yml');
+            const fallback = flags.includes(name) ? 'false' : '';
+            assert.ok(compose.includes(name + '=${' + name + ':-' + fallback + '}'));
+        }
+    }
+
+    const script = launch.with.script;
+    const start = script.indexOf('case "$RESERVE_RESERVATION_SHARED_LIMITS_ENABLED"');
+    const end = script.indexOf('case "$RESERVE_IMAGE_REFERENCE"', start);
+    assert.ok(start >= 0 && end > start && end < script.indexOf('sudo docker pull'));
+    assert.match(script, /\[ "\$RESERVE_RESERVATION_SHARED_LIMITS_ENABLED" = true \]; then\s+sudo [^\n]+ check-redis/);
+    const defaults = { [shared]: 'false', [prefix + 'ENABLED']: 'false', RESERVE_REDIS_ENABLED: 'false',
+        RESERVE_REDIS_USERNAME: '', APP_FRONTEND_URL: 'https://app.reserve.it.kr',
+        [prefix + 'SITE_KEY']: '', [prefix + 'SECRET_KEY']: '', [prefix + 'HOSTNAME']: '' };
+    const run = settings => spawnSync(process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash',
+        ['-eu', '-c', script.slice(start, end)], { encoding: 'utf8', timeout: 5000,
+            env: { ...process.env, ...defaults, ...settings } });
+    const enabled = { [shared]: 'true', [prefix + 'ENABLED']: 'true', RESERVE_REDIS_ENABLED: 'true',
+        RESERVE_REDIS_USERNAME: 'reserve_app', [prefix + 'SITE_KEY']: 'fixture-site', [prefix + 'SECRET_KEY']: 'fixture-private',
+        [prefix + 'HOSTNAME']: 'app.reserve.it.kr' };
+    assert.equal(run({}).status, 0);
+    assert.equal(run(enabled).status, 0);
+    for (const [name, value] of [[shared, 'invalid'], [prefix + 'ENABLED', 'invalid'], ['RESERVE_REDIS_ENABLED', 'false'],
+        ['RESERVE_REDIS_USERNAME', 'default'], [prefix + 'HOSTNAME', 'reserve.it.kr'], [prefix + 'SITE_KEY', ''],
+        [prefix + 'SECRET_KEY', ''], [prefix + 'SITE_KEY', '1x' + '0'.repeat(20) + 'AA'],
+        [prefix + 'SECRET_KEY', '1x' + '0'.repeat(31) + 'AA']]) {
+        const failure = run({ ...enabled, [name]: value });
+        assert.ifError(failure.error);
+        assert.notEqual(failure.status, 0);
+        assert.doesNotMatch(failure.stderr + failure.stdout, /fixture-private/);
+    }
+});
+
+test('production keeps Resend receiving off by default and requires all inbound settings to enable it', () => {
+    const launch = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
+    const flag = 'RESEND_INBOUND_ENABLED';
+    const address = 'RESEND_INBOUND_ADDRESS';
+    const secrets = ['RESEND_INBOUND_WEBHOOK_SECRET', 'RESEND_INBOUND_API_KEY'];
+    const names = [flag, address, ...secrets];
+    assert.ok(launch.env[flag].includes("vars.RESEND_INBOUND_ENABLED || 'false'"));
+    assert.ok(launch.env[address].includes('vars.' + address));
+    for (const secret of secrets) {
+        assert.ok(launch.env[secret].includes("vars.RESEND_INBOUND_ENABLED == 'true' && secrets." + secret));
+    }
+    for (const name of names) {
+        assert.ok(launch.with.envs.split(',').includes(name));
+        const fallback = name === flag ? 'false' : '';
+        for (const color of ['blue', 'green']) {
+            assert.ok(read('infra/compose/docker-compose-' + color + '.yml').includes(name + '=${' + name + ':-' + fallback + '}'));
+        }
+    }
+
+    const script = launch.with.script;
+    const start = script.indexOf('case "$RESEND_INBOUND_ENABLED"');
+    const end = script.indexOf('case "$RESERVE_RESERVATION_SHARED_LIMITS_ENABLED"', start);
+    assert.ok(start >= 0 && end > start && end < script.indexOf('sudo docker pull'));
+    const run = settings => spawnSync(process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash',
+        ['-eu', '-c', script.slice(start, end)], { encoding: 'utf8', timeout: 5000,
+            env: { ...process.env, [flag]: 'false', [address]: '', [secrets[0]]: '', [secrets[1]]: '', ...settings } });
+    assert.equal(run({}).status, 0);
+    const enabled = { [flag]: 'true', [address]: 'support@example.test',
+        [secrets[0]]: 'fixture-signing-secret', [secrets[1]]: 'fixture-api-key' };
+    assert.equal(run(enabled).status, 0);
+    for (const [name, value] of [[flag, 'invalid'], [address, ''], ...secrets.map(secret => [secret, ''])]) {
+        const failure = run({ ...enabled, [name]: value });
+        assert.ifError(failure.error);
+        assert.notEqual(failure.status, 0);
+        assert.doesNotMatch(failure.stderr + failure.stdout, /fixture-(?:signing-secret|api-key)/);
+    }
+});
+
 test('target app creation checks physical RAM immediately before compose and never ignores a rejection', () => {
-    const validation = frontendTests.steps.find(entry => entry.name === 'Validate operations scripts');
+    const validation = frontendCoreTests.steps.find(entry => entry.name === 'Validate operations scripts');
     assert.match(validation.run, /node --test[^\n]*scripts\/tests\/deployment-memory\.test\.mjs/);
     assert.match(validation.run, /bash -n scripts\/check-deployment-memory\.sh/);
     const transfer = deployment.steps.find(entry => entry.name === 'Deploy deployment guards to EC2');
@@ -219,7 +336,8 @@ exec bash -se`,
         curl: `if [[ "$*" == *8080* ]]; then printf '%s' "$MOCK_BLUE"; else printf '%s' "$MOCK_GREEN"; fi`,
         sudo: `case "$*" in
   'docker exec nginxserver cat /etc/nginx/conf.d/service-env.inc') printf 'set $service_url blue;\\n' ;;
-  'docker inspect --format '* ) printf 'fixture-image\\n' ;;
+  'docker inspect --format '* ) printf 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\n' ;;
+  'docker run '* ) exit "$MOCK_CAPABILITY_FAILURE" ;;
   *reserve.schema-compat*) printf '%s\\n' "$MOCK_SCHEMA" ;;
   *reserve.feature-compat*) printf '%s\\n' "$MOCK_FEATURE" ;;
   *) exit 91 ;;
@@ -238,7 +356,7 @@ esac`,
                     GITHUB_OUTPUT: bashPath(output), TASK_SSH_CALLED: bashPath(called),
                     RESERVE_SERVER_IP: 'reserve.test', EC2_SSH_KEY: 'fixture-key', RESERVE_SSH_FINGERPRINT: 'SHA256:fixture',
                     MOCK_BLUE: '200', MOCK_GREEN: '000', MOCK_SCHEMA: 'v280-mfa-completion-settlement-v1', MOCK_FEATURE: 'waiting-signup-hidden-feed-oauth-login-session-admission-mfa-completion-test-settlement-v11',
-                    MOCK_REMOTE_FAILURE: '0', MOCK_AMBIGUOUS: 'false', ...overrides },
+                    MOCK_REMOTE_FAILURE: '0', MOCK_CAPABILITY_FAILURE: '0', MOCK_AMBIGUOUS: 'false', ...overrides },
             });
         assert.ifError(result.error);
         return { ...result, output: fs.readFileSync(output, 'utf8'), sshCalled: fs.existsSync(called) };
@@ -330,6 +448,7 @@ for (const [description, overrides] of [
     ['recovery without managed login methods', { MOCK_FEATURE: 'waiting-signup-hidden-feed-oauth-v7' }],
     ['recovery without automatic service admission', { MOCK_FEATURE: 'waiting-signup-hidden-feed-oauth-login-session-admission-v9' }],
     ['unsupported refund schema', { MOCK_SCHEMA: 'old' }],
+    ['a v11 image without the executable review/profile contract', { MOCK_CAPABILITY_FAILURE: '42' }],
     ['unhealthy live upstream', { MOCK_BLUE: '503' }],
     ['ambiguous upstream marker', { MOCK_AMBIGUOUS: 'true' }],
 ]) test(`upstream detection refuses ${description} without publishing deployment output`, () => {
@@ -386,6 +505,8 @@ test('provider security remains opt-in and forwards dedicated keys through the p
     assert.match(launch.with.script, /KAKAO_APP_ID:\?Kakao app ID is required/);
 });
 
+
+
 test('CodeQL skips duplicate dev pushes without removing PR, main or scheduled security scans', () => {
     const scan = require('js-yaml').load(read('.github/workflows/codeql.yml'));
     assert.deepEqual(scan.on.push.branches, ['main']);
@@ -393,6 +514,8 @@ test('CodeQL skips duplicate dev pushes without removing PR, main or scheduled s
     assert.ok(scan.on.schedule.length > 0);
     assert.deepEqual(scan.jobs.analyze.strategy.matrix.include.map(entry => entry.language), ['java-kotlin', 'javascript-typescript']);
     assert.equal(scan.jobs.analyze['continue-on-error'], undefined);
+    const init = scan.jobs.analyze.steps.find(entry => entry.name === 'Initialize CodeQL');
+    assert.equal(init.env.CODEQL_OVERLAY_DATABASE_MODE, "${{ github.event_name == 'pull_request' && matrix.language == 'javascript-typescript' && 'none' || '' }}");
 });
 
 test('PR labels share existing CI events without metadata-only runs or weaker build checks', () => {
@@ -411,9 +534,9 @@ test('PR labels share existing CI events without metadata-only runs or weaker bu
     assert.equal(labels.steps[0].env, undefined);
     assert.doesNotMatch(labels.steps[0].with.script, /\$\{\{|(?:^|[^\w.])(?:require|exec|fetch)\(/);
     assert.equal(labels.concurrency.group, 'pr-labels-${{ github.event.pull_request.number }}');
-    for (const job of [backend, frontend, backendTests, frontendTests]) {
+    for (const job of [backend, frontend, backendTests, frontendTests, prepareFrontendTests, frontendCoreTests, frontendBrowserTests]) {
         assert.ok(!Object.hasOwn(job.permissions || {}, 'issues'));
-        assert.ok(!Object.hasOwn(job.permissions || {}, 'pull-requests'));
+        assert.equal(job.permissions?.['pull-requests'], job === prepareFrontendTests ? 'read' : undefined);
         assert.ok(![].concat(job.needs || []).includes('label-pr'));
     }
 });
@@ -458,7 +581,8 @@ test('forks, Dependabot and unrecognized titles do not perform label writes', as
 test('required CI checks remain present and independent deployment requires verified main CI', () => {
     assert.ok(backend && frontend && deployment && backendTests && frontendTests);
     assert.equal(backendTests.if, undefined);
-    assert.equal(frontendTests.if, undefined);
+    assert.equal(frontendCoreTests.if, undefined);
+    assert.equal(frontendTests.if, '${{ always() && !cancelled() }}');
     assert.deepEqual(backend.needs, ['test-backend', 'build-frontend']);
     assert.equal(frontend.needs, 'test-frontend');
     assert.equal(workflow.jobs.cd, undefined);
@@ -495,7 +619,9 @@ test('backend tests are explicit, required, and run before packaging', () => {
     assert.match(runner, /gradlew test --rerun --no-daemon --console=plain/);
     for (const gate of ['RESERVE_MYSQL_LOGIN_TEST_ISOLATED', 'RESERVE_ADMISSION_MYSQL_TEST',
         'RESERVE_CAPACITY_MYSQL_TEST', 'RESERVE_MYSQL_OAUTH_TEST_ISOLATED', 'RESERVE_ADMISSION_REDIS_TEST',
-        'RESERVE_SERVICE_ADMISSION_HELPER_REDIS_TEST']) {
+        'RESERVE_SERVICE_ADMISSION_HELPER_REDIS_TEST', 'RESERVE_MYSQL_REVIEW_TEST_ISOLATED',
+        'RESERVE_MYSQL_FINANCIAL_TEST_ISOLATED', 'RESERVE_MYSQL_AUTH_STATE_TEST_ISOLATED',
+        'RESERVE_MYSQL_FEED_STATE_TEST_ISOLATED']) {
         assert.match(runner, new RegExp('(?:export )?' + gate + '=1'));
     }
     assert.doesNotMatch(runner, /--exclude-task|(?:^|\s)-x\s+test/);
@@ -527,9 +653,9 @@ test('backend packaging can restore Java compilation from the same CI attempt', 
 });
 
 test('snapshot verification installs a scoped Git byte guard without changing the baseline', () => {
-    const baseline = frontendTests.steps.find(entry => entry.name === 'Load published baseline for preservation checks');
+    const baseline = frontendCoreTests.steps.find(entry => entry.name === 'Load published baseline for preservation checks');
     assert.equal(baseline.run, 'git fetch --no-tags --depth=1 origin c20ce59c4aec1cfc727fe1cba12960b0e7c78e74');
-    const snapshot = frontendTests.steps.find(entry => entry.name === 'Verify immutable design-system snapshot');
+    const snapshot = frontendCoreTests.steps.find(entry => entry.name === 'Verify immutable design-system snapshot');
     assert.equal(snapshot.run, './scripts/design-system-snapshot.ps1 -Stage Verify -InstallGitGuard');
     assert.match(read('.gitattributes'), /^docs\/design-system\/snapshots\/\*\* -text -eol$/m);
     assert.match(read('scripts/design-system-snapshot.ps1'), /rev-parse --git-path info\/attributes/);
@@ -537,30 +663,92 @@ test('snapshot verification installs a scoped Git byte guard without changing th
     assert.match(read('scripts/design-system-snapshot.ps1'), /Get-ChildItem -LiteralPath \$snapshotRoot -Recurse -File -Force/);
 });
 
-test('both HTML CSP policies allow verified Kakao scripts without enabling eval or enforcement', () => {
+test('both HTML CSP policies allow the exact Kakao and Turnstile origins without enabling eval or enforcement', () => {
     const nginx = read('nginx/default.conf');
     const policies = [...nginx.matchAll(/add_header Content-Security-Policy-Report-Only "([^"]+)" always;/g)].map(match => match[1]);
     assert.equal(policies.length, 2);
     assert.equal(policies[0], policies[1]);
-    const scripts = policies[0].split(';').map(value => value.trim()).find(value => value.startsWith('script-src ')).split(/\s+/);
-    assert.deepEqual(scripts, [
+    const directives = policies[0].split(';').map(value => value.trim().split(/\s+/));
+    assert.deepEqual(directives.find(([name]) => name === 'script-src'), [
         'script-src', "'self'", 'https://cdn.portone.io', 'https://dapi.kakao.com',
-        'https://t1.kakaocdn.net', 'https://*.daumcdn.net',
+        'https://t1.kakaocdn.net', 'https://*.daumcdn.net', 'https://challenges.cloudflare.com',
+    ]);
+    assert.deepEqual(directives.find(([name]) => name === 'frame-src'), [
+        'frame-src', "'self'", 'https://*.portone.io', 'https://*.iamport.kr',
+        'https://*.kakao.com', 'https://*.kakaopay.com', 'https://challenges.cloudflare.com',
     ]);
     assert.doesNotMatch(nginx, /add_header\s+Content-Security-Policy\s/);
 });
 
-test('PC and mobile browser checks use separate projects and failure evidence', () => {
-    const pc = step(frontendTests, 'browser_pc');
-    const mobile = step(frontendTests, 'browser_mobile');
-    assert.ok(pc && mobile);
-    assert.equal(pc.run, 'npm run test:e2e -- --project=chromium --output=test-results/pc');
-    assert.equal(mobile.run, 'npm run test:e2e -- --project=mobile-chromium --output=test-results/mobile');
-    assert.equal(mobile.if, "!cancelled() && steps.evidence.outputs.reused != 'true' && (success() || (failure() && steps.browser_pc.outcome == 'failure'))");
-    assert.ok(frontendTests.steps.indexOf(pc) < frontendTests.steps.indexOf(mobile));
-    for (const entry of [pc, mobile]) assert.equal(entry['continue-on-error'], undefined);
-    assert.ok(frontendTests.steps.some(entry => entry.run === 'npm run test:run'));
+test('unit and both browser checks run in parallel and gate the frontend build', () => {
+    assert.equal(frontendCoreTests.needs, 'prepare-frontend-tests');
+    assert.equal(frontendBrowserTests.needs, 'prepare-frontend-tests');
+    assert.equal(frontendBrowserTests.if, "needs.prepare-frontend-tests.outputs.reused == 'false'");
+    assert.deepEqual(frontendBrowserTests.strategy, { 'fail-fast': false, matrix: { project: ['chromium', 'mobile-chromium'] } });
+    const browser = frontendBrowserTests.steps.find(entry => entry.name === 'Test browser');
+    assert.equal(browser.env.PLAYWRIGHT_PROJECT, '${{ matrix.project }}');
+    assert.equal(browser.run, 'npm run test:e2e -- --project="$PLAYWRIGHT_PROJECT" --output=test-results');
+    assert.equal(browser['continue-on-error'], undefined);
+    assert.equal(frontendBrowserTests['continue-on-error'], undefined);
+    const units = frontendCoreTests.steps.find(entry => entry.run === 'npm run test:run');
+    assert.equal(units.if, "needs.prepare-frontend-tests.outputs.reused != 'true'");
+    assert.equal(units['continue-on-error'], undefined);
     assert.ok(frontend.steps.some(entry => entry.run === 'npm run build'));
+    assert.deepEqual(frontendTests.needs, ['prepare-frontend-tests', 'test-frontend-core', 'test-frontend-browser']);
+    const check = frontendTests.steps[0];
+    assert.equal(check.env.BROWSER_RESULT, '${{ needs.test-frontend-browser.result }}');
+    assert.equal(check.env.PREPARE_RESULT, '${{ needs.prepare-frontend-tests.result }}');
+    const bash = process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash';
+    for (const [core, browserResult, reused, key, succeeds] of [
+        ['success', 'success', 'false', 'verified-key', true],
+        ['success', 'skipped', 'true', 'verified-key', true],
+        ['success', 'failure', 'false', 'verified-key', false],
+        ['success', 'skipped', 'false', 'verified-key', false],
+        ['success', 'cancelled', 'false', 'verified-key', false],
+        ['failure', 'skipped', 'true', 'verified-key', false],
+        ['success', 'skipped', 'true', '', false],
+    ]) {
+        const result = spawnSync(bash, ['-e', '-c', check.run], {
+            env: { ...process.env, PREPARE_RESULT: 'success', CORE_RESULT: core, BROWSER_RESULT: browserResult, EVIDENCE_REUSED: reused, EVIDENCE_KEY: key },
+        });
+        assert.ifError(result.error);
+        assert.equal(result.status === 0, succeeds);
+    }
+});
+
+test('main PRs and main push commits must use the release title for the packaged version', () => {
+    const title = prepareFrontendTests.steps.find(entry => entry.name === 'Verify main release title');
+    assert.ok(prepareFrontendTests.steps.indexOf(title) < prepareFrontendTests.steps.indexOf(step(prepareFrontendTests, 'evidence')));
+    assert.equal(prepareFrontendTests.permissions['pull-requests'], 'read');
+    const needsTitle = new Function('github', `return ${title.if}`);
+    assert.equal(needsTitle({ event_name: 'pull_request', base_ref: 'main' }), true);
+    assert.equal(needsTitle({ event_name: 'push', ref: 'refs/heads/main' }), true);
+    assert.equal(needsTitle({ event_name: 'pull_request', base_ref: 'dev' }), false);
+    assert.equal(needsTitle({ event_name: 'workflow_dispatch', ref: 'refs/heads/main' }), false);
+    assert.match(title.run, /gh api .*pulls\/\$PR_NUMBER/);
+    assert.match(title.run, /git show -s --format=%s "\$GITHUB_SHA"/);
+    const { version } = JSON.parse(read('frontend/package.json'));
+    const script = fileURLToPath(new URL('../verify-release-title.mjs', import.meta.url));
+    for (const [subject, succeeds] of [[`release: v${version}`, true], [`release: v${version} (#1)`, false],
+        ['fix: update the preview', false], ['release: v999.0.0', false]]) {
+        const result = spawnSync(process.execPath, [script, subject]);
+        assert.ifError(result.error);
+        assert.equal(result.status === 0, succeeds);
+    }
+});
+
+test('Gradle dependency submission uses the default branch and the backend build root', () => {
+    const graph = require('js-yaml').load(read('.github/workflows/dependency-submission.yml'));
+    assert.deepEqual(Object.keys(graph.on), ['push', 'workflow_dispatch']);
+    assert.deepEqual(graph.on.push.branches, ['dev']);
+    assert.ok(graph.on.push.paths.includes('backend/gradle.lockfile'));
+    assert.deepEqual(graph.permissions, { contents: 'read' });
+    const submission = graph.jobs['submit-gradle-dependencies'];
+    assert.equal(submission.if, "github.repository == 'hanjeun/reserve' && github.ref == 'refs/heads/dev'");
+    assert.deepEqual(submission.permissions, { contents: 'write' });
+    assert.equal(submission.steps[0].with['persist-credentials'], false);
+    const submit = submission.steps.find(entry => /^gradle\/actions\/dependency-submission@[a-f0-9]{40}$/.test(entry.uses));
+    assert.equal(submit.with['build-root-directory'], 'backend');
 });
 
 test('image publication remains main-push-only and staging downloads only verified source CI artifacts', () => {
@@ -572,7 +760,12 @@ test('image publication remains main-push-only and staging downloads only verifi
     assert.deepEqual(staging.needs, ['verify-source']);
     assert.equal(staging.env.SOURCE_RUN_ID, '${{ needs.verify-source.outputs.run-id }}');
     assert.equal(staging.env.SOURCE_SHA, '${{ needs.verify-source.outputs.sha }}');
-    assert.equal(staging.steps.find(entry => entry.name === 'Stage marketing files').if, "vars.RESERVE_DOMAIN_SPLIT == 'true'");
+    assert.equal(staging.steps.find(entry => entry.name === 'Download marketing release').if, "vars.RESERVE_DOMAIN_SPLIT == 'true'");
+    const transfers = staging.steps.filter(entry => /^appleboy\/scp-action@/.test(entry.uses ?? ''));
+    assert.equal(transfers.length, 1);
+    assert.equal(transfers[0].with.source, 'reserve-stage.tar.gz');
+    assert.match(transfers[0].with.target, /outputs\.sha.*github\.run_id.*github\.run_attempt/);
+    assert.ok(staging.steps.indexOf(transfers[0]) > staging.steps.findIndex(entry => entry.name === 'Require current main before server access'));
     for (const job of [backend]) {
         const writes = job.steps.filter(entry => /^docker\/login-action@/.test(entry.uses ?? '')
             || /docker push\b|docker (?:build|buildx build)[^\n]*--push\b/.test(entry.run ?? ''));
@@ -583,7 +776,7 @@ test('image publication remains main-push-only and staging downloads only verifi
     }
 });
 
-test('frontend artifacts are stamped before upload and retries reject changed bytes for an existing SHA', () => {
+test('the staging bundle checks SHA and bytes before preparing app and marketing releases', () => {
     const stamp = frontend.steps.find(entry => entry.name === 'Stamp frontend release');
     const upload = frontend.steps.find(entry => entry.name === 'Upload built frontend');
     assert.equal(stamp.env.FRONTEND_RELEASE, '${{ github.sha }}');
@@ -593,56 +786,78 @@ test('frontend artifacts are stamped before upload and retries reject changed by
     const home = path.join(fixture, 'home');
     const html = path.join(fixture, 'html');
     const bin = path.join(fixture, 'bin');
-    const source = path.join(home, `reserve-frontend-${sha}`);
+    const source = path.join(fixture, 'frontend', 'dist');
+    const marketingSource = path.join(fixture, 'marketing', 'dist');
     const release = path.join(html, 'releases', sha);
+    const marketingRelease = path.join(html, 'marketing', 'releases', sha);
+    const uploaded = path.join(home, `reserve-stage-${sha}-123-1`);
+    const output = path.join(fixture, 'output');
     fs.mkdirSync(bin, { recursive: true });
     fs.mkdirSync(home, { recursive: true });
     fs.writeFileSync(path.join(bin, 'sudo'), '#!/usr/bin/env bash\nexec "$@"\n', { mode: 0o755 });
-    fs.writeFileSync(path.join(home, 'preserve-frontend-assets.sh'), read('scripts/preserve-frontend-assets.sh'));
+    fs.mkdirSync(path.join(fixture, 'scripts'));
+    fs.mkdirSync(path.join(fixture, 'nginx'));
+    fs.writeFileSync(path.join(fixture, 'nginx', 'default.conf'), 'reviewed nginx candidate\n');
+    fs.writeFileSync(path.join(fixture, 'scripts', 'preserve-frontend-assets.sh'), read('scripts/preserve-frontend-assets.sh'));
+    fs.writeFileSync(path.join(fixture, 'scripts', 'domain-release.sh'), read('scripts/domain-release.sh')
+        .replaceAll('/usr/share/nginx/html', bashPath(html)).replaceAll('/home/ubuntu', bashPath(home)));
+    const packScript = staging.steps.find(entry => entry.name === 'Pack release staging files').run;
     const stageScript = staging.steps.find(entry => entry.name === 'Stage frontend release').with.script
         .replaceAll('/usr/share/nginx/html', bashPath(html)).replaceAll('/home/ubuntu', bashPath(home));
-    const prepare = (index = '<main>app origin</main>', asset = 'original asset') => {
+    const run = (script, env) => spawnSync(process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash',
+        ['-e', '-c', 'export PATH="$TASK_MOCK_BIN:$PATH"; ' + script], {
+            cwd: fixture, encoding: 'utf8', timeout: 15000,
+            env: { ...process.env, TASK_MOCK_BIN: bashPath(bin), FRONTEND_RELEASE: sha, SOURCE_SHA: sha,
+                STAGING_RUN_ID: '123', STAGING_ATTEMPT: '1', GITHUB_OUTPUT: bashPath(output), ...env },
+        });
+    const prepare = ({ index = '<main>app origin</main>', asset = 'original asset', marketing } = {}) => {
         fs.mkdirSync(path.join(source, 'assets'), { recursive: true });
         fs.writeFileSync(path.join(source, 'index.html'), index);
         fs.writeFileSync(path.join(source, 'release-id.txt'), `${sha}\n`);
         fs.writeFileSync(path.join(source, 'assets', 'app-abcdefgh.js'), asset);
-        fs.writeFileSync(path.join(home, 'default.conf'), 'reviewed nginx candidate\n');
+        if (marketing) {
+            fs.mkdirSync(marketingSource, { recursive: true });
+            fs.writeFileSync(path.join(marketingSource, 'index.html'), marketing);
+            fs.writeFileSync(path.join(marketingSource, 'release-id.txt'), `${sha}\n`);
+        }
+        const split = String(Boolean(marketing));
+        fs.writeFileSync(output, '');
+        const packed = run(packScript, { RESERVE_DOMAIN_SPLIT: split });
+        assert.ifError(packed.error);
+        assert.equal(packed.status, 0, packed.stderr + packed.stdout);
+        const digest = fs.readFileSync(output, 'utf8').match(/^digest=([0-9a-f]{64})/m)?.[1];
+        assert.ok(digest);
+        fs.mkdirSync(uploaded);
+        fs.copyFileSync(path.join(fixture, 'reserve-stage.tar.gz'), path.join(uploaded, 'reserve-stage.tar.gz'));
+        return { STAGING_SHA256: digest, RESERVE_DOMAIN_SPLIT: split };
     };
-    const runStage = script => spawnSync(process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash',
-        ['-c', 'export PATH="$TASK_MOCK_BIN:$PATH"; ' + script], {
-            encoding: 'utf8', timeout: 15000,
-            env: { ...process.env, TASK_MOCK_BIN: bashPath(bin), FRONTEND_RELEASE: sha, RESERVE_DOMAIN_SPLIT: 'false' },
-        });
     try {
-        prepare();
-        const first = runStage(stageScript);
+        const corrupted = prepare();
+        fs.appendFileSync(path.join(uploaded, 'reserve-stage.tar.gz'), 'changed transfer');
+        assert.notEqual(run(stageScript, corrupted).status, 0);
+        assert.equal(fs.existsSync(release), false);
+        assert.equal(fs.existsSync(uploaded), false);
+        assert.notEqual(run(packScript, { SOURCE_SHA: 'b'.repeat(40), RESERVE_DOMAIN_SPLIT: 'false' }).status, 0);
+        const first = run(stageScript, prepare());
         assert.ifError(first.error);
         assert.equal(first.status, 0, first.stderr + first.stdout);
-        prepare();
-        const retry = runStage(stageScript);
+        assert.equal(fs.readFileSync(path.join(home, `default-${sha}.conf`), 'utf8'), 'reviewed nginx candidate\n');
+        assert.equal(fs.existsSync(marketingRelease), false);
+        const retry = run(stageScript, prepare());
         assert.equal(retry.status, 0, retry.stderr + retry.stdout);
-        prepare('<main>different domain configuration</main>');
-        assert.notEqual(runStage(stageScript).status, 0);
+        assert.notEqual(run(stageScript, prepare({ index: '<main>different domain configuration</main>' })).status, 0);
         assert.equal(fs.readFileSync(path.join(release, 'index.html'), 'utf8'), '<main>app origin</main>');
-        prepare('<main>app origin</main>', 'changed asset under the same filename');
-        assert.notEqual(runStage(stageScript).status, 0);
+        assert.notEqual(run(stageScript, prepare({ asset: 'changed asset under the same filename' })).status, 0);
         assert.equal(fs.readFileSync(path.join(release, 'assets', 'app-abcdefgh.js'), 'utf8'), 'original asset');
         assert.equal(fs.readFileSync(path.join(release, 'release-id.txt'), 'utf8'), `${sha}\n`);
 
-        const marketingSource = path.join(home, `reserve-marketing-${sha}`);
-        const marketingRelease = path.join(html, 'marketing', 'releases', sha);
-        fs.mkdirSync(marketingSource);
-        fs.writeFileSync(path.join(marketingSource, 'index.html'), '<main>marketing</main>');
-        fs.writeFileSync(path.join(marketingSource, 'release-id.txt'), `${sha}\n`);
-        const domainScript = read('scripts/domain-release.sh')
-            .replaceAll('/usr/share/nginx/html', bashPath(html)).replaceAll('/home/ubuntu', bashPath(home));
-        const command = `set -- stage ${sha}\n${domainScript}`;
-        const marketing = runStage(command);
+        const marketing = run(stageScript, prepare({ marketing: '<main>marketing</main>' }));
         assert.equal(marketing.status, 0, marketing.stderr + marketing.stdout);
-        assert.equal(runStage(command).status, 0);
-        fs.writeFileSync(path.join(marketingSource, 'index.html'), '<main>different marketing</main>');
-        assert.notEqual(runStage(command).status, 0);
+        assert.equal(run(stageScript, prepare({ marketing: '<main>marketing</main>' })).status, 0);
+        assert.notEqual(run(stageScript, prepare({ marketing: '<main>different marketing</main>' })).status, 0);
         assert.equal(fs.readFileSync(path.join(marketingRelease, 'index.html'), 'utf8'), '<main>marketing</main>');
+        assert.equal(fs.existsSync(path.join(html, 'current')), false);
+        assert.equal(fs.existsSync(path.join(html, 'marketing', 'current')), false);
     } finally {
         assert.equal(path.dirname(path.resolve(fixture)), path.resolve(os.tmpdir()));
         assert.ok(path.basename(fixture).startsWith('reserve-stage-test-'));
@@ -651,20 +866,26 @@ test('frontend artifacts are stamped before upload and retries reject changed by
 });
 
 test('only verified successful evidence can skip tests; records and required checks fail closed', () => {
-    for (const job of [backendTests, frontendTests]) {
+    for (const job of [backendTests, prepareFrontendTests]) {
         const restore = step(job, 'evidence');
-        const record = step(job, 'record');
         assert.match(restore.run, /ci-evidence\.mjs restore/);
         assert.match(restore.env.CI_FORCE_TESTS, /workflow_dispatch/);
-        assert.match(record.run, /ci-evidence\.mjs record/);
-        assert.equal(record['continue-on-error'], undefined);
-        assert.equal(record.if, undefined);
         assert.equal(job.permissions.actions, 'read');
         for (const entry of job.steps.filter(entry => /gradlew .*\btest\b|npm run test:run|npm run test:e2e/.test(entry.run ?? ''))) {
             assert.match(entry.if, /steps\.evidence\.outputs\.reused != 'true'/);
             assert.equal(entry['continue-on-error'], undefined);
         }
     }
+    assert.match(step(backendTests, 'record').run, /ci-evidence\.mjs record/);
+    assert.equal(step(backendTests, 'record').if, undefined);
+    const record = step(frontendTests, 'record');
+    assert.match(record.run, /ci-evidence\.mjs record frontend/);
+    assert.equal(record['continue-on-error'], undefined);
+    assert.equal(record.env.EVIDENCE_EXPECTED_KEY, '${{ needs.prepare-frontend-tests.outputs.key }}');
+    assert.match(record.if, /test-frontend-core\.outputs\.key == needs\.prepare-frontend-tests\.outputs\.key/);
+    assert.match(record.if, /outputs\.pc_key.*outputs\.key/);
+    assert.match(record.if, /outputs\.mobile_key.*outputs\.key/);
+    assert.equal(frontendTests.steps.find(entry => entry.name === 'Upload successful frontend test evidence').if, "steps.record.outputs.key != ''");
     const script = read('scripts/ci-evidence.mjs');
     assert.match(script, /keyAt\(component, run\.head_sha, runtime\) !== key/);
     assert.match(script, /artifact\.digest/);
@@ -815,7 +1036,7 @@ test('marketing smoke requires both restored layouts and rejects a partial or un
 test('test failures retain reports without uploading frontend secret files', () => {
     const artifacts = job => job.steps.filter(entry => entry.uses?.startsWith('actions/upload-artifact@'));
     const backendReport = artifacts(backendTests).find(entry => entry.with.name === 'backend-test-report');
-    const browserReport = artifacts(frontendTests).find(entry => entry.with.name === 'frontend-browser-failures');
+    const browserReport = artifacts(frontendBrowserTests).find(entry => entry.with.name === 'frontend-browser-failures-${{ matrix.project }}');
     assert.ok(backendReport && browserReport);
     assert.equal(backendReport.if, 'failure()');
     assert.match(backendReport.with.path, /backend\/build\/test-results\/test\//);

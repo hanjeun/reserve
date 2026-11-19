@@ -2,15 +2,16 @@
  * 서버 검색·페이지별 캐시를 분리하고 검색·페이지 초기화를 함께 반영한다.
  */
 import React, { useState } from 'react';
-import { Typography, Tag } from 'antd';
+import { Typography, Tag, Flex } from 'antd';
 import StatusHint from '../common/StatusHint';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { PauseCircleOutlined, StopOutlined, UndoOutlined } from '../common/icons';
-import { Button, FilterToolbar, AdminTableSkeleton, DataState, DataTable } from '../common';
+import { PauseCircleOutlined, StopOutlined, UndoOutlined, SafetyCertificateOutlined } from '../common/icons';
+import { Button, FilterToolbar, AdminTableSkeleton, DataState, PagedDataTable } from '../common';
 import SanctionModal from './SanctionModal';
+import AccountProtectionModal from './AccountProtectionModal';
 import { useMessage, useQueryParamsState } from '../../hooks';
-import useDebounce from '../../hooks/useDebounce';
 import { adminKeys } from '../../hooks/queryKeys';
+import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
 import { invalidateAdminData } from '../../hooks/invalidateAfterWrite';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
@@ -38,7 +39,7 @@ const getRoleColor = (role) => {
 
 // 스켈레톤이 실제 테이블과 1:1로 대응하도록 컬럼 정의와 같은 자리에서 관리
 const SKELETON_HEADERS = ['ID', '이름', '이메일', '권한', '로그인', '상태', '처리'];
-const SKELETON_COLS    = [60, 100, 220, 90, 90, 90, 230];
+const SKELETON_COLS    = [60, 100, 220, 90, 90, 120, 330];
 const PAGE_SIZE = 20;
 const QUERY_DEFAULTS = { search: '', page: '1' };
 
@@ -55,27 +56,28 @@ const EMPTY_MEMBERS = [];
 const MembersTab = () => {
     const { message, confirm } = useMessage();
     const queryClient = useQueryClient();
-    const [{ search: memberSearch, page: pageStr }, setQuery] = useQueryParamsState(QUERY_DEFAULTS);
-    const debouncedMemberSearch = useDebounce(memberSearch, 300);
+    const [{ search: memberSearch, page: pageStr }, setQuery] = useQueryParamsState(QUERY_DEFAULTS, { privateKeys: ['search'] });
     const page = Number(pageStr) || 1;
 
     const [sanctionTarget, setSanctionTarget] = useState(null);
     const [suspendOpen, setSuspendOpen]       = useState(false);
     const [banOpen, setBanOpen]               = useState(false);
+    const [protection, setProtection] = useState(null);
 
     const {
         data, isLoading: memberLoading, isFetching, isPlaceholderData, error: membersError, refetch,
     } = useQuery({
         // 검색어와 페이지를 조회 키에 포함해 서버 결과를 분리한다.
 
-        queryKey: [...adminKeys.members(), page, debouncedMemberSearch],
-        queryFn: async () => {
+        queryKey: [...adminKeys.members(), page, memberSearch],
+        queryFn: async ({ signal }) => {
             // 서버는 0-based, 이 화면은 1-based(AntD Table) — 여기서 한 번만 변환한다.
             const result = await api.get(API_ENDPOINTS.ADMIN_MANAGE.MEMBERS, {
+                signal,
                 params: {
                     page: page - 1,
                     size: PAGE_SIZE,
-                    ...(debouncedMemberSearch.trim() ? { search: debouncedMemberSearch.trim() } : {}),
+                    ...(memberSearch.trim() ? { search: memberSearch.trim() } : {}),
                 },
             });
             return {
@@ -89,11 +91,9 @@ const MembersTab = () => {
     const members = data?.members ?? EMPTY_MEMBERS;
     const totalElements = data?.totalElements ?? 0;
 
-    // 입력 안정화 뒤 서버 검색을 요청한다.
-
     // 검색어가 바뀌어 결과가 줄어들면 이전 페이지 번호가 존재하지 않는 페이지를 가리킬 수 있어 1로 복귀.
     // 검색어와 첫 페이지는 한 번의 URL 갱신으로 반영한다.
-    const handleSearchChange = (e) => setQuery({ search: e.target.value, page: '1' });
+    const handleSearchChange = search => setQuery({ search, page: '1' });
     const setPage = (p) => setQuery({ page: String(p) });
 
     // 제재는 회원 목록뿐 아니라 감사 로그·대시보드도 바꾼다.
@@ -154,16 +154,22 @@ const MembersTab = () => {
         { title: '이메일', dataIndex: 'email', key: 'email', width: 220, ellipsis: true, render: v => <Text style={{ fontSize: fontSize.sm }}>{v}</Text> },
         { title: '권한', dataIndex: 'role', key: 'role', width: 90, render: v => <Tag color={getRoleColor(v)}>{v}</Tag> },
         { title: '로그인', dataIndex: 'provider', key: 'provider', width: 90, render: v => <Tag>{v}</Tag> },
-        { title: '상태', dataIndex: 'status', key: 'status', width: 90, render: (v, r) => {
+        { title: '상태', dataIndex: 'status', key: 'status', width: 120, render: (v, r) => {
             const cfg = MEMBER_STATUS_CONFIG[v] || MEMBER_STATUS_CONFIG.ACTIVE;
             const reason = getSuspendTooltip(r);
-            return <StatusHint label={cfg.label} color={cfg.color} description={reason} />;
+            return <Flex align="center" wrap gap={4}>
+                {r.accountProtected && <Tag color="volcano">보호 중</Tag>}
+                {(!r.accountProtected || cfg !== MEMBER_STATUS_CONFIG.ACTIVE) && <StatusHint label={cfg.label} color={cfg.color} description={reason} />}
+            </Flex>;
         }},
-        { title: '처리', key: 'actions', width: 230, render: (_, r) => (
+        { title: '처리', key: 'actions', width: 330, render: (_, r) => (
             // 회원은 휴지통 미사용 — 정지/영구정지/해제만 존재
             // 회원 탈퇴는 본인만 가능 (MemberApiController), 관리자가 회원을 삭제하는 인터페이스는 제공하지 않음
             <div style={{ display: 'flex', gap: 6, flexWrap: 'nowrap', alignItems: 'center', whiteSpace: 'nowrap' }}>
                 {r.role !== 'ADMIN' && (<>
+                    <Button variant="ghost-sm" onClick={() => setProtection(value => value || { member: r, open: true })}>
+                        <SafetyCertificateOutlined aria-hidden="true" /> {r.accountProtected ? '복구 메일 재발송' : '계정 탈취 대응'}
+                    </Button>
                     {(!r.status || r.status === 'ACTIVE') && (<>
                         <Button variant="ghost-sm" onClick={() => { setSanctionTarget(r); setSuspendOpen(true); }} style={{ color: '#fa8c16' }}><PauseCircleOutlined /> 정지</Button>
                         <Button variant="ghost-sm-danger" onClick={() => { setSanctionTarget(r); setBanOpen(true); }}><StopOutlined /> 영구정지</Button>
@@ -178,24 +184,17 @@ const MembersTab = () => {
 
     // 목록 영역 — 오류 / 첫 로딩·페이지 전환 스켈레톤 / 표
     let tableBody;
-    if (membersError) {
+    if (isBlockingListReadError(membersError, members)) {
         tableBody = (
             <DataState state="error" kind="member" subject="회원 목록" error={membersError}
                 onRetry={refetch} retrying={isFetching} />
         );
-    } else if (memberLoading || isPlaceholderData || memberSearch.trim() !== debouncedMemberSearch.trim()) {
-        tableBody = (
-            <AdminTableSkeleton
-                rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
-                cols={SKELETON_COLS}
-                headers={SKELETON_HEADERS}
-                actionBtns={2}
-                pagination={totalElements ? { current: page, pageSize: PAGE_SIZE, total: totalElements } : null}
-            />
-        );
     } else {
         tableBody = (
-            <DataTable
+            <PagedDataTable
+                placeholder={(memberLoading || isPlaceholderData) && <AdminTableSkeleton
+                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
+                    cols={SKELETON_COLS} headers={SKELETON_HEADERS} actionBtns={3} />}
                 columns={memberColumns}
                 dataSource={members}
                 rowKey="id"
@@ -209,16 +208,21 @@ const MembersTab = () => {
         <>
             <FilterToolbar
                 count={totalElements}
-                search={{ value: memberSearch, onChange: handleSearchChange, placeholder: '이름, 이메일로 검색' }}
+                search={{ value: memberSearch, onSubmit: handleSearchChange, placeholder: '이름, 이메일로 검색' }}
                 onReload={refetch}
                 loading={memberLoading || isFetching}
                 initialLoading={memberLoading}
             />
+            {membersError && !isBlockingListReadError(membersError, members) && <DataState compact state="error" kind="member"
+                subject="회원 목록 갱신" error={membersError} onRetry={refetch} retrying={isFetching} />}
             {tableBody}
 
             {/*
              * 입력 초기화는 destroyOnHidden에 맡겨 닫힘 전환 중 모달을 재마운트하지 않는다.
              */}
+            {protection && <AccountProtectionModal open={protection.open} member={protection.member}
+                onClose={() => setProtection(value => ({ ...value, open: false }))}
+                afterClose={() => setProtection(null)} onChanged={invalidateMembers} />}
             <SanctionModal
                 presetKey="MEMBER_SUSPEND"
                 open={suspendOpen}

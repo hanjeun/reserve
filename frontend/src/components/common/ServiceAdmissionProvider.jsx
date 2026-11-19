@@ -9,9 +9,10 @@ import { RouteErrorBoundary } from '../layout/AppErrorBoundary';
 const Controller = lazy(() => import('./ServiceAdmissionController'));
 
 /* 입장 기능이 지연 로드되는 동안 페이지 트리를 유지한다. */
-export default function ServiceAdmissionProvider({ children }) {
+export default function ServiceAdmissionProvider({ children, enabled = true }) {
     const [active, setActive] = useState(false);
     useEffect(() => {
+        if (!enabled) return;
         const session = currentSession();
         const controller = new AbortController();
         const signal = AbortSignal.any([controller.signal, session.signal]);
@@ -23,7 +24,7 @@ export default function ServiceAdmissionProvider({ children }) {
             if (current() && serviceEntryStatus(value).mode !== 'OFF') activate();
         }).catch(() => { /* 초기 로드 오류는 화면을 막지 않으며 보호 관문에서 다시 로드한다. */ });
         return () => { stopped = true; controller.abort(); unsubscribe(); };
-    }, []);
-    return <>{children}{active && <RouteErrorBoundary><Suspense fallback={null}><Controller /></Suspense></RouteErrorBoundary>}</>;
+    }, [enabled]);
+    return <>{children}{enabled && active && <RouteErrorBoundary><Suspense fallback={null}><Controller /></Suspense></RouteErrorBoundary>}</>;
 }
-ServiceAdmissionProvider.propTypes = { children: PropTypes.node };
+ServiceAdmissionProvider.propTypes = { children: PropTypes.node, enabled: PropTypes.bool };

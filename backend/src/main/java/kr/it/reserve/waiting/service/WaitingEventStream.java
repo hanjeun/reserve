@@ -1,6 +1,8 @@
 package kr.it.reserve.waiting.service;
 
 import kr.it.reserve.member.entity.Member;
+import kr.it.reserve.config.updates.EntityUpdates;
+import kr.it.reserve.config.updates.RedisEntityUpdateRelay;
 import kr.it.reserve.config.updates.UpdateStreamAccess;
 import kr.it.reserve.waiting.error.WaitingException;
 import org.springframework.http.HttpStatus;
@@ -15,6 +17,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.time.LocalDateTime;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /** 본인에게 필요한 갱신 신호만 전송한다. 명단·이름·QR·대기번호는 SSE에 포함하지 않는다. */
@@ -71,6 +74,19 @@ public class WaitingEventStream {
 
     @EventListener
     public void remoteChanged(RedisWaitingRelay.RemoteChanged event) { deliver(event.storeId(), event.memberIds()); }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void sessionChanged(EntityUpdates.Change change) { recheckSessions(change, change.members()::contains); }
+
+    @EventListener
+    public void remoteSessionChanged(RedisEntityUpdateRelay.RemoteChanged event) { recheckSessions(event.change(), event.recipients()); }
+
+    private void recheckSessions(EntityUpdates.Change change, Predicate<Long> recipients) {
+        if (change.domain() == EntityUpdates.Domain.SESSION)
+            subscribers.forEach((emitter, identity) -> {
+                if (recipients.test(identity.memberId())) valid(emitter, identity);
+            });
+    }
 
     private void deliver(Long storeId, java.util.Set<Long> memberIds) {
         subscribers.forEach((emitter, identity) -> {

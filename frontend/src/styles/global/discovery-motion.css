@@ -1,6 +1,12 @@
 /* 헤더와 탐색 탭은 정지하고, 본문 부모가 스켈레톤을 포함해 한 번 들어온다.
    자식 교체는 부모의 애니메이션을 다시 시작하지 않는다. */
 @media (prefers-reduced-motion: no-preference) {
+    .reserve-app-layout:has(> :is(.reserve-discovery-swipe-dragging, .reserve-discovery-swipe-settling)) { overflow-x: clip; }
+    :is(.reserve-discovery-swipe-dragging, .reserve-discovery-swipe-settling) {
+        translate: var(--reserve-discovery-swipe-x, 0px) 0;
+    }
+    .reserve-discovery-swipe-dragging { user-select: none; }
+    .reserve-discovery-swipe-settling { transition: translate 180ms cubic-bezier(0.22, 1, 0.36, 1); }
     .reserve-route-entry--from-right {
         animation: reserve-discovery-page-from-right 180ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
     }

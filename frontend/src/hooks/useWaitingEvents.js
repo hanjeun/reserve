@@ -17,6 +17,7 @@ export default function useWaitingEvents(enabled = true) {
         let stream;
         let timer;
         let failures = 0;
+        let retryAt = 0;
         const current = () => !stopped && useAuthStore.getState().sessionRevision === revision
             && useAuthStore.getState().isLoggedIn;
         const refresh = () => {
@@ -30,7 +31,7 @@ export default function useWaitingEvents(enabled = true) {
             const connection = new EventSource(new URL(versionedApiUrl(API_ENDPOINTS.WAITING.EVENTS), base).href, { withCredentials: true });
             stream = connection;
             const active = () => current() && stream === connection;
-            connection.addEventListener('ready', () => { if (active()) { failures = 0; refresh(); } });
+            connection.addEventListener('ready', () => { if (active()) { failures = 0; retryAt = 0; refresh(); } });
             connection.addEventListener('waiting-changed', () => { if (active()) refresh(); });
             connection.addEventListener('session-ended', () => {
                 if (!active()) return;
@@ -45,16 +46,20 @@ export default function useWaitingEvents(enabled = true) {
                 connection.close();
                 stream = undefined;
                 refresh(); // 401 재발급도 기존 axios 경로에서 처리한다.
-                if (current() && !document.hidden) {
-                    timer = setTimeout(connect, Math.min(30_000, 5_000 * 2 ** Math.min(failures++, 3)));
-                }
+                retryAt = Date.now() + Math.min(30_000, 5_000 * 2 ** Math.min(failures++, 3));
+                if (!document.hidden) resume();
             };
+        };
+        const resume = () => {
+            const remaining = retryAt - Date.now();
+            if (remaining > 0) timer = setTimeout(connect, remaining);
+            else connect();
         };
         const visibility = () => {
             clearTimeout(timer);
             stream?.close();
             stream = undefined;
-            if (!document.hidden) connect();
+            if (!document.hidden) resume();
         };
         connect();
         document.addEventListener('visibilitychange', visibility);

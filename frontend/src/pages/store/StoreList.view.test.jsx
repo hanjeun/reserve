@@ -32,14 +32,11 @@ vi.mock('../../components/common/FilterMenu', () => ({
         {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
     </select>,
 }));
-vi.mock('../../components/common', () => ({
+vi.mock('../../components/common', async () => ({
     PageContainer: ({ children, className }) => <main className={className}>{children}</main>,
     StoreCardSkeleton: ({ count }) => <div data-testid="card-skeleton">{count}</div>,
     Button: ({ children, onClick }) => <button type="button" onClick={onClick}>{children}</button>,
-    FilterToolbar: ({ search, onReload, initialLoading }) => initialLoading ? <div data-testid="search-skeleton" aria-hidden="true" /> : <div>
-        <input placeholder={search.placeholder} value={search.value} onChange={search.onChange} />
-        <button type="button" onClick={onReload}>새로고침</button>
-    </div>,
+    FilterToolbar: (await import('../../components/common/FilterToolbar')).default,
     DataState: ({ state = 'empty', title, subject, onRetry }) => (
         <section role={state === 'error' ? 'alert' : undefined}>
             <span>{title ?? `${subject ?? '목록'}을 불러오지 못했습니다.`}</span>
@@ -51,6 +48,7 @@ vi.mock('../../components/store', () => ({ StoreCard: ({ store }) => <div data-t
 vi.mock('../../components/store/StoreListRow', () => ({ default: ({ store }) => <article data-testid="list-row">{store.name}</article> }));
 vi.mock('../../components/advertisement/AdBanner', () => ({ default: () => null }));
 vi.mock('antd', async (importOriginal) => ({
+    ...(await importOriginal()),
     Tooltip: (await importOriginal()).Tooltip,
     Modal: () => null,
     Typography: { Text: ({ children }) => <span>{children}</span> },
@@ -92,6 +90,34 @@ describe('store list view selection with real URL pagination', () => {
             page: { totalElements: 36, totalPages: 3 },
         }));
         vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    });
+
+    it('정렬 중 목록과 도구를 유지하고 도착한 순서만 한 번 전환한다', async () => {
+        const user = userEvent.setup();
+        let resolveSort;
+        const stores = [{ id: 1, name: '첫 가게' }, { id: 2, name: '둘째 가게' }];
+        storeService.getStores.mockImplementation(({ sort }) => sort === 'recommended'
+            ? Promise.resolve({ content: stores })
+            : new Promise(resolve => { resolveSort = resolve; }));
+        const { container } = renderList('/stores?sort=recommended');
+        await screen.findByText('첫 가게');
+        const grid = container.querySelector('.rsv-store-grid');
+        const animate = vi.fn(() => ({ cancel: vi.fn() }));
+        grid.animate = animate;
+        const sort = screen.getByRole('combobox', { name: '가게 정렬' });
+
+        await user.selectOptions(sort, 'reviewCount');
+        expect(grid).toHaveAttribute('aria-busy', 'true');
+        expect(sort).toHaveFocus();
+        expect(screen.queryByTestId('card-skeleton')).not.toBeInTheDocument();
+        expect(screen.getAllByTestId('original-card').map(card => card.textContent)).toEqual(['첫 가게', '둘째 가게']);
+        expect(animate).not.toHaveBeenCalled();
+
+        await act(async () => resolveSort({ content: [...stores].reverse() }));
+        await waitFor(() => expect(grid).not.toHaveAttribute('aria-busy'));
+        expect(screen.getAllByTestId('original-card').map(card => card.textContent)).toEqual(['둘째 가게', '첫 가게']);
+        expect(animate).toHaveBeenCalledTimes(1);
+        expect(sort).toHaveFocus();
     });
 
     it('uses a clicked live position for distance sort while preserving the selected domain', async () => {
@@ -234,7 +260,7 @@ describe('store list view selection with real URL pagination', () => {
         let resolve;
         storeService.getStores.mockReturnValue(new Promise(done => { resolve = done; }));
         const { container } = renderList(url);
-        expect(screen.getByTestId('search-skeleton')).toBeInTheDocument();
+        expect(container.querySelector('.reserve-filter-toolbar[aria-hidden="true"]')).toBeInTheDocument();
         expect(screen.queryByPlaceholderText('가게 검색')).toBeNull();
         if (skeleton === 'card-skeleton') expect(screen.getByTestId('card-skeleton')).toHaveTextContent('12');
         else expect(container.querySelectorAll('.reserve-store-list-row-skeleton')).toHaveLength(12);
@@ -258,7 +284,7 @@ describe('store list view selection with real URL pagination', () => {
         expect(routeParams().get('utm_source')).toBe('yes');
     });
 
-    it('searches after typing settles, keeps the input mounted, and preserves the other URL selections', async () => {
+    it('searches only after confirmation, keeps the input mounted, and preserves the other URL selections', async () => {
         renderList('/stores?view=list&page=3&domain=FOOD&sort=reviewCount&utm_source=yes');
         await screen.findByTestId('list-row');
         const input = screen.getByPlaceholderText('가게 검색');
@@ -267,6 +293,7 @@ describe('store list view selection with real URL pagination', () => {
         fireEvent.change(input, { target: { value: '카페' } });
         expect(input).toHaveValue('카페');
         expect(storeService.getStores).toHaveBeenCalledTimes(1);
+        fireEvent.submit(input.closest('form'));
         await waitFor(() => expect(storeService.getStores).toHaveBeenLastCalledWith({
             keyword: '카페', domain: 'FOOD', sort: 'reviewCount', page: 0, size: 12,
         }, expect.any(AbortSignal)));

@@ -12,10 +12,13 @@ import kr.it.reserve.chat.service.ChatModerationService;
 import kr.it.reserve.chat.service.ChatService;
 import kr.it.reserve.chat.service.ChatImageService;
 import kr.it.reserve.global.common.ApiResponse;
+import kr.it.reserve.global.error.BusinessException;
+import kr.it.reserve.global.ratelimit.RateLimiter;
 import kr.it.reserve.config.util.SecurityUtil;
 import kr.it.reserve.member.entity.Member;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -34,6 +37,7 @@ public class AdminChatController {
     private final ChatService chatService;
     private final ChatModerationService moderationService;
     private final ChatImageService imageService;
+    private final RateLimiter rateLimiter;
 
     /** 방 목록 — 안 읽은 방이 먼저, 그다음 최근 순. */
     @PreAuthorize("hasRole('ADMIN')")
@@ -83,6 +87,9 @@ public class AdminChatController {
             @PathVariable Long roomId,
             @Valid @RequestBody SendMessageRequest request) {
         Member admin = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
+        if (!rateLimiter.tryConsume(admin.getId().toString(), RateLimiter.Policy.CHAT_MEMBER_SEND)) {
+            throw new BusinessException("메시지를 너무 빠르게 보내고 있어요. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+        }
         return ResponseEntity.ok(ApiResponse.success(
                 chatService.sendAsAdmin(
                         admin, roomId, request.getContent(), request.getClientMessageId()), "전송 완료"));
@@ -126,6 +133,13 @@ public class AdminChatController {
     @GetMapping("/reports/{reportId}/images/{messageId}")
     public ResponseEntity<byte[]> reportImage(@PathVariable Long reportId, @PathVariable Long messageId) {
         return ChatImageController.imageResponse(imageService.readForReport(
+                SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE), reportId, messageId));
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/reports/{reportId}/files/{messageId}")
+    public ResponseEntity<byte[]> reportDocument(@PathVariable Long reportId, @PathVariable Long messageId) {
+        return ChatImageController.documentResponse(imageService.readDocumentForReport(
                 SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE), reportId, messageId));
     }
 }

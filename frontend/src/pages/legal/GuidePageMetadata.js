@@ -20,7 +20,7 @@ export const GUIDE_PAGES = {
         sections: [
             { id: 'register', title: '사업자 계정과 가게 등록' },
             { id: 'edit', title: '가게 수정과 접수 방식' },
-            { id: 'draft', title: '가게 임시저장 옮기기' },
+            { id: 'draft', title: '가게 임시저장' },
             { id: 'reservation', title: '예약 관리' },
             { id: 'waiting', title: '웨이팅 명단과 접수 중지' },
             { id: 'qr', title: '현장 접수 QR과 체크인' },

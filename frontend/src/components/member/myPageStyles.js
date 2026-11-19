@@ -2,11 +2,9 @@ import { colors, radius, shadows, fontSize, fontWeight } from '../../styles/toke
 
 const styles = {
     // PC 2단 (900px 이상)
-    // StoreDetail의 pcLeft/pcRight와 같은 구조. gap 32는 두 카드 묶음이 서로 다른 영역으로
-    // 읽히기에 충분하면서, 1000px 컨테이너에서 양쪽이 좁아지지 않는 값이다.
+    // 프로필과 앱 설정을 두 열로 구분한다.
     pcGrid:  { display: 'flex', gap: 32, alignItems: 'flex-start' },
-    // basis 420/300 — 아이패드 세로(768)에서도 두 열이 들어가는 값이다(위 isPC 주석의 계산 참고).
-    // 넓은 화면에서는 grow로 자연스럽게 벌어지고 pcRight의 maxWidth가 오른쪽 폭을 잡아준다.
+    // 남는 폭은 두 열이 나누고 오른쪽 설정 열의 최대 폭은 제한한다.
     pcLeft:  { flex: '1 1 420px', minWidth: 0 },
     // sticky — 왼쪽 탭(위치/사업자 등)이 길어져도 설정이 화면에 남는다.
     // top 80은 고정 헤더(64) + 여백. alignSelf: flex-start가 없으면 flex가 높이를 늘려 sticky가 안 먹는다.
@@ -62,7 +60,7 @@ const styles = {
     },
     tabLabel: { fontSize: fontSize.sm, fontWeight: fontWeight.semibold },
     loginMethodLabel: { minWidth: 0, padding: '8px 0', overflowWrap: 'anywhere' },
-    loginMethodActions: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, padding: '8px 0' },
+    loginMethodActions: { display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, padding: '8px 0' },
     loginMethodHint: { display: 'block', fontSize: fontSize.xs, color: colors.text.tertiary, marginTop: 4 },
     securityNotice: {
         display: 'flex', alignItems: 'center', gap: 6,

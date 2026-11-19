@@ -1,6 +1,7 @@
 package kr.it.reserve.file.service;
 
 import kr.it.reserve.file.util.ImageFileValidator;
+import kr.it.reserve.file.util.FileStoragePaths;
 import kr.it.reserve.global.error.FileException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
@@ -10,15 +11,20 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.UUID;
+import java.util.function.Supplier;
 
-/** 로컬 프로필의 피드 암호문만 저장한다. 공개 URL과 기존 S3 객체는 이 저장소로 옮기지 않는다. */
+/** 로컬 프로필에서 피드·리뷰 사진의 암호문을 저장한다. */
 @Component
 public class LocalFeedImageStore {
     private static final String NAMESPACE = "local-feed/";
-    private static final String KEY_PATTERN = "local-feed/users/\\d+/feed/images/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.bin";
+    private static final String PREFIX_PATTERN = "users/\\d+/(feed|reviews)/images";
+    private static final String UUID_PATTERN = "/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+    private static final String KEY_PATTERN = NAMESPACE + "(?:" + PREFIX_PATTERN + UUID_PATTERN + "\\.bin"
+            + "|users/\\d+/reviews/images" + UUID_PATTERN + "\\.(?:with-thumb|thumb)\\.bin)";
     private static final int LIMIT = (int) ImageFileValidator.MAX_FILE_BYTES + 28;
     private final boolean enabled;
     private final Path root;
@@ -51,16 +57,38 @@ public class LocalFeedImageStore {
     public boolean owns(String key) { return enabled && isLocalKey(key); }
 
     public boolean underPrefix(String key, String prefix) {
-        return owns(key) && prefix != null && prefix.matches("users/\\d+/feed/images")
+        return owns(key) && prefix != null && prefix.matches(PREFIX_PATTERN)
                 && key.startsWith(NAMESPACE + prefix + "/");
     }
 
     public String store(byte[] encrypted, String prefix) {
-        if (!enabled || prefix == null || !prefix.matches("users/\\d+/feed/images")
+        return store(encrypted, prefix, null);
+    }
+
+    String store(byte[] encrypted, String prefix, byte[] thumbnail) {
+        if (!enabled || prefix == null || !prefix.matches(PREFIX_PATTERN)
                 || encrypted == null || encrypted.length < 28 || encrypted.length > LIMIT) {
             throw FileException.invalid("올바른 로컬 피드 사진이 아니에요.");
         }
-        String key = NAMESPACE + prefix + "/" + UUID.randomUUID() + ".bin";
+        String key = NAMESPACE + prefix + "/" + UUID.randomUUID()
+                + (thumbnail == null ? ".bin" : FileStoragePaths.REVIEW_IMAGE_WITH_THUMBNAIL);
+        String smallKey = FileStoragePaths.reviewThumbnailKey(key);
+        if (thumbnail != null && (smallKey == null || thumbnail.length < 28 || thumbnail.length > LIMIT)) {
+            throw FileException.invalid("올바른 로컬 리뷰 사진이 아니에요.");
+        }
+        if (smallKey != null) write(smallKey, thumbnail);
+        try { write(key, encrypted); }
+        catch (RuntimeException failure) {
+            if (smallKey != null) {
+                try { delete(smallKey); }
+                catch (RuntimeException cleanupFailure) { failure.addSuppressed(cleanupFailure); }
+            }
+            throw failure;
+        }
+        return key;
+    }
+
+    private void write(String key, byte[] encrypted) {
         Path target = resolve(key);
         boolean created = false;
         try {
@@ -70,7 +98,6 @@ public class LocalFeedImageStore {
                 created = true;
                 stream.write(encrypted);
             }
-            return key;
         } catch (IOException exception) {
             // 실패한 새 파일만 보상 삭제한다. 기존 객체를 덮어쓰거나 폴더를 재귀 삭제하지 않는다.
             try { if (created && !Files.isSymbolicLink(target)) Files.deleteIfExists(target); }
@@ -80,12 +107,19 @@ public class LocalFeedImageStore {
     }
 
     public byte[] read(String key, String prefix) {
+        return read(key, prefix, LIMIT, null);
+    }
+
+    byte[] read(String key, String prefix, int limit, Supplier<byte[]> ifMissing) {
         if (!underPrefix(key, prefix)) throw FileException.invalid("올바른 로컬 피드 사진이 아니에요.");
         Path target = resolve(key);
         try (var stream = Files.newInputStream(target, LinkOption.NOFOLLOW_LINKS)) {
-            byte[] bytes = stream.readNBytes(LIMIT + 1);
-            if (bytes.length < 28 || bytes.length > LIMIT) throw FileException.invalid("사진 크기가 허용 범위를 벗어났어요.");
+            byte[] bytes = stream.readNBytes(limit + 1);
+            if (bytes.length < 28 || bytes.length > limit) throw FileException.invalid("사진 크기가 허용 범위를 벗어났어요.");
             return bytes;
+        } catch (NoSuchFileException missing) {
+            if (ifMissing != null) return ifMissing.get();
+            throw new FileException("사진을 불러오지 못했어요.");
         } catch (IOException exception) { throw new FileException("사진을 불러오지 못했어요."); }
     }
 

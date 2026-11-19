@@ -8,6 +8,7 @@ const hasMotionValue = value => value != null && value !== ''
 
 /* 표시값만 전환하고 폼 상태와 접근성 이름은 즉시 갱신한다. */
 const RollingFieldValue = ({ value, children, modalOpen = false, motionKey, order, direction: forcedDirection, onMotionChange }) => {
+    const surfaceRef = useRef(null);
     const currentRef = useRef(null);
     const previousRef = useRef(null);
     const snapshotRef = useRef({ value, text: children, modalOpen, motionKey, order });
@@ -28,7 +29,10 @@ const RollingFieldValue = ({ value, children, modalOpen = false, motionKey, orde
         if (previous) {
             previous.textContent = '';
             previous.style.visibility = 'hidden';
+            previous.style.removeProperty('backface-visibility');
         }
+        currentRef.current?.style.removeProperty('backface-visibility');
+        surfaceRef.current?.style.removeProperty('perspective');
         motionChangeRef.current?.(false);
     }, []);
     useLayoutEffect(() => stopMotion, [stopMotion]);
@@ -69,6 +73,9 @@ const RollingFieldValue = ({ value, children, modalOpen = false, motionKey, orde
         if (!forcedDirection && ordered) direction = Math.sign(before.order - order);
         previous.textContent = String(before.text);
         previous.style.visibility = 'visible';
+        surfaceRef.current.style.perspective = '300px';
+        current.style.backfaceVisibility = 'hidden';
+        previous.style.backfaceVisibility = 'hidden';
         const duration = Number.parseFloat(transitions.fast) * 1000;
         const timing = { duration, easing: transitions.easing, delay: before.modalOpen && !modalOpen ? duration : 0, fill: 'backwards' };
         const centered = { transform: 'translateY(0) rotateX(0deg)', opacity: 1 };
@@ -92,17 +99,17 @@ const RollingFieldValue = ({ value, children, modalOpen = false, motionKey, orde
     }, [value, children, reducedMotion, modalOpen, motionKey, order, onMotionChange, forcedDirection, stopMotion]);
 
     return (
-        <span className="reserve-rolling-field-value" style={styles.surface}>
+        <span ref={surfaceRef} className="reserve-rolling-field-value" style={styles.surface}>
             <span ref={currentRef} style={styles.layer}>{children}</span>
             <span ref={previousRef} aria-hidden="true" style={styles.previous} />
         </span>
     );
 };
 
-const layer = { gridArea: '1 / 1', backfaceVisibility: 'hidden' };
+const layer = { gridArea: '1 / 1' };
 const styles = {
-    // 이전 값은 크기 계산에서 빼고, 값 교체의 레이아웃·페인트 범위를 이 칸 안에 둔다.
-    surface: { position: 'relative', display: 'inline-grid', contain: 'layout paint', overflow: 'hidden', maxWidth: '100%', verticalAlign: 'bottom', perspective: '300px', fontVariantNumeric: 'tabular-nums' },
+    // 정지한 글자에는 3D 합성 레이어를 남기지 않아요.
+    surface: { position: 'relative', display: 'inline-grid', contain: 'layout paint', overflow: 'hidden', maxWidth: '100%', verticalAlign: 'bottom', fontVariantNumeric: 'tabular-nums' },
     layer,
     previous: { ...layer, position: 'absolute', inset: 0, whiteSpace: 'nowrap', visibility: 'hidden', pointerEvents: 'none' },
 };

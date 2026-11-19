@@ -1,6 +1,6 @@
 package kr.it.reserve.chat;
 
-import kr.it.reserve.chat.dto.ChatImagePayload;
+import kr.it.reserve.chat.dto.ChatAttachmentPayload;
 import kr.it.reserve.chat.entity.ChatMessage;
 import kr.it.reserve.chat.entity.ChatRoom;
 import kr.it.reserve.chat.entity.SenderRole;
@@ -54,9 +54,9 @@ class ChatImageSafetyTest {
     void nonParticipantCannotUploadOrReadSupportImage() {
         when(rooms.findByIdForUpdate(10L)).thenReturn(Optional.of(room));
         when(rooms.findById(10L)).thenReturn(Optional.of(room));
-        Supplier<ChatImagePayload> upload = mock(Supplier.class);
+        Supplier<ChatAttachmentPayload> upload = mock(Supplier.class);
         Member stranger = Member.builder().id(2L).role(Role.USER).build();
-        assertThatThrownBy(() -> chats.sendImage(stranger, 10L, "", "attempt", upload)).isInstanceOf(ChatException.class);
+        assertThatThrownBy(() -> chats.sendAttachment(stranger, 10L, "", "attempt", upload)).isInstanceOf(ChatException.class);
         assertThatThrownBy(() -> chats.assertImageReader(10L, stranger)).isInstanceOf(ChatException.class);
         verifyNoInteractions(upload);
         verifyNoInteractions(messages);
@@ -69,8 +69,8 @@ class ChatImageSafetyTest {
                 .imageKey("users/1/chat/10/image.bin").content("").clientMessageId("attempt").build();
         when(messages.findByRoomIdAndSenderMemberIdAndClientMessageId(10L, 1L, "attempt"))
                 .thenReturn(Optional.of(existing));
-        Supplier<ChatImagePayload> upload = mock(Supplier.class);
-        var response = chats.sendImage(owner, 10L, "", "attempt", upload);
+        Supplier<ChatAttachmentPayload> upload = mock(Supplier.class);
+        var response = chats.sendAttachment(owner, 10L, "", "attempt", upload);
         assertThat(response.getImageUrl()).isEqualTo("/api/chat/images/30");
         verifyNoInteractions(upload);
         verify(messages, never()).save(any());
@@ -80,8 +80,8 @@ class ChatImageSafetyTest {
     void sendsImageWithoutCaptionAndUpdatesTheSameUnreadLedger() {
         when(rooms.findByIdForUpdate(10L)).thenReturn(Optional.of(room));
         when(messages.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        var response = chats.sendImage(owner, 10L, "", "attempt",
-                () -> new ChatImagePayload("users/1/chat/10/image.bin", "image/png", 40, 30, 100, "C:\\fakepath\\가게 사진.PNG"));
+        var response = chats.sendAttachment(owner, 10L, "", "attempt",
+                () -> new ChatAttachmentPayload("users/1/chat/10/image.bin", "image/png", 40, 30, 100, "C:\\fakepath\\가게 사진.PNG"));
         assertThat(response.getContent()).isEmpty();
         assertThat(response.getImageWidth()).isEqualTo(40);
         assertThat(response.getImageOriginalFilename()).isEqualTo("가게 사진.PNG");

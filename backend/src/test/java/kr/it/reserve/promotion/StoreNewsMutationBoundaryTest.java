@@ -38,6 +38,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static kr.it.reserve.global.persistence.CurrentLockedStateTestSupport.managedEntities;
 
 @ExtendWith(MockitoExtension.class)
 class StoreNewsMutationBoundaryTest {
@@ -59,6 +60,7 @@ class StoreNewsMutationBoundaryTest {
 
     @BeforeEach
     void setUp() {
+        managedEntities(entityManager);
         owner = Member.builder().id(7L).role(Role.BUSINESS).termsAgreed(true).build();
         store = Store.builder().id(3L).owner(owner).name("가게").address("서울 강남구").build();
         profile = FeedProfile.create(owner, NOW);
@@ -188,7 +190,7 @@ class StoreNewsMutationBoundaryTest {
         FeedPost carrier = FeedPost.create(profile, REQUEST_ID, NOW);
         carrier.linkNews(news, "서울", NOW);
 
-        service.delete(7L, 11L);
+        service.delete(7L, 11L, null);
 
         var order = inOrder(stores, entityManager);
         order.verify(stores).findByIdForUpdate(3L);
@@ -200,6 +202,17 @@ class StoreNewsMutationBoundaryTest {
         assertThat(carrier.getDeletedAt()).isEqualTo(news.getDeletedAt());
         verify(promotions, never()).delete(any(Promotion.class));
         verifyNoInteractions(media);
+    }
+
+    @Test
+    void draftDeleteKeepsANewsItemPublishedInAnotherSession() {
+        when(feeds.activeWriter(7L)).thenReturn(owner);
+        when(promotions.findById(11L)).thenReturn(Optional.of(news));
+        when(stores.findByIdForUpdate(3L)).thenReturn(Optional.of(store));
+
+        assertStatus(() -> service.delete(7L, 11L, news.getRevision()), HttpStatus.CONFLICT);
+        assertThat(news.getState()).isEqualTo(Promotion.State.PUBLISHED);
+        assertThat(news.getDeletedAt()).isNull();
     }
 
     private void writable() {

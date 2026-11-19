@@ -1,7 +1,6 @@
 package kr.it.reserve.global.holiday;
 
 import kr.it.reserve.global.common.ApiResponse;
-import kr.it.reserve.global.common.ServiceTime;
 import kr.it.reserve.global.error.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -22,9 +21,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class HolidayApiController {
 
-    private static final int MONTHS_BEFORE = 12;
-    private static final int MONTHS_AFTER = 36;
-
     private final HolidayService holidayService;
 
     @GetMapping
@@ -36,8 +32,7 @@ public class HolidayApiController {
             throw new BusinessException("month 는 YYYY-MM 형식이어야 해요.", HttpStatus.BAD_REQUEST);
         }
 
-        YearMonth current = YearMonth.from(ServiceTime.today());
-        if (target.isBefore(current.minusMonths(MONTHS_BEFORE)) || target.isAfter(current.plusMonths(MONTHS_AFTER))) {
+        if (!HolidayService.supports(target)) {
             return ResponseEntity.ok(ApiResponse.success(List.of(), "공휴일 조회 범위 밖"));
         }
 

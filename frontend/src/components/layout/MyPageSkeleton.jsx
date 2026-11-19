@@ -8,6 +8,7 @@ import { useWindowWidth } from '../../hooks/useWindowWidth';
 import useAuthStore from '../../store/useAuthStore';
 import { hasAdminAccess, hasOwnerAccess } from '../../constants/roles';
 import { breakpoints, colors, radius, shadows } from '../../styles/tokens';
+import { normalizeProfileSettingsTab } from '../../utils/feed';
 
 const cardStyle = {
     padding: '20px 24px', background: colors.background.paper,
@@ -17,11 +18,6 @@ const gapStyle = { display: 'flex', flexDirection: 'column', gap: 16 };
 
 function NameSkeleton() {
     return <><Bone height={54} borderRadius={12} style={{ marginBottom: 16 }} /><Bone height={56} borderRadius={16} /></>;
-}
-function PhotoSkeleton() {
-    return <div style={{ ...gapStyle, alignItems: 'center', gap: 8 }}><Bone width={80} height={80} borderRadius="50%" />
-        <SkeletonText style={{ fontSize: 12 }}>클릭하여 사진 변경</SkeletonText>
-        <SkeletonText style={{ fontSize: 14, marginTop: 4 }}>기본 이미지로 변경</SkeletonText></div>;
 }
 function LocationSkeleton({ user }) {
     return <div style={{ ...gapStyle, gap: 12 }}><div style={{ padding: '8px 12px' }}><Bone width="100%" height={12} /><Bone width="85%" height={12} style={{ marginTop: 6 }} /></div>
@@ -37,18 +33,17 @@ function BusinessSkeleton({ user }) {
         <Bone height={100} borderRadius={12} /><Bone height={46} borderRadius={16} /></div>;
 }
 BusinessSkeleton.propTypes = { user: PropTypes.object };
-const TAB_SKELETONS = { name: NameSkeleton, photo: PhotoSkeleton,
-    'public-profile': PublicProfileSkeleton, location: LocationSkeleton, business: BusinessSkeleton };
+const TAB_SKELETONS = { name: NameSkeleton, profile: PublicProfileSkeleton, location: LocationSkeleton, business: BusinessSkeleton };
 
 // 이미 복원한 계정의 역할·로그인 방식으로 실제 마이페이지에 있는 탭과 설정 자리만 표시한다.
 export default function MyPageSkeleton({ search = '' }) {
     const isPC = useWindowWidth() >= breakpoints.tablet;
     const user = useAuthStore(state => state.user);
     const tabWidths = [
-        ['name', 46], ['photo', 46], ['public-profile', 92], ['location', 46],
+        ['name', 46], ['profile', 60], ['location', 46],
         ...(!hasAdminAccess(user?.role) ? [['business', 59]] : []),
     ];
-    const requested = new URLSearchParams(search).get('tab');
+    const requested = normalizeProfileSettingsTab(new URLSearchParams(search).get('tab'));
     const activeTab = tabWidths.some(([key]) => key === requested) ? requested : 'name';
     const TabSkeleton = TAB_SKELETONS[activeTab];
     const securitySection = <div className="reserve-my-page-skeleton-card" style={{ ...cardStyle, marginTop: isPC ? 24 : 0 }}>

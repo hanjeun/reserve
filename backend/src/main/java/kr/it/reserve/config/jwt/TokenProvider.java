@@ -100,28 +100,33 @@ public class TokenProvider {
     /** 액세스·리프레시 토큰을 같은 잠금 세션에서 발급한다. */
     @Transactional
     public IssuedSession issueSession(Member authenticated, LocalDateTime oauthAuthenticatedAt) {
-        return issue(authenticated, oauthAuthenticatedAt, loginMethod(authenticated, oauthAuthenticatedAt));
+        return issue(authenticated, oauthAuthenticatedAt, loginMethod(authenticated, oauthAuthenticatedAt), null, false);
     }
 
     @Transactional
     public IssuedSession issueVerifiedSession(Member member, LocalDateTime at, String method) {
         if (!kr.it.reserve.member.mfa.MfaPolicy.strong(method)) throw expired();
-        return issue(member, at, method);
+        return issue(member, at, method, null, false);
     }
 
     @Transactional
     public IssuedSession issueSession(Member member, LocalDateTime at, boolean persistent) {
-        return issue(member, at, loginMethod(member, at), persistent);
+        return issue(member, at, loginMethod(member, at), persistent, true);
     }
     @Transactional
     public IssuedSession issueVerifiedSession(Member member, LocalDateTime at, String method, boolean persistent) {
         if (!kr.it.reserve.member.mfa.MfaPolicy.strong(method)) throw expired();
-        return issue(member, at, method, persistent);
+        return issue(member, at, method, persistent, true);
     }
-    private IssuedSession issue(Member member, LocalDateTime at, String method) {
-        return issue(member, at, method, null);
+
+    @Transactional
+    public IssuedSession issueReplacementSession(Member member, LocalDateTime at, String method, boolean persistent) {
+        if (method != null && !kr.it.reserve.member.mfa.MfaPolicy.strong(method)) throw expired();
+        return issue(member, at, method == null ? loginMethod(member, at) : method, persistent, false);
     }
-    private IssuedSession issue(Member authenticated, LocalDateTime oauthAuthenticatedAt, String method, Boolean persistence) {
+
+    private IssuedSession issue(Member authenticated, LocalDateTime oauthAuthenticatedAt, String method,
+                                Boolean persistence, boolean login) {
         oauthAuthenticatedAt = oauthAuthenticatedAt == null ? null : oauthAuthenticatedAt.truncatedTo(ChronoUnit.MILLIS);
         int expectedVersion = authenticated.getAuthVersion();
         AuthProvider provider = authenticated.getProvider();
@@ -140,8 +145,9 @@ public class TokenProvider {
                 : ipProtection.beforeSession(current, kr.it.reserve.member.mfa.MfaPolicy.strong(method));
 
         LocalDateTime now = utcNow().truncatedTo(ChronoUnit.SECONDS);
-        LocalDateTime absolute = now.plus(jwtProperties.getAbsoluteSessionLifetime());
-        LocalDateTime expires = earlier(now.plus(jwtProperties.getRefreshTokenExpiration()), absolute);
+        var lifetime = jwtProperties.sessionLifetime(current.isUser(), persistence);
+        LocalDateTime absolute = now.plus(lifetime.absolute());
+        LocalDateTime expires = earlier(now.plus(lifetime.idle()), absolute);
         RefreshToken row = new RefreshToken(current.getId(), UUID.randomUUID().toString(), UUID.randomUUID().toString(),
                 jwtProperties.getActiveKeyId(), now, expires, absolute, current.getAuthVersion(), oauthAuthenticatedAt, method);
         String refresh = reconstructRefreshToken(row, persistence);
@@ -150,12 +156,19 @@ public class TokenProvider {
         List<RefreshToken> devices = refreshTokenRepository.findByMemberIdForUpdate(current.getId());
         for (int i = 0; i < devices.size() - 5; i++) refreshTokenRepository.delete(devices.get(i));
         refreshTokenRepository.flush();
+        Runnable recordEnvironment = () -> {
+            rememberNetwork.run();
+            if (ipProtection != null) {
+                if (login) ipProtection.renewBrowserAfterLogin(current);
+                ipProtection.trackSession(current, row.getSessionId());
+            }
+        };
         if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
             org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
                     new org.springframework.transaction.support.TransactionSynchronization() {
-                        @Override public void afterCommit() { rememberNetwork.run(); }
+                        @Override public void afterCommit() { recordEnvironment.run(); }
                     });
-        } else rememberNetwork.run();
+        } else recordEnvironment.run();
         return new IssuedSession(accessForSession(row, persistence), refresh, Duration.between(now, expires), !Boolean.FALSE.equals(persistence));
     }
 
@@ -197,7 +210,7 @@ public class TokenProvider {
         RefreshToken row = refreshTokenRepository.findBySessionIdForUpdate(previous.sessionId(), current.getId()).orElseThrow(TokenProvider::expired);
         entityManager.refresh(row, LockModeType.PESSIMISTIC_WRITE);
         if (current.isDeleted() || current.isSuspended() || current.getAuthVersion() != expectedVersion
-                || row.getAuthVersion() != current.getAuthVersion() || !row.isLiveAt(utcNow())
+                || row.getAuthVersion() != current.getAuthVersion() || !isSessionLive(current, row, utcNow())
                 || !Objects.equals(row.getLoginMethod(), previous.loginMethod())
                 || !Objects.equals(row.getOauthAuthenticatedAt(), previous.oauthAuthenticatedAt())
                 || !isLoginSessionCurrent(current, row.getOauthAuthenticatedAt(), row.getLoginMethod())
@@ -210,7 +223,24 @@ public class TokenProvider {
     public IssuedSession rotateSession(RefreshToken row) { return rotateSession(row, null); }
     public IssuedSession rotateSession(RefreshToken row, Boolean persistence) {
         LocalDateTime now = utcNow().truncatedTo(ChronoUnit.SECONDS);
-        LocalDateTime expires = earlier(now.plus(jwtProperties.getRefreshTokenExpiration()), row.getAbsoluteExpiresAt());
+        // 발급 당시의 유휴 기간을 이어가며 이미 절대 만료에 닿은 세션은 그 시각을 보존한다.
+        Duration idle = Duration.between(row.getIssuedAt(), row.getExpiresAt());
+        LocalDateTime expires = row.getExpiresAt().equals(row.getAbsoluteExpiresAt())
+                ? row.getAbsoluteExpiresAt() : earlier(now.plus(idle), row.getAbsoluteExpiresAt());
+        return rotateSession(row, persistence, now, expires);
+    }
+
+    /** 현재 로그인 시각에서 계산한 절대 만료를 사용하고 기기 세션과 인증 수단을 보존한다. */
+    public IssuedSession rememberSession(Member member, RefreshToken row) {
+        var now = utcNow().truncatedTo(ChronoUnit.SECONDS);
+        var lifetime = jwtProperties.sessionLifetime(member.isUser(), true);
+        var absolute = row.getCreatedAt().plus(lifetime.absolute());
+        if (!absolute.isAfter(now)) throw new AuthException("로그인 유지 선택 시간이 지났어요.", org.springframework.http.HttpStatus.CONFLICT);
+        row.changeAbsoluteExpiry(absolute);
+        return rotateSession(row, true, now, earlier(now.plus(lifetime.idle()), absolute));
+    }
+
+    private IssuedSession rotateSession(RefreshToken row, Boolean persistence, LocalDateTime now, LocalDateTime expires) {
         String jti = UUID.randomUUID().toString();
         String keyId = jwtProperties.getActiveKeyId();
         String refresh = makeToken(row, Purpose.REFRESH, jti, now, expires, keyId, row.getRotationVersion() + 1, persistence);
@@ -218,6 +248,14 @@ public class TokenProvider {
         return new IssuedSession(accessForSession(row, persistence), refresh, Duration.between(now, expires), !Boolean.FALSE.equals(persistence));
     }
     public IssuedSession currentSessionTokens(RefreshToken row) { return currentSessionTokens(row, null); }
+    public IssuedSession recoverRotatedSession(RefreshToken row, Boolean previousPersistence) {
+        // 로그인 유지 직전 토큰으로 동시에 갱신하면 해시가 일치하는 현재 설정을 이어준다.
+        if (Boolean.FALSE.equals(previousPersistence) && row.isCurrentToken(reconstructRefreshToken(row, true))) {
+            return currentSessionTokens(row, true);
+        }
+        return currentSessionTokens(row, previousPersistence);
+    }
+
     public IssuedSession currentSessionTokens(RefreshToken row, Boolean persistence) {
         String refresh = reconstructRefreshToken(row, persistence);
         if (!row.isCurrentToken(refresh)) throw new JwtException("Refresh reconstruction does not match stored hash");
@@ -309,7 +347,7 @@ public class TokenProvider {
         if (member.isDeleted() || member.isSuspended() || member.getAuthVersion() != readAuthVersion(claims)
                 || !isLoginSessionCurrent(member, oauthAt, method, current.mfaEnabled())) throw expired();
         RefreshToken session = current.session();
-        if (!session.isLiveAt(utcNow()) || session.getAuthVersion() != member.getAuthVersion()
+        if (!isSessionLive(member, session, utcNow()) || session.getAuthVersion() != member.getAuthVersion()
                 || !Objects.equals(session.getLoginMethod(), method)
                 || !Objects.equals(session.getOauthAuthenticatedAt(), oauthAt)
                 || !session.getAbsoluteExpiresAt().equals(readAbsoluteExpiry(claims))) throw expired();
@@ -319,10 +357,16 @@ public class TokenProvider {
         if (sessionId == null || memberId == null) return false;
         return refreshTokenRepository.findAuthenticationBySessionIdAndMemberId(sessionId, memberId)
                 .filter(value -> !value.member().isDeleted() && !value.member().isSuspended()
-                        && value.session().isLiveAt(utcNow())
+                        && isSessionLive(value.member(), value.session(), utcNow())
                         && value.session().getAuthVersion() == value.member().getAuthVersion()
                         && isLoginSessionCurrent(value.member(), value.session().getOauthAuthenticatedAt(), value.session().getLoginMethod(), value.mfaEnabled()))
                 .isPresent();
+    }
+
+    public boolean isSessionLive(Member member, RefreshToken session, LocalDateTime now) {
+        // 일반 회원의 장기 세션으로 바뀐 권한을 행사하려면 새 로그인이 필요하다.
+        return session.isLiveAt(now) && (member.isUser() || !session.getAbsoluteExpiresAt()
+                .isAfter(session.getCreatedAt().plus(jwtProperties.getAbsoluteSessionLifetime())));
     }
     public Member getActiveMemberFromToken(String token) { return verifyAuthentication(token).member(); }
     public Member getMemberFromToken(String token) { return getActiveMemberFromToken(token); }
@@ -344,6 +388,7 @@ public class TokenProvider {
         return isLoginSessionCurrent(member, at, method, null);
     }
     private boolean isLoginSessionCurrent(Member member, LocalDateTime at, String method, Boolean enrolled) {
+        if (member.isAccountProtected()) return false;
         if (mfaPolicy != null && !kr.it.reserve.member.mfa.MfaPolicy.strong(method)
                 && (enrolled == null ? mfaPolicy.mandatory(member) : mfaPolicy.mandatory(member, enrolled))) return false;
         return isPrimaryLoginCurrent(member, at, method);

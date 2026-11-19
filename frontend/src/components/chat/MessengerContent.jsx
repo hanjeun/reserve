@@ -1,16 +1,23 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import MessengerFooter from './MessengerFooter';
 import MessengerStoreSearch from './MessengerStoreSearch';
 import useChatIntro, { chatIntroScope } from '../../hooks/useChatIntro';
 import { SUPPORT_LABEL, SupportIdentityContext, useSupportIdentity } from './messengerIdentity';
 import ChatNotificationControl from './ChatNotificationControl';
+import ReservationNotificationThread, { ReservationNotificationEntry } from './ReservationNotificationThread';
+import ReservationNotificationShortcut from './ReservationNotificationShortcut';
+import CollapsibleContent from '../common/CollapsibleContent';
+import ConversationRowActions from './ConversationRowActions';
+import { afterMessageRead, chatUnreadCounts } from './chatUnread';
 import useChatImageDraft from '../../hooks/useChatImageDraft';
-import useChatThread from '../../hooks/useChatThread';
+import { chatAttachmentKind } from '../../utils/chatAttachments';
+import useChatThread, { newClientMessageId } from '../../hooks/useChatThread';
 import useChatNotifications from '../../hooks/useChatNotifications';
 import useChatRetentionNotice from '../../hooks/useChatRetentionNotice';
+import useNotificationConversationVisibility from '../../hooks/useNotificationConversationVisibility';
 import { useMessage, useWindowWidth } from '../../hooks';
 import { chatKeys } from '../../hooks/queryKeys';
 import { chatService } from '../../services';
@@ -42,6 +49,7 @@ import {
 
 const POLL_THREAD_MS = 4000;
 const THREAD_BACK_FALLBACK_MS = 320;
+const hasUnreadReservationNotification = data => chatUnreadCounts(data).notifications > 0;
 const EMPTY_HISTORY = { hasMore: false, nextBeforeId: null, loading: false };
 const STORE_OPEN_FAILURE_TITLES = {
     400: '이 가게에는 문의를 시작할 수 없어요.',
@@ -60,6 +68,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
     const { message } = useMessage();
     const user = useAuthStore((state) => state.user);
     const sessionIdentity = useMessengerStore((state) => state.sessionIdentity);
+    const { hidden: notificationHidden, setHidden: setNotificationHidden } = useNotificationConversationVisibility(user?.id);
     const { visible: retentionNoticeVisible, dismiss: dismissRetentionNotice } = useChatRetentionNotice(user?.id, sessionIdentity);
     const storedSelection = useMessengerStore((state) => state.selection);
     const storedView = useMessengerStore((state) => state.view);
@@ -77,10 +86,20 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
     const canOwnStores = hasOwnerAccess(user?.role);
     const canAdminSupport = hasAdminAccess(user?.role);
     const [mobileThreadOpen, setMobileThreadOpen] = useState(false);
+    const [notificationOpen, setNotificationOpen] = useState(false);
+    const notificationEntryId = useId();
+    const notificationEntryRef = useRef(null);
+    const notificationShortcutRef = useRef(null);
+    const notificationReturnFocusRef = useRef(null);
     const [returningToList, setReturningToList] = useState(false);
     // 목록 → 대화 열기 애니메이션. 뒤로가기(대화가 오른쪽으로 빠짐)의 반대 방향이다.
     const [openingThread, setOpeningThread] = useState(false);
     const [showHidden, setShowHidden] = useState(false);
+    const [conversationFilter, setConversationFilter] = useState('all');
+    const filter = showHidden ? 'all' : conversationFilter;
+    const { data: hasUnreadNotification } = useQuery({ queryKey: chatKeys.unread(), queryFn: chatService.getUnread, enabled: false,
+        select: hasUnreadReservationNotification });
+    const notificationVisible = showHidden === notificationHidden && (filter === 'all' || filter === 'unread' && hasUnreadNotification);
     const [storeOpenFailure, setStoreOpenFailure] = useState(null);
     const storeLoadRef = useRef(null);
     const searchFocusFrame = useRef(null);
@@ -119,7 +138,8 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
         key: selectionKey, hasMore: false, nextBeforeId: null, loading: false,
     });
     const mobileThreadVisible = isConversations && (mobileThreadOpen || inRoute);
-    const showThread = isConversations && ((isWide && activeThread) || mobileThreadVisible);
+    const showingNotifications = isConversations && notificationOpen && !inRoute && !activeThread;
+    const showThread = !showingNotifications && isConversations && ((isWide && activeThread) || mobileThreadVisible);
     const focusedMessageId = Number.isSafeInteger(selection.messageId) && selection.messageId > 0 ? selection.messageId : null;
     const threadKey = showThread ? selectionKey + (focusedMessageId ? ':message:' + focusedMessageId : '') : null;
     const imageDraft = useChatImageDraft(threadKey);
@@ -135,6 +155,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
         if (target?.roomId !== roomId
             || target.identity !== messengerIdentityOf(useAuthStore.getState())) return;
         if (routeSelection) navigate('/messages', { replace: true });
+        setNotificationOpen(false);
         select(target.selection);
         setMobileThreadOpen(true);
         window.focus();
@@ -180,7 +201,10 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
         [selection.kind, focusedMessageId],
     );
     const sendFn = useCallback((_roomId, content, clientMessageId, file, config) => {
-        if (file) return chatService.sendImage(_roomId, file, content, clientMessageId, config);
+        if (file) {
+            const sendAttachment = chatAttachmentKind(file) === 'document' ? chatService.sendFile : chatService.sendImage;
+            return sendAttachment(_roomId, file, content, clientMessageId, config);
+        }
         if (selection.kind === 'admin') {
             return chatService.sendAdminSupportRoom(selection.roomId, content, clientMessageId, config);
         }
@@ -207,7 +231,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
             (data) => clearUnreadInInfiniteData(data, selection),
         );
         if (readCount > 0) {
-            queryClient.setQueryData(chatKeys.unread(), (count) => Math.max(0, Number(count ?? 0) - readCount));
+            queryClient.setQueryData(chatKeys.unread(), (count) => afterMessageRead(count, readCount));
         }
         void queryClient.invalidateQueries({ queryKey: chatKeys.conversations() });
         void queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
@@ -292,7 +316,6 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
         void queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
     }, [queryClient, reload]);
 
-    const draft = useMessengerStore((state) => state.drafts[selectionKey] ?? '');
     const threadBodyRef = useRef(null);
     const historyScrollRef = useRef(null);
     const focusedScrollRef = useRef(null);
@@ -367,9 +390,19 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
     const choose = (next, { fromStoreSearch = false } = {}) => {
         if (returningToList || openingThread) return;
         if (routeSelection) navigate('/messages', { replace: true });
+        setNotificationOpen(false);
         select(next, { fromStoreSearch });
         setMobileThreadOpen(true);
         // 한 화면에 목록·대화가 같이 보이는 넓은 메시지 페이지는 자리만 바뀌므로 애니메이션이 없다.
+        if (!(surface === 'page' && isWide)) setOpeningThread(true);
+    };
+    const openReservationNotifications = event => {
+        if (showingNotifications || returningToList || openingThread) return;
+        notificationReturnFocusRef.current = event?.currentTarget;
+        if (routeSelection) navigate('/messages', { replace: true });
+        showConversations();
+        setNotificationOpen(true);
+        setMobileThreadOpen(true);
         if (!(surface === 'page' && isWide)) setOpeningThread(true);
     };
     const leaveMessageContext = () => {
@@ -381,14 +414,58 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
         if (routeSelection) navigate('/messages', { replace: true });
         if (searchBackAvailable) returnToStoreSearch();
         else showConversations();
+        if (showingNotifications) {
+            setNotificationOpen(false);
+            cancelAnimationFrame(searchFocusFrame.current);
+            searchFocusFrame.current = requestAnimationFrame(() => {
+                const opener = notificationReturnFocusRef.current;
+                if (opener?.isConnected) opener.focus();
+                else if (opener?.classList.contains('reserve-messenger-row') && notificationEntryRef.current) notificationEntryRef.current.focus();
+                else notificationShortcutRef.current?.querySelector('button')?.focus();
+            });
+        }
         setMobileThreadOpen(false);
         setReturningToList(false);
-    }, [navigate, routeSelection, showConversations, searchBackAvailable, returnToStoreSearch]);
-    const handleVisibilityChanged = () => {
+    }, [navigate, routeSelection, showConversations, searchBackAvailable, returnToStoreSearch, showingNotifications]);
+    const refreshConversationLists = () => {
         void queryClient.invalidateQueries({ queryKey: chatKeys.conversations() });
         void queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
         void queryClient.invalidateQueries({ queryKey: chatKeys.unread() });
+    };
+    const handleVisibilityChanged = () => {
+        refreshConversationLists();
         finishConversationList();
+    };
+    const changeRowVisibility = async (row, hidden) => {
+        const identity = messengerIdentityOf(useAuthStore.getState());
+        if (identity !== sessionIdentity || !['MEMBER', 'OWNER'].includes(row.viewerRole)) return;
+        await chatService.setHidden(row.roomId, row.viewerRole, hidden);
+        if (identity !== messengerIdentityOf(useAuthStore.getState())) return;
+        refreshConversationLists();
+        if (showThread && matchesSelection(row, selection)) finishConversationList();
+        message.success(hidden ? '대화를 숨겼어요. 숨긴 대화에서 다시 볼 수 있어요.' : '대화를 복원했어요.');
+    };
+    const leaveRow = async row => {
+        const identity = messengerIdentityOf(useAuthStore.getState());
+        if (identity !== sessionIdentity || !['MEMBER', 'OWNER'].includes(row.viewerRole)) return;
+        await chatService.leave(row.roomId, row.viewerRole);
+        if (identity !== messengerIdentityOf(useAuthStore.getState())) return;
+        const queryKey = row.viewerRole === 'OWNER' ? chatKeys.inbox() : chatKeys.conversations();
+        queryClient.setQueriesData({ queryKey }, data => data?.pages ? {
+            ...data, pages: data.pages.map(page => ({ ...page, content: page.content.filter(item => item.roomId !== row.roomId) })),
+        } : data);
+        refreshConversationLists();
+        if (showThread && matchesSelection(row, selection)) finishConversationList();
+        message.success('채팅방에서 나갔어요.');
+    };
+    const changeNotificationVisibility = hidden => {
+        setNotificationHidden(hidden);
+        message.success(hidden ? '알림 대화를 숨겼어요.' : '알림 대화를 다시 표시했어요.');
+    };
+    const toggleNotificationRow = () => {
+        if (showHidden) setShowHidden(false);
+        if (notificationHidden) setConversationFilter('all');
+        setNotificationHidden(!notificationHidden);
     };
     const showConversationList = () => {
         if (returningToList || openingThread) return;
@@ -406,22 +483,24 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
         return () => clearTimeout(timer);
     }, [finishConversationList, returningToList]);
     const handleSend = async () => {
-        const text = draft.trim();
+        const { drafts, sessionIdentity: identity } = useMessengerStore.getState();
+        if (identity !== sessionIdentity) return;
+        const text = (drafts[selectionKey] ?? '').trim();
         const files = imageDraft.files;
         if ((!text && !files.length) || sending || batchRef.current?.scope === sendScope || thread?.canSend === false) return;
-        const identity = useMessengerStore.getState().sessionIdentity;
         const batch = { scope: sendScope, cancelled: false };
         batchRef.current = batch;
         setBatchScope(sendScope);
         setDraft(selectionKey, '', identity);
         imageDraft.clear();
         try {
-            // 사진별 멱등 키와 취소 경계를 유지한다.
-            // 첫 사진에만 설명을 싣고 일부 실패 시 미전송 사진부터 복원한다.
+            // 첫 첨부에만 본문을 싣고, 실패하면 미전송분부터 복원한다.
             const queue = files.length ? files : [null];
+            const attachmentGroup = files.length > 1 ? newClientMessageId() : null;
             for (let index = 0; index < queue.length; index++) {
                 if (batchRef.current !== batch || batch.cancelled || useMessengerStore.getState().sessionIdentity !== identity) return;
-                const ok = await send(index === 0 ? text : '', queue[index]);
+                const caption = index === 0 ? text : '';
+                const ok = await send(caption, queue[index], attachmentGroup ? `attachments_${attachmentGroup}_${index}` : undefined);
                 if (ok !== true) {
                     if (ok === false) {
                         if (files.length) imageDraft.restore(files.slice(index));
@@ -452,16 +531,18 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
     // 답변이 없는 질문(관리자가 설정하기 전 기본 질문)만 입력칸에 채운다. 답변이 있으면 ChatIntro 가 바로 보여준다.
     const chooseIntroQuestion = (question) => {
         const state = useMessengerStore.getState();
+        if (state.sessionIdentity !== sessionIdentity) return;
         const current = state.drafts[selectionKey] ?? '';
         const next = current ? `${current}\n${question}` : question;
         if (!showIntro || sending || next.length > 2000) return;
         setDraft(selectionKey, next, state.sessionIdentity);
     };
-    const changeDraft = value => setDraft(selectionKey, value);
+    const changeDraft = value => setDraft(selectionKey, value, sessionIdentity);
 
     const findStore = () => {
         if (openingThread || returningToList) return;
         if (routeSelection) navigate('/messages', { replace: true });
+        setNotificationOpen(false);
         setMobileThreadOpen(false);
         openStoreSearch();
     };
@@ -478,6 +559,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
 
     const handleFooterChange = value => {
         if (routeSelection) navigate('/messages', { replace: true });
+        setNotificationOpen(false);
         setMobileThreadOpen(false);
         if (value === 'home') showHome();
         else if (value === 'settings') showSettings();
@@ -487,7 +569,12 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
         <MessengerFooter view={footerViewOf(isHome, isSettings)} disabled={openingThread || returningToList}
             onChange={handleFooterChange} />
     );
-    const closeAction = <MessengerCloseButton surface={surface} onClose={onClose} />;
+    const closeAction = ({ toggleRow = false, showNotification = true } = {}) => <>
+        {showNotification && <ReservationNotificationShortcut buttonRef={notificationShortcutRef} active={showingNotifications}
+            disabled={returningToList || openingThread} onSelect={toggleRow ? toggleNotificationRow : openReservationNotifications}
+            hidden={toggleRow ? notificationHidden : undefined} controls={toggleRow ? notificationEntryId : undefined} pollUnread={surface === 'page'} />}
+        <MessengerCloseButton surface={surface} onClose={onClose} />
+    </>;
     const headingLevel = surface === 'page' ? 1 : 2;
 
     const searchPanel = (inert = false, searchNavigation) => <MessengerStoreSearch search={storeSearch} memberId={user?.id}
@@ -496,7 +583,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
 
     if (isStoreSearch) {
         return <div className={`reserve-messenger reserve-messenger--${surface} is-store-search`}>
-            {closeAction}{searchPanel()}{navigation}
+            {closeAction()}{searchPanel()}{navigation}
         </div>;
     }
 
@@ -516,12 +603,12 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
             <MessengerHomeView surface={surface} isSettings={isSettings} user={user}
                 notificationControl={notificationControl} coverImageSrc={coverImageSrc}
                 admin={canAdminSupport} onChoose={chooseFromHome}
-                closeAction={closeAction} navigation={navigation} />
+                closeAction={closeAction({ showNotification: !isHome })} navigation={navigation} />
         );
     }
 
     const layout = messengerLayoutOf({
-        surface, isWide, showThread, mobileThreadVisible, returningToList, openingThread,
+        surface, isWide, showThread: showThread || showingNotifications, mobileThreadVisible, returningToList, openingThread,
     });
     const handleThreadAnimationEnd = event => {
         if (event.target !== event.currentTarget) return;
@@ -531,19 +618,32 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
 
     return (
         <div className={layout.className}>
-            {closeAction}
+            {closeAction({ toggleRow: layout.showList && !searchBackAvailable })}
             {layout.showList && (
                 searchBackAvailable ? searchPanel(openingThread || returningToList, layout.showListNavigation && navigation)
                     : <ConversationListPanel headingLevel={headingLevel}
                     inert={openingThread || returningToList}
-                    lists={lists} showHidden={showHidden}
+                    lists={lists} showHidden={showHidden} filter={filter} onFilterChange={setConversationFilter}
                     onToggleHidden={() => setShowHidden(value => !value)}
                     onFindStore={findStore}
                     canAdminSupport={canAdminSupport} canOwnStores={canOwnStores}
-                    rowProps={{ showThread, selection, onChoose: choose }}
+                    rowProps={{ showThread, selection, onChoose: choose, onVisibilityChange: changeRowVisibility, onLeave: leaveRow }}
+                    notificationVisible={notificationVisible}
+                    notificationEntry={<CollapsibleContent id={notificationEntryId} open={notificationVisible}
+                        aria-hidden={!notificationVisible || undefined} retainHeight>
+                        <ConversationRowActions key={sessionIdentity} title="RESERVE 알림" hidden={notificationHidden}
+                            onVisibilityChange={changeNotificationVisibility}>
+                            <ReservationNotificationEntry buttonRef={notificationEntryRef}
+                                selected={showingNotifications} onSelect={openReservationNotifications} pollUnread={false} />
+                        </ConversationRowActions>
+                    </CollapsibleContent>}
                     navigation={layout.showListNavigation && navigation} />
             )}
 
+            {showingNotifications && <ReservationNotificationThread
+                onBack={showConversationList} onAnimationEnd={handleThreadAnimationEnd}
+                returningToList={returningToList}
+                onOpenReservation={surface === 'panel' ? useMessengerStore.getState().closePanel : undefined} />}
             {showThread && (
                 <ThreadPanel
                     onAnimationEnd={handleThreadAnimationEnd}
@@ -580,7 +680,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
                             content: intro,
                             onAsk: chooseIntroQuestion,
                             disabled: sending,
-                            draftLength: draft.length,
+                            draftKey: selectionKey,
                         },
                         messageProps: {
                             messages,
@@ -596,14 +696,17 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
                         closed: Boolean(focusedMessageId) || !loading && !loadError && thread?.canSend === false,
                         disabledMessage: focusedMessageId ? '최신 대화로 이동하면 답장할 수 있어요.' : disabledMessageOf(thread?.sendDisabledReason),
                         showOwnerReplies: selection.kind === 'owner' && thread?.viewerRole === 'OWNER',
-                        draft,
+                        draftKey: selectionKey,
                         sending,
                         onDraftChange: changeDraft,
                         composerProps: {
                             onSend: handleSend,
                             files: imageDraft.files,
-                            onFilesChange: imageDraft.choose,
+                            onStageFiles: imageDraft.choose,
                             onRemoveFile: imageDraft.remove,
+                            allowDocuments: imageDraft.documentsEnabled,
+                            attachmentError: imageDraft.selectionError,
+                            draftScope: imageDraft.scopeKey,
                             imageEnabled: imageDraft.enabled,
                             imageLoading: imageDraft.loading,
                             imageError: !loadError && !loading ? imageDraft.error : null,

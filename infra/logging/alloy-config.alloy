@@ -1,10 +1,9 @@
-// Production uses Alloy 1.20.1 since 2026-10-02; Promtail 2.9.0 stays stopped for recovery.
-// Strictly converted from the pre-cutover Promtail config; never run both collectors.
-// Source SHA-256: fa2ae2bfdf8bbf8388b6eae96d799780880557ef7d4c567668b65b7a941b0253
-// Preserve the legacy /tmp/positions.yaml volume as read-only on cutover.
-// Persist Alloy state using --storage.path=/var/lib/alloy/data.
-// Keep the same four log mounts and the nginx-directory bind overlay.
-// Further production configuration changes require separate approval; see docs/technical/monitoring.md.
+// Alloy만 실행하고 복구용 Promtail 2.9.0과 동시에 기동하지 않는다.
+// 변환 원본의 SHA-256: fa2ae2bfdf8bbf8388b6eae96d799780880557ef7d4c567668b65b7a941b0253
+// 전환 시 기존 /tmp/positions.yaml 볼륨은 읽기 전용으로 보존한다.
+// Alloy 상태는 --storage.path=/var/lib/alloy/data에 보관한다.
+// 기존 네 로그 마운트와 nginx 디렉터리 오버레이를 유지한다.
+// 운영 설정 변경은 별도 승인이 필요하며 docs/technical/monitoring.md를 따른다.
 
 loki.process "reserve" {
 	forward_to = [loki.write.default.receiver]

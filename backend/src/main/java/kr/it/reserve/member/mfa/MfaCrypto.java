@@ -25,6 +25,8 @@ public final class MfaCrypto {
         RANDOM.nextBytes(value);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(value);
     }
+    String randomEmailCode() { return String.valueOf(100_000 + RANDOM.nextInt(900_000)); }
+
     public static String digest(String value) {
         try {
             byte[] hash = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));

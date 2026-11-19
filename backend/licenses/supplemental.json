@@ -20,10 +20,20 @@
       "source": "https://repo.maven.apache.org/maven2/com/bucket4j/bucket4j-core/8.10.1/bucket4j-core-8.10.1-sources.jar",
       "sha256": "c56a400615b084b61d7ccc605e24015d0154d9ca06e3b603c0bdab63b70388e3"
     },
+    "cc0-1.0": {
+      "file": "upstream/cc0-1.0.txt",
+      "source": "https://creativecommons.org/publicdomain/zero/1.0/legalcode.txt",
+      "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499"
+    },
     "content-type": {
       "file": "upstream/content-type.txt",
       "source": "https://bitbucket.org/connect2id/nimbus-content-type/raw/2.3/LICENSE.txt",
       "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    "datautilities-source-notices": {
+      "file": "upstream/datautilities-source-notices.txt",
+      "source": "https://repo.maven.apache.org/maven2/com/github/peteroupc/datautilities/1.1.0/datautilities-1.1.0-sources.jar",
+      "sha256": "226b2f887df987aaba2a23c856478c8ccf8adc7ed7abb86b313ba3496dee0026"
     },
     "epl-2.0": {
       "file": "upstream/epl-2.0.txt",
@@ -69,6 +79,11 @@
       "file": "upstream/istack-notice.txt",
       "source": "https://raw.githubusercontent.com/eclipse-ee4j/jaxb-istack-commons/4.1.2/NOTICE.md",
       "sha256": "47c2e638db178ecd17f586cc2ec464f4c886b2354b619b839d6b80d4ed0a1807"
+    },
+    "j2objc-3.1": {
+      "file": "upstream/j2objc-3.1.txt",
+      "source": "https://raw.githubusercontent.com/google/j2objc/1671e9afb72a16126d448f468db3e582358fba47/LICENSE",
+      "sha256": "22418fba3d2030cc22690f1c0c38ae423d5540110e9d61519027e3210ac29726"
     },
     "jandex": {
       "file": "upstream/jandex.txt",
@@ -130,6 +145,11 @@
       "source": "https://bitbucket.org/connect2id/nimbus-jose-jwt/raw/10.9.1/LICENSE.txt",
       "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
     },
+    "numbers": {
+      "file": "upstream/numbers.txt",
+      "source": "https://raw.githubusercontent.com/peteroupc/numbers-java/7e49b7b3e992724d30bde619c49785eea3ab4ad4/LICENSE.md",
+      "sha256": "845f5ff764d899c09fc88be34d307d94cc75dbcad1a78940fd8fd7939663618a"
+    },
     "oauth2": {
       "file": "upstream/oauth2.txt",
       "source": "https://bitbucket.org/connect2id/oauth-2.0-sdk-with-openid-connect-extensions/raw/11.38.2/LICENSE.txt",
@@ -139,6 +159,16 @@
       "file": "upstream/reactive-streams.txt",
       "source": "https://raw.githubusercontent.com/reactive-streams/reactive-streams-jvm/v1.0.4/LICENSE",
       "sha256": "96a3b2d45af72054d0676e8eb9a944a096812a7f8ff1b71bd82dadbc60ce0444"
+    },
+    "redis-authx": {
+      "source": "https://raw.githubusercontent.com/redis/jvm-redis-authx-entraid/1e6cb85fbd376db092fed18f079dfa7594156b6c/LICENSE",
+      "sha256": "bce18846018d0abb9b4c9a3751755d36ae87de2f23872b8124a83321a86ed58f",
+      "file": "upstream/redis-authx.txt"
+    },
+    "redis-authx-source-notices": {
+      "source": "https://repo.maven.apache.org/maven2/redis/clients/authentication/redis-authx-core/0.1.1-beta2/redis-authx-core-0.1.1-beta2-sources.jar",
+      "sha256": "62533790d055d7b88f86106865dd146fccabef8811e7c790c7ae8c3782195d5a",
+      "file": "upstream/redis-authx-source-notices.txt"
     },
     "sentry": {
       "file": "upstream/sentry.txt",
@@ -150,10 +180,25 @@
       "source": "https://raw.githubusercontent.com/getsentry/sentry-java/8.59.0/LICENSE",
       "sha256": "c90147c075a17f4aecfea27a56510ddf7c76508c8488df533623402008b9d052"
     },
+    "sentry-8.61.0": {
+      "file": "upstream/sentry-8.59.0.txt",
+      "source": "https://raw.githubusercontent.com/getsentry/sentry-java/8.61.0/LICENSE",
+      "sha256": "c90147c075a17f4aecfea27a56510ddf7c76508c8488df533623402008b9d052"
+    },
     "snakeyaml": {
       "file": "upstream/snakeyaml.txt",
       "source": "https://bitbucket.org/snakeyaml/snakeyaml/raw/snakeyaml-2.6/LICENSE.txt",
       "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9"
+    },
+    "twelvemonkeys": {
+      "file": "upstream/twelvemonkeys.txt",
+      "source": "https://raw.githubusercontent.com/haraldk/TwelveMonkeys/twelvemonkeys-3.15.0/LICENSE.txt",
+      "sha256": "10e1e2688c74b337e0ca9e3a6a02e16319c3ee4cec79b768bca28ab8823ffde2"
+    },
+    "unlicense": {
+      "file": "upstream/unlicense.txt",
+      "source": "https://raw.githubusercontent.com/peteroupc/CBOR-Java/e61997127fa2b7955265ba6f4b7ff5469089f9ec/LICENSE.md",
+      "sha256": "328f7a29fe35eabd6a9f68bc244257f6fd82d00c2b81e9b77546c06a5c325305"
     },
     "validation": {
       "file": "upstream/validation.txt",
@@ -169,46 +214,6 @@
       "file": "upstream/validation-notice.txt",
       "source": "https://raw.githubusercontent.com/jakartaee/validation/3.1.1/NOTICE.md",
       "sha256": "ec537c7af98d652c6cd2da2d67b344f37c1bab1fb8ee98600b7d072856015d8d"
-    },
-    "redis-authx": {
-      "source": "https://raw.githubusercontent.com/redis/jvm-redis-authx-entraid/1e6cb85fbd376db092fed18f079dfa7594156b6c/LICENSE",
-      "sha256": "bce18846018d0abb9b4c9a3751755d36ae87de2f23872b8124a83321a86ed58f",
-      "file": "upstream/redis-authx.txt"
-    },
-    "redis-authx-source-notices": {
-      "source": "https://repo.maven.apache.org/maven2/redis/clients/authentication/redis-authx-core/0.1.1-beta2/redis-authx-core-0.1.1-beta2-sources.jar",
-      "sha256": "62533790d055d7b88f86106865dd146fccabef8811e7c790c7ae8c3782195d5a",
-      "file": "upstream/redis-authx-source-notices.txt"
-    },
-    "sentry-8.61.0": {
-      "file": "upstream/sentry-8.59.0.txt",
-      "source": "https://raw.githubusercontent.com/getsentry/sentry-java/8.61.0/LICENSE",
-      "sha256": "c90147c075a17f4aecfea27a56510ddf7c76508c8488df533623402008b9d052"
-    },
-    "datautilities-source-notices": {
-      "file": "upstream/datautilities-source-notices.txt",
-      "source": "https://repo.maven.apache.org/maven2/com/github/peteroupc/datautilities/1.1.0/datautilities-1.1.0-sources.jar",
-      "sha256": "226b2f887df987aaba2a23c856478c8ccf8adc7ed7abb86b313ba3496dee0026"
-    },
-    "numbers": {
-      "file": "upstream/numbers.txt",
-      "source": "https://raw.githubusercontent.com/peteroupc/numbers-java/7e49b7b3e992724d30bde619c49785eea3ab4ad4/LICENSE.md",
-      "sha256": "845f5ff764d899c09fc88be34d307d94cc75dbcad1a78940fd8fd7939663618a"
-    },
-    "j2objc-3.1": {
-      "file": "upstream/j2objc-3.1.txt",
-      "source": "https://raw.githubusercontent.com/google/j2objc/1671e9afb72a16126d448f468db3e582358fba47/LICENSE",
-      "sha256": "22418fba3d2030cc22690f1c0c38ae423d5540110e9d61519027e3210ac29726"
-    },
-    "cc0-1.0": {
-      "file": "upstream/cc0-1.0.txt",
-      "source": "https://creativecommons.org/publicdomain/zero/1.0/legalcode.txt",
-      "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499"
-    },
-    "unlicense": {
-      "file": "upstream/unlicense.txt",
-      "source": "https://raw.githubusercontent.com/peteroupc/CBOR-Java/e61997127fa2b7955265ba6f4b7ff5469089f9ec/LICENSE.md",
-      "sha256": "328f7a29fe35eabd6a9f68bc244257f6fd82d00c2b81e9b77546c06a5c325305"
     }
   },
   "packages": {
@@ -308,6 +313,42 @@
       "documents": [
         "istack",
         "istack-notice"
+      ]
+    },
+    "com.twelvemonkeys.common:common-image:3.15.0": {
+      "jarSha256": "ec4e3e110b5509895761d1dd497c580e06a109546d0aae5e5b4f3da013496b29",
+      "documents": [
+        "twelvemonkeys"
+      ]
+    },
+    "com.twelvemonkeys.common:common-io:3.15.0": {
+      "jarSha256": "8994d3cb95c6ebc73f3722b98185ed767ad7a15b7a299fbe12759a8a8862c1bd",
+      "documents": [
+        "twelvemonkeys"
+      ]
+    },
+    "com.twelvemonkeys.common:common-lang:3.15.0": {
+      "jarSha256": "13b0e954537504bdca2be0ac2f2d3376dd0e87941f2bf07c6a1d9f83734983a9",
+      "documents": [
+        "twelvemonkeys"
+      ]
+    },
+    "com.twelvemonkeys.imageio:imageio-core:3.15.0": {
+      "jarSha256": "1126663b28fc0689af4ddc7cc5893509033b42c8f8bf361d03be729b76f2a04b",
+      "documents": [
+        "twelvemonkeys"
+      ]
+    },
+    "com.twelvemonkeys.imageio:imageio-metadata:3.15.0": {
+      "jarSha256": "5c869390bdf62002b1dad4b04e2dfed9fb1116b2429e7d6db75e1b92221f31c9",
+      "documents": [
+        "twelvemonkeys"
+      ]
+    },
+    "com.twelvemonkeys.imageio:imageio-webp:3.15.0": {
+      "jarSha256": "029882337da9d7b8055ea22238f750182a581a623547c83c2493c17a26e06fbd",
+      "documents": [
+        "twelvemonkeys"
       ]
     },
     "com.upokecenter:cbor:4.5.6": {

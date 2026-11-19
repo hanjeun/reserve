@@ -25,11 +25,18 @@ describe('field replacement motion', () => {
         view.rerender(<RollingFieldValue value={1}>10월 14일</RollingFieldValue>);
         expect(animate).not.toHaveBeenCalled();
         expect(view.container).toHaveTextContent('10월 14일');
+        const surface = view.container.querySelector('.reserve-rolling-field-value');
+        expect(surface.style.perspective).toBe('');
+        expect(surface.firstElementChild.style.backfaceVisibility).toBe('');
 
         view.rerender(<RollingFieldValue value={2}>10월 15일</RollingFieldValue>);
         expect(animate).toHaveBeenCalledTimes(2);
         expect(view.container.querySelector('[aria-hidden="true"]')).toHaveTextContent('10월 14일');
         expect(animate.mock.calls[0][0][0].transform).toBe('translateY(70%) rotateX(-25deg)');
+        expect(surface.style.perspective).toBe('300px');
+        act(() => animate.mock.results[0].value.onfinish());
+        expect(surface.style.perspective).toBe('');
+        expect(surface.firstElementChild.style.backfaceVisibility).toBe('');
     });
 
     it('cancels a replacement on clear and treats the next choice as a new first value', () => {

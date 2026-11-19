@@ -26,6 +26,7 @@ import useMessengerStore, { messengerIdentityOf } from '../../store/useMessenger
 
 vi.mock('../../services', () => ({
     chatService: {
+        getUnread: vi.fn(),
         listConversations: vi.fn(), listStoreInbox: vi.fn(),
         listAdminSupportInbox: vi.fn(), getAdminSupportRoom: vi.fn(),
         pollAdminSupportRoom: vi.fn(), markAdminSupportRead: vi.fn(), sendAdminSupportRoom: vi.fn(),
@@ -52,6 +53,7 @@ const adminMessage = (id, changes = {}) => ({
 
 beforeEach(() => {
     Object.values(chatService).forEach(mock => mock.mockReset());
+    chatService.getUnread.mockResolvedValue({ messages: 0, notifications: 0 });
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1200 });
     Element.prototype.scrollIntoView = vi.fn();
     useAuthStore.setState({ user: { id: 71, role: 'USER', name: '테스트 회원' }, isLoggedIn: true });
@@ -239,7 +241,7 @@ describe('messenger home and stable support identity wiring', () => {
             type: 'SUPPORT', counterpartName: '담당자 하늘', counterpartProfileImage: 'https://images.example.invalid/sky.png',
             lastMessagePreview: '확인 후 안내드립니다.', unread: 0,
         }} onSelect={onSelect} />);
-        const row = screen.getByRole('button', { name: /RESERVE 고객지원/ });
+        const row = screen.getByRole('button', { name: /RESERVE 고객지원(?! 대화 메뉴)/ });
         expect(container.querySelector('.reserve-messenger-row-icon img'))
             .toHaveAttribute('src', MESSENGER_BRAND_AVATAR);
         expect(screen.queryByText('담당자 하늘')).not.toBeInTheDocument();
@@ -281,7 +283,7 @@ describe('messenger home and stable support identity wiring', () => {
         expect(chatService.markRead).not.toHaveBeenCalled();
         expect(chatService.sendSupport).not.toHaveBeenCalled();
         await user.click(screen.getByRole('button', { name: '대화', exact: true }));
-        const row = await screen.findByRole('button', { name: /RESERVE 고객지원/ });
+        const row = await screen.findByRole('button', { name: /RESERVE 고객지원(?! 대화 메뉴)/ });
         expect(row.querySelector('img')).toHaveAttribute('src', MESSENGER_BRAND_AVATAR);
         expect(row.querySelector('.reserve-messenger-row-preview')).toHaveTextContent('목록 메시지');
         expect(chatService.getSupport).not.toHaveBeenCalled();
@@ -309,7 +311,7 @@ describe('messenger home and stable support identity wiring', () => {
         });
         useMessengerStore.getState().showConversations();
         const { container } = renderContent();
-        const row = await screen.findByRole('button', { name: /RESERVE 고객지원/ });
+        const row = await screen.findByRole('button', { name: /RESERVE 고객지원(?! 대화 메뉴)/ });
         expect(row.querySelector('img')).toHaveAttribute('src', MESSENGER_BRAND_AVATAR);
         expect(chatService.getSupport).not.toHaveBeenCalled();
         await user.click(row);
@@ -335,7 +337,7 @@ describe('messenger home and stable support identity wiring', () => {
         });
         useMessengerStore.getState().showConversations();
         const { container } = renderContent();
-        const row = await screen.findByRole('button', { name: /한식당/ });
+        const row = await screen.findByRole('button', { name: /한식당(?! 대화 메뉴)/ });
         expect(row.querySelector('.reserve-messenger-row-icon img')).toHaveAttribute('src', listImage);
         await userEvent.setup().click(row);
         await waitFor(() => expect(chatService.getStore).toHaveBeenCalledWith(42));

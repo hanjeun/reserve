@@ -127,13 +127,66 @@ it('cancels an unfinished transition on keyboard input, viewport changes and pag
     }
 });
 
-it('settles a vertical swipe to the next scene without treating a horizontal gesture as navigation', () => {
+it('leaves touch inertia and snapping native after cancelling a wheel transition', () => {
+    wheel(); frame(0);
     swipe('touchstart', { clientX: 50, clientY: 500 });
+    expect(callbacks.size).toBe(0);
     position = 300;
     swipe('touchend', { clientX: 55, clientY: 100 });
     frame(0); frame(420);
-    expect(position).toBe(700);
+    expect(position).toBe(300);
+    expect(callbacks.size).toBe(0);
     swipe('touchstart', { clientX: 50, clientY: 500 });
     swipe('touchend', { clientX: 300, clientY: 480 });
     expect(callbacks.size).toBe(0);
+});
+
+it('aligns a complete device inside a tall scene before advancing', () => {
+    heights[1] = 1000;
+    const device = document.createElement('figure');
+    device.dataset.marketingScrollStop = '';
+    device.getBoundingClientRect = () => ({ top: 64 + 980 - position, height: 600 });
+    document.querySelector('[data-index="1"]').append(device);
+    position = 700;
+    expect(wheel().defaultPrevented).toBe(true);
+    frame(0); frame(420);
+    expect(position).toBe(930);
+    vi.advanceTimersByTime(160);
+    wheel(); frame(450); frame(870);
+    expect(position).toBe(1700);
+});
+
+it('영상이 재생되거나 체험을 준비할 때 전진 입력을 넘기지 않고 뒤로 이동은 유지해요', () => {
+    const hero = document.querySelector('[data-index="0"]');
+    hero.dataset.heroStory = '';
+    hero.getBoundingClientRect = () => ({ top: -600, bottom: 764, height: 1364 });
+    for (const state of ['playing', 'preparing', 'transition']) {
+        hero.dataset.playbackState = state;
+        expect(wheel().defaultPrevented).toBe(true);
+        const key = new KeyboardEvent('keydown', { key: 'PageDown', bubbles: true, cancelable: true });
+        document.body.dispatchEvent(key); expect(key.defaultPrevented).toBe(true);
+        const back = new KeyboardEvent('keydown', { key: 'PageUp', bubbles: true, cancelable: true });
+        document.body.dispatchEvent(back); expect(back.defaultPrevented).toBe(false);
+        expect(callbacks.size).toBe(0);
+        vi.advanceTimersByTime(160);
+    }
+    hero.dataset.playbackState = 'unavailable';
+    expect(wheel().defaultPrevented).toBe(false);
+    expect(callbacks.size).toBe(0);
+});
+
+it('짧은 휠로 영상 전환 지점에 정착하고 반대 방향으로 첫 장면을 복원해요', () => {
+    const hero = document.querySelector('[data-index="0"]');
+    hero.dataset.heroStory = '';
+    hero.dataset.playbackState = 'idle';
+    heights[0] = 1470;
+    hero.getBoundingClientRect = () => ({ top: 64 - position, bottom: 1534 - position, height: 1470 });
+    expect(wheel(main(), { deltaY: 32 }).defaultPrevented).toBe(true);
+    frame(0); frame(420);
+    expect(position).toBe(770);
+    expect(wheel(main(), { deltaY: 180 }).defaultPrevented).toBe(true);
+    expect(callbacks.size).toBe(0);
+    expect(wheel(main(), { deltaY: -32 }).defaultPrevented).toBe(true);
+    frame(450); frame(870);
+    expect(position).toBe(0);
 });

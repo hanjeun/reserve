@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { readFileSync } from 'node:fs';
 import postcss from 'postcss';
 import App from './App';
@@ -15,7 +15,8 @@ vi.mock('./store/useAuthStore', () => ({
         { getState: () => fixture.auth, subscribe: () => () => {} }),
 }));
 vi.mock('./components/layout/Header', () => ({
-    default: () => <header>
+    default: ({ restoreControls }) => <header data-restore-controls={restoreControls || undefined}>
+        <Link to="/messages">메시지 열기</Link>
         <Link to="/" state={{ reserveHomeEntry: true, reserveRouteMotion: 'from-left' }}>로고로 홈</Link>
         <Link to="/">일반 홈 이동</Link>
         <Link to="/?region=all" replace state={{ reserveHomeEntry: true, reserveRouteMotion: 'from-left' }}>홈 주소 보정</Link>
@@ -31,6 +32,10 @@ vi.mock('./components/layout/OfflineBanner', () => ({ default: () => null }));
 vi.mock('./components/layout/DiscoveryNav', () => ({ default: () => null }));
 vi.mock('./components/chat/MessengerShell', () => ({ default: () => null }));
 vi.mock('./pages/member/MyPage', () => ({ default: () => <h1>마이페이지</h1> }));
+vi.mock('./pages/member/MessagesPage', () => ({ default: function MessagesStub() {
+    const navigate = useNavigate();
+    return <button onClick={() => navigate(-1)}>메시지 닫기</button>;
+} }));
 vi.mock('./pages/Home', () => ({ default: () => <div data-home-content="true">
     <h1>홈</h1><section className="reserve-discovery-location">위치</section>
     {fixture.homeLoading ? <Bone /> : <p>추천 가게</p>}
@@ -72,6 +77,18 @@ beforeEach(() => {
     vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{ width: 100, height: 14 }]);
 });
 afterEach(() => vi.restoreAllMocks());
+
+it('restores the previous route header without requesting a new entrance after messages', async () => {
+    show('/my-page');
+    await screen.findByRole('heading', { name: '마이페이지' });
+    const open = screen.getByRole('link', { name: '메시지 열기' });
+    expect(open.closest('header')).not.toHaveAttribute('data-restore-controls');
+    fireEvent.click(open);
+    fireEvent.click(await screen.findByRole('button', { name: '메시지 닫기' }));
+    await screen.findByRole('heading', { name: '마이페이지' });
+    expect(screen.getByRole('link', { name: '메시지 열기' }).closest('header')).toHaveAttribute('data-restore-controls', 'true');
+    expectStill();
+});
 
 it('does not replay a persisted home-logo or explicit direction after a document reload', async () => {
     show('/?region=all', { reserveHomeEntry: true, reserveRouteMotion: 'from-left' });

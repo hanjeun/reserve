@@ -8,9 +8,13 @@ import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity @Getter @NoArgsConstructor
-@Table(name = "feed_comment", uniqueConstraints = @UniqueConstraint(name = "uk_feed_comment_request", columnNames = {"profile_id", "client_request_id"}), indexes = {
+@Table(name = "feed_comment", uniqueConstraints = {
+    @UniqueConstraint(name = "uk_feed_comment_request", columnNames = {"profile_id", "client_request_id"}),
+    @UniqueConstraint(name = "uk_feed_comment_public_id", columnNames = "public_id")
+}, indexes = {
     @Index(name = "ix_feed_comment_post", columnList = "post_id,parent_id,created_at,comment_id"),
     @Index(name = "ix_feed_comment_profile", columnList = "profile_id,state,comment_id"),
     @Index(name = "ix_feed_comment_retention", columnList = "state,deleted_at,comment_id")
@@ -18,6 +22,7 @@ import java.time.LocalDateTime;
 public class FeedComment {
     public enum State { PUBLISHED, HIDDEN, DELETED }
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) @Column(name = "comment_id") private Long id;
+    @Column(name = "public_id", length = 36, updatable = false) private String publicId;
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "post_id", nullable = false)
     @OnDelete(action = OnDeleteAction.CASCADE) private FeedPost post;
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "profile_id")
@@ -30,6 +35,9 @@ public class FeedComment {
     @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt;
     @Column(name = "deleted_at") private LocalDateTime deletedAt;
+    @PrePersist
+    private void assignPublicId() { publicId = UUID.randomUUID().toString(); }
+
     public static FeedComment create(FeedPost post, FeedProfile author, FeedComment parent, String text, String requestId, LocalDateTime now) {
         FeedComment item = new FeedComment(); item.post = post; item.profile = author; item.parent = parent; item.content = text;
         item.clientRequestId = requestId; item.state = State.PUBLISHED; item.createdAt = now; item.updatedAt = now; return item;

@@ -1,6 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Login from './Login';
 
@@ -35,26 +35,44 @@ vi.mock('antd', () => {
     };
 });
 
+const Address = () => <output data-testid="address">{useLocation().search}</output>;
+
 describe('social and email suspension notices', () => {
     beforeEach(() => { vi.clearAllMocks(); window.history.replaceState({}, '', '/login'); });
     afterEach(() => window.history.replaceState({}, '', '/'));
     const show = url => {
         window.history.replaceState({}, '', url);
-        return render(<React.StrictMode><MemoryRouter initialEntries={[url]}><Login /></MemoryRouter></React.StrictMode>);
+        return render(<React.StrictMode><MemoryRouter initialEntries={[url]}><Address /><Login /></MemoryRouter></React.StrictMode>);
     };
 
     it.each([
         ['SUSPENDED', '이용이 제한된 계정이에요'],
         ['BANNED', '영구 정지된 계정이에요'],
-    ])('keeps the %s notice visible after the social redirect query is cleared', (status, title) => {
-        const rendered = show(`/login?suspended=true&status=${status}&until=2026-10-02`);
-        expect(screen.getByRole('dialog')).toHaveTextContent(title);
+    ])('displays only verified %s status and clears the result from the address', async (status, title) => {
+        const reference = '00000000-0000-4000-a000-000000000001';
+        api.post.mockResolvedValueOnce({ code: 'account_restricted', status, until: '2026-10-02' });
+        show('/login?error=oauth2&result=' + reference);
+        expect(await screen.findByRole('dialog')).toHaveTextContent(title);
         if (status === 'SUSPENDED') expect(screen.getByRole('dialog')).toHaveTextContent('2026-10-02까지');
-        expect(window.location.search).toBe('');
+        await waitFor(() => expect(screen.getByTestId('address')).toBeEmptyDOMElement());
+        expect(api.post).toHaveBeenCalledOnce();
         fireEvent.click(screen.getByRole('button', { name: '확인' }));
         expect(screen.queryByRole('dialog')).toBeNull();
-        rendered.rerender(<React.StrictMode><MemoryRouter initialEntries={['/login']}><Login /></MemoryRouter></React.StrictMode>);
+    });
+
+    it('ignores an address-supplied account suspension', async () => {
+        show('/login?suspended=true&status=BANNED&until=2026-10-02');
+        await waitFor(() => expect(screen.getByTestId('address')).toBeEmptyDOMElement());
         expect(screen.queryByRole('dialog')).toBeNull();
+        expect(api.post).not.toHaveBeenCalled();
+    });
+
+    it('does not render suspension when the browser has no verified result', async () => {
+        api.post.mockResolvedValueOnce(null);
+        show('/login?error=oauth2&result=00000000-0000-4000-a000-000000000001&status=BANNED');
+        await waitFor(() => expect(screen.getByTestId('address')).toBeEmptyDOMElement());
+        expect(screen.queryByRole('dialog')).toBeNull();
+        expect(api.post).toHaveBeenCalledOnce();
     });
 
     it('still uses structured suspension data from an email login failure', async () => {

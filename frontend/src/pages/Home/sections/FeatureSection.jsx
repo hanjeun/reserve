@@ -34,7 +34,7 @@ export default function FeatureSection({ sec, index, isMobile }) {
                 style={{
                     ...styles.sectionMobile,
                     background: bgColor,
-                    // shorthand로 통일: sectionMobile의 padding을 덮어쓰되, 해당 인덱스만 상하 안줷을 탈되게 확보
+                    // 모바일 좌우 여백을 유지하면서 상하 여백을 확보한다.
                     ...((index === 1 || index === 2) && {
                         padding: '80px 20px',
                     })
@@ -76,7 +76,7 @@ export default function FeatureSection({ sec, index, isMobile }) {
                  * 클래스별 태블릿 규칙을 적용한다. 시각 순서를 뒤집어도 DOM은 글·목업 순서를 유지한다.
                  */}
                 <div className="rsv-feature-inner"
-                     style={{ ...styles.sectionInner, flexDirection: reverse ? 'row-reverse' : 'row' }}>
+                    style={{ ...styles.sectionInner, flexDirection: reverse ? 'row-reverse' : 'row' }}>
                     <div className="reveal rsv-feature-text" style={styles.sectionText}>
                         <div style={styles.sectionTag}>{tag}</div>
                         <SectionTitle title={title} blue={blue} style={styles.sectionTitle} />

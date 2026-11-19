@@ -13,6 +13,10 @@ public final class PasswordPolicy {
     public static final String BYTE_LENGTH_MESSAGE = "비밀번호가 너무 길어요. 영문 기준 72자 이내로 입력해주세요.";
     public static final String MISMATCH_MESSAGE = "비밀번호가 일치하지 않아요.";
 
+    /** 비밀번호나 코드가 없는 요청에도 같은 비용으로 대조한다. 인코더 비용을 바꾸면 이 값도 맞춘다. */
+    public static final String DUMMY_BCRYPT_HASH =
+            "$2a$10$ZZZZZZZZZZZZZZZZZZZZZeZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ";
+
     private PasswordPolicy() {
     }
 

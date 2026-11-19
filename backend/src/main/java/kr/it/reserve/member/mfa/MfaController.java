@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import kr.it.reserve.config.jwt.JwtProperties;
+import kr.it.reserve.config.jwt.TokenProvider;
 import kr.it.reserve.config.util.CookieUtil;
 import kr.it.reserve.config.util.SecurityUtil;
 import kr.it.reserve.global.common.ApiResponse;
@@ -38,13 +39,14 @@ public class MfaController {
         @Override public String toString() { return "Proof[redacted]"; }
     }
     public record Removal(@NotBlank @Size(max = 36) String id) { }
-    public record Finish(@Pattern(regexp = "[a-f0-9]{64}") String completionId, Boolean rememberBrowser) {
+    public record Finish(@Pattern(regexp = "[a-f0-9]{64}") String completionId, Boolean rememberBrowser, Boolean offerBrowserRegistration) {
         @Override public String toString() { return "Finish[redacted]"; }
     }
     public record CompletionReference(@NotBlank @Pattern(regexp = "[a-f0-9]{64}") String completionId) {
         @Override public String toString() { return "CompletionReference[redacted]"; }
     }
     public record CredentialRemoval(boolean sessionRenewed) { }
+    public record Disable(boolean keepCurrentSession) { }
     public record Rename(@NotBlank @Size(max = 36) String id, @NotBlank @Size(max = 80) String name) {
         @Override public String toString() { return "Rename[redacted]"; }
     }
@@ -88,9 +90,11 @@ public class MfaController {
         return ok(mfa.beginTotp(ticket(request), member, SecurityUtil.getSessionId()));
     }
     @PostMapping("/api/auth/mfa/totp/confirm")
-    public ApiResponse<Recovery> confirmTotp(HttpServletRequest request, @AuthenticationPrincipal Member member, @Valid @RequestBody Code body) {
+    public ApiResponse<Recovery> confirmTotp(HttpServletRequest request, HttpServletResponse response, @AuthenticationPrincipal Member member, @Valid @RequestBody Code body) {
         limit(request, member, true);
-        return ok(new Recovery(mfa.confirmTotp(ticket(request), member, SecurityUtil.getSessionId(), body.code())));
+        var result = mfa.confirmTotp(ticket(request), member, SecurityUtil.getSessionId(), body.code());
+        renewCookies(response, result.session());
+        return ok(new Recovery(result.codes()));
     }
     @PostMapping("/api/auth/mfa/passkey/options")
     public ApiResponse<String> options(HttpServletRequest request, @AuthenticationPrincipal Member member, @RequestBody Options body) {
@@ -98,9 +102,11 @@ public class MfaController {
         return ok(mfa.beginPasskey(ticket(request), member, SecurityUtil.getSessionId(), body.registration()));
     }
     @PostMapping("/api/auth/mfa/passkey/confirm")
-    public ApiResponse<Recovery> confirmPasskey(HttpServletRequest request, @AuthenticationPrincipal Member member, @Valid @RequestBody Registration body) {
+    public ApiResponse<Recovery> confirmPasskey(HttpServletRequest request, HttpServletResponse response, @AuthenticationPrincipal Member member, @Valid @RequestBody Registration body) {
         limit(request, member, true);
-        return ok(new Recovery(mfa.confirmPasskey(ticket(request), member, SecurityUtil.getSessionId(), body.credential(), body.name())));
+        var result = mfa.confirmPasskey(ticket(request), member, SecurityUtil.getSessionId(), body.credential(), body.name());
+        renewCookies(response, result.session());
+        return ok(new Recovery(result.codes()));
     }
     @PostMapping("/api/auth/mfa/verify")
     public ApiResponse<MfaService.View> verify(HttpServletRequest request, HttpServletResponse response, @AuthenticationPrincipal Member member, @Valid @RequestBody Proof body) {
@@ -124,16 +130,28 @@ public class MfaController {
     public ApiResponse<java.util.Map<String, String>> finish(HttpServletRequest request, HttpServletResponse response, @AuthenticationPrincipal Member member,
             @Valid @RequestBody(required = false) Finish body) {
         limit(request, member, false);
-        var result = mfa.finish(ticket(request), member, SecurityUtil.getSessionId(), body == null ? null : body.completionId(), body == null ? null : body.rememberBrowser());
+        var result = mfa.finish(ticket(request), member, SecurityUtil.getSessionId(),
+                body == null ? null : body.completionId(), body == null ? null : body.rememberBrowser(),
+                body != null && Boolean.TRUE.equals(body.offerBrowserRegistration()));
         if (result.session() != null) {
             cookies.addAuthCookies(response, result.session().accessToken(), result.session().refreshToken(),
                     (int) jwt.getAccessTokenExpiration().toSeconds(), (int) result.session().refreshMaxAge().toSeconds(), result.session().persistent());
         }
-        cookies.deleteCookie(response, "mfa_ticket");
         mfa.writeBrowserCookie(request, response);
+        if (result.browserRegistrationAvailable()) return ok(java.util.Map.of("browserRegistration", "AVAILABLE"));
+        cookies.deleteCookie(response, "mfa_ticket");
         String browser = mfa.browserResult();
         return ok(browser == null ? java.util.Map.of() : java.util.Map.of("browser", browser));
     }
+    @PostMapping("/api/member/mfa/remember-browser")
+    public ApiResponse<Void> rememberBrowser(HttpServletRequest request, HttpServletResponse response,
+            @AuthenticationPrincipal Member member, @Valid @RequestBody CompletionReference body) {
+        limit(request, member, false);
+        mfa.rememberAfterLogin(ticket(request), body.completionId(), member, SecurityUtil.getSessionId());
+        mfa.writeBrowserCookie(request, response);
+        return ok(null);
+    }
+
     @PostMapping("/api/auth/mfa/completion")
     public ApiResponse<Void> completion(HttpServletRequest request, @AuthenticationPrincipal Member member,
             @Valid @RequestBody CompletionReference body) {
@@ -170,10 +188,7 @@ public class MfaController {
     public ApiResponse<CredentialRemoval> remove(HttpServletRequest request, HttpServletResponse response, @AuthenticationPrincipal Member member, @Valid @RequestBody Removal body) {
         limit(request, member, false);
         var result = mfa.remove(ticket(request), member, SecurityUtil.getSessionId(), body.id());
-        if (result.session() != null) {
-            cookies.addAuthCookies(response, result.session().accessToken(), result.session().refreshToken(),
-                    (int) jwt.getAccessTokenExpiration().toSeconds(), (int) result.session().refreshMaxAge().toSeconds(), result.session().persistent());
-        }
+        renewCookies(response, result.session());
         cookies.deleteCookie(response, "mfa_ticket");
         return ok(new CredentialRemoval(result.session() != null));
     }
@@ -183,11 +198,17 @@ public class MfaController {
         return ok(mfa.rename(ticket(request), member, SecurityUtil.getSessionId(), body.id(), body.name()));
     }
     @PostMapping("/api/auth/mfa/disable")
-    public ApiResponse<Void> disable(HttpServletRequest request, HttpServletResponse response, @AuthenticationPrincipal Member member) {
+    public ApiResponse<CredentialRemoval> disable(HttpServletRequest request, HttpServletResponse response, @AuthenticationPrincipal Member member,
+            @RequestBody(required = false) Disable body) {
         limit(request, member, false);
-        mfa.disable(ticket(request), member, SecurityUtil.getSessionId());
+        var result = mfa.disable(ticket(request), member, SecurityUtil.getSessionId(), body != null && body.keepCurrentSession());
+        renewCookies(response, result.session());
         cookies.deleteCookie(response, "mfa_ticket");
-        return ok(null);
+        return ok(new CredentialRemoval(result.session() != null));
+    }
+    private void renewCookies(HttpServletResponse response, TokenProvider.IssuedSession session) {
+        if (session != null) cookies.addAuthCookies(response, session.accessToken(), session.refreshToken(),
+                (int) jwt.getAccessTokenExpiration().toSeconds(), (int) session.refreshMaxAge().toSeconds(), session.persistent());
     }
     private static <T> ApiResponse<T> ok(T value) { return ApiResponse.success(value, "요청을 처리했어요."); }
     private String ticket(HttpServletRequest request) { return CookieUtil.getCookie(request, "mfa_ticket"); }

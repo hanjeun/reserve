@@ -40,9 +40,24 @@ public final class FileStoragePaths {
         return USER_ROOT + memberId + "/chat/" + roomId;
     }
 
+    public static String chatDocument(Long memberId, Long roomId) {
+        return chatImage(memberId, roomId) + "/documents";
+    }
+
     /** 피드 사진은 공개 CDN에도 암호문만 저장하고 전용 API에서 가시성을 확인한다. */
     public static String feedImage(Long memberId) {
         return USER_ROOT + memberId + "/feed/images";
+    }
+
+    public static String reviewImage(Long memberId) {
+        return USER_ROOT + memberId + "/reviews/images";
+    }
+
+    public static final String REVIEW_IMAGE_WITH_THUMBNAIL = ".with-thumb.bin";
+
+    public static String reviewThumbnailKey(String key) {
+        if (key == null || !key.matches("(?:[^/]+/)*users/\\d+/reviews/images/[0-9a-f-]{36}\\.with-thumb\\.bin")) return null;
+        return key.substring(0, key.length() - REVIEW_IMAGE_WITH_THUMBNAIL.length()) + ".thumb.bin";
     }
 
     /** 계정 사진과 별도로 선택한 공개 피드 프로필 이미지. */

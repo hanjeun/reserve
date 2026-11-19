@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { bundleNotices } from './scripts/bundle-notices.mjs';
 import { siteOrigins } from './scripts/site-origins.mjs';
+import { RETIRED_DETAIL_PATH } from './src/utils/publicAddress.js';
 
 const messengerCoverRevision = createHash('sha256')
     .update(readFileSync(new URL('./public/og-image.png', import.meta.url)))
@@ -18,6 +19,22 @@ return {
     },
     plugins: [
         react(),
+        {
+            name: 'reserve-retired-public-details',
+            configureServer(server) {
+                server.middlewares.use(async (request, response, next) => {
+                    const path = request.url?.split('?')[0] ?? '';
+                    if (!RETIRED_DETAIL_PATH.test(path) || !['GET', 'HEAD'].includes(request.method)) return next();
+                    try {
+                        const html = await server.transformIndexHtml(path, readFileSync(new URL('./index.html', import.meta.url), 'utf8'));
+                        response.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex, nofollow' });
+                        response.end(request.method === 'HEAD' ? undefined : html);
+                    } catch (error) {
+                        next(error);
+                    }
+                });
+            },
+        },
         bundleNotices(),
         siteOrigins({ appOrigin: process.env.VITE_APP_ORIGIN || env.VITE_APP_ORIGIN }),
     ],

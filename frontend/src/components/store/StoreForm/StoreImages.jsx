@@ -1,5 +1,5 @@
 import React from 'react';
-import { Form, Upload, Divider, Switch, message as antMessage } from 'antd';
+import { Form, Upload, Divider, Switch } from 'antd';
 import {
     IMAGE_ACCEPT,
     MAX_IMAGE_REQUEST_BYTES,
@@ -10,20 +10,12 @@ import {
 import SortableImageUpload from '../../common/SortableImageUpload';
 import LoadingUpload from '../../common/LoadingUpload';
 import ImageUploadButton from '../../common/ImageUploadButton';
+import useMessage from '../../../hooks/useMessage';
 
 /*
  * Upload의 fileList만 검증 값으로 전달해 빈 배열의 필수 검증을 유지한다. 실제 파일 전송은 폼 상태에서 관리한다.
  */
 const normFileList = (e) => (Array.isArray(e) ? e : e?.fileList ?? []);
-
-const validateImage = (file) => {
-    const error = imageFileError(file);
-    if (error) {
-        antMessage.error(error);
-        return Upload.LIST_IGNORE;
-    }
-    return false;
-};
 
 /**
  * 가게 이미지 업로드 섹션
@@ -37,9 +29,16 @@ const StoreImages = ({
     onPreviewClickCapture,
     mainImageRequired = true,
 }) => {
+    const { message } = useMessage();
+    const validateImage = file => {
+        const error = imageFileError(file);
+        if (!error) return false;
+        message.error(error);
+        return Upload.LIST_IGNORE;
+    };
     const withinRequestLimit = (nextMain, nextDetails) => {
         if (uploadListBytes([...nextMain, ...nextDetails]) <= MAX_IMAGE_REQUEST_BYTES) return true;
-        antMessage.error(`새로 올리는 이미지 전체 합계는 ${MAX_IMAGE_REQUEST_MB}MB 이하여야 해요.`);
+        message.error(`새로 올리는 이미지 전체 합계는 ${MAX_IMAGE_REQUEST_MB}MB 이하여야 해요.`);
         return false;
     };
 

@@ -1,9 +1,12 @@
+export const canManageStoreNews = user => ['BUSINESS', 'ADMIN'].includes(user?.role);
+export const storeNewsManagementPath = user => user?.role === 'ADMIN' ? '/admin?tab=news' : '/business?tab=news';
+
 export const STORE_NEWS_TYPES = [
     { value: 'NEWS', label: '소식' }, { value: 'NOTICE', label: '공지' },
     { value: 'EVENT', label: '행사' }, { value: 'BENEFIT', label: '혜택' },
 ];
 export const STORE_NEWS_STATES = [
-    { value: 'ALL', label: '전체 상태' }, { value: 'DRAFT', label: '임시저장' },
+    { value: 'ALL', label: '전체 상태' },
     { value: 'PUBLISHED', label: '게시됨' }, { value: 'ENDED', label: '기간 종료' },
     { value: 'HIDDEN', label: '관리자 숨김' },
 ];

@@ -15,7 +15,12 @@ import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { API_ENDPOINTS } from '../../constants';
 import { VALIDATION_RULES } from '../../utils/validation';
 import { saveRedirect, safeRedirectPath, consumeLoginRedirect } from '../../utils/redirect';
-import { oauthAuthorizationUrl } from '../../utils/oauthAuthorization';
+import { oauthAuthorizationUrl, socialLoginLabel } from '../../utils/oauthAuthorization';
+import { oauthOutcomeMessage } from '../../utils/oauthOutcome';
+import { peekSecurityReturn } from '../../utils/securityReturn';
+import { clearPendingLoginMethodNotice, loginMethodRecoveryText, pendingLoginMethodNotice } from '../../utils/loginMethodRecovery';
+import TextLink from '../../components/common/TextLink';
+import { APP_ORIGIN, isLegacyAppOrigin } from '../../config/siteUrls';
 import { colors, fontSize } from '../../styles/tokens';
 
 const { Text } = Typography;
@@ -29,11 +34,17 @@ const suspensionInfo = (status, until, reason) => ({
     isBanned: status === 'BANNED', until, reason,
 });
 
-const Login = () => {
-    const { login, isLoggedIn } = useAuthStore();
+const LoginForm = () => {
+    const { login, isLoggedIn, sessionRevision, browserRegistrationReference, user } = useAuthStore();
     useDocumentTitle('로그인');
     const navigate = useNavigate();
     const location = useLocation();
+    const [removedEmailLoginProvider] = useState(() => socialLoginLabel(location.state?.emailLoginRemoved));
+    const [unconfirmedMethod] = useState(() => !isLoggedIn
+        && (location.state?.loginMethodUnconfirmed || pendingLoginMethodNotice(sessionRevision)));
+    useEffect(() => {
+        if (unconfirmedMethod) clearPendingLoginMethodNotice(sessionRevision);
+    }, [unconfirmedMethod, sessionRevision]);
     const registrationRequested = new URLSearchParams(location.search).get('enroll') === 'passkey';
     const { message } = useMessage();
     // 안내가 라우터 상태를 비우기 전에 복귀 경로를 보존한다.
@@ -44,8 +55,10 @@ const Login = () => {
     // 안내 후에도 로그인 전환 방향을 유지한다.
     const preventedRef = useRef(Boolean(location.state?.prevented));
     const hasHandledRef = useRef(false);
+    const oauthOutcomeRef = useRef(null);
     const enrollmentNoticeRef = useRef(null);
-    const [loading, setLoading] = useState(false);
+    const [pendingLogin, setPendingLogin] = useState(null);
+    const loading = pendingLogin !== null;
     const [rememberMe, setRememberMe] = useState(false);
     const loginAttempt = useRef(false);
     const socialNavigation = useRef(false);
@@ -62,7 +75,7 @@ const Login = () => {
             if (!event.persisted || !socialNavigation.current) return;
             socialNavigation.current = false;
             loginAttempt.current = false;
-            setLoading(false);
+            setPendingLogin(null);
         };
         window.addEventListener('pageshow', restore);
         return () => { mounted.current = false; nativeController.current?.abort(); window.removeEventListener('pageshow', restore); };
@@ -79,8 +92,9 @@ const Login = () => {
         return () => controller.abort();
     }, [rememberNotice, policyAttempt]);
     const [mfa, setMfa] = useState(() => new URLSearchParams(location.search).get('mfa') === '1' ? {} : null);
+    const showingMfa = Boolean(mfa || browserRegistrationReference);
     useEffect(() => {
-        if (!registrationRequested || isLoggedIn || mfa || enrollmentNoticeRef.current === location.key) return;
+        if (!registrationRequested || isLoggedIn || showingMfa || enrollmentNoticeRef.current === location.key) return;
         enrollmentNoticeRef.current = location.key;
         fromRef.current = PASSKEY_SETTINGS;
         saveRedirect(PASSKEY_SETTINGS);
@@ -90,32 +104,59 @@ const Login = () => {
         const { prevented: _prevented, ...state } = location.state || {};
         navigate({ pathname: location.pathname, search: params.size ? `?${params}` : '', hash: location.hash },
             { replace: true, state: { ...state, from: PASSKEY_RETURN } });
-    }, [registrationRequested, isLoggedIn, mfa, location.key, location.pathname, location.search, location.hash, location.state, navigate, message]);
-    // 정지 사유는 소셜·이메일 로그인에 같은 모달로 표시한다.
-    const [suspendInfo, setSuspendInfo] = useState(() => {
-        if (isLoggedIn || location.state?.signupSuccess || location.state?.prevented) return null;
-        const params = new URLSearchParams(window.location.search);
-        return params.get('suspended') === 'true' && params.get('status')
-            ? suspensionInfo(params.get('status'), params.get('until'), null) : null;
-    });
+    }, [registrationRequested, isLoggedIn, showingMfa, location.key, location.pathname, location.search, location.hash, location.state, navigate, message]);
+    const [suspendInfo, setSuspendInfo] = useState(null);
 
     const showSuspendModal = (status, until, reason) => {
         setSuspendInfo(suspensionInfo(status, until, reason));
     };
 
     useEffect(() => {
-        if (registrationRequested && !isLoggedIn && !mfa) return;
+        if (registrationRequested && !isLoggedIn && !showingMfa) return;
         if (hasHandledRef.current) return;
         const params = new URLSearchParams(location.search);
-        // 연결·재인증을 취소해도 기존 로그인은 유효하다. 오류를 먼저 알리고 보안 설정으로 돌려보낸다.
-        if (isLoggedIn && params.get('error') === 'oauth2') {
-            hasHandledRef.current = true;
-            message.error(params.get('message') || '소셜 로그인하지 못했어요. 다시 시도해주세요.');
-            navigate('/my-page?security=retry', { replace: true });
-            return;
+        if (params.get('error') === 'oauth2' || params.get('suspended') === 'true') {
+            const reference = params.get('result');
+            const validReference = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(reference ?? '');
+            if (validReference && oauthOutcomeRef.current?.reference !== reference) {
+                // StrictMode에서 같은 브라우저의 일회용 결과를 두 번 요청하지 않는다.
+                const request = api.post('/api/auth/oauth-outcome', { reference }, { skipAuthRefresh: true, timeout: 5000 })
+                    .catch(() => null);
+                oauthOutcomeRef.current = { reference, sessionRevision, request };
+            }
+            const pending = oauthOutcomeRef.current;
+            const request = validReference && pending?.reference === reference && pending.sessionRevision === sessionRevision
+                ? pending.request : Promise.resolve(null);
+            let active = true;
+            void request.then(outcome => {
+                if (!active) return;
+                hasHandledRef.current = true;
+                if (outcome?.code === 'account_restricted' && ['SUSPENDED', 'BANNED'].includes(outcome.status)) {
+                    setSuspendInfo(suspensionInfo(outcome.status, outcome.until, null));
+                } else {
+                    message.error(oauthOutcomeMessage(outcome?.code));
+                }
+                if (isLoggedIn) {
+                    const deviceRetry = params.get('error') === 'oauth2' && peekSecurityReturn(user?.id)?.target === 'devices';
+                    navigate(outcome || deviceRetry ? '/my-page?security=retry' : consumeLoginRedirect(fromRef.current), { replace: true });
+                } else {
+                    for (const key of ['error', 'result', 'message', 'suspended', 'status', 'until']) params.delete(key);
+                    navigate({ pathname: location.pathname, search: params.toString(), hash: location.hash },
+                        { replace: true, state: location.state });
+                }
+            });
+            return () => { active = false; };
         }
         // 계정 경계에서 재마운트돼도 원래 요청한 경로로 돌아간다.
-        if (isLoggedIn && !mfa) { navigate(consumeLoginRedirect(registrationRequested ? PASSKEY_SETTINGS : fromRef.current), { replace: true }); return; }
+        if (isLoggedIn && !showingMfa) { navigate(consumeLoginRedirect(registrationRequested ? PASSKEY_SETTINGS : fromRef.current), { replace: true }); return; }
+
+        if (location.state?.emailLoginRemoved || location.state?.loginMethodUnconfirmed
+            || (unconfirmedMethod && location.state?.prevented)) {
+            const { emailLoginRemoved: _removed, loginMethodUnconfirmed: _unconfirmed, prevented: _prevented, ...state } = location.state;
+            navigate({ pathname: location.pathname, search: location.search, hash: location.hash },
+                { replace: true, state });
+            return;
+        }
 
         if (location.state?.signupSuccess) {
             hasHandledRef.current = true;
@@ -133,37 +174,34 @@ const Login = () => {
             return;
         }
 
-        // 정지 정보는 suspended·status·until 쿼리로 전달된다.
-        const isSuspended = params.get('suspended') === 'true';
-        const suspendStatus = params.get('status');    // 'SUSPENDED' | 'BANNED'
-
-        if (isSuspended && suspendStatus) {
-            hasHandledRef.current = true;
-            window.history.replaceState({}, '', '/login');
-        }
-
-        // 구 오류 파라미터 하위 호환 (oauthError='oauth2', message=...)
-        const oauthError = params.get('error');
-        const oauthMessage = params.get('message');
-        if (oauthError === 'oauth2' && oauthMessage) {
-            hasHandledRef.current = true;
-            message.error(oauthMessage);
-            window.history.replaceState({}, '', '/login');
-        }
-    }, [isLoggedIn, mfa, registrationRequested, location.state, location.search, navigate, message]);
+    }, [isLoggedIn, user?.id, sessionRevision, showingMfa, registrationRequested, unconfirmedMethod, location.state, location.pathname, location.search, location.hash, navigate, message]);
 
     const notifyLoginSuccess = member => {
         if (member?.id == null) return;
         message.success(member.name ? `${member.name}님, 로그인됐어요!` : '로그인됐어요.');
     };
-    const completeLogin = member => {
+    const continueToRememberLogin = (path, passkey = false) => {
+        if (path) saveRedirect(path);
+        navigate('/oauth2/callback?remember=1', { replace: true,
+            ...(passkey ? { state: { passkeyReturn: { path, prevented: preventedRef.current } } } : {}) });
+    };
+    const completeLogin = (member, offerRemember = false) => {
         login(member);
+        if (offerRemember) { continueToRememberLogin(fromRef.current, true); return; }
         notifyLoginSuccess(member);
         const target = consumeLoginRedirect(fromRef.current);
         const direction = preventedRef.current && target !== '/' ? 'from-right' : 'from-left';
         navigate(target, { replace: true, state: { reserveRouteMotion: direction } });
     };
-    const nativePasskeyLogin = async view => {
+    const openMfa = view => {
+        setMfa(view);
+        if (view.purpose !== 'RISK_LOGIN') return;
+        const params = new URLSearchParams(location.search);
+        if (params.get('mfa') === '1') return;
+        params.set('mfa', '1');
+        navigate({ pathname: location.pathname, search: `?${params}`, hash: location.hash }, { replace: true, state: location.state });
+    };
+    const nativePasskeyLogin = async (view, offerRemember) => {
         if (!mounted.current) return;
         const controller = new AbortController();
         nativeController.current = controller;
@@ -174,16 +212,15 @@ const Login = () => {
             if (!mounted.current || controller.signal.aborted) return;
             completionState.reference ??= verified?.completionId;
             if (verified?.purpose === 'RISK_LOGIN') {
-                setMfa({ ...verified, mfaRequired: true, completionState });
+                openMfa({ ...verified, mfaRequired: true, completionState, offerRemember });
                 return;
             }
             const member = await finishMfaSession(controller.signal, false, completionState);
-            if (mounted.current && !controller.signal.aborted) completeLogin(member);
+            if (mounted.current && !controller.signal.aborted) completeLogin(member, offerRemember);
         } catch (failure) {
             if (mounted.current && !controller.signal.aborted && !failure.isStaleSession && !failure.isSessionExpired
                 && !['NotAllowedError', 'AbortError'].includes(failure.name)) {
-                setMfa({ ...(verified || view), mfaRequired: true, completionState,
-                    preferredFactor: view?.totpAvailable ? 'TOTP' : 'PASSKEY', initialError: failure.message });
+                openMfa({ ...(verified || view), mfaRequired: true, completionState, offerRemember, initialError: failure.message });
                 return;
             }
             throw failure;
@@ -192,20 +229,12 @@ const Login = () => {
     const onLoginSubmit = async (values) => {
         if (loginAttempt.current) return;
         loginAttempt.current = true;
-        setLoading(true);
+        setPendingLogin('password');
         try {
             const res = await api.post(API_ENDPOINTS.AUTH.LOGIN, { ...values, rememberMe }, { withCredentials: true });
             if (!mounted.current) return;
             if (res?.mfaRequired) {
-                if (res.passkeyAvailable && !res.enrollmentRequired) {
-                    try { await nativePasskeyLogin(res); return; }
-                    catch (failure) {
-                        if (failure.isSessionExpired || failure.isStaleSession || nativeController.current?.signal.aborted) return;
-                        setMfa({ ...res, preferredFactor: res.totpAvailable ? 'TOTP' : 'PASSKEY',
-                            initialError: ['NotAllowedError', 'AbortError'].includes(failure.name)
-                                ? '다른 인증 수단을 사용하거나 패스키를 다시 선택해주세요.' : failure.message });
-                    }
-                } else setMfa(res);
+                openMfa(res);
                 return;
             }
             if (res) completeLogin(res);
@@ -217,35 +246,39 @@ const Login = () => {
                 showSuspendModal(suspendData.status, suspendData.until, suspendData.reason);
                 return;
             }
+            if (err?.status === 401) {
+                message.error('이메일 또는 비밀번호가 올바르지 않아요. 소셜 로그인만 사용한다면 연결한 서비스로 로그인해주세요.');
+                return;
+            }
             const msg = typeof err === 'string' ? err : err?.message;
             message.error(msg || '이메일 또는 비밀번호를 확인해주세요.');
         } finally {
             loginAttempt.current = false;
-            if (mounted.current) setLoading(false);
+            if (mounted.current) setPendingLogin(null);
         }
     };
 
     const handlePasskeyLogin = async () => {
         if (loginAttempt.current) return;
         loginAttempt.current = true;
-        setLoading(true);
+        setPendingLogin('passkey');
         try {
             const view = await api.post('/api/auth/mfa/passkey/login', { rememberMe }, { skipAuthRefresh: true });
             if (!mounted.current) return;
-            await nativePasskeyLogin(view);
+            await nativePasskeyLogin(view, !rememberMe);
         } catch (failure) {
             if (!mounted.current || failure.isSessionExpired || failure.isStaleSession || nativeController.current?.signal.aborted) return;
             await api.post('/api/auth/mfa/cancel', undefined, { skipAuthRefresh: true }).catch(() => {});
             if (['NotAllowedError', 'AbortError'].includes(failure.name)) message.info('패스키 인증을 취소했어요.');
             else message.error(failure.message || '패스키 인증을 다시 시도해주세요.');
         }
-        finally { loginAttempt.current = false; if (mounted.current) setLoading(false); }
+        finally { loginAttempt.current = false; if (mounted.current) setPendingLogin(null); }
     };
 
     const handleSocialLogin = (provider) => {
         if (loginAttempt.current) return;
         loginAttempt.current = true;
-        setLoading(true);
+        setPendingLogin('social');
         try {
             if (fromRef.current) saveRedirect(fromRef.current);
             socialNavigation.current = true;
@@ -253,7 +286,7 @@ const Login = () => {
         } catch (error) {
             socialNavigation.current = false;
             loginAttempt.current = false;
-            setLoading(false);
+            setPendingLogin(null);
             message.error(error.message || '소셜 로그인을 시작하지 못했어요. 다시 시도해주세요.');
         }
     };
@@ -261,14 +294,34 @@ const Login = () => {
     return (
         <PageContainer size="sm" paddingTop="80px" center>
             <div className="fade-in-up">
-                {!mfa && <><PageTitle aria-label="로그인" className="reserve-auth-title" style={styles.title}><LockOutlined aria-hidden="true" /></PageTitle>
-                <PageDescription style={styles.subtitle}>예약이 필요한 순간, RESERVE</PageDescription></>}
+                {!showingMfa && <><PageTitle aria-label="로그인" className="reserve-auth-title" style={styles.title}><LockOutlined aria-hidden="true" /></PageTitle>
+                <PageDescription style={styles.subtitle} role={removedEmailLoginProvider || unconfirmedMethod ? 'status' : undefined}>
+                    {removedEmailLoginProvider
+                        ? '이메일 로그인을 해제했어요. ' + removedEmailLoginProvider + '로 다시 로그인해주세요.'
+                        : unconfirmedMethod ? loginMethodRecoveryText(unconfirmedMethod) : '예약이 필요한 순간, RESERVE'}
+                </PageDescription></>}
 
-                {mfa ? <MfaFlow page initialView={mfa.mfaRequired ? mfa : undefined}
-                    onDone={member => {
-                        const securityAction = new URLSearchParams(location.search).get('security') === '1';
-                        if (!securityAction) notifyLoginSuccess(member);
-                        navigate(securityAction ? '/my-page?security=verified' : consumeLoginRedirect(fromRef.current), { replace: true });
+                {showingMfa ? <MfaFlow page initialView={mfa?.mfaRequired ? mfa : undefined}
+                    onAuthenticated={() => {
+                        const params = new URLSearchParams(location.search);
+                        if (!params.has('mfa')) return;
+                        params.delete('mfa');
+                        const state = params.get('security') === '1'
+                            ? { ...location.state, from: { pathname: '/my-page', search: '?security=verified' } }
+                            : location.state;
+                        navigate({ pathname: location.pathname, search: params.size ? `?${params}` : '', hash: location.hash },
+                            { replace: true, state });
+                    }}
+                    onDone={(member, { home = false, deviceRegistration = false } = {}) => {
+                        const params = new URLSearchParams(location.search);
+                        const securityAction = params.get('security') === '1';
+                        if (!securityAction && (params.get('remember') === '1' || mfa?.offerRemember)) {
+                            continueToRememberLogin(home ? '/' : fromRef.current, Boolean(mfa?.offerRemember));
+                            return;
+                        }
+                        if ((!securityAction || home) && !deviceRegistration) notifyLoginSuccess(member);
+                        const target = securityAction && !home ? '/my-page?security=verified' : consumeLoginRedirect(fromRef.current);
+                        navigate(home ? '/' : target, { replace: true });
                     }}
                     onCancel={() => { setMfa(null); navigate('/login', { replace: true }); }} /> : <>
                 <Form onFinish={onLoginSubmit} layout="vertical" size="large" requiredMark={false}>
@@ -280,22 +333,25 @@ const Login = () => {
                     </Form.Item>
 
                     <Flex justify="space-between" align="center" className="reserve-login-tools">
-                        <Checkbox checked={rememberMe} disabled={loading} onChange={event => { if (event.target.checked) setRememberNotice(true); else setRememberMe(false); }}>로그인 유지</Checkbox>
+                        <Checkbox checked={rememberMe} disabled={loading}
+                            onChange={event => { if (event.target.checked) setRememberNotice(true); else setRememberMe(false); }}>
+                            로그인 유지
+                        </Checkbox>
                         <Flex align="center">
-                        <IconTool label="패스키 등록" icon={<SafetyCertificateOutlined />} disabled={loading}
-                            onClick={() => {
-                                fromRef.current = PASSKEY_SETTINGS;
-                                saveRedirect(PASSKEY_SETTINGS);
-                                message.info('패스키를 등록하려면 먼저 로그인해주세요.');
-                                navigate('/login', { replace: true, state: { from: PASSKEY_RETURN } });
-                            }} />
-                        <IconTool label="비밀번호 찾기" icon={<MailOutlined />} disabled={loading}
-                            onClick={() => navigate('/forgot-password')} />
+                            <IconTool label="패스키 등록" icon={<SafetyCertificateOutlined />} disabled={loading}
+                                onClick={() => {
+                                    fromRef.current = PASSKEY_SETTINGS;
+                                    saveRedirect(PASSKEY_SETTINGS);
+                                    message.info('패스키를 등록하려면 먼저 로그인해주세요.');
+                                    navigate('/login', { replace: true, state: { from: PASSKEY_RETURN } });
+                                }} />
+                            <IconTool label="비밀번호 찾기" icon={<MailOutlined />} disabled={loading}
+                                onClick={() => navigate('/forgot-password')} />
                         </Flex>
                     </Flex>
                     <div className="reserve-login-actions">
-                        <Button variant="primary" htmlType="submit" loading={loading} block icon={<LockOutlined />}>로그인</Button>
-                        <Button variant="secondary" htmlType="button" disabled={loading} icon={<LockOutlined />}
+                        <Button variant="primary" htmlType="submit" loading={pendingLogin === 'password'} disabled={loading && pendingLogin !== 'password'} block icon={<LockOutlined />}>로그인</Button>
+                        <Button variant="secondary" htmlType="button" loading={pendingLogin === 'passkey'} disabled={loading && pendingLogin !== 'passkey'} icon={<LockOutlined />}
                             onClick={handlePasskeyLogin} block>패스키로 로그인</Button>
                     </div>
                 </Form>
@@ -310,12 +366,14 @@ const Login = () => {
                     <SocialLoginButton provider="google" label="Google로 로그인" disabled={loading} onClick={() => handleSocialLogin('google')} />
                 </Flex>
 
-                <Flex vertical gap={20} style={{ width: '100%', marginTop: '32px' }} align="center">
-                    <Flex align="center" justify="center" gap={4}>
-                        <Text type="secondary" style={{ fontSize: fontSize.base }}>계정이 없으신가요?</Text>
-                        <Button variant="link" onClick={() => navigate('/signup')} style={{ padding: 0 }}>회원가입</Button>
-                    </Flex>
-
+                <Flex vertical gap={12} className="reserve-login-help" style={{ marginTop: 32 }} align="center">
+                    <Text type="secondary" style={{ fontSize: fontSize.base }}>
+                        계정이 없으신가요? <TextLink to="/signup" className="reserve-auth-accent-link">회원가입</TextLink>
+                    </Text>
+                    <Text type="secondary" style={{ fontSize: fontSize.base }}>
+                        계정이 <TextLink to="/account-recovery" className="reserve-auth-accent-link">잠기거나</TextLink>{' 혹은 '}
+                        <TextLink to="/account-recovery?type=withdrawn" className="reserve-auth-accent-link">복구</TextLink>가 필요하신가요?
+                    </Text>
                 </Flex>
                 </>}
             </div>
@@ -327,8 +385,12 @@ const Login = () => {
                 {policyError && <DataState compact state="error" title="로그인 유지 안내를 불러오지 못했어요."
                     error={policyError} retrying={policyRetrying} onRetry={() => { setPolicyRetrying(true); setPolicyAttempt(value => value + 1); }} />}
                 <Typography.Paragraph type="secondary">{loginPolicy?.idleSeconds && loginPolicy?.absoluteSeconds
-                    ? lifetimeLabel(loginPolicy.idleSeconds) + ' 동안 사용하지 않거나 로그인한 지 ' + lifetimeLabel(loginPolicy.absoluteSeconds) + '이 지나면 다시 로그인해요.'
+                    ? '일반 회원은 ' + lifetimeLabel(loginPolicy.idleSeconds) + ' 동안 사용하지 않거나 로그인한 지 '
+                        + lifetimeLabel(loginPolicy.absoluteSeconds) + '이 지나면 다시 로그인해요.'
                     : '일정 기간 접속하지 않거나 로그인 유지 기간이 끝나면 다시 로그인해야 해요.'}</Typography.Paragraph>
+                {loginPolicy?.browserIdleSeconds > 0 && <Typography.Paragraph type="secondary">
+                    로그인 유지 없이 사용하면 {lifetimeLabel(loginPolicy.browserIdleSeconds)} 동안 세션이 갱신되지 않을 때 로그인이 만료돼요.
+                </Typography.Paragraph>}
             </Modal>
             <Modal
                 title={
@@ -372,4 +434,15 @@ const styles = {
     },
 };
 
-export default Login;
+function LegacyLogin() {
+    useDocumentTitle('로그인');
+    return <PageContainer size="sm" paddingTop="80px" center>
+        <PageTitle>새 앱에서 로그인해주세요</PageTitle>
+        <PageDescription>패스키도 새 주소에서 사용할 수 있어요.</PageDescription>
+        <TextLink href={APP_ORIGIN + '/login'}>새 앱에서 로그인</TextLink>
+    </PageContainer>;
+}
+
+export default function Login() {
+    return isLegacyAppOrigin() ? <LegacyLogin /> : <LoginForm />;
+}

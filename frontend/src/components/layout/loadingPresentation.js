@@ -3,12 +3,13 @@ import { createContext, useContext, useLayoutEffect, useState, useSyncExternalSt
 export const LoadingPresentationContext = createContext(null);
 
 // 한 번의 이동 안에서 실제로 커밋된 골격만 기록한다. 요청 여부나 캐시 유무를 추측하지 않는다.
-export function createLoadingPresentation(navigationKey, { documentEntry = false } = {}) {
+export function createLoadingPresentation(navigationKey, { documentEntry = false, previousPathname } = {}) {
     let shown = false;
     const listeners = new Set();
     return {
         navigationKey,
         documentEntry,
+        previousPathname,
         getSnapshot: () => shown,
         subscribe: listener => {
             listeners.add(listener);
@@ -31,7 +32,7 @@ export function useRouteLoadingPresentation({ pathname, key }, navigationType) {
     // URL 기본값·안내 상태 정리는 같은 화면의 로딩 이력을 유지해요.
     const samePageReplacement = navigationType === 'REPLACE' && entry.pathname === pathname;
     const next = { pathname, key, presentation: samePageReplacement
-        ? entry.presentation : createLoadingPresentation(key) };
+        ? entry.presentation : createLoadingPresentation(key, { previousPathname: entry.pathname }) };
     setEntry(next);
     return next.presentation;
 }

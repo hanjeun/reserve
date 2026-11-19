@@ -1,42 +1,41 @@
 package kr.it.reserve.store.service;
 
+import kr.it.reserve.config.updates.EntityUpdates;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.it.reserve.global.common.ServiceTime;
 import kr.it.reserve.advertisement.entity.AdStatus;
 import kr.it.reserve.advertisement.repository.AdvertisementRepository;
-import kr.it.reserve.config.updates.EntityUpdates;
 import kr.it.reserve.favorite.repository.FavoriteRepository;
-import kr.it.reserve.file.service.FileDeletionOutboxService;
 import kr.it.reserve.file.service.FileStorageService;
+import kr.it.reserve.file.service.FileDeletionOutboxService;
 import kr.it.reserve.file.util.FileStoragePaths;
-import kr.it.reserve.global.common.PageRequests;
-import kr.it.reserve.global.common.ServiceTime;
 import kr.it.reserve.global.error.StoreException;
 import kr.it.reserve.lifecycle.dto.StoreClosureReadiness;
 import kr.it.reserve.lifecycle.service.DataLifecycleGuard;
 import kr.it.reserve.member.entity.Member;
-import kr.it.reserve.payment.repository.PaymentRepository;
 import kr.it.reserve.promotion.repository.PromotionRepository;
+import kr.it.reserve.payment.repository.PaymentRepository;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
-import kr.it.reserve.store.dto.StoreCreateRequest;
-import kr.it.reserve.store.dto.StoreRegionGroup;
-import kr.it.reserve.store.dto.StoreResponse;
-import kr.it.reserve.store.dto.StoreStatisticsResponse;
-import kr.it.reserve.store.dto.StoreUpdateRequest;
-import kr.it.reserve.store.entity.ServiceDomain;
-import kr.it.reserve.store.entity.Store;
-import kr.it.reserve.store.entity.StoreStatus;
-import kr.it.reserve.store.entity.WaitingIntakeMode;
 import kr.it.reserve.store.event.StoreClosed;
 import kr.it.reserve.store.repository.StoreRepository;
 import kr.it.reserve.store.search.StoreFulltextSearch;
+import kr.it.reserve.store.dto.StoreCreateRequest;
+import kr.it.reserve.store.dto.StoreResponse;
+import kr.it.reserve.store.dto.StoreRegionGroup;
+import kr.it.reserve.store.dto.StoreStatisticsResponse;
+import kr.it.reserve.store.dto.StoreUpdateRequest;
+import kr.it.reserve.store.entity.BookingOpening;
+import kr.it.reserve.store.entity.Store;
+import kr.it.reserve.store.entity.ServiceDomain;
+import kr.it.reserve.store.entity.StoreStatus;
+import kr.it.reserve.store.entity.WaitingIntakeMode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,7 +52,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Executor;
+import org.springframework.data.domain.Page;
+import kr.it.reserve.global.common.PageRequests;
+import org.springframework.data.domain.Pageable;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -64,6 +67,7 @@ public class StoreService {
     private final StoreRepository storeRepository;
     private final StoreFulltextSearch storeFulltextSearch;
     private final StoreWaitingCounts waitingCounts;
+    private final StoreRegionCache regionCache;
     private final FileStorageService fileStorageService;
     private final FileDeletionOutboxService fileDeletionOutboxService;
     private final DataLifecycleGuard dataLifecycleGuard;
@@ -136,6 +140,8 @@ public class StoreService {
                 .imageAutoplayEnabled(!Boolean.FALSE.equals(request.getImageAutoplayEnabled()))
                 .waitingIntakeMode(WaitingIntakeMode.parse(request.getWaitingIntakeMode()))
                 .maxAdvanceBookingDays(clampMaxAdvanceBookingDays(request.getMaxAdvanceBookingDays()))
+                .bookingOpening(bookingOpening(request.getBookingOpeningScheduled(), request.getBookingOpensAt(),
+                        request.getBookingOpeningFrom(), request.getBookingOpeningTo()))
                 .build();
 
         store.setClosedDayList(normalizeClosedDays(request.getClosedDays()));
@@ -194,6 +200,11 @@ public class StoreService {
         return directory().getStore(id);
     }
 
+    @Transactional(readOnly = true)
+    public StoreResponse getStoreByPublicId(UUID publicId) {
+        return directory().getStoreByPublicId(publicId.toString());
+    }
+
     @Transactional
     public StoreResponse updateStore(Long id, StoreUpdateRequest request, Member member) {
         log.info("Store update started: storeId={}", id);
@@ -219,6 +230,10 @@ public class StoreService {
             if (request.getAutoCompletionEnabled() != null) store.setAutoCompletionEnabled(request.getAutoCompletionEnabled());
             if (request.getServiceDurationMinutes() != null) store.setServiceDurationMinutes(kr.it.reserve.reservation.service.ReservationCompletionPolicy.duration(request.getServiceDurationMinutes()));
             if (request.hasField("bookingDeadlineHours")) store.setBookingDeadlineHours(clampBookingDeadlineHours(request.getBookingDeadlineHours()));
+            if (request.getBookingOpeningScheduled() != null) {
+                store.setBookingOpening(bookingOpening(request.getBookingOpeningScheduled(), request.getBookingOpensAt(),
+                        request.getBookingOpeningFrom(), request.getBookingOpeningTo()));
+            }
             if (request.getPaymentTimeoutMinutes() != null) store.setPaymentTimeoutMinutes(clampPaymentTimeout(request.getPaymentTimeoutMinutes()));
             if (request.getReservationSlotMinutes() != null) store.setReservationSlotMinutes(clampSlotMinutes(request.getReservationSlotMinutes()));
             if (request.getNearbyRadiusKm() != null) store.setNearbyRadiusKm(clampNearbyRadiusKm(request.getNearbyRadiusKm()));
@@ -301,12 +316,11 @@ public class StoreService {
                         Reservation.ReservationStatus.UNCONFIRMED), ServiceTime.today())) {
             throw new StoreException("남아 있는 유료 예약이 있어 환불 기준을 바꿀 수 없어요. 기존 예약을 처리한 뒤 다시 수정해주세요.", HttpStatus.CONFLICT);
         }
-        // 옵션 값은 전부 clamp/normalize 를 거친다(생성 경로와 동일) — "가게 옵션 정규화" 절 참고.
+        // 생성과 수정에 같은 옵션 정규화 규칙을 적용한다.
         if (request.getNoShowDeposit() != null) store.setNoShowDeposit(clampDeposit(request.getNoShowDeposit()));
         if (request.getFullRefundDays() != null) store.setFullRefundDays(clampFullRefundDays(request.getFullRefundDays()));
         if (request.getPartialRefundDays() != null) {
-            // 비교 기준은 "이번 요청의 fullDays"가 아니라 **최종 저장될 fullDays** 여야 한다.
-            // 전액 기준일을 안 보낸 부분 수정 요청이면 기존 값과 비교해야 구간이 맞는지 판단된다.
+            // 부분 수정에서도 환불 구간이 맞도록 최종 저장될 전액 환불 기준일과 비교한다.
             store.setPartialRefundDays(clampPartialRefundDays(
                     request.getPartialRefundDays(), store.getFullRefundDays()));
         }
@@ -476,7 +490,15 @@ public class StoreService {
         return km;
     }
 
-    /** 이미 종료된 운영 기간도 보존한다. 잘못된 날짜는 제한 없음으로 정규화하되 종료일이 시작일보다 이르면 거부한다. */
+    private BookingOpening bookingOpening(Boolean scheduled, LocalDateTime opensAt, LocalDate from, LocalDate to) {
+        if (!Boolean.TRUE.equals(scheduled)) return null;
+        if (opensAt == null || from == null || to == null || to.isBefore(from) || opensAt.toLocalDate().isAfter(from)) {
+            throw new StoreException("예약 오픈 일시와 방문일 범위를 확인해주세요. 오픈 날짜는 첫 방문일보다 늦을 수 없어요.", HttpStatus.BAD_REQUEST);
+        }
+        return new BookingOpening(opensAt, from, to);
+    }
+
+    /** 이미 종료된 운영 기간도 보존한다. */
     private void applyOperatingPeriod(Store store, String rawOpen, String rawClose) {
         LocalDate open  = parseIsoDateOrNull(rawOpen);
         LocalDate close = parseIsoDateOrNull(rawClose);
@@ -598,17 +620,9 @@ public class StoreService {
         }
     }
 
-    /** 회차 상한. 이보다 많아지면 SLOT 방식이 맞다. */
     private static final int MAX_SESSION_TIMES = 50;
 
-    // 가게 옵션 정규화
-    //
-    // 왜 컨트롤러의 @Valid 가 아니라 여기인가
-    //   이 두 엔드포인트는 @ModelAttribute(multipart) 라 검증 실패가 BindException 으로
-    //   나가 기존 에러 응답 규격과 달라진다. 또 사장님 입력은 Select 라 범위를 벗어날 일이
-    //   없고, 실제 위험은 **API 를 직접 두드리는 경우**다. 그럴 땐 거절보다 안전한 값으로
-    //   수렴시키는 쪽이 서비스를 멈추지 않는다. 위 clampNearbyRadiusKm 이 이미 그 패턴이다.
-    //   생성·수정 두 경로가 **반드시 여기를 지나가게** 해서 한 쪽만 고치는 사고를 막는다.
+    // multipart 검증의 에러 응답 규격을 유지하면서 생성·수정 모두 옵션 값을 안전한 범위로 정규화한다.
 
     /** 슬롯 생성이 전진하도록 예약 단위 시간은 양수여야 한다. */
     private static final int MIN_SLOT_MINUTES = 5;
@@ -622,11 +636,7 @@ public class StoreService {
         return minutes;
     }
 
-    /**
-     * 슬롯당 정원. <b>null = 무제한</b> 이 이 필드의 약속이다.
-     * 0 이하를 그대로 저장하면 조회는 "무제한"으로, 예약 검증은 "항상 마감"으로 반대로 판정해
-     * 사용자에겐 전 시간대가 열려 보이는데 누르면 전부 마감 에러가 난다. → null 로 통일한다.
-     */
+    /** 조회와 예약 검증이 같은 무제한 기준을 쓰도록 0 이하의 슬롯 정원을 {@code null}로 통일한다. */
     private static final int MAX_CAPACITY_PER_SLOT = 999;
 
     private Integer normalizeCapacity(Integer capacity) {
@@ -656,12 +666,7 @@ public class StoreService {
                 .distinct().sorted().toList();
     }
 
-    /**
-     * 임시 휴무일 정규화 — 파싱 실패·중복·<b>지난 날짜</b>를 버린다.
-     *
-     * <p>지난 날짜를 안 걸러내면 이 컬럼이 해가 갈수록 무한히 길어지고(varchar(1000) 상한),
-     * 아무 효과도 없는 값이 계속 쌓인다. 저장할 때마다 정리하는 게 별도 청소 배치보다 싸다.
-     */
+    /** 저장 길이가 불필요하게 늘지 않도록 임시 휴무일의 과거 값·중복·형식 오류를 제거한다. */
     private List<LocalDate> normalizeClosedDates(List<String> raw) {
         if (raw == null) return List.of();
         LocalDate today = ServiceTime.today();
@@ -784,8 +789,7 @@ public class StoreService {
     }
 
     /** 현재 가게가 실제로 있는 시도·시군구만 모아 인기 지역과 계층 목록에 공유한다. */
-    @Transactional(readOnly = true)
     public List<StoreRegionGroup> getAvailableRegions() {
-        return directory().getAvailableRegions();
+        return regionCache.get(() -> directory().getAvailableRegions());
     }
 }

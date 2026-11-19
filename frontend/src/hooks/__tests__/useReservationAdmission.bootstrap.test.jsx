@@ -36,7 +36,7 @@ describe('admission recovery during first auth bootstrap', () => {
         expect(api.get).toHaveBeenCalledWith('/api/auth/session', { skipAuthRefresh: true, timeout: 8000 });
         expect(useAuthStore.getState()).toMatchObject({ user: { id: 7 }, authRestoring: false, sessionRevision: 1 });
         expect(JSON.parse(sessionStorage.getItem(KEY))).toEqual(saved);
-        await expect(view.result.current.getPendingAttempt({ storeId: 31, date: '2026-10-23', time: '10:00' }))
+        await expect(view.result.current.getPendingAttempt({ storeId: 31, date: '2026-10-23', time: '10:00' }, { storedTicketOnly: true }))
             .resolves.toEqual(saved.attempts['sale-1']);
         expect(admissionService.join).not.toHaveBeenCalled();
         expect(admissionService.status).not.toHaveBeenCalled();

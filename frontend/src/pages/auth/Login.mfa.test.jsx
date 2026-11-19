@@ -3,8 +3,10 @@ import { App as AntApp } from 'antd';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Login from './Login';
+import ForgotPassword from './ForgotPassword';
 import PrivateRoute from '../../components/PrivateRoute';
 import * as oauth from '../../utils/oauthAuthorization';
+import * as sites from '../../config/siteUrls';
 
 const fixture = vi.hoisted(() => ({ state: {}, member: null, post: vi.fn(), get: vi.fn(), authenticate: vi.fn(), finish: vi.fn(), login: vi.fn(),
     message: { warning: vi.fn(), error: vi.fn(), success: vi.fn(), info: vi.fn() } }));
@@ -14,13 +16,19 @@ vi.mock('../../store/useAuthStore', () => ({ default: selector => typeof selecto
 vi.mock('../../hooks', () => ({ useMessage: () => ({ message: fixture.message }) }));
 vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: fixture.message }) }));
 vi.mock('../../hooks/useDocumentTitle', () => ({ default: () => {} }));
-vi.mock('../../components/member/MfaFlow', () => ({ default: ({ onDone, initialView }) => <button data-method={initialView?.preferredFactor}
-    data-purpose={initialView?.purpose} data-verified={initialView?.verified} data-reference={initialView?.completionState?.reference}
-    data-issued={initialView?.completionState?.issued} onClick={() => onDone(fixture.member)}>추가 인증 완료</button> }));
+vi.mock('../../components/member/MfaFlow', () => ({ default: ({ onDone, onAuthenticated, initialView }) => <>
+    <button data-passkey={initialView?.passkeyAvailable} data-totp={initialView?.totpAvailable} data-purpose={initialView?.purpose} data-verified={initialView?.verified}
+        data-reference={initialView?.completionState?.reference ?? initialView?.completionId} data-issued={initialView?.completionState?.issued}
+        onClick={() => onDone(fixture.member)}>추가 인증 완료</button>
+    <button onClick={() => onAuthenticated()}>기기 등록 선택 열기</button>
+</> }));
 
-const DestinationPath = () => { const location = useLocation(); return <span aria-label="도착 주소" data-state={JSON.stringify(location.state)}>{location.pathname + location.search}</span>; };
+const DestinationPath = () => { const location = useLocation(); return <span aria-label="도착 주소" data-hash={location.hash} data-state={JSON.stringify(location.state)}>{location.pathname + location.search}</span>; };
 const show = path => render(<MemoryRouter initialEntries={[path]}><AntApp><DestinationPath /><Routes>
-    <Route path="/login" element={<Login />} /><Route element={<PrivateRoute />}>
+    <Route path="/login" element={<Login />} />
+    <Route path="/oauth2/callback" element={<span>소셜 로그인 완료</span>} />
+    <Route path="/forgot-password" element={<ForgotPassword />} />
+    <Route element={<PrivateRoute />}>
         <Route path="/my-page" element={<span>보안 설정</span>} /></Route>
     <Route path="/" element={<span>홈 화면</span>} />
 </Routes></AntApp></MemoryRouter>);
@@ -47,9 +55,25 @@ describe('로그인과 기본 인증 인계', () => {
         vi.resetAllMocks(); sessionStorage.clear(); fixture.state = { isLoggedIn: false, login: fixture.login };
         fixture.member = { id: 7, name: '합성 회원', role: 'USER', termsAgreed: true };
         fixture.login.mockImplementation(user => { fixture.state = { ...fixture.state, isLoggedIn: true, isLoggingOut: false, user }; });
-        fixture.get.mockResolvedValue({ idleSeconds: 1209600, absoluteSeconds: 2592000 });
+        fixture.get.mockResolvedValue({ idleSeconds: 2592000, absoluteSeconds: 7776000, browserIdleSeconds: 3600 });
         fixture.authenticate.mockResolvedValue({ verified: true });
         fixture.finish.mockResolvedValue({ id: 7, name: '합성 회원' });
+    });
+    it('회원가입과 잠긴 계정·탈퇴한 계정 안내에 각각 연결해요', () => {
+        show('/login');
+        expect(screen.getByRole('link', { name: '회원가입', exact: true })).toHaveAttribute('href', '/signup');
+        expect(screen.getByRole('link', { name: '잠기거나', exact: true })).toHaveAttribute('href', '/account-recovery');
+        expect(screen.getByRole('link', { name: '복구', exact: true })).toHaveAttribute('href', '/account-recovery?type=withdrawn');
+        expect(screen.getByRole('link', { name: '복구', exact: true }).parentElement).toHaveTextContent('계정이 잠기거나 혹은 복구가 필요하신가요?');
+        expect(fixture.post).not.toHaveBeenCalled();
+    });
+    it('기기 등록 선택 전에 완료한 인증 주소를 정리하고 보안 설정 복귀를 이어줘요', async () => {
+        show('/login?mfa=1&security=1');
+        fireEvent.click(await screen.findByRole('button', { name: '기기 등록 선택 열기' }));
+        const location = screen.getByLabelText('도착 주소');
+        expect(location).toHaveTextContent(/^\/login\?security=1$/);
+        expect(JSON.parse(location.dataset.state)).toEqual({ from: { pathname: '/my-page', search: '?security=verified' } });
+        expect(screen.getByRole('button', { name: '추가 인증 완료' })).toBeInTheDocument();
     });
     it.each([['kakao', '카카오'], ['naver', '네이버'], ['google', 'Google']])('취소 후 복원된 %s 로그인은 입력을 유지하고 다시 시작할 수 있어요', async (provider, label) => {
         const authorization = vi.spyOn(oauth, 'oauthAuthorizationUrl');
@@ -79,6 +103,23 @@ describe('로그인과 기본 인증 인계', () => {
         expect(fixture.message.error).toHaveBeenCalledExactlyOnceWith('이동 요청을 확인하지 못했어요.');
         expect(fixture.post).not.toHaveBeenCalled();
     });
+    it.each([['kakao', '카카오'], ['naver', '네이버'], ['google', 'Google']])('공통 로그인 유지 선택을 %s에 전달해요', async (provider, label) => {
+        const authorization = vi.spyOn(oauth, 'oauthAuthorizationUrl').mockReturnValue('#provider');
+        show('/login');
+        const preference = screen.getByRole('checkbox', { name: '로그인 유지' });
+        expect(preference.closest('.reserve-login-tools')).toContainElement(screen.getByRole('button', { name: '비밀번호 찾기' }));
+        expect(preference.closest('form')).toContainElement(screen.getByPlaceholderText('비밀번호'));
+        expect(screen.getByPlaceholderText('비밀번호').compareDocumentPosition(preference) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        await enableRememberMe();
+        fireEvent.click(screen.getByRole('button', { name: `${label}로 로그인` }));
+        expect(authorization).toHaveBeenCalledExactlyOnceWith(provider, undefined, true);
+        expect(fixture.post).not.toHaveBeenCalled();
+    });
+    it('미선택 소셜 로그인은 추가 인증 뒤 유지 선택으로 이어져요', async () => {
+        show('/login?mfa=1&remember=1');
+        fireEvent.click(await screen.findByRole('button', { name: '추가 인증 완료' }));
+        expect(screen.getByLabelText('도착 주소')).toHaveTextContent(/^\/oauth2\/callback\?remember=1$/);
+    });
     it('외부 이동이 아닌 진행 중 비밀번호 요청은 페이지 표시 이벤트로 초기화하지 않아요', async () => {
         let finish;
         fixture.post.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
@@ -90,6 +131,24 @@ describe('로그인과 기본 인증 인계', () => {
         await screen.findByRole('button', { name: '추가 인증 완료' });
         expect(fixture.post).toHaveBeenCalledTimes(1);
     });
+    it('이메일 로그인에서 새 접속 환경을 확인할 때 새로고침할 수 있는 주소로 이어가요', async () => {
+        fixture.post.mockResolvedValue({ mfaRequired: true, purpose: 'RISK_LOGIN', emailAvailable: true });
+        show('/login');
+        submitPassword();
+        const continuation = await screen.findByRole('button', { name: '추가 인증 완료' });
+        expect(continuation).toHaveAttribute('data-purpose', 'RISK_LOGIN');
+        await waitFor(() => expect(screen.getByLabelText('도착 주소')).toHaveTextContent('/login?mfa=1'));
+    });
+    it('이전 앱 주소에서는 로그인이나 패스키 요청을 시작하지 않아요', () => {
+        vi.spyOn(sites, 'isLegacyAppOrigin').mockReturnValue(true);
+        show('/login?enroll=passkey#fixture');
+        expect(screen.getByRole('link', { name: '새 앱에서 로그인' })).toHaveAttribute('href', sites.APP_ORIGIN + '/login');
+        expect(screen.queryByRole('button', { name: '패스키로 로그인' })).toBeNull();
+        expect(screen.queryByPlaceholderText('이메일 주소')).toBeNull();
+        expect(fixture.get).not.toHaveBeenCalled();
+        expect(fixture.post).not.toHaveBeenCalled();
+        expect(fixture.authenticate).not.toHaveBeenCalled();
+    });
     it('페이지 제목은 아이콘과 접근성 이름만 남기고 로그인 동의 문구를 표시하지 않아요', () => {
         show('/login');
         const title = screen.getByRole('heading', { name: '로그인' });
@@ -98,6 +157,97 @@ describe('로그인과 기본 인증 인계', () => {
         expect(screen.queryByText(/로그인 시/)).toBeNull();
         expect(screen.getByRole('button', { name: '로그인', exact: true })).toBeInTheDocument();
     });
+    it.each([['NAVER', '네이버'], ['KAKAO', '카카오'], ['GOOGLE', 'Google']])('이메일 로그인 해제 후 연결한 %s 안내를 표시해요', (provider, label) => {
+        show({ pathname: '/login', state: { emailLoginRemoved: provider, reserveRouteMotion: 'from-right' } });
+        const notice = screen.getByText('이메일 로그인을 해제했어요. ' + label + '로 다시 로그인해주세요.');
+        expect(notice).toHaveAttribute('role', 'status');
+        expect(screen.getByLabelText('도착 주소')).toHaveAttribute('data-state', JSON.stringify({ reserveRouteMotion: 'from-right' }));
+        expect(fixture.post).not.toHaveBeenCalled();
+    });
+    it('로그인 주소의 파라미터로는 연결 제공자 안내를 표시하지 않아요', () => {
+        show('/login?emailLoginRemoved=NAVER');
+        expect(screen.queryByText(/이메일 로그인을 해제했어요/)).toBeNull();
+        expect(screen.getByText('예약이 필요한 순간, RESERVE')).toBeInTheDocument();
+    });
+    it('이메일 로그인 실패는 연결된 서비스를 구분하지 않는 안내를 표시해요', async () => {
+        fixture.post.mockRejectedValueOnce({ status: 401 });
+        show('/login');
+        submitPassword();
+        await waitFor(() => expect(fixture.message.error).toHaveBeenCalledWith(
+            '이메일 또는 비밀번호가 올바르지 않아요. 소셜 로그인만 사용한다면 연결한 서비스로 로그인해주세요.'));
+        expect(screen.getByRole('button', { name: '네이버로 로그인' })).toBeEnabled();
+    });
+    it('비밀번호 찾기의 요청과 재요청은 실제 코드 발송으로 안내하지 않아요', async () => {
+        const acknowledgment = '요청을 받았어요. 이메일 로그인이 설정된 주소라면 인증 코드를 보내요.';
+        fixture.post.mockResolvedValue(null);
+        show('/forgot-password');
+        expect(screen.getByText(/소셜 로그인만 사용한다면 로그인 화면에서 연결한 서비스를 선택해주세요/)).toBeVisible();
+        fireEvent.change(screen.getByPlaceholderText('로그인 이메일 주소'), { target: { value: 'fixture@example.test' } });
+        fireEvent.click(screen.getByRole('button', { name: '코드발송', exact: true }));
+        const resend = await screen.findByRole('button', { name: '재발송', exact: true });
+        expect(fixture.message.success).toHaveBeenCalledExactlyOnceWith(acknowledgment);
+        fireEvent.click(resend);
+        await waitFor(() => expect(fixture.message.success.mock.calls).toEqual([[acknowledgment], [acknowledgment]]));
+        fireEvent.click(screen.getByRole('link', { name: '로그인으로 돌아가기' }));
+        expect(await screen.findByRole('heading', { name: '로그인' })).toBeVisible();
+    });
+    it('비밀번호 찾기에서 재발송이 끝날 때까지 이전 코드 확인을 잠가요', async () => {
+        let finishResend;
+        fixture.post.mockResolvedValueOnce(null).mockImplementationOnce(() => new Promise(resolve => { finishResend = resolve; }));
+        show('/forgot-password');
+        fireEvent.change(screen.getByPlaceholderText('로그인 이메일 주소'), { target: { value: 'fixture@example.test' } });
+        fireEvent.click(screen.getByRole('button', { name: '코드발송', exact: true }));
+        const code = await screen.findByPlaceholderText('6자리 인증번호');
+        fireEvent.change(code, { target: { value: '123456' } });
+        fireEvent.click(screen.getByRole('button', { name: '재발송', exact: true }));
+        const verify = screen.getByRole('button', { name: '확인', exact: true });
+        expect(verify).toBeDisabled();
+        fireEvent.click(verify);
+        expect(fixture.post).toHaveBeenCalledTimes(2);
+        await act(async () => finishResend(null));
+        expect(code).toHaveValue('');
+        expect(verify).toBeEnabled();
+    });
+
+    it.each(['invalid', 'expired', 'unconfirmed'])('비밀번호 찾기는 %s 결과에서 이메일을 유지하고 코드 단계로 돌아가요', async outcome => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        try {
+            const expiresAt = Date.now() + 60_000;
+            fixture.post.mockResolvedValueOnce(null).mockResolvedValueOnce({ expiresAt: new Date(expiresAt).toISOString() });
+            if (outcome === 'invalid') fixture.post.mockRejectedValueOnce({ status: 400, data: { code: 'PASSWORD_RESET_CODE_INVALID' } });
+            if (outcome === 'unconfirmed') fixture.post.mockRejectedValueOnce({ isResponseUnconfirmed: true });
+            show('/forgot-password');
+            fireEvent.change(screen.getByPlaceholderText('로그인 이메일 주소'), { target: { value: 'fixture@example.test' } });
+            fireEvent.click(screen.getByRole('button', { name: '코드발송', exact: true }));
+            fireEvent.change(await screen.findByPlaceholderText('6자리 인증번호'), { target: { value: '123456' } });
+            fireEvent.click(screen.getByRole('button', { name: '확인', exact: true }));
+            const password = await screen.findByPlaceholderText('새 비밀번호 (8자 이상, 영문+숫자)');
+            fireEvent.change(password, { target: { value: 'Example1234!' } });
+            fireEvent.change(screen.getByPlaceholderText('새 비밀번호 확인'), { target: { value: 'Example1234!' } });
+            if (outcome === 'expired') {
+                vi.setSystemTime(expiresAt + 1000);
+                fireEvent(document, new Event('visibilitychange'));
+            } else {
+                fireEvent.submit(password.closest('form'));
+            }
+            expect(await screen.findByPlaceholderText('로그인 이메일 주소')).toHaveValue('fixture@example.test');
+            expect(screen.getByPlaceholderText('6자리 인증번호')).toHaveValue('');
+            expect(screen.getByRole('button', { name: '재발송', exact: true })).toBeEnabled();
+            expect(screen.queryByPlaceholderText('새 비밀번호 확인')).toBeNull();
+            if (outcome === 'unconfirmed') expect(screen.getByText(/변경 결과를 확인하지 못했어요/)).toBeVisible();
+            expect(fixture.post).toHaveBeenCalledTimes(outcome === 'expired' ? 2 : 3);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('로그인 수단 변경의 응답 유실 안내는 로그인 화면에 남고 재실행하지 않아요', () => {
+        show({ pathname: '/login', state: { loginMethodUnconfirmed: 'NAVER', reserveRouteMotion: 'from-right' } });
+        expect(screen.getByText(/변경 결과를 확인하지 못했어요. 네이버로 다시 로그인한 뒤/)).toHaveAttribute('role', 'status');
+        expect(screen.getByLabelText('도착 주소')).toHaveAttribute('data-state', JSON.stringify({ reserveRouteMotion: 'from-right' }));
+        expect(fixture.post).not.toHaveBeenCalled();
+    });
+
     it.each([false, true])('확인한 로그인 유지 선택을 비밀번호 요청에 전달해요 (%s)', async rememberMe => {
         fixture.post.mockResolvedValue({ mfaRequired: true, enrollmentRequired: true });
         show('/login');
@@ -112,7 +262,8 @@ describe('로그인과 기본 인증 인계', () => {
     it('로그인 유지 안내는 서버 만료 기간을 표시하고 취소하면 선택하지 않아요', async () => {
         show('/login');
         fireEvent.click(screen.getByRole('checkbox', { name: '로그인 유지' }));
-        expect(await screen.findByText(/14일 동안 사용하지 않거나 로그인한 지 30일/)).toBeInTheDocument();
+        expect(await screen.findByText(/30일 동안 사용하지 않거나 로그인한 지 90일/)).toBeInTheDocument();
+        expect(screen.getByText(/1시간 동안 세션이 갱신되지 않을 때/)).toBeInTheDocument();
         expect(screen.getByText(/공용 PC에서는 사용 후 꼭 로그아웃해주세요/)).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: '취소', exact: true }));
         expect(screen.getByRole('checkbox', { name: '로그인 유지' })).not.toBeChecked();
@@ -124,7 +275,7 @@ describe('로그인과 기본 인증 인계', () => {
         expect(await screen.findByRole('alert')).toHaveTextContent('로그인 유지 안내를 불러오지 못했어요.');
         expect(screen.getByRole('alert')).toHaveTextContent('서버에서 요청을 처리하지 못했어요.');
         fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
-        expect(await screen.findByText(/14일 동안 사용하지 않거나 로그인한 지 30일/)).toBeInTheDocument();
+        expect(await screen.findByText(/30일 동안 사용하지 않거나 로그인한 지 90일/)).toBeInTheDocument();
         expect(screen.queryByRole('alert')).not.toBeInTheDocument();
         expect(screen.getByRole('checkbox', { name: '로그인 유지' })).not.toBeChecked();
         expect(fixture.get).toHaveBeenCalledTimes(2);
@@ -147,6 +298,35 @@ describe('로그인과 기본 인증 인계', () => {
         expect(fixture.login).toHaveBeenCalledExactlyOnceWith({ id: 7, name: '합성 회원' });
         expect(fixture.message.success).toHaveBeenCalledExactlyOnceWith('합성 회원님, 로그인됐어요!');
     });
+    it('보호 화면에서 돌아온 뒤 한 번의 패스키 인증으로 같은 주소를 다시 열어요', async () => {
+        fixture.post.mockResolvedValue({ purpose: 'PASSKEY_LOGIN' });
+        show('/my-page?tab=photo#login-security');
+        const passkey = await screen.findByRole('button', { name: '패스키로 로그인', exact: true });
+        await enableRememberMe();
+        fireEvent.click(passkey);
+        expect(await screen.findByText('보안 설정')).toBeInTheDocument();
+        expect(screen.getByLabelText('도착 주소')).toHaveTextContent('/my-page?tab=photo');
+        expect(screen.getByLabelText('도착 주소')).toHaveAttribute('data-hash', '#login-security');
+        expect(fixture.authenticate).toHaveBeenCalledTimes(1);
+    });
+    it('미선택 패스키 로그인은 본인 확인 뒤 목적지를 보존하고 유지 선택으로 이어져요', async () => {
+        fixture.post.mockResolvedValue({ purpose: 'PASSKEY_LOGIN' });
+        show('/my-page?tab=photo#login-security');
+        fireEvent.click(await screen.findByRole('button', { name: '패스키로 로그인', exact: true }));
+        await waitFor(() => expect(screen.getByLabelText('도착 주소')).toHaveTextContent(/^\/oauth2\/callback\?remember=1$/));
+        expect(JSON.parse(screen.getByLabelText('도착 주소').dataset.state).passkeyReturn.path).toBe('/my-page?tab=photo#login-security');
+        expect(fixture.post).toHaveBeenCalledExactlyOnceWith('/api/auth/mfa/passkey/login', { rememberMe: false }, { skipAuthRefresh: true });
+        expect(fixture.authenticate).toHaveBeenCalledTimes(1);
+        expect(fixture.login).toHaveBeenCalledTimes(1);
+        expect(fixture.message.success).not.toHaveBeenCalled();
+    });
+    it('이메일 로그인은 유지 선택이 비어 있어도 목적지로 바로 이동해요', async () => {
+        fixture.post.mockResolvedValue(fixture.member);
+        show('/login'); submitPassword();
+        expect(await screen.findByText('홈 화면')).toBeInTheDocument();
+        expect(fixture.get).not.toHaveBeenCalled();
+        expect(fixture.finish).not.toHaveBeenCalled();
+    });
     it('직접 패스키 로그인도 발급 뒤 조회 실패를 완료 상태와 함께 인증 화면으로 넘겨요', async () => {
         const reference = 'e'.repeat(64);
         fixture.post.mockResolvedValue({ purpose: 'PASSKEY_LOGIN', completionId: reference });
@@ -160,36 +340,51 @@ describe('로그인과 기본 인증 인계', () => {
         expect(resume).toHaveAttribute('data-issued', 'true');
         expect(fixture.post.mock.calls.some(([path]) => path.endsWith('/cancel'))).toBe(false);
         expect(fixture.login).not.toHaveBeenCalled();
+        fireEvent.click(resume);
+        expect(screen.getByLabelText('도착 주소')).toHaveTextContent(/^\/oauth2\/callback\?remember=1$/);
     });
-    it('비밀번호 뒤 새 환경의 패스키 확인은 기억 동의를 선택할 화면을 유지해요', async () => {
+    it('비밀번호 뒤 새 환경 확인은 요청 참조와 사용 가능한 인증 수단을 전달해요', async () => {
         const reference = 'e'.repeat(64);
-        fixture.post.mockResolvedValue({ mfaRequired: true, passkeyAvailable: true, purpose: 'RISK_LOGIN', completionId: reference });
-        fixture.authenticate.mockResolvedValue({ mfaRequired: true, verified: true, purpose: 'RISK_LOGIN', completionId: reference });
+        fixture.post.mockResolvedValue({ mfaRequired: true, passkeyAvailable: true, verified: false, purpose: 'RISK_LOGIN', completionId: reference });
         show('/login'); submitPassword();
         const resume = await screen.findByRole('button', { name: '추가 인증 완료' });
         expect(resume).toHaveAttribute('data-purpose', 'RISK_LOGIN');
-        expect(resume).toHaveAttribute('data-verified', 'true');
+        expect(resume).toHaveAttribute('data-verified', 'false');
+        expect(resume).toHaveAttribute('data-passkey', 'true');
         expect(resume).toHaveAttribute('data-reference', reference);
+        expect(fixture.authenticate).not.toHaveBeenCalled();
         expect(fixture.finish).not.toHaveBeenCalled();
     });
-    it('패스키 선택을 취소하면 임시 인증을 폐기하고 로그인 화면을 유지해요', async () => {
+    it('패스키 버튼만 로딩하고 취소하면 임시 인증을 폐기해요', async () => {
+        let cancelPasskey;
         fixture.post.mockResolvedValue({ purpose: 'PASSKEY_LOGIN' });
-        fixture.authenticate.mockRejectedValue(new DOMException('cancelled', 'NotAllowedError'));
+        fixture.authenticate.mockImplementation(() => new Promise((_, reject) => { cancelPasskey = reject; }));
         show('/login');
-        fireEvent.click(screen.getByRole('button', { name: '패스키로 로그인', exact: true }));
+        const passkey = screen.getByRole('button', { name: '패스키로 로그인', exact: true });
+        const password = screen.getByRole('button', { name: '로그인', exact: true });
+        fireEvent.click(passkey);
+        await waitFor(() => expect(fixture.authenticate).toHaveBeenCalledTimes(1));
+        expect(passkey).toHaveAttribute('aria-busy', 'true');
+        expect(password).not.toHaveAttribute('aria-busy');
+        expect(password).toBeDisabled();
+        await act(async () => cancelPasskey(new DOMException('cancelled', 'NotAllowedError')));
         await waitFor(() => expect(fixture.message.info).toHaveBeenCalledTimes(1));
+        expect(passkey).toBeEnabled();
+        expect(passkey).not.toHaveAttribute('aria-busy');
+        expect(password).toBeEnabled();
         expect(fixture.post).toHaveBeenCalledWith('/api/auth/mfa/cancel', undefined, { skipAuthRefresh: true });
         expect(fixture.finish).not.toHaveBeenCalled(); expect(fixture.login).not.toHaveBeenCalled();
         expect(fixture.message.success).not.toHaveBeenCalled();
         expect(screen.getByPlaceholderText('이메일 주소')).toBeEnabled();
     });
-    it('비밀번호 이후에도 패스키를 바로 요청하고 취소하면 인증 앱으로 인계해요', async () => {
+    it('비밀번호가 맞으면 패스키를 자동 실행하지 않고 인증 선택으로 넘어가요', async () => {
         fixture.post.mockResolvedValue({ mfaRequired: true, passkeyAvailable: true, totpAvailable: true });
-        fixture.authenticate.mockRejectedValue(new DOMException('cancelled', 'NotAllowedError'));
         show('/login'); submitPassword();
-        const alternative = await screen.findByRole('button', { name: '추가 인증 완료' });
-        expect(alternative).toHaveAttribute('data-method', 'TOTP');
-        expect(fixture.authenticate).toHaveBeenCalledTimes(1); expect(fixture.finish).not.toHaveBeenCalled();
+        const choice = await screen.findByRole('button', { name: '추가 인증 완료' });
+        expect(choice).toHaveAttribute('data-passkey', 'true');
+        expect(choice).toHaveAttribute('data-totp', 'true');
+        expect(fixture.authenticate).not.toHaveBeenCalled();
+        expect(fixture.finish).not.toHaveBeenCalled();
         expect(fixture.login).not.toHaveBeenCalled();
     });
     it('페이지를 떠난 뒤 도착한 응답은 브라우저 인증을 열지 않아요', async () => {
@@ -206,6 +401,8 @@ describe('로그인과 기본 인증 인계', () => {
         fixture.post.mockImplementationOnce(() => new Promise(done => { resolve = done; }));
         show('/login'); submitPassword();
         await waitFor(() => expect(fixture.post).toHaveBeenCalledTimes(1));
+        expect(screen.getByRole('button', { name: '로그인', exact: true })).toHaveAttribute('aria-busy', 'true');
+        expect(screen.getByRole('button', { name: '패스키로 로그인', exact: true })).not.toHaveAttribute('aria-busy');
         submitPassword();
         fireEvent.click(screen.getByRole('button', { name: '패스키로 로그인', exact: true }));
         expect(screen.getByRole('button', { name: 'Google로 로그인' })).toBeDisabled();

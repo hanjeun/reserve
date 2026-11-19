@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { test } from 'node:test';
-import { resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { eligibleRun, evidenceKey, evidenceInputPaths, freshProof, main } from '../ci-evidence.mjs';
+import { resolveBin } from '../resolve-bin.mjs';
 
 const entries = '100644 blob aaaa\tfrontend/src/App.jsx\0' +
     '100644 blob bbbb\tfrontend/package-lock.json\0' +
@@ -11,13 +16,13 @@ const runtime = { node: 'v22.21.0', image: 'ubuntu24', imageVersion: '1', config
 test('backend evidence covers its code and test executor, not unrelated frontend tooling or PR labels', () => {
     assert.deepEqual(evidenceInputPaths('backend'), [
         'backend', 'frontend/index.html', 'scripts/java/kr/it/reserve/tools/VerifyDatabaseSchema.java', 'scripts/java/kr/it/reserve/tools/VerifyChatImageRecovery.java', 'scripts/tests/kr/it/reserve/tools/VerifyChatImageRecoveryTest.java', 'scripts/java/kr/it/reserve/tools/PrepareAdmissionCampaign.java', 'scripts/java/kr/it/reserve/tools/PrepareServiceAdmission.java', 'scripts/tests/kr/it/reserve/tools/PrepareServiceAdmissionTest.java', 'scripts/test-backend-isolated.sh', 'scripts/ci-evidence.mjs', 'scripts/resolve-bin.mjs', 'scripts/coverage.init.gradle', 'scripts/dependency-notices.gradle', '.github/workflows/CI.yml',
-        '.gitattributes', 'infra/compose/docker-compose-blue.yml', 'infra/compose/docker-compose-green.yml',
+        'scripts/tests/release-compatibility.test.mjs', 'scripts/check-release-compatibility-image.sh', '.gitattributes', 'infra/compose/docker-compose-blue.yml', 'infra/compose/docker-compose-green.yml',
     ]);
     assert.ok(evidenceInputPaths('frontend').includes('backend/src/main'));
     assert.throws(() => evidenceInputPaths('../outside'), /Unknown test component/);
 });
 test('CLI rejects unsupported modes and path-like components before executing tools or writing files', async () => {
-    await assert.rejects(main('unsupported', 'frontend'), /Expected restore or record/);
+    await assert.rejects(main('unsupported', 'frontend'), /Expected restore, record or key/);
     for (const component of ['../outside', resolve('outside'), String.raw`C:\outside`, 'frontend/../outside', '__proto__', 'constructor', '', undefined]) {
         await assert.rejects(main('record', component), /Unknown test component/);
         assert.throws(() => evidenceKey(component, entries, runtime), /Unknown test component/);
@@ -37,6 +42,34 @@ test('toolchain, runner and configuration changes invalidate evidence', () => {
     }
     assert.notEqual(key, evidenceKey('backend', entries, runtime));
     assert.throws(() => evidenceKey('arbitrary', entries, runtime));
+});
+test('a runner can identify its inputs and only records evidence for the tested identity', () => {
+    const repo = fileURLToPath(new URL('../../', import.meta.url));
+    const gitDir = execFileSync(resolveBin('git'), ['rev-parse', '--absolute-git-dir'], { cwd: repo, encoding: 'utf8' }).trim();
+    const directory = mkdtempSync(join(tmpdir(), 'reserve-runner-evidence-'));
+    const output = join(directory, 'output');
+    const evidence = join(directory, '.ci-evidence', 'frontend', 'evidence.json');
+    const script = fileURLToPath(new URL('../ci-evidence.mjs', import.meta.url));
+    const run = (mode, env = {}) => execFileSync(process.execPath, [script, mode, 'frontend'], {
+        cwd: directory, env: { ...process.env, GIT_DIR: gitDir, GITHUB_OUTPUT: output, ...env }, encoding: 'utf8',
+    });
+    try {
+        run('key');
+        const key = readFileSync(output, 'utf8').match(/^key=([a-f0-9]{64})$/m)?.[1];
+        assert.ok(key);
+        run('record', { EVIDENCE_EXPECTED_KEY: key, ImageVersion: 'different-runner' });
+        assert.equal(existsSync(evidence), false);
+        const executedAt = new Date(Date.now() - 60_000).toISOString();
+        run('record', { EVIDENCE_EXPECTED_KEY: key, EVIDENCE_ORIGIN: '123', EVIDENCE_EXECUTED_AT: executedAt });
+        const proof = JSON.parse(readFileSync(evidence, 'utf8'));
+        assert.equal(proof.key, key);
+        assert.equal(proof.originRunId, '123');
+        assert.equal(proof.executedAt, executedAt);
+    } finally {
+        assert.equal(dirname(directory), resolve(tmpdir()));
+        assert.ok(basename(directory).startsWith('reserve-runner-evidence-'));
+        rmSync(directory, { recursive: true, force: true });
+    }
 });
 test('documentation changes do not require repeated browser execution', () => {
     assert.equal(evidenceKey('frontend', entries, runtime),

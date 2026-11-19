@@ -8,6 +8,7 @@ import kr.it.reserve.global.ratelimit.RateLimiter;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.reservation.controller.ReservationApiController;
 import kr.it.reserve.reservation.dto.ReservationCreateRequest;
+import kr.it.reserve.reservation.protection.ReservationSubmissionProtection;
 import kr.it.reserve.reservation.service.ReservationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +32,7 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.standal
 class ReservationRecoveryControllerTest {
     private final ReservationService service = mock(ReservationService.class);
     private final RateLimiter limiter = mock(RateLimiter.class);
+    private final ReservationSubmissionProtection protection = mock(ReservationSubmissionProtection.class);
     private final Member member = Member.builder().id(1L).build();
     private final ObjectMapper mapper = new ObjectMapper().findAndRegisterModules().disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     private MockMvc mvc;
@@ -39,7 +41,7 @@ class ReservationRecoveryControllerTest {
     @BeforeEach
     void prepare() {
         mvc = standaloneSetup(new ReservationApiController(service, limiter,
-                mock(kr.it.reserve.reservation.service.ReservationRemovalService.class))).setControllerAdvice(new GlobalExceptionHandler())
+                mock(kr.it.reserve.reservation.service.ReservationRemovalService.class), protection)).setControllerAdvice(new GlobalExceptionHandler())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(mapper)).build();
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(member, null, List.of()));
         request = new ReservationCreateRequest(10L, LocalDate.now().plusDays(2), LocalTime.NOON, 1, null, false);
@@ -77,7 +79,7 @@ class ReservationRecoveryControllerTest {
         request.setGuestCount(0);
         mvc.perform(post("/api/reservations/requests/result").contentType("application/json").content(mapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
-        verifyNoInteractions(service, limiter);
+        verifyNoInteractions(service, limiter, protection);
     }
 
     @Test
@@ -90,5 +92,29 @@ class ReservationRecoveryControllerTest {
         when(service.recoverReservation(any(), eq(member))).thenThrow(new ReservationException("이미 사용한 요청 번호예요.", HttpStatus.CONFLICT));
         mvc.perform(post("/api/reservations/requests/result").contentType("application/json").content(mapper.writeValueAsString(request)))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    void repeatedSubmissionReturnsTheScopedChallengeBeforeCreatingAnything() throws Exception {
+        when(protection.check(eq(member.getId()), anyString(), eq(request.getRequestId()), isNull()))
+                .thenReturn(new ReservationSubmissionProtection.Challenge("RESERVATION_CHALLENGE_REQUIRED", "test-site",
+                        "reservation_submit", request.getRequestId()));
+        mvc.perform(post("/api/reservations").contentType("application/json").content(mapper.writeValueAsString(request)))
+                .andExpect(status().is(428))
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.data.code").value("RESERVATION_CHALLENGE_REQUIRED"))
+                .andExpect(jsonPath("$.data.requestId").value(request.getRequestId()));
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void providerFailureHasAnExplicitPreWriteOutcome() throws Exception {
+        when(protection.check(eq(member.getId()), anyString(), eq(request.getRequestId()), eq("sample-proof")))
+                .thenThrow(ReservationException.challengeUnavailable());
+        mvc.perform(post("/api/reservations").header(ReservationSubmissionProtection.TOKEN_HEADER, "sample-proof")
+                        .contentType("application/json").content(mapper.writeValueAsString(request)))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.data.code").value("RESERVATION_CHALLENGE_UNAVAILABLE"));
+        verifyNoInteractions(service);
     }
 }

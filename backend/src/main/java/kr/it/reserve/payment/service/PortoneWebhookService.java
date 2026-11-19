@@ -58,13 +58,7 @@ public class PortoneWebhookService {
         return new PortoneWebhookSignal(type, merchantUid, true);
     }
 
-    /**
-     * inbox에 저장된 결제 ID를 사용해 PG 권위 상태를 조회하고 반영한다.
-     *
-     * <p>로컬 결제 행이 없으면 PortOne 호출 테스트나 다른 환경의 신호이므로 종료한다.
-     * 반영할 로컬 상태가 없는데 PG를 먼저 조회하면 존재하지 않는 테스트 결제의 404가
-     * 정상 호출 테스트를 실패한 웹훅으로 남겨 불필요한 재시도를 만든다.
-     */
+    /** 로컬에서 관리하는 결제만 PG 상태를 조회·반영하고, 다른 환경의 신호로 불필요한 재시도를 만들지 않는다. */
     public ProcessingResult processMerchantUid(String merchantUid) {
         Payment payment = paymentRepository.findByMerchantUid(merchantUid).orElse(null);
         if (payment == null && adPaymentService.isKnown(merchantUid)) {

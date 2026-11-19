@@ -37,6 +37,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static kr.it.reserve.global.persistence.CurrentLockedStateTestSupport.managedEntities;
 
 @ExtendWith(MockitoExtension.class)
 class StoreNewsApprovalBoundaryTest {
@@ -58,6 +59,7 @@ class StoreNewsApprovalBoundaryTest {
 
     @BeforeEach
     void setUp() {
+        managedEntities(entityManager);
         LocalDateTime now = LocalDateTime.parse("2026-10-12T04:00:00");
         owner = Member.builder().id(7L).role(Role.BUSINESS).termsAgreed(true).build();
         store = Store.builder().id(3L).owner(owner).name("가게").address("서울 강남구").build();

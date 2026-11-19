@@ -45,20 +45,20 @@ describe('photo store card rating summaries', () => {
         { rating: 4.86, reviewCount: 2576, score: '4.9', count: '(2,576)' },
         { rating: 'invalid', reviewCount: 3, score: '0.0', count: '(3)' },
     ])('renders the same star, one-decimal rating and parenthesized count: %j', values => {
-        const { container } = render(<MemoryRouter><StoreCard store={{ id: 12, name: '가게', ...values }} /></MemoryRouter>);
+        const { container } = render(<MemoryRouter><StoreCard store={{ id: 12, publicId: '00000000-0000-4000-8000-000000000012', name: '가게', ...values }} /></MemoryRouter>);
         expect(screen.getByText(values.score)).toBeInTheDocument();
         expect(screen.getByText(values.count)).toBeInTheDocument();
         expect(container.querySelector('[aria-hidden="true"] svg')).toBeTruthy();
         expect(screen.queryByText('아직 리뷰가 없어요')).toBeNull();
         expect(container).not.toHaveTextContent('NaN');
-        expect(screen.getByRole('link', { name: '가게 상세 보기' })).toHaveAttribute('href', '/store/12');
+        expect(screen.getByRole('link', { name: '가게 상세 보기' })).toHaveAttribute('href', '/store/00000000-0000-4000-8000-000000000012');
     });
 
     it('places the heart beside the title and plain identity text before the rating', () => {
         const { container } = render(
             <MemoryRouter>
                 <StoreCard
-                    store={{ id: 12, name: '가게', category: '한식', latitude: 37.5, longitude: 127 }}
+                    store={{ id: 12, publicId: '00000000-0000-4000-8000-000000000012', name: '가게', category: '한식', latitude: 37.5, longitude: 127 }}
                     userLocation={{ latitude: 37.5, longitude: 127 }}
                     isAdvertised
                 />
@@ -71,7 +71,7 @@ describe('photo store card rating summaries', () => {
         expect(titleLine).toHaveTextContent('가게');
         expect(titleLine.querySelector('.reserve-store-card-favorite')).toBeTruthy();
         expect(identity).toHaveTextContent('한식AD광고우리동네');
-        expect(identity.querySelector('.reserve-store-identity-text-ad')).toHaveTextContent('광고');
+        expect(identity.querySelector('.reserve-ad-mark')).toHaveTextContent('광고');
         expect(identity.querySelector('[style*="background"]')).toBeNull();
         expect(titleLine.nextElementSibling).toBe(identity);
         expect(identity.nextElementSibling).toHaveClass('reserve-store-card-rating');
@@ -87,7 +87,7 @@ describe('photo store card rating summaries', () => {
         const user = userEvent.setup();
         render(
             <MemoryRouter initialEntries={['/stores']}>
-                <StoreCard store={{ id: 12, name: '가게' }} />
+                <StoreCard store={{ id: 12, publicId: '00000000-0000-4000-8000-000000000012', name: '가게' }} />
                 <LocationProbe />
             </MemoryRouter>,
         );
@@ -100,6 +100,6 @@ describe('photo store card rating summaries', () => {
         await user.click(favorite);
         expect(screen.getByRole('status', { name: '현재 경로' })).toHaveTextContent('/stores');
         await user.click(details);
-        expect(screen.getByRole('status', { name: '현재 경로' })).toHaveTextContent('/store/12');
+        expect(screen.getByRole('status', { name: '현재 경로' })).toHaveTextContent('/store/00000000-0000-4000-8000-000000000012');
     });
 });

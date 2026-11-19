@@ -1,4 +1,6 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import PropTypes from 'prop-types';
+import { adminKeys } from '../../hooks/queryKeys';
 import { Checkbox, Form, Tag } from 'antd';
 import { useSearchParams } from 'react-router-dom';
 import Pagination from '../common/Pagination';
@@ -26,7 +28,7 @@ import useReportReviewDraft from './useReportReviewDraft';
 const PAGE_SIZE = 20;
 const statuses = [{ value: 'OPEN', label: '접수' }, { value: 'RESOLVED', label: '처리 완료' }];
 
-export default function FeedReportsPanel() {
+export default function FeedReportsPanel({ initialReportId = null, initialCommentId = null } = {}) {
     const [urlParams] = useSearchParams();
     const [query, setQuery] = useQueryParamsState(REPORT_QUERY_DEFAULTS, REPORT_URL_KEYS[reportMode(urlParams.get('reportMode'))]);
     const mode = reportMode(query.reportMode);
@@ -42,7 +44,7 @@ export default function FeedReportsPanel() {
     const setPage = value => setQuery({ [pageKey]: String(value) });
     const active = useContext(WorkspaceActivityContext);
     const requestAction = useWorkspaceAction();
-    const [selected, setSelected] = useState(null);
+    const [selected, setSelected] = useState(initialReportId);
     const [form] = Form.useForm();
     const submitLock = useRef(false);
     const [validating, setValidating] = useState(false);
@@ -73,7 +75,7 @@ export default function FeedReportsPanel() {
     },
         onSuccess: async (_data, variables) => {
             if (!isCurrentSession(variables.session)) return;
-            await invalidateFeed(client);
+            await Promise.all([invalidateFeed(client), client.invalidateQueries({ queryKey: adminKeys.reportQueue() })]);
             if (isCurrentSession(variables.session)) { setSelected(null); message.success('신고 처리를 저장했어요.'); }
         },
         onError: error => { if (!error.isStaleSession) { if (error.status === 409) draft.reject(); message.error(error.message); } },
@@ -118,7 +120,8 @@ export default function FeedReportsPanel() {
     const renderList = () => {
         if (mode === 'comments') return interactions.isPending ? <FeedReportListSkeleton label="댓글 신고를 불러오는 중" />
             : interactions.isError ? <DataState state="error" title="댓글 신고 상태를 불러오지 못했어요." error={interactions.error} onRetry={interactions.refetch} retrying={interactions.isFetching} />
-                : <CommentReportsPanel status={status} page={page} onPageChange={setPage} enabled={Boolean(interactions.data?.enabled)} />;
+                : <CommentReportsPanel status={status} page={page} onPageChange={setPage} enabled={Boolean(interactions.data?.enabled)}
+                    initialReportId={initialCommentId} />;
         if (configPending || enabled && activeList.isPending) return <FeedReportListSkeleton />;
         if (!enabled && (config.isError || newsConfig.isError)) return <DataState state="error" title="신고함 상태를 불러오지 못했어요."
             error={config.error || newsConfig.error} onRetry={() => Promise.all([config.refetch(), newsConfig.refetch()])} retrying={config.isFetching || newsConfig.isFetching} />;
@@ -185,3 +188,5 @@ export default function FeedReportsPanel() {
         </FormModal>
     </section>;
 }
+
+FeedReportsPanel.propTypes = { initialReportId: PropTypes.number, initialCommentId: PropTypes.number };

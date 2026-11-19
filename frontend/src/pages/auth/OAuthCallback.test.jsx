@@ -1,5 +1,5 @@
-import { act, render } from '@testing-library/react';
-import { App } from 'antd';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { App, ConfigProvider } from 'antd';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import OAuthCallback from './OAuthCallback';
@@ -8,10 +8,14 @@ import DiscoveryRouteSkeleton from '../../components/layout/DiscoveryRouteSkelet
 import RouteSkeletonPages from '../../components/layout/RouteSkeletonPages';
 import { clearRedirect, peekRedirect, saveRedirect } from '../../utils/redirect';
 import { consumeLoginFeedback } from '../../utils/loginFeedback';
+import { refreshSessionOnce } from '../../api/sessionRefresh';
+import { currentSession } from '../../api/sessionScope';
 
-const { checkAuth, navigate, replace, message } = vi.hoisted(() => ({
+const { checkAuth, navigate, replace, api, message } = vi.hoisted(() => ({
     checkAuth: vi.fn(), navigate: vi.fn(), replace: vi.fn(), message: { success: vi.fn(), error: vi.fn() },
+    api: { get: vi.fn(), post: vi.fn() },
 }));
+vi.mock('../../api/axios', () => ({ default: api }));
 vi.mock('../../store/useAuthStore', () => {
     const state = { checkAuth, user: null, isLoggedIn: false, sessionRevision: 0 };
     return { default: Object.assign(selector => selector ? selector(state) : state, {
@@ -46,6 +50,7 @@ describe('OAuth pending presentation', () => {
         const user = { id: 7, role: 'USER', email: 'account@example.test', name: '회원', termsAgreed: true };
         await act(async () => resolve(user));
         expect(replace).toHaveBeenCalledWith('/');
+        expect(api.get).not.toHaveBeenCalled();
         expect(message.success).not.toHaveBeenCalled();
         expect(consumeLoginFeedback(user)).toBe(true);
     });
@@ -101,12 +106,49 @@ describe('OAuth pending presentation', () => {
         expect(peekRedirect()).toBe('/store/31#waiting-token=rw1.j.example');
     });
 
-    it('handles an already decoded error containing a percent sign without getting stuck', () => {
+    it.each([[false, true], [false, false], [true, true], [true, false]])(
+        'asks only after login, then resumes the original route (passkey=%s, keep=%s)', async (passkey, keep) => {
+        const target = '/my-reservations?view=list#fixture';
+        saveRedirect(target);
+        checkAuth.mockResolvedValue({ id: 7, email: 'account@example.test', termsAgreed: true });
+        api.get.mockResolvedValue({ reference: 'fixture-offer' });
+        render(<ConfigProvider theme={{ token: { motion: false } }}>
+            <MemoryRouter initialEntries={[{ pathname: '/oauth2/callback', search: '?remember=1',
+                state: passkey ? { passkeyReturn: { path: target, prevented: true } } : null }]}><OAuthCallback /></MemoryRouter>
+        </ConfigProvider>);
+        expect(await screen.findByRole('dialog', { name: '로그인을 유지할까요?' })).toBeInTheDocument();
+        expect(replace).not.toHaveBeenCalled();
+        let releaseRefresh;
+        const refresh = keep ? refreshSessionOnce(currentSession().epoch, () => new Promise(resolve => { releaseRefresh = resolve; })) : null;
+        fireEvent.click(screen.getByRole('button', { name: keep ? '로그인 유지' : '이번만 로그인' }));
+        if (refresh) {
+            await act(async () => {});
+            try { expect(api.post).not.toHaveBeenCalled(); }
+            finally { await act(async () => { releaseRefresh(); await refresh; }); }
+        }
+        if (passkey) {
+            await waitFor(() => expect(navigate).toHaveBeenCalledExactlyOnceWith(target, { replace: true, state: { reserveRouteMotion: 'from-right' } }));
+            expect(replace).not.toHaveBeenCalled();
+        } else await waitFor(() => expect(replace).toHaveBeenCalledExactlyOnceWith(target));
+        if (keep) expect(api.post).toHaveBeenCalledExactlyOnceWith('/api/auth/remember-login', { reference: 'fixture-offer' },
+            { skipAuthRefresh: true, timeout: 8000 });
+        else expect(api.post).not.toHaveBeenCalled();
+    });
+
+    it('leaves the prompt out when the server has no matching offer', async () => {
+        checkAuth.mockResolvedValue({ email: 'account@example.test', termsAgreed: true });
+        api.get.mockResolvedValue(null);
+        render(<MemoryRouter initialEntries={['/oauth2/callback?remember=1']}><OAuthCallback /></MemoryRouter>);
+        await waitFor(() => expect(replace).toHaveBeenCalledExactlyOnceWith('/'));
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(api.post).not.toHaveBeenCalled();
+    });
+
+    it('uses a neutral fallback when a legacy address contains arbitrary copy', () => {
         window.history.replaceState({}, '', '/oauth2/callback?error=oauth2&message=100%25');
-        window.location.search = '?error=oauth2&message=100%25';
-        render(<MemoryRouter initialEntries={['/oauth2/callback']}><OAuthCallback /></MemoryRouter>);
+        render(<MemoryRouter initialEntries={['/oauth2/callback?error=oauth2&message=100%25']}><OAuthCallback /></MemoryRouter>);
         expect(checkAuth).not.toHaveBeenCalled();
-        expect(message.error).toHaveBeenCalledWith('100%');
+        expect(message.error).toHaveBeenCalledWith('소셜 로그인 결과를 확인하지 못했어요. 다시 시도해주세요.');
         expect(navigate).toHaveBeenCalledWith('/login', { replace: true });
     });
 });

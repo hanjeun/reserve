@@ -62,8 +62,8 @@ test('admin filtered counts stay attached and remain visible on mobile', async (
     ];
 
     for (const tab of tabs) {
-        await page.goto(`/admin?tab=${tab.key}`);
         const management = tab.key === 'reports';
+        await page.goto(`/admin?tab=${tab.key}${management ? '&queueType=CHAT' : ''}`);
         const toolbar = page.locator(management ? '.reserve-management-toolbar' : '.reserve-filter-toolbar-primary');
         const filter = toolbar.locator('.reserve-filter-menu--plain').first();
         const filterSurface = filter.locator('.reserve-filter-menu-surface');
@@ -105,7 +105,7 @@ test('admin filtered counts stay attached and remain visible on mobile', async (
 });
 
 test('mailbox keeps the trash action in the selected message detail', async ({ page }) => {
-    await page.goto('/admin?tab=mailbox');
+    await page.goto('/admin?tab=mailbox&mailFolder=sent');
 
     await expect(page.getByText('member@example.test')).toBeVisible();
     await expect(page.locator('.reserve-maillist-trash')).toHaveCount(0);

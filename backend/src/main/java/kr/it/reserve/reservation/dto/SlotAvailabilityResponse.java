@@ -3,13 +3,16 @@ package kr.it.reserve.reservation.dto;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
-/**
- * 날짜별 예약 슬롯 가용 여부 응답 (예약 시간 선택 UI용)
- */
+/** 잔여 인원이 null이면 시간대별 정원 제한이 없다. */
 @Getter
 @AllArgsConstructor
 public class SlotAvailabilityResponse {
 
-    private String time;       // "09:00" 형식
-    private boolean available; // 정원 여유 있는지
+    private final String time;
+    private final boolean available;
+    private final Integer remainingCapacity;
+
+    public SlotAvailabilityResponse(String time, boolean available) {
+        this(time, available, null);
+    }
 }

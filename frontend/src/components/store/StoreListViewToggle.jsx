@@ -1,9 +1,9 @@
 import PropTypes from 'prop-types';
 import { AppstoreOutlined, UnorderedListOutlined } from '../common/icons';
 
-export default function StoreListViewToggle({ view, onChange, disabled = false }) {
+export default function StoreListViewToggle({ view, onChange, disabled = false, cardsLabel = '사진형 보기로 전환' }) {
     const isList = view === 'list';
-    const label = isList ? '사진형 보기로 전환' : '목록형 보기로 전환';
+    const label = isList ? cardsLabel : '목록형 보기로 전환';
     return (
         <button
             type="button"
@@ -23,4 +23,5 @@ StoreListViewToggle.propTypes = {
     view: PropTypes.oneOf(['cards', 'list']).isRequired,
     onChange: PropTypes.func.isRequired,
     disabled: PropTypes.bool,
+    cardsLabel: PropTypes.string,
 };

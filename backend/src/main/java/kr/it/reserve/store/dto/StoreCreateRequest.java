@@ -6,6 +6,8 @@ import lombok.Setter;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -126,6 +128,14 @@ public class StoreCreateRequest {
 
     /** 오늘부터 며칠 뒤까지 예약을 받을지. null·0 이하 = 제한 없음. */
     private Integer maxAdvanceBookingDays;
+
+    private Boolean bookingOpeningScheduled;
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+    private LocalDateTime bookingOpensAt;
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    private LocalDate bookingOpeningFrom;
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    private LocalDate bookingOpeningTo;
 
     public Integer getMaxCapacityPerSlot() {
         if (maxCapacityPerSlotRaw == null || maxCapacityPerSlotRaw.isBlank()) return null;

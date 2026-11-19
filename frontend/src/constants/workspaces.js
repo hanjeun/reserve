@@ -2,7 +2,7 @@ import {
     BarChartOutlined, CalendarOutlined, ClockCircleOutlined, DeleteOutlined, DollarOutlined,
     FileTextOutlined, FlagOutlined, IdcardOutlined, MailOutlined, MessageOutlined,
     NotificationOutlined, PartitionOutlined, QrcodeOutlined, SafetyCertificateOutlined,
-    ShopOutlined, TeamOutlined,
+    ShopOutlined, TeamOutlined, WarningOutlined,
 } from '../components/common/icons';
 
 // 메뉴, 직접 진입 정규화, 로딩 화면이 같은 항목과 이름을 사용한다.
@@ -12,13 +12,13 @@ export const ADMIN_WORKSPACE_GROUPS = [
         { key: 'reservations', label: '전체 예약', icon: CalendarOutlined },
         { key: 'members', label: '회원 관리', icon: TeamOutlined },
         { key: 'stores-admin', label: '가게 관리', icon: ShopOutlined },
+        { key: 'news', label: '내 가게 소식', icon: NotificationOutlined },
     ] },
     { key: 'review', label: '인증·문의·신고', items: [
         { key: 'pending', label: '인증 대기', icon: IdcardOutlined },
         { key: 'all', label: '인증 전체 목록', icon: SafetyCertificateOutlined },
         { key: 'mailbox', label: '메일함', icon: MailOutlined },
-        { key: 'reports', label: '채팅 신고', icon: FlagOutlined },
-        { key: 'feed-reports', label: '피드·소식 신고', icon: FlagOutlined },
+        { key: 'reports', label: '신고 관리', icon: FlagOutlined },
         { key: 'benefit-applications', label: '혜택 신청', icon: NotificationOutlined },
         { key: 'chat-intro', label: '채팅 관리', icon: MessageOutlined },
     ] },
@@ -35,6 +35,8 @@ export const ADMIN_WORKSPACE_GROUPS = [
 export const BUSINESS_WORKSPACE_GROUPS = [
     { key: 'operations', label: '예약·현장 운영', items: [
         { key: 'reservations', label: '예약 관리', icon: CalendarOutlined },
+        { key: 'customers', label: '고객 관리', icon: TeamOutlined },
+        { key: 'no-show', label: '노쇼 관리', icon: WarningOutlined },
         { key: 'waiting', label: '웨이팅', icon: ClockCircleOutlined },
         { key: 'qr-checkin', label: 'QR 체크인', icon: QrcodeOutlined },
     ] },
@@ -53,7 +55,7 @@ const adminKeys = new Set(ADMIN_WORKSPACE_GROUPS.flatMap(group => group.items.ma
 const businessKeys = new Set(BUSINESS_WORKSPACE_GROUPS.flatMap(group => group.items.map(item => item.key)));
 
 export const resolveAdminTab = requested => {
-    const key = requested === 'chat' ? 'reports' : requested;
+    const key = requested === 'chat' || requested === 'feed-reports' ? 'reports' : requested;
     return adminKeys.has(key) ? key : 'pending';
 };
 export const resolveBusinessTab = requested => businessKeys.has(requested) ? requested : 'reservations';

@@ -63,7 +63,7 @@ test('login restores the Google circle and keeps error and login notices readabl
     await page.getByPlaceholder('비밀번호').fill('wrong-password');
     const submit = page.getByRole('main').getByRole('button', { name: '로그인', exact: true });
     await submit.click();
-    await readableNotice(page, '이메일 또는 비밀번호를 확인해주세요.');
+    await readableNotice(page, '이메일 또는 비밀번호가 올바르지 않아요. 소셜 로그인만 사용한다면 연결한 서비스로 로그인해주세요.');
     await capture(page, info, 'login-error');
     await page.getByPlaceholder('비밀번호').fill('sample-password');
     await submit.click();

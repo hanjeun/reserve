@@ -10,10 +10,10 @@ const Field = ({ label, height = field.height }) => <div style={{ marginBottom: 
 Field.propTypes = { label: PropTypes.string.isRequired, height: PropTypes.oneOfType([PropTypes.number, PropTypes.string]) };
 
 export function FeedProfileLoading() {
-    return <div aria-label="공개 프로필을 불러오는 중" aria-busy="true">
-        <p className="reserve-feed-note"><SkeletonText>피드에서 사용할 공개 닉네임을 정해주세요.</SkeletonText></p>
+    return <div aria-label="프로필을 불러오는 중" aria-busy="true">
+        <p className="reserve-feed-note"><SkeletonText>게시물과 댓글에 사용할 공개 닉네임을 정해주세요.</SkeletonText></p>
         <Field label="공개 닉네임" /><Field label="소개 (선택)" height={96} />
-        <SkeletonText>계정의 프로필 사진을 피드에 공개해요.</SkeletonText>
+        <Field label="프로필 공개 범위" />
     </div>;
 }
 
@@ -26,7 +26,7 @@ export default function FeedEditorLoading({ business = false }) {
         </div>
         <Field label="글" height={160} />
         {business && <Field label="내 가게 연결 (선택)" />}
-        <p className="reserve-feed-note"><SkeletonText>글·사진과 공개 프로필이 전체 공개돼요.</SkeletonText></p>
+        <p className="reserve-feed-note"><SkeletonText>게시한 글과 사진은 누구나 볼 수 있어요.</SkeletonText></p>
     </div>;
 }
 FeedEditorLoading.propTypes = { business: PropTypes.bool };

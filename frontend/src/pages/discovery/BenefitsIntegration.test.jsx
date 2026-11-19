@@ -9,9 +9,12 @@ import storeService from '../../services/storeService';
 import { benefitKeys } from '../../hooks/queryKeys';
 import { feedKeys } from '../../hooks/feedQueries';
 import { storeNewsKeys } from '../../hooks/storeNewsQueries';
+import { interactionKeys } from '../../hooks/feedInteractionQueries';
+import feedInteractionService from '../../services/feedInteractionService';
 
 vi.mock('../../services/benefitService', () => ({ default: { getList: vi.fn() } }));
 vi.mock('../../services/storeService', () => ({ default: { getStores: vi.fn() } }));
+vi.mock('../../services/feedInteractionService', () => ({ default: { config: vi.fn(), status: vi.fn() } }));
 vi.mock('../../components/common', async () => ({
     Bone: (await import('../../components/common/Bone')).default,
     Button: (await import('../../components/common/Button')).default,
@@ -23,7 +26,8 @@ vi.mock('../../components/common', async () => ({
 
 const NEWS_TOTAL = 37;
 const newsPage = (number = 0, total = NEWS_TOTAL) => ({
-    content: [{ id: number * 12 + 1, storeId: 12, storeName: '소식 가게', title: `소식 페이지 ${number + 1}`, excerpt: '가게가 직접 작성한 안내', createdAt: '2026-09-14T10:00:00' }],
+    content: [{ id: number * 12 + 1, publicId: `00000000-0000-4000-8000-${String(number + 1).padStart(12, '0')}`,
+        storeId: 12, storeName: '소식 가게', title: `소식 페이지 ${number + 1}`, excerpt: '가게가 직접 작성한 안내', createdAt: '2026-09-14T10:00:00' }],
     page: { number, size: 12, totalElements: total, totalPages: Math.ceil(total / 12) },
 });
 const deferred = () => {
@@ -39,10 +43,11 @@ function RouteProbe({ onLocation }) {
     return <output data-testid="shared-search">{location.search}</output>;
 }
 
-function renderPage(url) {
+function renderPage(url, newsLikes = false) {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 60000 } } });
     client.setQueryData(feedKeys.config(), { enabled: false });
     client.setQueryData(storeNewsKeys.config(), { enabled: false, benefitApprovalEnabled: true });
+    client.setQueryData(interactionKeys.config(), { newsEnabled: newsLikes });
     const onLocation = vi.fn();
     clients.push(client);
     const result = render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[url]}>
@@ -67,6 +72,20 @@ describe('benefits-only query integration; general store pagination remains on /
         window.scrollTo = vi.fn();
     });
     afterEach(() => { clients.splice(0).forEach(client => client.clear()); });
+
+    it('shows likes from the benefit page response without requesting each item status', async () => {
+        const page = newsPage(0);
+        page.content[0] = { ...page.content[0], liked: true, likeCount: 2 };
+        benefitService.getList.mockResolvedValueOnce(page);
+        renderPage('/benefits', true);
+
+        const heart = await screen.findByRole('button', { name: '좋아요 취소' });
+        const link = await newsLink(1);
+        expect(heart).toHaveAttribute('aria-pressed', 'true');
+        expect(link).toHaveClass('reserve-card-link');
+        expect(link).not.toContainElement(heart);
+        expect(feedInteractionService.status).not.toHaveBeenCalled();
+    });
 
     it('repairs an invalid news page, removes unsupported store options and preserves attribution', async () => {
         const news = deferred();

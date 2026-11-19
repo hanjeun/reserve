@@ -18,7 +18,7 @@ import { ListingToolbarSkeleton, SegmentedControlSkeleton } from './routeSkeleto
 import { reservationSkeletonFilters } from './reservationSkeletonFilters';
 import { breakpoints, colors, radius } from '../../styles/tokens';
 import { useWindowWidth } from '../../hooks/useWindowWidth';
-import { RESERVATION_STATUS_FILTER_OPTIONS, RESERVATION_SORT_OPTIONS } from '../../constants';
+import { AD_PRICE_SUMMARY, RESERVATION_STATUS_FILTER_OPTIONS, RESERVATION_SORT_OPTIONS } from '../../constants';
 import {
     BUSINESS_VERIFICATION_SKELETON_COLS,
     BUSINESS_VERIFICATION_SKELETON_HEADERS,
@@ -129,7 +129,7 @@ ChatIntroRouteSkeleton.propTypes = { business: PropTypes.bool };
 export function AdsRouteSkeleton() {
     return <div className="reserve-ad-manage-tab">
         <div className="reserve-ad-manage-heading" style={{ color: colors.text.secondary, fontSize: 13 }}>
-            <SkeletonText>노출형(1,000원/일)은 가게 목록 상단에 카드·리스트로 우선 노출되고 작은 &quot;광고&quot; 표기가 붙어요. 배너형(5,000원/일)은 화면 우측 하단에 표시돼요.</SkeletonText>
+            <SkeletonText className="reserve-ad-manage-intro">{AD_PRICE_SUMMARY}</SkeletonText>
         </div>
         <div className="reserve-ad-manage-primary-row" aria-hidden="true">
             <Bone width={112} height={36} />
@@ -145,10 +145,11 @@ function PaymentOperationsRouteSkeleton() {
     const options = [
         { value: 'ready', label: '오래된 READY' }, { value: 'issues', label: '수동 대사' },
         { value: 'webhooks', label: '웹훅 inbox' }, { value: 'ads', label: '광고 결제' },
+        { value: 'receipts', label: '영수증 조회' },
     ];
     return <div>
         <div style={{ maxWidth: 560, marginBottom: 16 }}>{narrow
-            ? <div className="reserve-segmented" aria-hidden="true" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 4, width: '100%' }}>
+            ? <div className="reserve-segmented" aria-hidden="true" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, width: '100%' }}>
                 {options.map(option => <span key={option.value} className={'reserve-segmented-btn reserve-segmented-btn--wrap' + (option.value === 'ready' ? ' reserve-segmented-btn--active' : '')}>
                     <SkeletonText>{option.label}</SkeletonText></span>)}
             </div> : <SegmentedControlSkeleton block value="ready" options={options} />}</div>
@@ -174,7 +175,8 @@ export default function AdminTabRouteSkeleton({ tab, search = '' }) {
         return <FeedReportsSkeleton mode={mode} status={reviewOption(REPORT_STATUS_OPTIONS, params.get(mode === 'comments' ? 'commentReportStatus' : 'reportStatus'), 'ALL')}
             auditAction={reviewOption(REPORT_AUDIT_ACTION_OPTIONS, readQuerySelection('reportAuditAction', params.get('reportAuditAction')), 'ALL')} />;
     }
-    if (tab === 'benefit-applications') return <BenefitApplicationsSkeleton state={readQuerySelection('benefitState', params.get('benefitState')) || 'PENDING'} />;
+    if (tab === 'benefit-applications') return <BenefitApplicationsSkeleton state={readQuerySelection('benefitState', params.get('benefitState')) || 'PENDING'}
+        view={params.get('view') === 'cards' ? 'cards' : 'list'} />;
     if (tab === 'dashboard') return <StatisticsRouteSkeleton dashboard />;
     if (tab === 'payments') return <PaymentOperationsRouteSkeleton />;
     if (tab === 'reservations') return <>

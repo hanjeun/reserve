@@ -1,12 +1,11 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Input, Typography } from 'antd';
+import { Typography } from 'antd';
 import FilterMenu from './FilterMenu';
 import RefreshButton from './RefreshButton';
 import FilterToolbarSkeleton from './FilterToolbarSkeleton';
-import { SearchOutlined } from './icons';
-import { colors, fontSize } from '../../styles/tokens';
-import useLiveUpdatesStatus from '../../hooks/useLiveUpdatesStatus';
+import { fontSize } from '../../styles/tokens';
+import ListSearchField from './ListSearchField';
 import useInitialLoading from '../../hooks/useInitialLoading';
 
 const { Text } = Typography;
@@ -21,15 +20,13 @@ const FilterToolbar = ({
     onReload,
     loading = false,
     initialLoading = false,
-    autoRefreshDomain,
     extra,
     extraSkeleton,
     spread = false,
     style,
 }) => {
     const firstLoading = useInitialLoading(initialLoading);
-    const live = useLiveUpdatesStatus();
-    const showRefresh = Boolean(onReload) && !live.domains.includes(autoRefreshDomain);
+    const showRefresh = Boolean(onReload);
     if (firstLoading) return <FilterToolbarSkeleton selects={selects} count={count} search={search} extra={extra} extraSkeleton={extraSkeleton} spread={spread} style={style} showRefresh={showRefresh} />;
     /*
      * 새로고침 대기·스피너 수명은 RefreshButton에서 관리한다.
@@ -56,10 +53,10 @@ const FilterToolbar = ({
                             aria-label={select.ariaLabel ?? select.placeholder ?? '목록 필터'}
                             className={select.className}
                             style={{
-                                width: keepCountAdjacent ? 'fit-content' : `min(${select.width ?? 168}px, ${select.mobileWidth ?? 128}px + 10vw)`,
+                                width: keepCountAdjacent || select.fitContent ? 'fit-content' : `min(${select.width ?? 168}px, ${select.mobileWidth ?? 128}px + 10vw)`,
                                 maxWidth: `min(${select.width ?? 168}px, ${select.mobileWidth ?? 128}px + 10vw)`,
-                                flex: keepCountAdjacent ? '0 1 auto' : undefined,
-                                flexShrink: keepCountAdjacent ? undefined : 1,
+                                flex: keepCountAdjacent || select.fitContent ? '0 1 auto' : undefined,
+                                flexShrink: keepCountAdjacent || select.fitContent ? undefined : 1,
                             }}
                         />
                     ))}
@@ -79,15 +76,7 @@ const FilterToolbar = ({
                 {menuRow}
                 {search && (
                     <div className="reserve-filter-toolbar-secondary">
-                        <Input
-                            prefix={<SearchOutlined style={{ color: colors.text.tertiary }} />}
-                            placeholder={search.placeholder ?? '검색'}
-                            value={search.value}
-                            onChange={search.onChange}
-                            allowClear size="large"
-                            disabled={search.disabled}
-                            style={{ width: '100%', maxWidth: 480 }}
-                        />
+                        <ListSearchField {...search} />
                         {showRefresh && <div className="reserve-filter-toolbar-refresh">{reloadBtn}</div>}
                     </div>
                 )}
@@ -104,15 +93,7 @@ const FilterToolbar = ({
             <div className={`reserve-filter-toolbar-secondary${spread ? ' reserve-filter-toolbar-secondary--spread' : ''}${!search && !extra ? ' reserve-filter-toolbar-secondary--refresh-only' : ''}`}>
                 {extra}
                 {search && (
-                    <Input
-                        prefix={<SearchOutlined style={{ color: colors.text.tertiary }} />}
-                        placeholder={search.placeholder ?? '검색'}
-                        value={search.value}
-                        onChange={search.onChange}
-                        allowClear size="large"
-                        disabled={search.disabled}
-                        style={{ flex: 1, maxWidth: 480 }}
-                    />
+                    <ListSearchField {...search} />
                 )}
                 {count != null && (
                     <Text type="secondary" style={{ fontSize: fontSize.sm, alignSelf: 'center', whiteSpace: 'nowrap', flexShrink: 0 }}>
@@ -129,6 +110,8 @@ FilterToolbar.propTypes = {
     selects: PropTypes.arrayOf(PropTypes.shape({
         value: PropTypes.any,
         onChange: PropTypes.func,
+        onSubmit: PropTypes.func,
+        maxLength: PropTypes.number,
         options: PropTypes.array,
         key: PropTypes.string,
         width: PropTypes.number,
@@ -137,6 +120,7 @@ FilterToolbar.propTypes = {
         placeholder: PropTypes.string,
         ariaLabel: PropTypes.string,
         className: PropTypes.string,
+        fitContent: PropTypes.bool,
     })),
     count: PropTypes.number,
     search: PropTypes.shape({

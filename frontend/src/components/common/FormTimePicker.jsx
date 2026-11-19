@@ -308,7 +308,7 @@ FormTimePicker.RangePicker.propTypes = sharedPropTypes;
 const styles = {
     trigger: {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
-        width: '100%', height: field.height, padding: '0 11px', boxSizing: 'border-box',
+        width: '100%', height: field.height, paddingInline: field.paddingInline, boxSizing: 'border-box',
         border: 'none', borderRadius: field.radius, background: field.bg,
         cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
     },

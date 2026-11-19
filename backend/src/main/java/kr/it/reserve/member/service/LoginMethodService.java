@@ -67,9 +67,9 @@ public class LoginMethodService {
     private static final String LINKED = LoginMethodService.class.getName() + ".linked";
 
     public record Status(Long memberId, boolean passwordEnabled, AuthProvider socialProvider, String email, boolean socialProofFresh,
-            AuthProvider linkableSocialProvider, String browserTrust) {
+            AuthProvider linkableSocialProvider, String browserTrust, boolean deviceFactorAvailable, boolean deviceSessionsAvailable) {
         public Status(Long id, boolean password, AuthProvider provider, String email, boolean fresh, AuthProvider linkable) {
-            this(id, password, provider, email, fresh, linkable, "DISABLED");
+            this(id, password, provider, email, fresh, linkable, "DISABLED", false, true);
         }
     }
     public record EmailChallenge(String challengeId, Instant expiresAt,
@@ -81,11 +81,16 @@ public class LoginMethodService {
 
     @Transactional(readOnly = true)
     public Status status(Member authenticated, LocalDateTime oauthAt) {
+        return status(authenticated, oauthAt, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Status status(Member authenticated, LocalDateTime oauthAt, String loginMethod) {
         Member current = members.findByIdAndDeletedAtIsNull(authenticated.getId()).orElseThrow(this::expired);
         if (current.getAuthVersion() != authenticated.getAuthVersion() || current.isSuspended()) throw expired();
         return new Status(current.getId(), current.getPassword() != null, current.isOAuthUser() ? current.getProvider() : null,
                 current.getEmail(), freshSocial(current, oauthAt), current.isOAuthUser() || current.getPassword() == null
-                        ? null : providerForEmail(current.getEmail()), mfa.browserStatus(current));
+                        ? null : providerForEmail(current.getEmail()), mfa.browserStatus(current), mfa.deviceFactorAvailable(current, loginMethod), true);
     }
 
     @Transactional
@@ -214,8 +219,8 @@ public class LoginMethodService {
             // 연결 저장과 새 세션 발급은 같은 트랜잭션으로 완료해요.
             mfa.prepareLinkedSession(current, linkFlags.charAt(0) == 'S', linkFlags.charAt(1) == '1');
             boolean persistent = tokens.isPersistentLogin(CookieUtil.getCookie(request, "access_token"));
-            var issued = linkFlags.charAt(0) == 'S' ? tokens.issueVerifiedSession(current, authenticatedAt, "OAUTH_MFA", persistent)
-                    : tokens.issueSession(current, authenticatedAt, persistent);
+            var issued = tokens.issueReplacementSession(current, authenticatedAt,
+                    linkFlags.charAt(0) == 'S' ? "OAUTH_MFA" : null, persistent);
             members.flush();
             subjects.requireFreshAuthentication(authenticatedAt, tokenExpiresAt);
             request.setAttribute(LINKED, new kr.it.reserve.config.oauth2.OAuthSessionIssuer.SessionTokens(
@@ -285,6 +290,7 @@ public class LoginMethodService {
         passwordResets.invalidateForEmail(current.getEmail());
         String previousEmail = current.getEmail();
         current.setEmail(challenge.getEmail());
+        current.setSecurityContactEmail(challenge.getEmail());
         current.setPassword(passwords.encode(password));
         challenge.consume();
         changed(current);
@@ -396,7 +402,7 @@ public class LoginMethodService {
     private Member locked(Long id, int expectedVersion) {
         Member current = members.findActiveByIdForUpdate(id).orElseThrow(this::expired);
         entityManager.refresh(current, LockModeType.PESSIMISTIC_WRITE);
-        if (current.isSuspended() || current.getAuthVersion() != expectedVersion) throw expired();
+        if (current.isSuspended() || current.isAccountProtected() || current.getAuthVersion() != expectedVersion) throw expired();
         return current;
     }
     private Member browserMember(HttpServletRequest request) {

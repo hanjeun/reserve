@@ -1,80 +1,48 @@
 package kr.it.reserve.config;
 
 import kr.it.reserve.config.oauth2.OAuth2AuthenticationFailureHandler;
-import org.junit.jupiter.api.DisplayName;
+import kr.it.reserve.config.oauth2.OAuthLoginOutcome;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.AuthenticationServiceException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
-import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * OAuth 공급자·내부 예외의 원문이 브라우저 주소와 서버 로그로 새지 않도록 사용자 문구 경계를 고정한다.
- */
 class OAuth2FailureMessageSafetyTest {
-
     private final OAuth2AuthenticationFailureHandler handler = new OAuth2AuthenticationFailureHandler();
 
-    @Test
-    void environmentVerificationOutageIsNotReportedAsASessionExpiry() {
-        String message = ReflectionTestUtils.invokeMethod(handler, "resolveMessage",
-                new OAuth2AuthenticationException(new OAuth2Error("ip_verification_unavailable"), "private-provider-response"));
-        assertThat(message).contains("접속 환경", "잠시 후").doesNotContain("만료", "private-provider-response");
+    @ParameterizedTest
+    @ValueSource(strings = {"ip_verification_unavailable", "authorization_request_not_found", "invalid_state",
+            "login_method_expired", "email_conflict", "login_method_email_mismatch", "login_method_identity_mismatch"})
+    void recognizedFailureKeepsOnlyItsAllowlistedCode(String code) throws Exception {
+        assertOutcome(new OAuth2AuthenticationException(new OAuth2Error(code), "synthetic private provider detail"), code);
     }
 
     @Test
-    void reusedOrExpiredRequestsAreNotReportedAsAnExpiredLoginSession() {
-        for (String code : java.util.List.of("authorization_request_not_found", "invalid_state", "login_method_expired")) {
-            var exception = new OAuth2AuthenticationException(new OAuth2Error(code), "private-provider-response");
-            String message = ReflectionTestUtils.invokeMethod(handler, "resolveMessage", exception);
-            assertThat(message).contains("요청").doesNotContain("로그인 요청이 만료", "로그인이 만료", "private-provider-response");
-        }
+    void unknownProviderDetailUsesGenericCode() throws Exception {
+        assertOutcome(new AuthenticationServiceException("synthetic private provider detail"), "login_failed");
+        assertOutcome(new OAuth2AuthenticationException(new OAuth2Error("unknown_provider_error"),
+                "synthetic private provider detail"), "login_failed");
     }
 
-    @Test
-    @DisplayName("알 수 없는 OAuth 예외 원문은 사용자 리다이렉트 메시지에 포함하지 않는다")
-    void unknownExceptionMessageIsReplacedWithGenericCopy() {
-        String privateDetail = "private-user@example.com access_token=secret-value";
-        AuthenticationServiceException exception = new AuthenticationServiceException(privateDetail);
+    private void assertOutcome(AuthenticationException failure, String expected) throws Exception {
+        var request = new MockHttpServletRequest();
+        var response = new MockHttpServletResponse();
+        handler.onAuthenticationFailure(request, response, failure);
 
-        String message = ReflectionTestUtils.invokeMethod(handler, "resolveMessage", exception);
-
-        assertThat(message)
-                .isEqualTo("소셜 로그인에 실패했어요. 다시 시도해주세요.")
-                .doesNotContain("private-user@example.com", "secret-value");
-    }
-
-    @Test
-    @DisplayName("이메일 충돌은 예외 원문 대신 허용된 안내 문구만 사용한다")
-    void emailConflictUsesAllowlistedCopy() {
-        OAuth2AuthenticationException exception = new OAuth2AuthenticationException(
-                new OAuth2Error("email_conflict"),
-                "GOOGLE account private-user@example.com");
-
-        String message = ReflectionTestUtils.invokeMethod(handler, "resolveMessage", exception);
-
-        assertThat(message)
-                .isEqualTo("이미 가입된 이메일이에요. 기존 가입 방식으로 로그인한 뒤 마이페이지의 로그인 및 보안에서 소셜 계정을 연결해주세요.")
-                .doesNotContain("private-user@example.com", "GOOGLE account");
-    }
-
-    @Test
-    void linkingEmailMismatchExplainsTheRequiredAccountWithoutExposingProviderData() {
-        var exception = new OAuth2AuthenticationException(new OAuth2Error("login_method_email_mismatch"),
-                "private-user@example.com access_token=secret-value");
-        String message = ReflectionTestUtils.invokeMethod(handler, "resolveMessage", exception);
-        assertThat(message).isEqualTo("현재 RESERVE 계정과 같은 이메일의 인증된 소셜 계정을 사용해주세요.")
-                .doesNotContain("private-user@example.com", "secret-value");
-    }
-
-    @Test
-    void reauthenticationMismatchPointsToTheOriginallyLinkedIdentity() {
-        var exception = new OAuth2AuthenticationException(new OAuth2Error("login_method_identity_mismatch"),
-                "private-subject private-user@example.com");
-        String message = ReflectionTestUtils.invokeMethod(handler, "resolveMessage", exception);
-        assertThat(message).isEqualTo("처음 연결한 소셜 계정으로 본인 확인해주세요.")
-                .doesNotContain("private-subject", "private-user@example.com");
+        String location = response.getRedirectedUrl();
+        assertThat(location).contains("/login?error=oauth2&result=")
+                .doesNotContain("message=", "status=", "synthetic", expected);
+        String reference = UriComponentsBuilder.fromUriString(location).build().getQueryParams().getFirst("result");
+        assertThat(OAuthLoginOutcome.take(new MockHttpServletRequest(), reference)).isNull();
+        assertThat(OAuthLoginOutcome.take(request, reference)).isEqualTo(new OAuthLoginOutcome.View(expected));
+        assertThat(OAuthLoginOutcome.take(request, reference)).isNull();
     }
 }

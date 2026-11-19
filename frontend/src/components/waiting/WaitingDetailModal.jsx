@@ -2,6 +2,7 @@ import { useState } from 'react';
 import PropTypes from 'prop-types';
 import ResponsiveModal from '../common/ResponsiveModal';
 import TextLink from '../common/TextLink';
+import { storeDetailPath } from '../../utils/storePublicAddress';
 
 const STATUS_LABELS = { WAITING: '대기 중', CALLED: '호출됨', SEATED: '입장 완료', CANCELLED: '취소됨' };
 const KST_DATE_TIME = new Intl.DateTimeFormat('ko-KR', {
@@ -20,6 +21,7 @@ export default function WaitingDetailModal({ detail, open, onClose }) {
     const displayed = detail ?? cached;
     if (!displayed) return null;
     const { entry, storeName, teamsAhead } = displayed;
+    const storePath = storeDetailPath({ publicId: displayed.storePublicId });
     const personal = Number.isFinite(teamsAhead);
     const progress = entry.status === 'WAITING'
         ? personal ? `내 앞에 ${teamsAhead}팀이 있어요.` : '호출을 기다리고 있어요.'
@@ -42,7 +44,7 @@ export default function WaitingDetailModal({ detail, open, onClose }) {
             {entry.finishedAt && <div><dt>{entry.status === 'SEATED' ? '입장 시각' : '취소 시각'}</dt>
                 <dd>{dateTimeLabel(entry.finishedAt)}</dd></div>}
         </dl>
-        {entry.storeId != null && <TextLink to={`/store/${entry.storeId}`} onClick={onClose}>가게 상세 보기</TextLink>}
+        {storePath && <TextLink to={storePath} onClick={onClose}>가게 상세 보기</TextLink>}
     </ResponsiveModal>;
 }
 WaitingDetailModal.propTypes = {

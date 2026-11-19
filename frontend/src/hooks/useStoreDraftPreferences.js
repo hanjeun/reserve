@@ -38,13 +38,14 @@ export default function useStoreDraftPreferences(user) {
     const key = preferenceKey(user);
     const autoSaveEnabled = useSyncExternalStore(subscribe, () => readPreference(key), () => Boolean(key));
     const setAutoSaveEnabled = useCallback(enabled => {
-        if (!key || preferenceKey(useAuthStore.getState().user) !== key) return;
+        if (!key || preferenceKey(useAuthStore.getState().user) !== key) return false;
         const value = Boolean(enabled);
         try {
             localStorage.setItem(key, String(value));
             memorySettings.delete(key);
         } catch { memorySettings.set(key, value); }
         emit();
+        return true;
     }, [key]);
     return { autoSaveEnabled, setAutoSaveEnabled };
 }

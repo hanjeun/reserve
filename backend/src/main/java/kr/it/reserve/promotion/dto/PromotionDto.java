@@ -5,15 +5,15 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
-import kr.it.reserve.promotion.StoreNewsPolicy;
 import kr.it.reserve.promotion.entity.Promotion;
-import kr.it.reserve.store.entity.WaitingIntakeMode;
 import lombok.*;
 
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.OffsetDateTime;
 import java.util.List;
+import kr.it.reserve.promotion.StoreNewsPolicy;
+import kr.it.reserve.store.entity.WaitingIntakeMode;
 
 public class PromotionDto {
 
@@ -28,7 +28,9 @@ public class PromotionDto {
     @Builder
     public static class PublicPromotionSummaryResponse {
         private Long id;
+        private String publicId;
         private Long storeId;
+        private String storePublicId;
         private String storeName;
         private String storeAddress;
         private String storeCategory;
@@ -48,12 +50,16 @@ public class PromotionDto {
         private Long feedPostId;
         private boolean feedEnabled;
         private boolean benefitVisible;
+        private Long likeCount;
+        private boolean liked;
         @Builder.Default private List<? extends NewsImage> images = List.of();
 
         public static PublicPromotionSummaryResponse fromEntity(Promotion promotion) {
             return PublicPromotionSummaryResponse.builder()
                     .id(promotion.getId())
+                    .publicId(promotion.getPublicId())
                     .storeId(promotion.getStore().getId())
+                    .storePublicId(promotion.getStore().getPublicId())
                     .storeName(promotion.getStore().getName())
                     .storeAddress(promotion.getStore().getAddress())
                     .storeCategory(promotion.getStore().getCategory())
@@ -90,7 +96,9 @@ public class PromotionDto {
     @Builder
     public static class PublicPromotionDetailResponse {
         private Long id;
+        private String publicId;
         private Long storeId;
+        private String storePublicId;
         private String storeName;
         private String storeAddress;
         private String storeCategory;
@@ -117,7 +125,9 @@ public class PromotionDto {
         public static PublicPromotionDetailResponse fromEntity(Promotion promotion) {
             return PublicPromotionDetailResponse.builder()
                     .id(promotion.getId())
+                    .publicId(promotion.getPublicId())
                     .storeId(promotion.getStore().getId())
+                    .storePublicId(promotion.getStore().getPublicId())
                     .storeName(promotion.getStore().getName())
                     .storeAddress(promotion.getStore().getAddress())
                     .storeCategory(promotion.getStore().getCategory())
@@ -173,7 +183,9 @@ public class PromotionDto {
     @Builder
     public static class PromotionResponse {
         private Long id;
+        private String publicId;
         private Long storeId;
+        private String storePublicId;
         private String storeName;
         private String storeAddress;
         private String storeCategory;
@@ -199,7 +211,9 @@ public class PromotionDto {
 
             return PromotionResponse.builder()
                     .id(promotion.getId())
+                    .publicId(promotion.getPublicId())
                     .storeId(promotion.getStore().getId())
+                    .storePublicId(promotion.getStore().getPublicId())
                     .storeName(promotion.getStore().getName())
                     .storeAddress(promotion.getStore().getAddress())
                     .storeCategory(promotion.getStore().getCategory())

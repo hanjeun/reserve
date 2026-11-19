@@ -57,11 +57,12 @@ class LoginMethodServiceTest {
         when(mfa.linkBinding(any(), any())).thenReturn("disabled");
         when(mfa.consumeSensitive(any(), any())).thenReturn(new kr.it.reserve.member.mfa.MfaService.SensitiveProof(NOW.plusMinutes(5), false, "disabled"));
         when(tokens.getSessionId("test-session")).thenReturn("test-session-id");
-        when(tokens.issueSession(any(), any(), anyBoolean())).thenReturn(new TokenProvider.IssuedSession("test-issued-access", "test-issued-refresh", Duration.ofDays(14)));
         ReflectionTestUtils.setField(service, "passwords", encoder);
         ReflectionTestUtils.setField(service, "entityManager", mock(EntityManager.class));
         member = Member.builder().id(7L).name("사업자 기존 이름").email("owner@naver.com").role(Role.BUSINESS)
                 .profileImage("/original-photo.png").provider(AuthProvider.LOCAL).password(encoder.encode("Original123!")).build();
+        when(tokens.issueReplacementSession(eq(member), eq(NOW), isNull(), eq(false)))
+                .thenReturn(new TokenProvider.IssuedSession("test-issued-access", "test-issued-refresh", Duration.ofDays(14), false));
         when(subjects.now()).thenReturn(NOW);
         when(subjects.lock(any(), any())).thenReturn(subject);
         when(subject.acceptsAuthentication(any())).thenReturn(true);

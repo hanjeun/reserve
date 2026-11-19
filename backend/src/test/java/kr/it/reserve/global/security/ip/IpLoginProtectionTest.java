@@ -55,7 +55,7 @@ class IpLoginProtectionTest {
         assertThatThrownBy(() -> protection.beforeSession(member, false)).isInstanceOf(AuthException.class);
         verify(store, never()).remember(anyString(), anyString());
     }
-    @Test void sameIpHistoryCannotAdmitANewBrowserAndSuccessfulPrimaryLoginDoesNotExtendTheLease() {
+    @Test void sameIpHistoryCannotAdmitANewBrowserAndTheSessionGuardDoesNotExtendTheLease() {
         when(store.known(anyString(), anyString())).thenReturn(true);
         assertThat(protection.needsStepUp(member)).isTrue();
         request.setCookies(new jakarta.servlet.http.Cookie("__Host-reserve_browser", "a".repeat(43)));
@@ -63,6 +63,27 @@ class IpLoginProtectionTest {
         assertThat(protection.needsStepUp(member)).isFalse();
         protection.beforeSession(member, false).run();
         verify(store, never()).rememberBrowser(anyString(), anyString(), anyString(), anyString(), anyString());
+        verify(store, never()).renewBrowser(anyString(), anyString(), anyString(), anyString(), anyString());
+    }
+    @Test void loginRenewalReissuesOnlyTheExistingCookieAfterRedisSucceeds() {
+        String raw = "a".repeat(43);
+        request.setCookies(new jakarta.servlet.http.Cookie("__Host-reserve_browser", raw));
+        when(store.renewBrowser(anyString(), anyString(), anyString(), anyString(), anyString())).thenReturn(false, true);
+        var response = new org.springframework.mock.web.MockHttpServletResponse();
+        protection.renewBrowserAfterLogin(member);
+        protection.writeBrowserCookie(request, response);
+        assertThat(response.getHeaders("Set-Cookie")).isEmpty();
+        protection.renewBrowserAfterLogin(member);
+        protection.writeBrowserCookie(request, response);
+        assertThat(response.getHeader("Set-Cookie")).startsWith("__Host-reserve_browser=" + raw + ";")
+                .contains("Max-Age=2592000", "Secure", "HttpOnly", "SameSite=Lax").doesNotContain("Domain=");
+        assertThat(protection.browserResult()).isNull();
+    }
+    @Test void explicitDeclineWinsOverAutomaticRenewal() {
+        request.setCookies(new jakarta.servlet.http.Cookie("__Host-reserve_browser", "a".repeat(43)));
+        protection.prepareBrowser(member, false);
+        protection.renewBrowserAfterLogin(member);
+        verifyNoInteractions(store);
     }
     @Test void proofAndExplicitConsentRecordOnlyPseudonymousBrowserMetadataAfterCommit() {
         protection.prepareBrowser(member, true);
@@ -137,6 +158,23 @@ class IpLoginProtectionTest {
         assertThatThrownBy(() -> protection.requireBinding("other-ticket", member)).isInstanceOf(AuthException.class);
         request.setRemoteAddr("198.51.100.7");
         assertThatThrownBy(() -> protection.requireBinding("synthetic-ticket", member)).isInstanceOf(AuthException.class);
+    }
+    @Test void pendingProofRejectsEmulatedBrowserFamilyAndWorksAgainInTheOriginalEnvironment() {
+        String browser = "Mozilla/5.0 (Windows NT 10.0) Chrome/140.0.0.0";
+        request.addHeader("User-Agent", browser);
+        protection.bind("synthetic-ticket", member);
+        var ticket = ArgumentCaptor.forClass(String.class);
+        var binding = ArgumentCaptor.forClass(String.class);
+        verify(store).bind(ticket.capture(), binding.capture());
+        when(store.binding(ticket.getValue(), binding.getValue())).thenReturn(true);
+
+        request.removeHeader("User-Agent");
+        request.addHeader("User-Agent", "Mozilla/5.0 (iPhone) Mobile/15E148 Safari/604.1");
+        assertThatThrownBy(() -> protection.requireBinding("synthetic-ticket", member)).isInstanceOf(AuthException.class);
+
+        request.removeHeader("User-Agent");
+        request.addHeader("User-Agent", browser);
+        assertThatCode(() -> protection.requireBinding("synthetic-ticket", member)).doesNotThrowAnyException();
     }
     @Test void redisOutagePreservesExistingLimitsButDoesNotAdmitAnUnknownPrimaryLogin() {
         request.setCookies(new jakarta.servlet.http.Cookie("__Host-reserve_browser", "a".repeat(43)));

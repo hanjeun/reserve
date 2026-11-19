@@ -113,6 +113,11 @@ async function mockApi(page, authenticatedUser = null) {
             return;
         }
 
+        if (url.pathname === '/api/chat/unread' && url.searchParams.get('split') === 'true') {
+            await ok(route, { messages: 0, notifications: 0 });
+            return;
+        }
+
         if (url.pathname.endsWith('/waiting-count')
             || url.pathname === '/api/chat/my/unread'
             || url.pathname === '/api/chat/unread') {
@@ -471,7 +476,7 @@ test('messenger: every internal view keeps a close X and shared refresh feedback
     await refreshed;
     await expect(refresh).not.toHaveAttribute('aria-busy', 'true');
     await expect(refresh.locator('.anticon-sync')).not.toHaveClass(/anticon-spin/);
-    await surface.getByRole('button', { name: /테스트 가게/ }).click();
+    await surface.getByRole('button', { name: /테스트 가게(?! 대화 메뉴)/ }).click();
     await expect(messenger).toHaveClass(/has-thread/);
     await expect(messenger).not.toHaveClass(/is-opening-thread/);
     await checkClose();
@@ -505,9 +510,11 @@ test('messenger: message actions, private photo preview and motion settle withou
     else await page.locator('.reserve-chat-launcher').click();
     const surface = page.locator(isMobile ? '.reserve-messages-page' : '.reserve-chat-panel');
     await surface.getByRole('button', { name: '대화', exact: true }).click();
-    const frames = await surface.evaluate(async element => {
-        const row = element.querySelector('.reserve-messenger-row');
-        if (!row) throw new Error('The conversation row must be ready before measuring entry.');
+    const conversation = surface.getByRole('complementary', { name: '대화 목록' })
+        .getByRole('button', { name: /^합성 가게(?! 대화 메뉴)(?:\s|$)/ });
+    const frames = await conversation.evaluate(async row => {
+        const element = row.closest('.reserve-messenger');
+        if (!element) throw new Error('The conversation row must belong to the messenger.');
         const animationReady = new Promise(resolve => {
             const observer = new MutationObserver(() => {
                 const entrance = element.querySelector('.reserve-messenger-thread')?.getAnimations()
@@ -527,7 +534,7 @@ test('messenger: message actions, private photo preview and motion settle withou
             const thread = element.querySelector('.reserve-messenger-thread');
             const list = element.querySelector('.reserve-messenger-list');
             if (thread) samples.push({ time: Number(document.timeline.currentTime) - start, x: thread.getBoundingClientRect().x,
-                opacity: Number(getComputedStyle(thread).opacity), opening: element.querySelector('.reserve-messenger').classList.contains('is-opening-thread'),
+                opacity: Number(getComputedStyle(thread).opacity), opening: element.classList.contains('is-opening-thread'),
                 listOpacity: list ? Number(getComputedStyle(list).opacity) : 0 });
         }
         return samples;

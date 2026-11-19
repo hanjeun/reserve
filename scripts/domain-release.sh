@@ -22,7 +22,7 @@ case "$OPERATION" in
   stage)
     test -f "$APP_RELEASE/index.html"
     test "$(tr -d '\r\n' < "$APP_RELEASE/release-id.txt")" = "$RELEASE"
-    SOURCE=/home/ubuntu/reserve-marketing-$RELEASE
+    SOURCE=${3:-/home/ubuntu/reserve-marketing-$RELEASE}
     test -f "$SOURCE/index.html"
     test "$(tr -d '\r\n' < "$SOURCE/release-id.txt")" = "$RELEASE"
     mkdir -p "$MARKETING_ROOT/releases"

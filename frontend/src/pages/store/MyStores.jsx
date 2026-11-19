@@ -3,13 +3,14 @@ import LoadingStatus from '../../components/common/LoadingStatus';
 import React, { useState, useCallback } from 'react';
 import { Typography, Modal, Flex } from 'antd';
 import { EditOutlined, DeleteOutlined, ExclamationCircleFilled, PlusOutlined } from '../../components/common/icons';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageContainer, Button, Card, DataState, StoreCardSkeleton, ModalLoading, Tooltip } from '../../components/common';
-import ListingContent from '../../components/common/ListingContent';
+import { AnimatedListingContent } from '../../components/common/AnimatedContent';
 import { useMyStores } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useViewModeParam from '../../hooks/useViewModeParam';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
+import useListSelectionMotion from '../../hooks/useListSelectionMotion';
 import { isBlockingListReadError, queryErrorStatus } from '../../hooks/liveUpdateQueries';
 import { colors, radius, fontSize } from '../../styles/tokens';
 import storeService from '../../services/storeService';
@@ -245,8 +246,7 @@ const OwnedStoresBody = ({ stores, visibleStores, view, onEdit, onDelete, onRegi
     );
 };
 
-// MyStores 메인
-const MyStores = () => {
+const OwnedStores = () => {
     const navigate = useNavigate();
     const [urlSearchParams, setUrlSearchParams] = useSearchParams();
     const { stores, loading, refetching = false, error, refetch, deleteStore, hasData = stores.length > 0 || !loading && !error } = useMyStores();
@@ -262,6 +262,10 @@ const MyStores = () => {
     const accessDenied = [401, 403].includes(queryErrorStatus(error));
     const blockingError = isBlockingListReadError(error, stores);
     useListRefreshAnchor(listRef, JSON.stringify([view, domain, sort]), refetching || retrying, hasData ? stores : null);
+    useListSelectionMotion(listRef, {
+        selection: JSON.stringify([domain, sort]), view, ids: visibleStores.map(store => store.id),
+        ready: !loading && !blockingError,
+    });
     if (accessDenied && (deleteModalOpen || targetStore !== null)) {
         setDeleteModalOpen(false); setTargetStore(null);
     }
@@ -352,11 +356,11 @@ const MyStores = () => {
             />
 
             {}
-            <ListingContent notice={!loading && error && !blockingError && (
+            <AnimatedListingContent motionKey={view} ready={!loading} notice={!loading && error && !blockingError && (
                 <DataState state="error" kind="store" subject="가게 목록" error={error}
                     title="최신 가게 정보를 확인하지 못해 이전 목록을 보여드리고 있어요."
                     onRetry={handleRetry} retrying={retrying || refetching} compact />
-            )}>{storesContent}</ListingContent>
+            )}>{storesContent}</AnimatedListingContent>
 
             {/* 삭제 모달 */}
             {!accessDenied && <DeleteStoreModal
@@ -371,8 +375,7 @@ const MyStores = () => {
 };
 
 const styles = {
-    // 가게 카드 하단 액션(수정/삭제) — AntD Card actions의 <li> 안을 꿉 채워
-    // 아이콘뿐 아니라 네모 영역 전체가 클릭되게 한다. 세로 padding으로 클릭 높이도 확보.
+    // 아이콘 밖에서도 누를 수 있도록 AntD actions의 li 전체를 클릭 영역으로 사용한다.
     cardAction: {
         display: 'flex',
         alignItems: 'center',
@@ -389,4 +392,7 @@ const styles = {
     },
 };
 
-export default MyStores;
+export default function MyStores() {
+    const [searchParams] = useSearchParams();
+    return searchParams.get('view') === 'drafts' ? <Navigate to="/drafts?tab=stores" replace /> : <OwnedStores />;
+}

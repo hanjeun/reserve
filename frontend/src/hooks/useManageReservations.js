@@ -5,16 +5,29 @@ import { handleApiError } from '../utils/errorHandler';
 import useMessage from './useMessage';
 import { reservationKeys } from './queryKeys';
 import { invalidateReservationData } from './invalidateAfterWrite';
-import { colors } from '../styles/tokens';
-import { queryErrorStatus } from './liveUpdateQueries';
+import UnderlinedTextButton from '../components/common/UnderlinedTextButton';
+import { assertCurrentSession, currentSession, isCurrentSession } from '../api/sessionScope';
+import { isReadAccessDenied } from './liveUpdateQueries';
+import { keepListForSort } from './listSortPlaceholder';
+import { WorkspaceActivityContext } from '../components/layout/workspaceActivity';
 
 const useManageReservations = (params) => {
     const { message } = useMessage();
     const queryClient = useQueryClient();
+    const active = React.useContext(WorkspaceActivityContext);
 
-    const { data, isLoading, isFetching, error } = useQuery({
+    const { data, isLoading, isFetching, isPlaceholderData, error } = useQuery({
         queryKey: reservationKeys.managePage(params),
-        queryFn:  () => reservationService.getStoreReservations(params),
+        enabled: active,
+        queryFn: ({ signal }) => reservationService.getStoreReservations(params, signal),
+        placeholderData: (previous, query) => {
+            if (!query || isReadAccessDenied(query.state.error)) return undefined;
+            const source = query.queryKey[3];
+            if (source.search !== params.search || source.status !== params.status
+                || source.storeId !== params.storeId || source.size !== params.size) return undefined;
+            return keepListForSort(previous, source.sort, params.sort, source.page) ?? previous;
+        },
+        refetchOnReconnect: false,
         staleTime: 1000 * 60,  // 1분 — 예약 관리는 실시간성 중요
     });
 
@@ -30,30 +43,32 @@ const useManageReservations = (params) => {
             ? reservationService.undoApprove(id)
             : reservationService.undoComplete(id)),
         onSuccess:  (_d, { kind }) => message.success(
-            kind === 'approve' ? '승인을 되돌렸어요' : '이용완료를 되돌렸어요'),
+            kind === 'approve' ? '승인을 되돌렸어요.' : '이용 완료를 되돌렸어요.'),
         onError,
         onSettled,
     });
 
-    /*
-     * 서버의 실행 취소 제한 안에서 토스트를 8초간 노출한다.
-     */
-    const successWithUndo = (text, id, kind) => {
+    // 처리 직후 되돌리기 알림을 8초간 노출한다.
+    const successWithUndo = (text, id, kind, epoch = currentSession().epoch) => {
+        if (!isCurrentSession(epoch)) return;
         const key = `undo-${kind}-${id}`;
+        let used = false;
         message.open({
             key,
             type: 'success',
             duration: 8,
             content: React.createElement('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 12 } },
                 text,
-                React.createElement('button', {
-                    type: 'button',
-                    onClick: () => { message.destroy(key); undoMutation.mutate({ id, kind }); },
-                    style: {
-                        background: 'none', border: 'none', padding: 0, font: 'inherit',
-                        color: colors.primary.main, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline',
+                React.createElement(UnderlinedTextButton, {
+                    onClick: () => {
+                        if (used) return;
+                        used = true;
+                        message.destroy(key);
+                        if (!isCurrentSession(epoch)) return;
+                        if (kind === 'noshow') undoNoShowMutation.mutate({ id, epoch });
+                        else undoMutation.mutate({ id, kind });
                     },
-                }, '실행 취소'),
+                }, '되돌리기'),
             ),
         });
     };
@@ -84,16 +99,37 @@ const useManageReservations = (params) => {
 
     const completeMutation = useMutation({
         mutationFn: (id) => reservationService.completeReservation(id),
-        onSuccess:  (_d, id) => successWithUndo('방문 완료로 처리했어요', id, 'complete'),
+        onSuccess: (result, id) => {
+            const reservation = data?.content?.find(item => item.id === id);
+            const attendanceDeposit = reservation?.attendanceRefundEnabled && reservation.depositAmount > 0;
+            if (result?.canUndo ?? (Boolean(reservation) && !attendanceDeposit)) {
+                successWithUndo('이용 완료로 처리했어요.', id, 'complete');
+            } else if (result?.refundRequested ?? (attendanceDeposit && reservation.depositPaid)) {
+                message.success('이용 완료로 처리했어요. 보증금 환불을 진행해요.');
+            } else message.success('이용 완료로 처리했어요.');
+        },
         onError,
         onSettled,
     });
 
     const noShowMutation = useMutation({
-        mutationFn: (id) => reservationService.noShowReservation(id),
-        onSuccess:  () => message.success('노쇼로 처리했어요'),
-        onError,
-        onSettled,
+        mutationFn: ({ id, epoch }) => {
+            assertCurrentSession(epoch);
+            return reservationService.noShowReservation(id);
+        },
+        onSuccess: (_d, { id, epoch }) => successWithUndo('노쇼로 처리했어요.', id, 'noshow', epoch),
+        onError: (failure, { epoch }) => { if (isCurrentSession(epoch)) onError(failure); },
+        onSettled: (_d, _error, { epoch }) => { if (isCurrentSession(epoch)) return onSettled(); },
+    });
+
+    const undoNoShowMutation = useMutation({
+        mutationFn: ({ id, epoch }) => {
+            assertCurrentSession(epoch);
+            return reservationService.undoNoShow(id);
+        },
+        onSuccess: (_d, { epoch }) => { if (isCurrentSession(epoch)) message.success('노쇼 처리를 되돌렸어요.'); },
+        onError: (failure, { epoch }) => { if (isCurrentSession(epoch)) onError(failure); },
+        onSettled: (_d, _error, { epoch }) => { if (isCurrentSession(epoch)) return onSettled(); },
     });
 
     // ReservationCard의 actionLoading 키 형식과 동일
@@ -102,28 +138,33 @@ const useManageReservations = (params) => {
         if (rejectMutation.isPending)   return `reject-${rejectMutation.variables?.id}`;
         if (storeCancelMutation.isPending) return `storecancel-${storeCancelMutation.variables?.id}`;
         if (completeMutation.isPending) return `complete-${completeMutation.variables}`;
-        if (noShowMutation.isPending)   return `noshow-${noShowMutation.variables}`;
+        if (noShowMutation.isPending)   return `noshow-${noShowMutation.variables?.id}`;
+        if (undoNoShowMutation.isPending) return `undo-noshow-${undoNoShowMutation.variables?.id}`;
         if (undoMutation.isPending)     return `undo-${undoMutation.variables?.id}`;
         return null;
     };
 
-    const accessDenied = [401, 403].includes(queryErrorStatus(error));
+    const accessDenied = isReadAccessDenied(error);
+    const previousOrder = isPlaceholderData ? data?.previousOrder : undefined;
+    const loading = isLoading || isPlaceholderData && !previousOrder;
     return {
-        reservations:  accessDenied ? [] : data?.content ?? [],
+        reservations:  accessDenied || loading ? [] : data?.content ?? [],
         total:         accessDenied ? 0 : data?.page?.totalElements ?? data?.totalElements ?? 0,
         totalPages:    accessDenied ? 0 : data?.page?.totalPages ?? data?.totalPages ?? 0,
         hasData:       data !== undefined && !accessDenied,
+        sorting:       Boolean(previousOrder),
+        resultSort:    previousOrder?.sort ?? params.sort,
+        resultPage:    (previousOrder?.page ?? params.page ?? 0) + 1,
         error,
-        // 배경 재조회 중에도 기존 목록을 유지하도록 최초 로딩만 노출한다.
-
-        loading:       isLoading,
-        refetching:    isFetching && !isLoading,
+        loading,
+        refetching:    isFetching && !loading,
         actionLoading: getActionLoading(),
         approve:  (id) => approveMutation.mutateAsync(id),
         reject:   (id, reason = '') => rejectMutation.mutateAsync({ id, reason }),
         storeCancel: (id, reason = '') => storeCancelMutation.mutateAsync({ id, reason }),
         complete: (id) => completeMutation.mutateAsync(id),
-        noShow:   (id) => noShowMutation.mutateAsync(id),
+        noShow:   (id) => noShowMutation.mutateAsync({ id, epoch: currentSession().epoch }),
+        undoNoShow: (id) => undoNoShowMutation.mutateAsync({ id, epoch: currentSession().epoch }),
         refetch:  () => queryClient.invalidateQueries({ queryKey: reservationKeys.manage() }),
     };
 };

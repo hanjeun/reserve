@@ -89,7 +89,7 @@ export default function FilterMenu({ value, options, onChange, appearance = 'pla
                 })),
                 onClick: ({ key }) => {
                     const option = options.find(item => String(item.value) === key);
-                    setOpen(false);
+                    closeWithFocus();
                     if (option && option.value !== value) onChange(option.value);
                 },
                 onKeyDown: event => {

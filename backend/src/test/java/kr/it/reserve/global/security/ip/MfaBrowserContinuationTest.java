@@ -100,6 +100,33 @@ class MfaBrowserContinuationTest {
         assertThatThrownBy(() -> mfa.finish(ticket.value(), null, null)).isInstanceOf(AuthException.class);
         verify(store, never()).rememberBrowser(anyString(), anyString(), anyString(), anyString(), anyString());
     }
+    @Test void managedEnrollmentKeepsTheBrowserBeforeCodeAcknowledgementAndRecoversALostFinishResponse() {
+        var original = tokens.issueSession(current(), null);
+        String originalSid = tokens.getSessionId(original.accessToken());
+        var pending = mfa.beginManage(current(), originalSid, null, "synthetic-password");
+        var setup = mfa.beginTotp(pending.value(), current(), originalSid);
+        String code = org.springframework.test.util.ReflectionTestUtils.invokeMethod(MfaCrypto.class, "code", setup.secret(), Instant.now().getEpochSecond() / 30, 6);
+        var enrollment = mfa.confirmTotp(pending.value(), current(), originalSid, code);
+        assertThat(enrollment.codes()).hasSize(10);
+        assertThat(tokens.verifyAuthentication(enrollment.session().accessToken()).loginMethod()).isEqualTo("PASSWORD");
+        assertThatThrownBy(() -> tokens.verifyAuthentication(original.accessToken())).isInstanceOf(AuthException.class);
+        String interimSid = tokens.getSessionId(enrollment.session().accessToken());
+        assertThat(mfa.finish(pending.value(), current(), interimSid).session()).isNull();
+        assertThat(tokens.verifyAuthentication(enrollment.session().accessToken()).loginMethod()).isEqualTo("PASSWORD");
+        assertThatCode(() -> mfa.confirmCompletion(MfaCrypto.digest(pending.value()), current(), interimSid)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> mfa.finish(pending.value(), current(), interimSid)).isInstanceOf(AuthException.class);
+    }
+    @Test void cancellingManagedEnrollmentDoesNotRevokeTheRenewedBrowser() {
+        var pending = mfa.beginManage(current(), sid, null, "synthetic-password");
+        var setup = mfa.beginTotp(pending.value(), current(), sid);
+        String code = org.springframework.test.util.ReflectionTestUtils.invokeMethod(MfaCrypto.class, "code", setup.secret(), Instant.now().getEpochSecond() / 30, 6);
+        var enrollment = mfa.confirmTotp(pending.value(), current(), sid, code);
+        mfa.cancel(pending.value());
+        assertThat(tokens.verifyAuthentication(enrollment.session().accessToken()).loginMethod()).isEqualTo("PASSWORD");
+        assertThat(mfa.settings(current()).enabled()).isTrue();
+        assertThatThrownBy(() -> mfa.finish(pending.value(), current(), tokens.getSessionId(enrollment.session().accessToken()))).isInstanceOf(AuthException.class);
+    }
+
     @ParameterizedTest @ValueSource(strings = {"address", "cookie", "family"})
     void aChangedEnvironmentCannotResumeTheManagementEnrollment(String changed) {
         var ticket = enrolled();

@@ -44,6 +44,21 @@ it('shows headings only for groups with actual results and reuses the correspond
     expect(screen.getByRole('link', { name: '일치하는 공방' }).querySelector('.anticon-shop')).toBeTruthy();
     expect(view.container.querySelector('.reserve-data-state')).toBeNull();
 });
+it('places a public store thumbnail in the store row and falls back to the shop icon on image error', () => {
+    const thumbnailUrl = 'https://cdn.reserve.it.kr/users/7/stores/81/thumbnails/store.webp';
+    const value = result();
+    value.publicData.groups[0].items = [{ id: 81, title: '일치하는 공방', path: '/store/81', thumbnailUrl }];
+    show(value);
+    const row = screen.getByRole('link', { name: '일치하는 공방' });
+    const thumbnail = row.querySelector('.reserve-search-store-thumbnail');
+    expect(thumbnail).toHaveAttribute('aria-hidden', 'true');
+    const image = thumbnail.querySelector('img');
+    expect(image).toHaveAttribute('src', thumbnailUrl);
+    expect(image).toHaveAttribute('loading', 'lazy');
+    fireEvent.error(image);
+    expect(thumbnail.querySelector('img')).toBeNull();
+    expect(thumbnail.querySelector('.anticon-shop')).toBeInTheDocument();
+});
 it('uses one shared three-row skeleton for an explicitly confirmed pending search', () => {
     const value = result(); value.publicQuery.isLoading = true; value.publicQuery.isFetching = true;
     value.personalQuery.isLoading = true; value.personalQuery.isFetching = true;

@@ -4,6 +4,20 @@ import { ADMIN_WORKSPACE_GROUPS, BUSINESS_WORKSPACE_GROUPS, resolveAdminTab, res
 import { reportTabSearch, reviewPage } from '../../components/admin/managementReviewQuery';
 
 describe('workspace menu and query contracts', () => {
+    it('관리자 본인 소식의 필터를 다른 관리 탭과 분리해요', () => {
+        const news = new URLSearchParams(adminTabSearch('?tab=members&search=abc&page=4', 'news'));
+        expect(Object.fromEntries(news)).toEqual({ tab: 'news' });
+        const restored = new URLSearchParams(adminTabSearch('?tab=members', 'news', 'newsStore=7&newsState=DRAFT&newsPage=2&view=cards'));
+        expect(Object.fromEntries(restored)).toEqual({ tab: 'news', newsStore: '7', newsState: 'DRAFT', newsPage: '2', view: 'cards' });
+        expect(adminTabSearch('?tab=news&newsStore=7&newsPage=2&view=cards', 'members')).toBe('tab=members');
+    });
+    it('혜택 신청의 보기 방식을 해당 관리 탭에만 유지해요', () => {
+        const benefits = adminTabSearch('?tab=members', 'benefit-applications', 'benefitState=APPROVED&benefitPage=2&view=cards');
+        expect(Object.fromEntries(new URLSearchParams(benefits))).toEqual({
+            tab: 'benefit-applications', benefitState: 'APPROVED', benefitPage: '2', view: 'cards',
+        });
+        expect(adminTabSearch(benefits, 'news')).toBe('tab=news');
+    });
     it('bounds invalid review pages before they reach Spring integer request parameters', () => {
         for (const value of ['-2', '1.5', 'NaN', '9007199254740991', '10001']) expect(reviewPage(value)).toBe(1);
         expect(reviewPage('3')).toBe(3);
@@ -12,8 +26,13 @@ describe('workspace menu and query contracts', () => {
     it('has unique entries for all admin and business functions including settlement', () => {
         const admin = ADMIN_WORKSPACE_GROUPS.flatMap(group => group.items.map(item => item.key));
         const business = BUSINESS_WORKSPACE_GROUPS.flatMap(group => group.items.map(item => item.key));
-        expect(new Set(admin).size).toBe(15);
-        expect(new Set(business).size).toBe(8);
+        expect(new Set(admin).size).toBe(admin.length);
+        expect(new Set(business).size).toBe(business.length);
+        expect(admin).toContain('news');
+        expect(admin).toContain('reports');
+        expect(admin).not.toContain('feed-reports');
+        expect(business).toContain('no-show');
+        expect(business).toContain('customers');
         expect(business).toContain('settlements');
     });
     it('normalizes legacy and unknown menu addresses instead of opening an empty panel', () => {
@@ -27,6 +46,8 @@ describe('workspace menu and query contracts', () => {
     it('retains only the current report mode filters and page on direct entry', () => {
         const params = new URLSearchParams(adminTabSearch('?tab=feed-reports&reportMode=comments&commentReportStatus=OPEN&commentReportPage=3&reportPage=2&benefitPage=5', 'feed-reports'));
         expect(params.get('reportMode')).toBe('comments');
+        expect(params.get('tab')).toBe('reports');
+        expect(params.get('queueType')).toBe('FEED');
         expect(params.get('commentReportPage')).toBe('3');
         expect(params.has('reportPage')).toBe(false);
         expect(params.has('benefitPage')).toBe(false);

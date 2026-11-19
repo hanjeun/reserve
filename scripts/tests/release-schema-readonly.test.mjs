@@ -25,7 +25,7 @@ docker() {
     [[ "$MYSQL_PWD" == synthetic-schema-test-only && "$*" != *synthetic-schema-test-only* ]] || return 98
     local query
     for query in "$@"; do :; done
-    if [[ "$RESERVE_VERIFY_AUTH_ADMISSION_SCHEMA" == 1 || "$RESERVE_VERIFY_V11_SCHEMA" == 1 ]]; then
+    if [[ "$RESERVE_VERIFY_AUTH_ADMISSION_SCHEMA" == 1 || "$RESERVE_VERIFY_V11_SCHEMA" == 1 || "$RESERVE_VERIFY_REVIEW_PROFILE_SCHEMA" == 1 ]]; then
         [[ "$query" == 'START TRANSACTION READ ONLY; '* && "$query" == *' ROLLBACK;' ]] || return 97
     fi
     printf 'SQL %s\n' "$query" >&3
@@ -37,6 +37,7 @@ docker() {
         *"SELECT COUNT(*) FROM information_schema.tables"*"table_name IN ('mfa_account','mfa_credential','mfa_challenge','mfa_recovery_code','test_settlement_payout','reservation_consent','reservation_retention_hold')"*) printf '7\n' ;;
         *"SELECT COUNT(*) FROM information_schema.columns"*"table_name = 'mfa_credential' AND column_name IN"*) printf '6\n' ;;
         *"SELECT COUNT(*) FROM information_schema.columns"*"character_set_name = 'ascii'"*) printf '2\n' ;;
+        *'FROM reservation r JOIN review v'*) printf '%s\n' "$MOCK_UNMARKED_REVIEW_VISITS" ;;
         *'FROM information_schema.'*)
             if [[ "$query" != *'SELECT CONCAT(table_name'* ]]; then printf '1\n'; fi ;;
         *'SELECT COUNT(*) FROM payment '*|*'SELECT COUNT(*) FROM payment_reconciliation_issue '*|*'SELECT COUNT(*) FROM payment_webhook_inbox '*|*'SELECT COUNT(*) FROM file_deletion_task '*|*'SELECT COUNT(*) FROM oauth_unlink_task '*|*'SELECT COUNT(*) FROM reservation '*) printf '0\n' ;;
@@ -55,6 +56,7 @@ function run(overrides = {}) {
             RESERVE_VERIFY_ENV: '/reserve-schema-test-missing-config',
             RESERVE_VERIFY_AUTH_ADMISSION_SCHEMA: '1', RESERVE_VERIFY_WAITING_SIGNUP_SCHEMA: '0',
             RESERVE_VERIFY_V11_SCHEMA: '0',
+            RESERVE_VERIFY_REVIEW_PROFILE_SCHEMA: '0', MOCK_UNMARKED_REVIEW_VISITS: '0',
             RESERVE_VERIFY_PREVIEW_SCHEMA: '0', MYSQL_CONTAINER: 'mysql', DB_NAME: 'reserve',
             DB_USER: 'reserve_backup', DB_PASSWORD: 'synthetic-schema-test-only', STALE_READY_DAYS: '7',
             MOCK_AUTHENTICATED_ROLE: '1', MOCK_FAIL_SQL: '', MOCK_QUERY_FAILURE: '', ...overrides,
@@ -163,4 +165,35 @@ test('v11 missing evidence columns, weakened holds and failed queries stop verif
     const result = run({ RESERVE_VERIFY_V11_SCHEMA: '1', MOCK_QUERY_FAILURE: "table_name = 'reservation_consent'" });
     assert.notEqual(result.status, 0);
     assert.doesNotMatch(result.stdout, /v11\/JDBC schema: contract matches|PASS:/);
+});
+
+test('review and profile opt-in checks column contracts and written-visit backfill with the backup role', () => {
+    const result = run({ RESERVE_VERIFY_AUTH_ADMISSION_SCHEMA: '0', RESERVE_VERIFY_REVIEW_PROFILE_SCHEMA: '1' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /review\/profile schema: contract and written-visit backfill match/);
+    for (const column of ['author_alias', 'profile_visibility', 'review_written']) assert.ok(result.stderr.includes(column));
+    assert.match(result.stderr, /FROM reservation r JOIN review v/);
+    for (const query of result.stderr.split('\n').filter(line => line.startsWith('SQL '))) {
+        assert.ok(query.startsWith('SQL START TRANSACTION READ ONLY; SELECT '), query);
+        assert.ok(query.endsWith(' ROLLBACK;'), query);
+    }
+    for (const overrides of [{ DB_USER: 'root' }, { MOCK_AUTHENTICATED_ROLE: '0' }, { RESERVE_VERIFY_REVIEW_PROFILE_SCHEMA: 'true' }]) {
+        const failure = run({ RESERVE_VERIFY_AUTH_ADMISSION_SCHEMA: '0', RESERVE_VERIFY_REVIEW_PROFILE_SCHEMA: '1', ...overrides });
+        assert.notEqual(failure.status, 0);
+        assert.doesNotMatch(failure.stderr, /FROM information_schema|FROM payment /);
+    }
+});
+
+test('missing review and profile columns, failed backfill reads and remaining reviews fail closed', () => {
+    const base = { RESERVE_VERIFY_AUTH_ADMISSION_SCHEMA: '0', RESERVE_VERIFY_REVIEW_PROFILE_SCHEMA: '1' };
+    for (const column of ['author_alias', 'profile_visibility', 'review_written']) {
+        const failure = run({ ...base, MOCK_FAIL_SQL: `column_name = '${column}'` });
+        assert.notEqual(failure.status, 0);
+        assert.doesNotMatch(failure.stdout, /review\/profile schema: contract|PASS:/);
+    }
+    for (const overrides of [{ MOCK_UNMARKED_REVIEW_VISITS: '1' }, { MOCK_QUERY_FAILURE: 'FROM reservation r JOIN review v' }]) {
+        const failure = run({ ...base, ...overrides });
+        assert.notEqual(failure.status, 0);
+        assert.doesNotMatch(failure.stdout, /review\/profile schema: contract|PASS:/);
+    }
 });

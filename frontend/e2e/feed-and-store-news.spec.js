@@ -50,6 +50,7 @@ async function setup(page, role) {
             data = {
                 ...values,
                 id: 7,
+                publicId: '00000000-0000-4000-8000-000000000007',
                 revision: 0,
                 state: values.draft ? 'DRAFT' : 'PUBLISHED',
                 benefitState: values.benefitRequested ? 'PENDING' : 'NONE',
@@ -65,6 +66,7 @@ async function setup(page, role) {
             data = {
                 ...values,
                 id: 8,
+                publicId: '00000000-0000-4000-8000-000000000008',
                 revision: 0,
                 state: values.draft ? 'DRAFT' : 'PUBLISHED',
                 author: state.profile,
@@ -128,16 +130,61 @@ test('benefits write icon opens the approval writer directly and keeps a photo a
     await page.screenshot({ path: testInfo.outputPath('benefits-approved.png') });
 });
 
+for (const theme of ['light', 'dark']) test(`photo uploads keep the add tile first and separate preview from removal (${theme})`, async ({ page }) => {
+    await page.addInitScript(value => localStorage.setItem('reserve:theme', value), theme);
+    await setup(page, 'BUSINESS');
+    await page.goto('/benefits');
+    await page.getByRole('button', { name: '가게 소식 작성', exact: true }).click();
+    const editor = page.getByRole('dialog', { name: /새 가게 소식|가게 소식 미리보기/ });
+    await editor.getByLabel('혜택 사진 선택').setInputFiles(Array.from({ length: 5 }, (_, index) => ({
+        name: `photo-${index}.png`, mimeType: 'image/png', buffer: image,
+    })));
+    const list = editor.locator('.reserve-picture-upload .ant-upload-list-picture-card');
+    const photos = list.locator(':scope > .ant-upload-list-item-container');
+    await expect(photos).toHaveCount(5);
+    await page.evaluate(() => document.fonts.ready);
+    await list.evaluate(async node => {
+        const animations = node.getAnimations({ subtree: true }).filter(animation => Number.isFinite(animation.effect.getComputedTiming().iterations));
+        await Promise.allSettled(animations.map(animation => animation.finished));
+    });
+    const add = list.locator(':scope > .ant-upload-select');
+    const position = async locator => locator.evaluate(node => {
+        const box = node.getBoundingClientRect();
+        return { x: box.x, y: box.y, width: box.width, height: box.height };
+    });
+    const initial = await position(add);
+    const first = await position(photos.first());
+    expect(initial.x + initial.width).toBeLessThanOrEqual(first.x);
+    await expect.poll(async () => Math.abs((await position(add)).y - (await position(photos.first())).y)).toBeLessThan(1);
+    await list.evaluate(node => { node.scrollLeft = node.scrollWidth; });
+    await expect.poll(async () => Math.abs((await position(add)).x - initial.x)).toBeLessThan(1);
+    const actions = photos.last().locator('.ant-upload-list-item-actions');
+    const preview = actions.locator(':scope > a');
+    const remove = actions.locator(':scope > button');
+    await preview.focus();
+    const previewBox = await position(preview);
+    const removeBox = await position(remove);
+    for (const box of [previewBox, removeBox]) {
+        expect(box.width).toBeGreaterThanOrEqual(44);
+        expect(box.height).toBeGreaterThanOrEqual(44);
+    }
+    expect(removeBox.x - previewBox.x - previewBox.width).toBeGreaterThanOrEqual(11.5);
+    expect(Math.abs(removeBox.y - previewBox.y)).toBeLessThan(1);
+    await preview.click();
+    await expect(page.locator('.reserve-image-preview img')).toBeVisible();
+    await expect(photos).toHaveCount(5);
+});
+
 test('an ordinary member chooses a public profile and publishes a photo without a store or real-name disclosure', async ({ page }, testInfo) => {
     const state = await setup(page, 'USER');
     await page.goto('/feed');
     await page.getByRole('button', { name: '새 글 작성', exact: true }).click();
-    const publicProfile = page.getByRole('dialog', { name: '처음 글쓰기 · 공개 닉네임' });
+    const publicProfile = page.getByRole('dialog', { name: '프로필 만들기' });
     await publicProfile.getByRole('textbox', { name: '공개 닉네임' }).fill(profile.nickname);
-    await publicProfile.getByRole('checkbox', { name: '계정의 프로필 사진을 피드에 공개해요.' }).uncheck();
-    await expect(publicProfile.getByRole('checkbox')).not.toBeChecked();
+    await publicProfile.getByRole('combobox', { name: '프로필 공개 범위' }).click();
+    await page.getByText('전체 공개', { exact: true }).last().click();
     await publicProfile.getByRole('button', { name: '저장하고 작성하기', exact: true }).click();
-    expect(state.profile).toMatchObject({ nickname: profile.nickname, useAccountAvatar: false });
+    expect(state.profile).toMatchObject({ nickname: profile.nickname, visibility: 'PUBLIC' });
     const editor = page.getByRole('dialog', { name: /피드 글쓰기|게시물 미리보기/ });
     await editor.getByRole('textbox', { name: '게시물 글' }).fill('회원 모두가 나누는 일상이에요.');
     await editor

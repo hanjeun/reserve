@@ -22,7 +22,9 @@ export function FilterMenuSkeleton({ select, style }) {
 FilterMenuSkeleton.propTypes = { select: PropTypes.object.isRequired, style: PropTypes.object };
 
 const refresh = <div className="reserve-filter-toolbar-refresh"><IconToolSkeleton /></div>;
-const searchField = <Bone height={40} style={{ flex: '1 1 0', minWidth: 0, maxWidth: 480 }} borderRadius={12} />;
+const searchField = <div className="reserve-list-search">
+    <Bone height={44} borderRadius={12} />
+</div>;
 const extraField = <Bone width="min(128px, 24vw)" height={32} style={{ flexShrink: 1 }} />;
 
 /** 데이터 없는 첫 로딩만 대체한다. 실제 도구줄과 같은 행·정렬·터치 높이를 사용한다. */
@@ -33,10 +35,10 @@ export default function FilterToolbarSkeleton({ selects = [], count = null, sear
                 {selects.map((select, index) => <FilterMenuSkeleton
                     key={select.key ?? select.placeholder ?? select.ariaLabel ?? index} select={select}
                     style={{
-                        width: count != null ? 'fit-content' : `min(${select.width ?? 168}px, ${select.mobileWidth ?? 128}px + 10vw)`,
+                        width: count != null || select.fitContent ? 'fit-content' : `min(${select.width ?? 168}px, ${select.mobileWidth ?? 128}px + 10vw)`,
                         maxWidth: `min(${select.width ?? 168}px, ${select.mobileWidth ?? 128}px + 10vw)`,
-                        flex: count != null ? '0 1 auto' : undefined,
-                        flexShrink: count != null ? undefined : 1,
+                        flex: count != null || select.fitContent ? '0 1 auto' : undefined,
+                        flexShrink: count != null || select.fitContent ? undefined : 1,
                     }} />)}
                 {count != null && <span className="reserve-filter-toolbar-count"><Bone width={40} height={16} /></span>}
                 {extra && <div className="reserve-filter-toolbar-extra">{extraSkeleton ?? extraField}</div>}

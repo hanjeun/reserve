@@ -113,6 +113,28 @@ public class ChatRoom {
     @Column(name = "owner_hidden_by_member_id")
     private Long ownerHiddenByMemberId;
 
+    @Column(name = "member_left_at")
+    private LocalDateTime memberLeftAt;
+
+    @Column(name = "owner_left_by_member_id")
+    private Long ownerLeftByMemberId;
+
+    public boolean hasLeft(SenderRole role, Long actorId) {
+        return switch (role) {
+            case MEMBER -> memberLeftAt != null;
+            case OWNER -> ownerLeftByMemberId != null && ownerLeftByMemberId.equals(actorId);
+            case ADMIN -> false;
+        };
+    }
+
+    /** 내 목록에서만 나가고 새 메시지가 올 때까지 숨긴 목록에도 표시하지 않는다. */
+    public void leave(SenderRole role, Long actorId, LocalDateTime at) {
+        setHidden(role, false, actorId, at);
+        if (role == SenderRole.MEMBER) memberLeftAt = at;
+        else ownerLeftByMemberId = actorId;
+        markRead(role);
+    }
+
     /** 목록에서만 숨긴다. 참가 권한·원장·차단 상태는 바꾸지 않는다. */
     public void setHidden(SenderRole role, boolean hidden, Long actorId, LocalDateTime at) {
         switch (role) {
@@ -148,6 +170,8 @@ public class ChatRoom {
         memberHiddenAt = null;
         ownerHiddenAt = null;
         ownerHiddenByMemberId = null;
+        memberLeftAt = null;
+        ownerLeftByMemberId = null;
         this.lastMessageAt = at;
         this.lastMessagePreview = previewContent(content);
         switch (sender) {

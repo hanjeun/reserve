@@ -48,6 +48,21 @@ class FeedProfileReadRateLimitTest {
     }
 
     @Test
+    void commentsAndReviewsShareTheSameProfileReadQuota() {
+        try (var security = mockStatic(SecurityUtil.class)) {
+            security.when(SecurityUtil::isLoggedIn).thenReturn(false);
+            when(limiter.tryConsume("feed-profile-read-ip:203.0.113.9", PROFILE_READ)).thenReturn(true, false);
+
+            var response = controller.authorComments("first-author", 1, 12, request("203.0.113.9"));
+
+            assertThat(response.getHeaders().getCacheControl()).isEqualTo("no-store");
+            assertLimited(() -> controller.authorReviews("second-author", 0, 12, request("203.0.113.9")));
+            verify(feeds).authorComments("first-author", 1, 12, null);
+            verify(feeds, never()).authorReviews("second-author", 0, 12, null);
+        }
+    }
+
+    @Test
     void changingIpOrAuthorDoesNotResetTheAuthenticatedMemberQuota() {
         try (var security = mockStatic(SecurityUtil.class)) {
             security.when(SecurityUtil::isLoggedIn).thenReturn(true);

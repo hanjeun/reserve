@@ -221,4 +221,5 @@ export function createAdmissionPollingCoordinator({ owner, campaignId, ticket, v
     };
 }
 
-import.meta.hot?.dispose(() => { for (const dispose of [...activeCoordinators]) dispose(); });
+const hot = import.meta.hot;
+hot?.dispose(() => { for (const dispose of [...activeCoordinators]) dispose(); });

@@ -1,4 +1,4 @@
-import { cloneElement, isValidElement, useCallback } from 'react';
+import { Children, cloneElement, isValidElement, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { Upload } from 'antd';
 import LoadingImage from './LoadingImage';
@@ -6,14 +6,14 @@ import { DeleteOutlined, EyeOutlined, DownloadOutlined } from './icons';
 
 // AntD 항목의 DOM·실행 도구를 유지하고 기본 사진만 대체한다.
 function withLoadingPictures(node) {
-    if (Array.isArray(node)) return node.map(withLoadingPictures);
+    if (Array.isArray(node)) return Children.map(node, withLoadingPictures);
     if (!isValidElement(node)) return node;
     if (node.type === 'img') return <LoadingImage key={node.key} {...node.props} />;
     if (node.props.children === undefined) return node;
     return cloneElement(node, {}, withLoadingPictures(node.props.children));
 }
 
-export default function LoadingUpload({ itemRender, ...props }) {
+export default function LoadingUpload({ itemRender, className, ...props }) {
     const renderItem = useCallback((originNode, ...args) => {
         const loadingNode = withLoadingPictures(originNode);
         return itemRender ? itemRender(loadingNode, ...args) : loadingNode;
@@ -24,6 +24,7 @@ export default function LoadingUpload({ itemRender, ...props }) {
         downloadIcon: <DownloadOutlined aria-hidden="true" />,
         ...(typeof props.showUploadList === 'object' ? props.showUploadList : {}),
     };
-    return <Upload {...props} showUploadList={showUploadList} itemRender={renderItem} />;
+    return <Upload {...props} className={[className, props.listType === 'picture-card' && 'reserve-picture-upload'].filter(Boolean).join(' ')}
+        showUploadList={showUploadList} itemRender={renderItem} />;
 }
-LoadingUpload.propTypes = { itemRender: PropTypes.func };
+LoadingUpload.propTypes = { itemRender: PropTypes.func, className: PropTypes.string };

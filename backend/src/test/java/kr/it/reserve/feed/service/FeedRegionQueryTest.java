@@ -2,11 +2,14 @@ package kr.it.reserve.feed.service;
 
 import jakarta.persistence.EntityManager;
 import kr.it.reserve.feed.FeedPolicy;
+import kr.it.reserve.feed.FeedException;
 import kr.it.reserve.feed.dto.FeedDto;
+import kr.it.reserve.feed.entity.FeedComment;
 import kr.it.reserve.feed.entity.FeedPost;
 import kr.it.reserve.feed.entity.FeedProfile;
 import kr.it.reserve.feed.entity.ContentLike;
 import kr.it.reserve.feed.repository.FeedMediaRepository;
+import kr.it.reserve.feed.repository.FeedCommentRepository;
 import kr.it.reserve.feed.repository.FeedPostRepository;
 import kr.it.reserve.feed.repository.FeedProfileRepository;
 import kr.it.reserve.file.service.FileStorageService;
@@ -17,6 +20,9 @@ import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.promotion.entity.Promotion;
 import kr.it.reserve.promotion.repository.PromotionRepository;
+import kr.it.reserve.review.entity.Review;
+import kr.it.reserve.review.entity.ReviewPhoto;
+import kr.it.reserve.review.repository.ReviewRepository;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.entity.StoreStatus;
 import kr.it.reserve.store.repository.StoreRepository;
@@ -25,10 +31,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.http.HttpStatus;
 
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
 @DataJpaTest(showSql = false, properties = "spring.datasource.driver-class-name=org.h2.Driver")
@@ -36,6 +44,8 @@ class FeedRegionQueryTest {
     private static final LocalDateTime NOW = LocalDateTime.parse("2026-10-12T04:00:00");
     @Autowired FeedProfileRepository profiles;
     @Autowired FeedPostRepository posts;
+    @Autowired FeedCommentRepository comments;
+    @Autowired ReviewRepository reviews;
     @Autowired FeedMediaRepository media;
     @Autowired MemberRepository members;
     @Autowired StoreRepository stores;
@@ -44,7 +54,7 @@ class FeedRegionQueryTest {
     private FeedService feeds;
 
     @BeforeEach void configure() {
-        feeds = new FeedService(new FeedPolicy(true), profiles, posts, media, members, stores, promotions,
+        feeds = new FeedService(new FeedPolicy(true), profiles, posts, comments, new FeedProfileReviewReader(reviews), media, members, stores, promotions,
                 mock(FileStorageService.class), mock(FileDeletionOutboxService.class));
         ReflectionTestUtils.setField(feeds, "entityManager", entityManager);
     }
@@ -141,6 +151,116 @@ class FeedRegionQueryTest {
                 .extracting(FeedDto.Post::id).containsExactly(newest.getId());
         assertThat(feeds.publicPosts(0, 20, null, false, null).getContent())
                 .extracting(FeedDto.Post::id).containsExactly(newest.getId(), second.getId(), first.getId());
+    }
+
+    @Test void profileScopeGuardsEveryActivityAndDefaultsExistingThreadsToTheirOriginalExposure() {
+        var member = member("profile");
+        var owner = profile(member);
+        var viewer = member("profile-viewer");
+        var post = post(owner, "서울", null, false);
+        String address = owner.getPublicId();
+        assertThat(feeds.publicProfile(address).activityAvailable()).isFalse();
+        assertThat(feeds.authorPosts(address, 0, 12, null).getTotalElements()).isEqualTo(1);
+        assertThatThrownBy(() -> feeds.authorComments(address, 0, 12, null)).isInstanceOf(FeedException.class);
+        assertThatThrownBy(() -> feeds.authorReviews(address, 0, 12, null)).isInstanceOf(FeedException.class);
+
+        owner.setVisibility(FeedProfile.Visibility.MEMBERS);
+        assertThatThrownBy(() -> feeds.publicProfile(address)).isInstanceOfSatisfying(FeedException.class,
+                error -> assertThat(error.getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
+        assertThat(feeds.publicProfile(address, viewer.getId()).activityAvailable()).isTrue();
+        assertThat(feeds.reviewAuthors(java.util.List.of(member.getId()), null)).isEmpty();
+        assertThat(feeds.reviewAuthors(java.util.List.of(member.getId()), viewer)).containsKey(member.getId());
+        assertThat(feeds.readPost(post.getId(), null).author().publicId()).isNull();
+        assertThat(feeds.readPost(post.getId(), viewer.getId()).author().publicId()).isEqualTo(address);
+        assertThat(feeds.authorPosts(address, 0, 12, viewer.getId()).getTotalElements()).isEqualTo(1);
+        viewer.setStatus(MemberStatus.SUSPENDED);
+        viewer.setSuspendedUntil(NOW.plusYears(20));
+        assertThatThrownBy(() -> feeds.publicProfile(address, viewer.getId())).isInstanceOf(FeedException.class);
+
+        owner.setVisibility(FeedProfile.Visibility.PRIVATE);
+        assertThat(feeds.reviewAuthors(java.util.List.of(member.getId()), member)).isEmpty();
+        assertThatThrownBy(() -> feeds.authorPosts(address, 0, 12, viewer.getId())).isInstanceOf(FeedException.class);
+        assertThatThrownBy(() -> feeds.authorComments(address, 0, 12, viewer.getId())).isInstanceOf(FeedException.class);
+        assertThatThrownBy(() -> feeds.authorReviews(address, 0, 12, viewer.getId())).isInstanceOf(FeedException.class);
+        assertThat(feeds.publicProfile(address, member.getId()).mine()).isTrue();
+        assertThat(feeds.authorPosts(address, 0, 12, member.getId()).getTotalElements()).isEqualTo(1);
+        assertThat(feeds.readPost(post.getId(), null).author().nickname()).isEqualTo(owner.getNickname());
+        assertThat(feeds.readPost(post.getId(), null).author().publicId()).isNull();
+        assertThat(feeds.readPost(post.getId(), member.getId()).author().publicId()).isEqualTo(address);
+    }
+
+    @Test void aggregateShowsOnlyPublishedCommentsAndReviewsWithPublicDestinations() {
+        var author = member("activity");
+        var profile = profile(author);
+        profile.setVisibility(FeedProfile.Visibility.PUBLIC);
+        var host = member("host");
+        var hostProfile = profile(host);
+        var visiblePost = post(hostProfile, "서울", null, false);
+        var draftPost = post(hostProfile, "서울", null, true);
+        var visible = comments.save(FeedComment.create(visiblePost, profile, null, "공개 댓글", null, NOW));
+        comments.save(FeedComment.create(draftPost, profile, null, "초안 댓글", null, NOW));
+        var hiddenParent = comments.save(FeedComment.create(visiblePost, hostProfile, null, "숨긴 댓글", null, NOW));
+        hiddenParent.visibility(true, NOW);
+        comments.save(FeedComment.create(visiblePost, profile, hiddenParent, "숨긴 답글", null, NOW));
+        var deleted = comments.save(FeedComment.create(visiblePost, profile, null, "삭제한 댓글", null, NOW));
+        deleted.delete(NOW);
+        var store = store(host, "서울");
+        var closed = store(host, "서울");
+        closed.softDelete();
+        reviews.save(Review.builder().member(author).store(store).title("공개 리뷰").content("공개 내용").rating(5).createdAt(NOW).build());
+        reviews.save(Review.builder().member(author).store(store).title("별칭 리뷰").content("본문").rating(5)
+                .createdAt(NOW).authorAlias("땅을 파는 두더지").build());
+        reviews.save(Review.builder().member(author).store(closed).title("폐점 리뷰").content("본문").rating(5).createdAt(NOW).build());
+        reviews.save(Review.builder().member(author).store(store).title("숨긴 리뷰").content("본문").rating(5).createdAt(NOW).moderationHidden(true).build());
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(feeds.authorComments(profile.getPublicId(), 0, 12, null).getContent()).singleElement()
+                .satisfies(comment -> {
+                    assertThat(comment.content()).isEqualTo("공개 댓글");
+                    assertThat(comment.commentPublicId()).isEqualTo(visible.getPublicId());
+                    assertThat(comment.postPublicId()).isEqualTo(visiblePost.getPublicId());
+                });
+        assertThat(feeds.authorReviews(profile.getPublicId(), 0, 12, null).getContent()).singleElement()
+                .satisfies(review -> {
+                    assertThat(review.storePublicId()).isEqualTo(store.getPublicId());
+                    assertThat(review.title()).isEqualTo("공개 리뷰");
+                });
+        assertThat(feeds.authorReviews(profile.getPublicId(), 0, 12, author.getId()).getContent())
+                .extracting(FeedDto.ProfileReview::title).containsExactlyInAnyOrder("공개 리뷰", "별칭 리뷰");
+    }
+
+    @Test void profileReviewsPreserveTheirPagesAndPublicPhotoReferences() {
+        var author = member("paged-review-author");
+        var profile = profile(author);
+        profile.setVisibility(FeedProfile.Visibility.PUBLIC);
+        var destination = store(member("paged-review-host"), "서울");
+        for (int index = 0; index < 2; index++) {
+            reviews.saveAndFlush(Review.builder().member(author).store(destination).title("이전 리뷰 " + index)
+                    .content("합성 공개 리뷰예요.").rating(4).createdAt(NOW).build());
+        }
+        var latest = Review.builder().member(author).store(destination).title("사진 리뷰")
+                .content("사진이 있는 합성 리뷰예요.").rating(5).createdAt(NOW).build();
+        var photo = new ReviewPhoto(latest, "synthetic-private-object.bin", "image/png", 180, 320);
+        latest.getPhotos().add(photo);
+        reviews.saveAndFlush(latest);
+        entityManager.clear();
+
+        var first = feeds.authorReviews(profile.getPublicId(), 0, 1, null);
+        assertThat(first.getTotalElements()).isEqualTo(3);
+        assertThat(first.getTotalPages()).isEqualTo(3);
+        assertThat(first.getNumber()).isZero();
+        assertThat(first.getContent()).singleElement().satisfies(review -> {
+            assertThat(review.id()).isEqualTo(latest.getId());
+            String url = "/api/reviews/" + latest.getId() + "/photos/" + photo.getId();
+            assertThat(review.photos()).containsExactly(new FeedDto.ProfileReviewPhoto(photo.getId(), url, 180, 320,
+                    url + "?size=thumbnail"));
+        });
+        var second = feeds.authorReviews(profile.getPublicId(), 1, 1, null);
+        assertThat(second.getTotalElements()).isEqualTo(3);
+        assertThat(second.getNumber()).isEqualTo(1);
+        assertThat(second.getSize()).isEqualTo(1);
+        assertThat(second.getContent()).singleElement().extracting(FeedDto.ProfileReview::title).isEqualTo("이전 리뷰 1");
     }
 
     private Member member(String name) {

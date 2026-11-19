@@ -1,10 +1,13 @@
 import { mkdir, copyFile, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { resolve } from 'node:path';
+import { basename, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
+import { buildServicePreview } from './build-service-preview.mjs';
+import { collectDependencyNotices } from '../frontend/scripts/bundle-notices.mjs';
 const root = fileURLToPath(new URL('.', import.meta.url));
 const output = resolve(root, 'dist');
+if (process.argv.some(argument => argument.startsWith('--local-hero-'))) throw new Error('Local media flags are invalid for the text hero build');
 const frontendRequire = createRequire(resolve(root, '../frontend/package.json'));
 const viteRequire = createRequire(frontendRequire.resolve('vite/package.json'));
 const { build } = viteRequire('esbuild');
@@ -14,7 +17,7 @@ const { parseFragment, serialize } = await import(pathToFileURL(jsdomRequire.res
 const app = new URL(process.env.APP_PUBLIC_URL || 'https://app.reserve.it.kr');
 const marketing = new URL(process.env.APP_MARKETING_URL || 'https://reserve.it.kr');
 for (const url of [app, marketing]) if (url.protocol !== 'https:' || url.pathname !== '/' || url.username || url.password || url.search || url.hash) throw new Error('Build origins must be HTTPS origins');
-for (const dir of ['icons', 'fonts', 'marketing-images']) await mkdir(resolve(output, dir), { recursive: true });
+for (const dir of ['icons', 'fonts', 'marketing-images', 'marketing-images/device']) await mkdir(resolve(output, dir), { recursive: true });
 const bundler = { bundle: true, nodePaths: [resolve(root, '../frontend/node_modules')], jsx: 'automatic',
     define: { 'process.env.NODE_ENV': '"production"', 'import.meta.env': '{}', '__RESERVE_APP_ORIGIN__': JSON.stringify(app.origin) }, logLevel: 'warning' };
 const rendered = await build({ ...bundler, entryPoints: [resolve(root, 'src/render.jsx')], platform: 'node', format: 'cjs', write: false });
@@ -40,6 +43,9 @@ function staticMarkup(source, mobile = false) {
                 node.attrs = node.attrs.filter(a => a !== style);
             }
             const path = attr('data-app-path');
+            const preview = attr('data-preview-src');
+            if (preview && (node.tagName !== 'iframe' || !/^\/service-preview\/index\.html\?scene=(explore|booking|reservations|waiting|qr)$/.test(preview.value)
+                || attr('sandbox')?.value !== 'allow-scripts allow-forms')) throw new Error('Invalid service preview frame');
             if (path) {
                 const url = new URL(path.value, app.origin);
                 if (url.origin !== app.origin || !path.value.startsWith('/') || path.value.startsWith('//')) throw new Error('Invalid app navigation');
@@ -51,7 +57,7 @@ function staticMarkup(source, mobile = false) {
                 if (/^on/i.test(a.name)) throw new Error('Inline event handlers are not allowed');
                 if (photos.has(a.value)) a.value = photos.get(a.value);
                 if (a.name === 'src' && !a.value.startsWith('/')) throw new Error('Marketing media must be bundled locally');
-                if (mobile && (a.name === 'id' || a.name === 'data-scroll-target' || a.name === 'name')) a.value = `mobile-${a.value}`;
+                if (mobile && (a.name === 'id' || a.name === 'data-scroll-target' || a.name === 'data-scene-mark' || a.name === 'name')) a.value = `mobile-${a.value}`;
             }
         }
         node.childNodes?.forEach(visit);
@@ -82,16 +88,34 @@ const surfaceCss = sharedRules(postcss.parse(await readFile(resolve(root, '../fr
 const iconTokens = await readFile(resolve(root, '../frontend/src/styles/tokens/icon-controls.css'), 'utf8');
 const iconCss = sharedRules(postcss.parse(await readFile(resolve(root, '../frontend/src/styles/global/icons.css'), 'utf8')),
     /\.anticon\.reserve-ui-icon|\.reserve-favorite-button|\.reserve-header-search/).toString();
+const themeCss = await readFile(resolve(root, '../frontend/src/styles/theme.css'), 'utf8');
+const demoPalette = postcss.rule({ selector: '.marketing-phone-screen' });
+postcss.parse(themeCss).walkRules(rule => {
+    if (rule.selector === ':root') rule.walkDecls(/^--c-/, declaration => demoPalette.append(declaration.clone()));
+});
 await writeFile(resolve(output, 'site.css'), [await readFile(resolve(root, 'site.css'), 'utf8'), page.css, componentCss, textLinkCss, footerCss, socialCss, surfaceCss, iconTokens, iconCss,
+    demoPalette.toString(),
     ...[...styles].map(([name, value]) => `:root .${name}{${value}}`)].join('\n'));
-await build({ ...bundler, entryPoints: [resolve(root, 'site.js')], platform: 'browser', target: ['es2022'], format: 'iife', minify: true, outfile: resolve(output, 'site.js') });
-await copyFile(resolve(root, '../frontend/src/styles/theme.css'), resolve(output, 'theme.css'));
+const seasonal = await build({ ...bundler, entryPoints: [resolve(root, 'src/seasonPreview.jsx')], platform: 'browser', target: ['es2022'],
+    format: 'esm', minify: true, splitting: true, metafile: true, entryNames: '[name]-[hash]', outdir: resolve(output, 'season-assets') });
+const outputs = Object.entries(seasonal.metafile.outputs);
+const [seasonScript, { cssBundle: seasonStyles }] = outputs.find(([, asset]) => asset.entryPoint?.endsWith('/seasonPreview.jsx'));
+const seasonNotices = collectDependencyNotices(outputs.flatMap(([, asset]) =>
+    Object.entries(asset.inputs).filter(([, entry]) => entry.bytesInOutput > 0).map(([file]) => resolve(file))));
+await writeFile(resolve(output, 'season-assets/THIRD_PARTY_NOTICES.txt'), seasonNotices.sections.join('\n'));
+const seasonAssetUrl = file => JSON.stringify('/season-assets/' + basename(file));
+await build({ ...bundler, entryPoints: [resolve(root, 'site.js')], platform: 'browser', target: ['es2022'], format: 'iife',
+    minify: true, outfile: resolve(output, 'site.js'), define: { ...bundler.define,
+        __RESERVE_SEASON_SCRIPT__: seasonAssetUrl(seasonScript), __RESERVE_SEASON_STYLES__: seasonAssetUrl(seasonStyles) } });
+await writeFile(resolve(output, 'theme.css'), themeCss);
 await copyFile(resolve(root, '../frontend/node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2'), resolve(output, 'fonts/PretendardVariable.woff2'));
 await copyFile(resolve(root, '../frontend/node_modules/pretendard/dist/LICENSE.txt'), resolve(output, 'fonts/Pretendard-LICENSE.txt'));
 await copyFile(resolve(root, '../frontend/public/fonts/SUITE-Variable.woff2'), resolve(output, 'fonts/SUITE-Variable.woff2'));
 await copyFile(resolve(root, '../frontend/public/fonts/SUITE-LICENSE.txt'), resolve(output, 'fonts/SUITE-LICENSE.txt'));
 for (const file of ['og-image.png', 'icons/favicon.svg', 'icons/R_logo.png']) await copyFile(resolve(root, '../frontend/public', file), resolve(output, file));
-for (const file of ['pilates.jpg', 'hair.jpg']) await copyFile(resolve(root, 'images', file), resolve(output, 'marketing-images', file));
+for (const file of ['pilates.jpg', 'hair.jpg', 'device/iphone16-pro.png', 'device/cellular.svg', 'device/wifi.svg', 'device/battery.svg']) {
+    await copyFile(resolve(root, 'images', file), resolve(output, 'marketing-images', file));
+}
 await copyFile(resolve(root, '../frontend/node_modules/hangul-js/LICENSE'), resolve(output, 'Hangul-js-LICENSE.txt'));
 let html = (await readFile(resolve(root, 'index.html'), 'utf8')).replaceAll('https://app.reserve.it.kr', app.origin).replaceAll('https://reserve.it.kr', marketing.origin);
 for (const file of ['theme.css', 'site.css', 'site.js']) {
@@ -101,6 +125,7 @@ for (const file of ['theme.css', 'site.css', 'site.js']) {
 for (const [name, markup] of Object.entries(fragments)) html = html.replace(`<!--MARKETING_${name}-->`, markup);
 if (html.includes('<!--MARKETING_')) throw new Error('Marketing template is incomplete');
 await writeFile(resolve(output, 'index.html'), html);
-await writeFile(resolve(output, 'robots.txt'), `User-agent: *\nAllow: /\nDisallow: /drafts/\nDisallow: /login\nDisallow: /oauth2/\nSitemap: ${marketing.origin}/sitemap.xml\n`);
+await writeFile(resolve(output, 'robots.txt'), `User-agent: *\nAllow: /\nDisallow: /drafts/\nDisallow: /service-preview/\nDisallow: /login\nDisallow: /oauth2/\nSitemap: ${marketing.origin}/sitemap.xml\n`);
 await writeFile(resolve(output, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${marketing.origin}/</loc></url></urlset>\n`);
 await writeFile(resolve(output, 'release-id.txt'), `${process.env.RELEASE_ID || 'local-candidate'}\n`);
+await buildServicePreview();

@@ -19,7 +19,8 @@ export const invalidateReviewData = (queryClient) =>
     invalidateAll(queryClient, [
         storeKeys.all(),        // 가게 상세 헤더·목록 카드·사업자 통계의 별점·리뷰 수
         favoriteKeys.my(),      // 즐겨찾기 카드의 별점·리뷰 수
-        reservationKeys.my(),   // '내 예약'의 리뷰 쓰기 ↔ 내 리뷰 보기 버튼
+        reservationKeys.my(),
+        ['feed', 'author'],
     ]);
 
 /** 예약 생성·취소·승인·거절·완료·노쇼·되돌리기. */

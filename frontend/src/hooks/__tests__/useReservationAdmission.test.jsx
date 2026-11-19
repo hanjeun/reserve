@@ -60,6 +60,25 @@ describe('reservation admission scope and recovery', () => {
         sessionStorage.clear();
     });
 
+    it('keeps the admission dialog closed while checking a slot without a campaign', async () => {
+        let resolveLookup;
+        admissionService.find.mockReturnValueOnce(new Promise(resolve => { resolveLookup = resolve; }));
+        const view = renderAdmission();
+        let decision;
+        act(() => { decision = view.result.current.enter(SCOPE); });
+        expect(view.result.current.modalProps.open).toBe(false);
+        await act(async () => { resolveLookup(null); await decision; });
+        await expect(decision).resolves.toBeNull();
+        expect(view.result.current.modalProps.open).toBe(false);
+        expect(admissionService.join).not.toHaveBeenCalled();
+    });
+
+    it('skips campaign lookup when only checking stored tickets and there is none', async () => {
+        const view = renderAdmission();
+        await expect(view.result.current.getPendingAttempt(SCOPE, { storedTicketOnly: true })).resolves.toBeNull();
+        expect(admissionService.find).not.toHaveBeenCalled();
+    });
+
     it('shares a successful null lookup and never bypasses a failed initial lookup', async () => {
         admissionService.find.mockResolvedValueOnce(null);
         const view = renderAdmission();

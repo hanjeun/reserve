@@ -108,6 +108,101 @@ class IpProtectionRedisIntegrationTest {
         assertThat(admin.opsForHash().size(key(owner, "browser-details"))).isEqualTo(8);
     }
 
+    @Test void browserSessionsAreSharedBoundedScopedAndDoNotExtendTrust() {
+        String owner = id(), browser = id(), legacy = id();
+        left.rememberBrowser(owner, legacy, "ip", "prefix", "family");
+        left.rememberBrowser(owner, browser, "ip", "prefix", "family", "windows:chrome", "a".repeat(64));
+        var entry = right.devices(owner).stream().filter(device -> device.browser().equals(browser)).findFirst().orElseThrow();
+        assertThat(entry.metadata()).isEqualTo("windows:chrome:" + "a".repeat(64));
+        assertThat(right.devices(owner)).contains(new IpProtectionStore.BrowserEntry(legacy,
+                admin.opsForZSet().score(key(owner, "browsers"), legacy).longValue(), ""));
+        assertThat(right.devices(id())).isEmpty();
+        right.trackBrowser(owner, browser, "other-family", "ios:safari", "b".repeat(64));
+        assertThat(left.devices(owner)).contains(entry);
+        for (String value : java.util.List.of("b", "c", "d", "e", "f", "0", "0")) {
+            right.trackBrowser(owner, browser, "family", "windows:chrome", value.repeat(64));
+        }
+        var tracked = left.devices(owner).stream().filter(device -> device.browser().equals(browser)).findFirst().orElseThrow();
+        assertThat(tracked.expiresAt()).isEqualTo(entry.expiresAt());
+        assertThat(tracked.metadata().split(":")).containsExactly("windows", "chrome",
+                "0".repeat(64), "f".repeat(64), "e".repeat(64), "d".repeat(64), "c".repeat(64));
+        admin.opsForZSet().add(key(owner, "browsers"), browser, 1);
+        assertThat(right.devices(owner)).extracting(IpProtectionStore.BrowserEntry::browser).containsExactly(legacy);
+        assertThat(admin.opsForHash().hasKey(key(owner, "browser-sessions"), browser)).isFalse();
+        right.forgetBrowser(owner, legacy);
+        assertThat(left.devices(owner)).isEmpty();
+    }
+
+    @Test void renewalExtendsOnlyTheLiveRegistrationInTheSameEnvironment() {
+        String owner = id(), browser = id();
+        left.rememberBrowser(owner, browser, "ip", "prefix", "family", "windows:chrome", "a".repeat(64));
+        String registered = key(owner, "browsers");
+        double before = System.currentTimeMillis() + Duration.ofDays(1).toMillis();
+        admin.opsForZSet().add(registered, browser, before);
+        assertThat(right.renewBrowser(id(), browser, "ip", "prefix", "family")).isFalse();
+        assertThat(right.renewBrowser(owner, browser, "new-ip", "new-prefix", "family")).isFalse();
+        assertThat(right.renewBrowser(owner, browser, "ip", "prefix", "other-family")).isFalse();
+        assertThat(admin.opsForZSet().score(registered, browser)).isEqualTo(before);
+        assertThat(right.renewBrowser(owner, browser, "nearby-ip", "prefix", "family")).isTrue();
+        assertThat(admin.opsForZSet().score(registered, browser)).isGreaterThan(before);
+        assertThat(left.devices(owner)).singleElement().satisfies(entry ->
+                assertThat(entry.metadata()).isEqualTo("windows:chrome:" + "a".repeat(64)));
+        assertThat(left.browser(owner, browser, "ip", "prefix", "family")).isEqualTo(1);
+        admin.opsForZSet().add(registered, browser, 1);
+        assertThat(left.renewBrowser(owner, browser, "ip", "prefix", "family")).isFalse();
+        assertThat(right.devices(owner)).isEmpty();
+        left.rememberBrowser(owner, browser, "ip", "prefix", "family");
+        right.forgetBrowser(owner, browser);
+        assertThat(left.renewBrowser(owner, browser, "ip", "prefix", "family")).isFalse();
+    }
+
+    @Test void deviceRegistrationRebindsOnlyTheCurrentTicketWithoutExtendingItsLifetime() {
+        String owner = id(), browser = id(), ticket = id();
+        left.bind(ticket, "before");
+        long originalTtl = admin.getExpire(key(ticket, "challenge"), TimeUnit.MILLISECONDS);
+        assertThat(right.registerBrowser(owner, browser, "ip", "prefix", "family", "windows:chrome", "a".repeat(64),
+                ticket, "wrong", "after")).isFalse();
+        assertThat(left.devices(owner)).isEmpty();
+        assertThat(left.binding(ticket, "before")).isTrue();
+
+        assertThat(right.registerBrowser(owner, browser, "ip", "prefix", "family", "windows:chrome", "a".repeat(64),
+                ticket, "before", "after")).isTrue();
+        assertThat(left.browser(owner, browser, "ip", "prefix", "family")).isEqualTo(1);
+        assertThat(left.binding(ticket, "before")).isFalse();
+        assertThat(left.binding(ticket, "after")).isTrue();
+        assertThat(admin.getExpire(key(ticket, "challenge"), TimeUnit.MILLISECONDS)).isPositive().isLessThanOrEqualTo(originalTtl);
+        assertThat(right.registerBrowser(owner, id(), "ip", "prefix", "family", "windows:chrome", "b".repeat(64),
+                ticket, "before", "other")).isFalse();
+        assertThat(right.devices(owner)).extracting(IpProtectionStore.BrowserEntry::browser).containsExactly(browser);
+    }
+
+    @Test void browserOfferConsumesOnlyItsOwnBindingAfterSuccessfulRegistration() {
+        String owner = id(), browser = id(), ticket = id();
+        left.bind(ticket, "original-environment");
+        assertThat(right.registerBrowser(owner, browser, "ip", "prefix", "family", "windows:chrome", "a".repeat(64),
+                ticket, "emulated-environment", "")).isFalse();
+        assertThat(left.binding(ticket, "original-environment")).isTrue();
+        assertThat(left.devices(owner)).isEmpty();
+
+        assertThat(right.registerBrowser(owner, browser, "ip", "prefix", "family", "windows:chrome", "a".repeat(64),
+                ticket, "original-environment", "")).isTrue();
+        assertThat(left.binding(ticket, "original-environment")).isFalse();
+        assertThat(right.registerBrowser(owner, id(), "ip", "prefix", "family", "windows:chrome", "b".repeat(64),
+                ticket, "original-environment", "")).isFalse();
+        assertThat(left.devices(owner)).extracting(IpProtectionStore.BrowserEntry::browser).containsExactly(browser);
+    }
+
+    @Test void retiringAllBrowsersRemovesOnlyTheSpecifiedAccountVersion() {
+        String oldOwner = id(), newOwner = id(), browser = id();
+        left.rememberBrowser(oldOwner, browser, "ip", "prefix", "family", "windows:chrome", "a".repeat(64));
+        left.rememberBrowser(newOwner, browser, "ip", "prefix", "family", "windows:chrome", "b".repeat(64));
+        right.forgetBrowsers(oldOwner);
+        assertThat(left.devices(oldOwner)).isEmpty();
+        assertThat(left.devices(newOwner)).hasSize(1);
+        assertThat(admin.hasKey(key(oldOwner, "browser-details"))).isFalse();
+        assertThat(admin.hasKey(key(oldOwner, "browser-sessions"))).isFalse();
+    }
+
     @BeforeEach void resetBackoff() {
         left = new IpProtectionStore(redis, RedisNamespace.LOCAL, new RedisFailureBackoff());
         right = new IpProtectionStore(redis, RedisNamespace.LOCAL, new RedisFailureBackoff());

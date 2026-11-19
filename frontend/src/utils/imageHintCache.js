@@ -1,13 +1,16 @@
 import { imageDimensions } from './imageDimensions';
-import { storeCoverImage, storeGalleryLayoutRatio } from './storeImages';
+import { publicStoreImageUrl, storeCoverImage, storeGalleryLayoutRatio } from './storeImages';
+import { isLegacyStoreId, normalizeStorePublicId } from './storePublicAddress';
 
 // 공개 사진 식별자·원본 크기만 복구하며 가게·프로필 데이터는 저장하지 않는다.
 const KEY = 'reserve:storeImageHints';
 const MAX_ENTRIES = 300;
 let memoryCache = null;
-const supersededHtml = new Set();
-const storeKey = value => /^\d+$/.test(String(value ?? '')) && Number.isSafeInteger(Number(value)) && Number(value) > 0
-    ? String(Number(value)) : null;
+let supersededDocumentId = null;
+const storeKey = value => isLegacyStoreId(value) ? String(Number(value)) : null;
+const addressKey = value => normalizeStorePublicId(value) ?? storeKey(value);
+const documentHint = suffix => typeof document === 'undefined' ? undefined
+    : document.querySelector('meta[name="reserve-store-image-' + suffix + '"]')?.content;
 const load = () => {
     if (memoryCache) return memoryCache;
     try {
@@ -34,27 +37,22 @@ export const extractImageHint = store => {
 };
 
 /* OG 축소판과 분리해 같은 가게·관리 사진 경로의 공개 문서 힌트만 사용한다. */
-const initialImageHint = id => {
-    if (typeof document === 'undefined' || supersededHtml.has(id)) return null;
-    const content = suffix => document.querySelector('meta[name="reserve-store-image-' + suffix + '"]')?.content;
-    if (storeKey(content('id')) !== id) return null;
-    const size = imageDimensions({ width: Number(content('width')), height: Number(content('height')) });
+const initialImageHint = key => {
+    const id = storeKey(documentHint('id'));
+    if (!id || id === supersededDocumentId || id !== key && normalizeStorePublicId(documentHint('public-id')) !== key) return null;
+    const size = imageDimensions({ width: Number(documentHint('width')), height: Number(documentHint('height')) });
     if (!size) return null;
-    try {
-        const value = content('url');
-        const url = new URL(value);
-        const path = decodeURIComponent(url.pathname);
-        if (url.protocol !== 'https:' || !['cdn.reserve.it.kr', 'reserve.it.kr', 'app.reserve.it.kr'].includes(url.hostname)
-            || url.username || url.password || url.port || url.search || url.hash || path.includes('\\')
-            || !new RegExp('^/users/[0-9]+/stores/' + id + '/(?:images|thumbnails)/[^/]+$').test(path)) return null;
-        return { url: value, ...geometryHint({ ...size, layoutRatio: Number(content('layout-ratio')) }) };
-    } catch { return null; }
+    const url = publicStoreImageUrl(documentHint('url'), id);
+    return url ? { url, ...geometryHint({ ...size, layoutRatio: Number(documentHint('layout-ratio')) }) } : null;
 };
 
 export const forgetImageHint = storeId => {
-    const id = storeKey(storeId);
+    const id = addressKey(storeId);
     if (!id) return;
-    supersededHtml.add(id);
+    const documentId = storeKey(documentHint('id'));
+    if (documentId && (id === documentId || id === normalizeStorePublicId(documentHint('public-id')))) {
+        supersededDocumentId = documentId;
+    }
     const cache = load();
     if (Object.hasOwn(cache, id)) { delete cache[id]; persist(); }
 };
@@ -62,11 +60,13 @@ export const forgetImageHint = storeId => {
 /* 새 공개 응답에서 메타데이터가 빠지면 이전 사진 힌트도 폐기한다. */
 export const rememberImageHints = stores => {
     const cache = load();
+    const documentId = storeKey(documentHint('id'));
     let changed = false;
     for (const store of Array.isArray(stores) ? stores : [stores]) {
         const id = storeKey(store?.id);
         if (!id) continue;
-        supersededHtml.add(id);
+        // 문서의 가게 한 곳에 대해서만 초기 메타를 폐기한다.
+        if (id === documentId) supersededDocumentId = documentId;
         const image = storeCoverImage(store);
         const hint = extractImageHint(store);
         if (!hint || typeof image.url !== 'string' || !image.url) {
@@ -87,7 +87,7 @@ export const rememberImageHints = stores => {
 
 /* 새 공개 API 응답 전까지 문서 메타데이터를 브라우저 힌트보다 우선한다. */
 export const getImageHint = storeId => {
-    const id = storeKey(storeId);
+    const id = addressKey(storeId);
     if (!id) return null;
     const initial = initialImageHint(id);
     if (initial) return geometryHint(initial);

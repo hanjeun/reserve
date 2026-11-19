@@ -3,8 +3,7 @@ import { colors } from '../../styles/tokens';
 import Bone from './Bone';
 import SkeletonText from './SkeletonText';
 
-// 표 본문만 그리며 페이지 이동 도구는 AdminTableSkeleton이 담당한다.
-// 라우트 골격에서 쓰는 경량 파일이므로 Pagination을 가져오지 않는다.
+// 페이지 이동 도구는 본문이 조회되는 동안에도 부모에서 유지한다.
 const skeletonKeys = (n, prefix = 'sk') => Array.from({ length: n }, (_, i) => `${prefix}-${i}`);
 
 /*   AdminTableSkeleton — 관리자/사업자 패널 테이블 로딩용*/
@@ -17,7 +16,7 @@ const CELL_PAD_X = 8;
 const FLEX_COL_MIN = 160;
 
 /*
- * rows {number}, cols {(number|null)[]}, headers {string[]}, actionBtns {number}, stackFirstCol {bool}, pagination {object|null}.
+ * rows {number}, cols {(number|null)[]}, headers {string[]}, actionBtns {number}, stackFirstCol {bool}.
  * CSS 2.1 §17.5.2.1에 맞춰 고정 열만 있으면 폭 비율로 확장하고 null 열이 있으면 남는 공간을 그 열에 둔다. 좁은 화면에서는 축소하지 않고 가로 스크롤을 유지한다.
  */
 const AdminTableSkeletonTable = ({

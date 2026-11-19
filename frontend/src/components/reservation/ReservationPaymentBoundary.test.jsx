@@ -28,6 +28,9 @@ for (const [name, Component] of [['목록', ReservationRow], ['카드', Reservat
             expect(notice).toBe(notice.parentElement.firstElementChild);
             fireEvent.click(notice);
             expect(open).not.toHaveBeenCalled();
+        } else {
+            expect(timer.parentElement.nextElementSibling).toContainElement(notice);
+            expect(notice.parentElement).toHaveClass('reserve-reservation-summary-card-payment-note');
         }
         fireEvent.click(screen.getByRole('button', { name: '합성 가게 예약 상세 보기' }));
         expect(open).toHaveBeenCalledTimes(1);

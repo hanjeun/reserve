@@ -5,7 +5,7 @@ import { ArrowRightOutlined, SmileOutlined, StopOutlined } from '../common/icons
 import { SpinIndicator } from '../common/Loading';
 import DataState from '../common/DataState';
 import ChatImagePicker from './ChatImagePicker';
-import { colors } from '../../styles/tokens';
+import { filesFromTransfer } from '../../utils/chatAttachments';
 
 const usesTouchInput = () => globalThis.matchMedia?.('(pointer: coarse)').matches === true;
 
@@ -23,7 +23,7 @@ const EMOJI = [
 export default function ChatComposer({ value, onChange, onSend, sending = false, disabled = false,
     file, onFileChange, imageEnabled = false, imageLoading = false, onCancel,
     imageError, imageRetrying = false, onImageRetry,
-    files, onFilesChange, onRemoveFile,
+    files, onFilesChange, onRemoveFile, onStageFiles, allowDocuments, draftScope,
     maxLength = 2000, placeholder = '메시지를 입력하세요', inputLabel = '메시지 입력', sendText = '보내기',
     inputRef, attachmentControl, attachments, attachmentError, hasAttachments = Boolean(files?.length || file) }) {
     const input = useRef(null);
@@ -73,21 +73,28 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
         sendLabel = '보내는 중';
         sendIcon = <span aria-hidden="true"><SpinIndicator /></span>;
     }
-    const renderComposer = (control, previews) => <div className="reserve-chat-composer reserve-messenger-composer">
+    const pasteFiles = event => {
+        const selected = filesFromTransfer(event.clipboardData);
+        if (!selected.length) return;
+        event.preventDefault();
+        if (!blocked && imageEnabled && !imageError) onStageFiles(selected);
+    };
+    const renderComposer = (control, previews, expanded = false) => <div
+        className="reserve-chat-composer reserve-messenger-composer" onPaste={onStageFiles ? pasteFiles : undefined}>
         <div className="reserve-chat-composer-input-area">
-        <textarea ref={input} value={value} onChange={event => onChange(event.target.value)}
-            onKeyDown={event => {
-                if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) {
-                    event.preventDefault();
-                    if (!blocked && (value.trim() || hasAttachments)) onSend();
-                }
-            }} placeholder={placeholder} aria-label={inputLabel} maxLength={maxLength} rows={2} disabled={disabled} />
-        <div className="reserve-chat-composer-attachments">
-            {imageError && <DataState compact state="error" title="사진 첨부 설정을 불러오지 못했어요."
+            <div className="reserve-chat-composer-attachments" data-expanded={expanded || undefined}>
+                <div className="reserve-chat-composer-attachments-clip">{previews}</div>
+            </div>
+            {imageError && <DataState compact state="error" title={onStageFiles ? '첨부 설정을 불러오지 못했어요.' : '사진 첨부 설정을 불러오지 못했어요.'}
                 error={imageError} onRetry={onImageRetry} retrying={imageRetrying} />}
-            {attachmentError && <span role="alert" style={{ color: colors.error.main, fontSize: 12 }}>{attachmentError}</span>}
-            {previews}
-        </div>
+            {attachmentError && <span role="alert" className="reserve-chat-attachment-error">{attachmentError}</span>}
+            <textarea ref={input} value={value} onChange={event => onChange(event.target.value)}
+                onKeyDown={event => {
+                    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) {
+                        event.preventDefault();
+                        if (!blocked && (value.trim() || hasAttachments)) onSend();
+                    }
+                }} placeholder={placeholder} aria-label={inputLabel} maxLength={maxLength} rows={2} disabled={disabled} />
         </div>
         <div className="reserve-chat-composer-toolbar">
             <div className="reserve-chat-composer-tools">
@@ -113,12 +120,13 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
         </div>
     </div>;
     if (typeof attachmentControl === 'function') {
-        return attachmentControl((control, previews) => renderComposer(control, <>{previews}{attachments}</>));
+        return attachmentControl((control, previews, expanded) => renderComposer(control, <>{previews}{attachments}</>, expanded || hasAttachments));
     }
-    if (attachmentControl != null) return renderComposer(attachmentControl, attachments);
+    if (attachmentControl != null) return renderComposer(attachmentControl, attachments, hasAttachments);
     return <ChatImagePicker file={file} onChange={onFileChange} files={files} onFilesChange={onFilesChange} onRemoveFile={onRemoveFile}
         enabled={imageEnabled || imageLoading || Boolean(imageError)} disabled={blocked || imageLoading || Boolean(imageError)}
-        renderContent={(control, previews) => renderComposer(control, attachments ?? previews)} />;
+        allowDocuments={allowDocuments} onStageFiles={onStageFiles} draftScope={draftScope}
+        renderContent={(control, previews, expanded) => renderComposer(control, attachments ?? previews, expanded)} />;
 }
 
 ChatComposer.propTypes = {
@@ -131,4 +139,5 @@ ChatComposer.propTypes = {
     attachmentControl: PropTypes.oneOfType([PropTypes.node, PropTypes.func]), attachments: PropTypes.node,
     attachmentError: PropTypes.string, hasAttachments: PropTypes.bool,
     files: PropTypes.arrayOf(PropTypes.object), onFilesChange: PropTypes.func, onRemoveFile: PropTypes.func,
+    onStageFiles: PropTypes.func, allowDocuments: PropTypes.bool, draftScope: PropTypes.string,
 };

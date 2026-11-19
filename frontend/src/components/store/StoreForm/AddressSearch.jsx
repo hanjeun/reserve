@@ -105,12 +105,8 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
     const touchState     = useRef({ startX: 0, scrollStart: 0 });
     const debouncedQuery = useDebounce(state.query, 400);
 
-    // 드롭다운이 닫힐 때(선택/blur/ESC)도 슬라이드 아웃 애니메이션이 재생되도록.
-    // SELECT_RESULT는 results를 즉시 []로 비우므로, 닫히는 애니메이션 동안 보여줄 마지막 결과를
-    // 별도로 기억해둔다. effect+setState는 리렌더가 한 번 더 발생하고(cascading render 경고 대상),
-    // ref는 렌더링 중 읽기/쓰기가 금지되어(이 프로젝트 lint 규칙) 둘 다 못 씀 — 대신 렌더링 도중
-    // 이전 값과 비교해서 바로 setState하는, React 공식 문서의 "prop 변경 시 state 조정" 패턴 사용
-    // (effect 없이 렌더 도중 호출하는 setState는 같은 렌더 사이클 안에서 처리되어 cascading이 아님).
+    // 닫힘 모션이 끝날 때까지 마지막 검색 결과를 보존한다.
+    // 결과 배열이 바뀐 렌더에서만 갱신해 추가 effect 렌더를 피한다.
     const [prevResultsRef, setPrevResultsRef] = useState(state.results);
     const [lastResults, setLastResults] = useState(state.results);
     if (state.results !== prevResultsRef) {
@@ -229,7 +225,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
         if (!v) onChange?.('');
     };
 
-    // 상세주소 입력은 내부 state만 바꾸고 부모로 전파 안 되던 버그 수정 — 사용자가 직접 수정해도 form에 반영되도록 onDetailChange 호출 추가
+    // 상위 폼에도 상세주소를 전달해 화면과 제출 값이 어긋나지 않게 한다.
     const handleDetailChange = (e) => {
         const v = e.target.value;
         dispatch({ type: 'DETAIL_CHANGE', value: v });
@@ -248,9 +244,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
     const boxStyle = (isFocused) => ({
         display: 'flex', alignItems: 'center',
         background: colors.gray[50],
-        // 공통 입력칸과 같은 포커스 — 평소에는 테두리 없이 배경색으로만 경계를 나타내고,
-        // 포커스 때만 1px 중립 테두리(검색창·채팅 입력과 같은 색). 브랜드 파랑은 결과를 바꾸는
-        // 행동에만 쓴다(디자인 시스템). transparent 1px 로 두어 포커스 전후 1px 밀림이 없게 한다.
+        // 포커스 전후 크기가 변하지 않도록 투명 테두리 자리를 유지한다.
         border: `1px solid ${isFocused ? colors.gray[500] : 'transparent'}`,
         borderRadius: radius.lg,
         boxSizing: 'border-box',

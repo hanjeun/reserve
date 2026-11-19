@@ -6,11 +6,11 @@ import { Typography, Tag } from 'antd';
 import StatusHint from '../common/StatusHint';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { PauseCircleOutlined, StopOutlined, UndoOutlined, StarFilled } from '../common/icons';
-import { Button, FilterToolbar, AdminTableSkeleton, DataState, DataTable } from '../common';
+import { Button, FilterToolbar, AdminTableSkeleton, DataState, PagedDataTable } from '../common';
 import SanctionModal from './SanctionModal';
 import { useMessage, useQueryParamsState } from '../../hooks';
-import useDebounce from '../../hooks/useDebounce';
 import { adminKeys } from '../../hooks/queryKeys';
+import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
 import { invalidateAdminData, invalidateStoreData } from '../../hooks/invalidateAfterWrite';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
@@ -47,7 +47,6 @@ const StoresAdminTab = () => {
     const { message, confirm } = useMessage();
     const queryClient = useQueryClient();
     const [{ search: storeSearch, page: pageStr }, setQuery] = useQueryParamsState(QUERY_DEFAULTS);
-    const debouncedStoreSearch = useDebounce(storeSearch, 300);
     const page = Number(pageStr) || 1;
     const setPage = (p) => setQuery({ page: String(p) });
 
@@ -58,13 +57,14 @@ const StoresAdminTab = () => {
     const {
         data, isLoading: storeLoading, isFetching, isPlaceholderData, error: storesError, refetch,
     } = useQuery({
-        queryKey: [...adminKeys.stores(), page, debouncedStoreSearch],
-        queryFn: async () => {
+        queryKey: [...adminKeys.stores(), page, storeSearch.trim()],
+        queryFn: async ({ signal }) => {
             const result = await api.get(API_ENDPOINTS.ADMIN_MANAGE.STORES, {
+                signal,
                 params: {
                     page: page - 1,
                     size: PAGE_SIZE,
-                    ...(debouncedStoreSearch.trim() ? { search: debouncedStoreSearch.trim() } : {}),
+                    ...(storeSearch.trim() ? { search: storeSearch.trim() } : {}),
                 },
             });
             return {
@@ -78,7 +78,7 @@ const StoresAdminTab = () => {
     const totalElements = data?.totalElements ?? 0;
 
     // 검색은 서버 전체 집합에 적용한다. 검색어가 바뀌면 존재하지 않을 수 있는 페이지를 초기화한다.
-    const handleSearchChange = (e) => setQuery({ search: e.target.value, page: '1' });
+    const handleSearchChange = search => setQuery({ search, page: '1' });
 
     // 제재는 감사 로그·대시보드(관리자 쪽)와 공개 가게 목록·상세를 함께 바꾼다.
     const invalidateStores = () => Promise.all([
@@ -168,25 +168,17 @@ const StoresAdminTab = () => {
 
     // 가게 목록 본문 — 오류 → 로딩(스켈레톤) → 표 순으로 판정한다.
     const renderStoreList = () => {
-        if (storesError) {
+        if (isBlockingListReadError(storesError, stores)) {
             return (
                 <DataState state="error" kind="store" subject="가게 목록" error={storesError}
                     onRetry={refetch} retrying={isFetching} />
             );
         }
-        if (storeLoading || isPlaceholderData || storeSearch.trim() !== debouncedStoreSearch.trim()) {
-            return (
-                <AdminTableSkeleton
-                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
-                    cols={SKELETON_COLS}
-                    headers={SKELETON_HEADERS}
-                    actionBtns={2}
-                    pagination={totalElements ? { current: page, pageSize: PAGE_SIZE, total: totalElements } : null}
-                />
-            );
-        }
         return (
-            <DataTable
+            <PagedDataTable
+                placeholder={(storeLoading || isPlaceholderData) && <AdminTableSkeleton
+                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
+                    cols={SKELETON_COLS} headers={SKELETON_HEADERS} actionBtns={2} />}
                 columns={storeAdminColumns}
                 dataSource={stores}
                 rowKey="id"
@@ -200,11 +192,13 @@ const StoresAdminTab = () => {
         <>
             <FilterToolbar
                 count={totalElements}
-                search={{ value: storeSearch, onChange: handleSearchChange, placeholder: '가게명, 주소로 검색' }}
+                search={{ value: storeSearch, onSubmit: handleSearchChange, placeholder: '가게명, 주소로 검색' }}
                 onReload={refetch}
                 loading={storeLoading || isFetching}
                 initialLoading={storeLoading}
             />
+            {storesError && !isBlockingListReadError(storesError, stores) && <DataState compact state="error" kind="store"
+                subject="가게 목록 갱신" error={storesError} onRetry={refetch} retrying={isFetching} />}
             {renderStoreList()}
 
             {/* key 토글 제거 — SanctionModal의 destroyOnHidden이 입력값 초기화를 담당하므로

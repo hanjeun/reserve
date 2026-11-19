@@ -211,7 +211,7 @@ export default function FeedComposer({ open, post, profile, config, onClose, onS
                         options={[{ value: '', label: '가게 없이 게시' }, ...owned.map(store => ({ value: store.id, label: store.name }))]} aria-label="연결할 내 가게" placeholder="가게 없이 게시" /></Form.Item>
                 </>}
             </Form>
-            <p className="reserve-feed-note">글·사진과 공개 프로필이 전체 공개돼요.</p>
+            <p className="reserve-feed-note">게시한 글과 사진은 누구나 볼 수 있어요.</p>
         </div>
         {preview && <FeedPostCard post={previewPost} preview detail />}
         {progress && <p className="reserve-feed-note" role="status">{progress}</p>}

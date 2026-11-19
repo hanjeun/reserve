@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { App as AntApp } from 'antd';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
-import { LoginMethodPasswordProof, LoginMethodPasswordSetup } from './LoginMethodForms';
+import { LoginMethodPasswordProof, LoginMethodPasswordSetup, LoginMethodSocialProof } from './LoginMethodForms';
 import PasswordTab from './PasswordTab';
 import useAuthStore from '../../store/useAuthStore';
 
@@ -21,6 +21,31 @@ beforeEach(() => {
     vi.resetAllMocks();
     useAuthStore.setState({ user: { id: 7, email: 'member@example.test' }, sessionRevision: 70 });
     fixture.onSend.mockResolvedValue({ challengeId: 'challenge', expiresAt: new Date(Date.now() + 300000).toISOString() });
+});
+
+it('소셜 본인 확인은 목적을 안내하고 폼 제출 없이 선택한 작업만 시작해요', () => {
+    show(<form onSubmit={fixture.onSubmit}><LoginMethodSocialProof title="패스키·인증 앱 등록"
+        description="본인 확인 후 인증 수단 등록 화면으로 이어져요." provider="naver"
+        buttonLabel="패스키·인증 앱 등록 본인 확인" onConfirm={fixture.onSend} onClose={fixture.onCancel} /></form>);
+    const proof = screen.getByRole('button', { name: '패스키·인증 앱 등록 본인 확인' });
+    expect(screen.getByText('패스키·인증 앱 등록')).toBeVisible();
+    expect(screen.getByText('본인 확인 후 인증 수단 등록 화면으로 이어져요.')).toBeVisible();
+    const close = screen.getByRole('button', { name: '닫기' });
+    expect(close.closest('.reserve-login-panel-heading')).toContainElement(screen.getByText('패스키·인증 앱 등록'));
+    fireEvent.click(close);
+    expect(fixture.onCancel).toHaveBeenCalledOnce();
+    fireEvent.click(proof);
+    expect(fixture.onSend).toHaveBeenCalledOnce();
+    expect(fixture.onSubmit).not.toHaveBeenCalled();
+});
+
+it('요청 중에는 소셜 본인 확인을 다시 시작하지 않아요', () => {
+    show(<LoginMethodSocialProof title="이메일 로그인 해제" description="본인 확인 후 해제 여부를 확인해요."
+        provider="naver" buttonLabel="이메일 로그인 해제 본인 확인" disabled onConfirm={fixture.onSend} />);
+    const proof = screen.getByRole('button', { name: '이메일 로그인 해제 본인 확인' });
+    expect(proof).toBeDisabled();
+    fireEvent.click(proof);
+    expect(fixture.onSend).not.toHaveBeenCalled();
 });
 
 it('explains a missing current password, focuses its field and does not submit the proof', async () => {
@@ -105,6 +130,7 @@ it('explains a missing code after a challenge arrives and does not set the passw
     setup();
     fireEvent.click(screen.getByRole('button', { name: '인증 코드 받기' }));
     await screen.findByRole('button', { name: '인증 코드 다시 받기' });
+    expect(screen.getByLabelText('인증 코드')).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: '이메일 로그인 설정' }));
     await waitFor(() => expect(fixture.message.info).toHaveBeenCalledWith('6자리 인증 코드를 입력해주세요.'));
     expect(screen.getByLabelText('인증 코드')).toHaveFocus();

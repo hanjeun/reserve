@@ -1,5 +1,6 @@
 import { versionedApiUrl } from '../api/apiVersion';
 import { REGION_OPTIONS } from '../constants/regions';
+import { normalizePublicId, publicPath } from './publicAddress';
 
 export const FEED_PAGE_SIZE = 12;
 export const FEED_DIRECTORY_VIEWS = [
@@ -27,12 +28,12 @@ export const feedTotal = result => {
     const total = result?.page?.totalElements ?? result?.totalElements ?? 0;
     return Number.isSafeInteger(total) && total >= 0 ? total : 0;
 };
-export const feedDate = value => {
+export const feedDate = (value, { dateOnly = false } = {}) => {
     if (!value) return '';
     // 서버의 LocalDateTime은 운영 저장 관례인 UTC이며 오프셋 없는 값에만 Z를 붙인다.
     const date = new Date(/(?:Z|[+-]\d\d:\d\d)$/.test(value) ? value : `${value}Z`);
     return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat('ko-KR', {
-        timeZone: 'Asia/Seoul', dateStyle: 'medium', timeStyle: 'short',
+        timeZone: 'Asia/Seoul', dateStyle: 'medium', timeStyle: dateOnly ? undefined : 'short',
     }).format(date);
 };
 export const feedRelativeDate = value => {
@@ -52,6 +53,15 @@ export const feedMediaUrl = value => {
     if (!/^\/api\/(?:v1\/)?(?:feed\/media\/\d+|store-news\/media\/\d+|admin\/feed\/(?:reports|comment-reports|comments)\/\d+\/images\/\d+|admin\/promotions\/\d+\/images\/\d+)$/.test(value)) return undefined;
     return `${import.meta.env.VITE_API_BASE_URL || ''}${versionedApiUrl(value)}`;
 };
-export const postPath = id => `/feed/posts/${id}`;
-export const authorPath = id => `/feed/u/${encodeURIComponent(id)}`;
+export const postPath = publicId => publicPath('/feed/posts/', publicId);
+
+export function postCommentsPath(postPublicId, commentPublicId) {
+    const path = postPath(postPublicId);
+    const comment = normalizePublicId(commentPublicId);
+    return path ? path + (comment ? '#comment-' + comment : '#comments') : null;
+}
+export const authorPath = id => typeof id === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+    ? '/feed/u/' + id.toLowerCase() : null;
+export const normalizeProfileSettingsTab = key => key === 'photo' || key === 'public-profile' ? 'profile' : key;
 export const feedStateLabel = state => ({ DRAFT: '임시저장', HIDDEN: '관리자 숨김', DELETED: '삭제됨' }[state]);

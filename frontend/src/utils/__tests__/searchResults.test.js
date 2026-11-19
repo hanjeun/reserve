@@ -1,15 +1,31 @@
 import { describe, expect, it } from 'vitest';
 import { isSearchResultPath, normalizeSearchResponse, parseSearchMessageTarget, positiveSearchId } from '../searchResults';
 
-const store = { id: 12, type: 'STORE', title: '공개 가게', description: '안산', path: '/store/12' };
-const group = (key = 'stores', items = [store]) => ({ key, items, error: null, hasMore: false });
+const publicId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+const store = { id: 12, type: 'STORE', title: '공개 가게', description: '안산', path: '/store/' + publicId };
+const group = (key = 'stores', items = [{ ...store, publicId }]) => ({ key, items, error: null, hasMore: false });
 
 describe('unified search navigation boundary', () => {
-    it.each(['https://example.test/store/12', '//example.test/store/12', '/store/13', '/store/12?redirect=https://example.test', '/admin?tab=members', '/store/012', '/store/12#other'])('rejects unexpected or mismatched store destination %s', path => {
-        expect(isSearchResultPath('stores', { ...store, path })).toBe(false);
+    it('allows only the UUID address belonging to the returned public ID', () => {
+        const item = { ...store, publicId, path: '/store/' + publicId };
+        expect(isSearchResultPath('stores', item)).toBe(true);
+        expect(isSearchResultPath('stores', { ...item, publicId: undefined })).toBe(false);
+        expect(isSearchResultPath('stores', { ...item, path: '/store/ffffffff-bbbb-4ccc-8ddd-eeeeeeeeeeee' })).toBe(false);
+        expect(isSearchResultPath('stores', { ...item, path: item.path + '/edit' })).toBe(false);
+        expect(normalizeSearchResponse({ keyword: '카페', groups: [group('stores', [item])] }, '카페', ['stores'])
+            .groups[0].items[0].path).toBe(item.path);
     });
-    it.each([['benefits', 'BENEFIT', '/benefits/12'], ['feed', 'FEED', '/feed/posts/12'],
-        ['reservations', 'RESERVATION', '/my-reservations?reservationId=12'], ['waiting', 'WAITING', '/my-reservations?tab=waiting&entryId=12']])('accepts only the exact %s destination', (key, type, path) => {
+    it.each(['https://example.test/store/12', '//example.test/store/12', '/store/13', '/store/12?redirect=https://example.test', '/admin?tab=members', '/store/012', '/store/12#other'])('rejects unexpected or mismatched store destination %s', path => {
+        expect(isSearchResultPath('stores', { ...store, publicId, path })).toBe(false);
+    });
+    it.each([['benefits', 'BENEFIT', '/benefits/'], ['feed', 'FEED', '/feed/posts/']])(
+        'requires the returned public UUID in the exact %s destination', (key, type, prefix) => {
+            expect(isSearchResultPath(key, { ...store, type, publicId, path: prefix + publicId })).toBe(true);
+            expect(isSearchResultPath(key, { ...store, type, publicId, path: prefix + '12' })).toBe(false);
+            expect(isSearchResultPath(key, { ...store, type, publicId: undefined, path: prefix + publicId })).toBe(false);
+        },
+    );
+    it.each([['reservations', 'RESERVATION', '/my-reservations?reservationId=12'], ['waiting', 'WAITING', '/my-reservations?tab=waiting&entryId=12']])('accepts only the exact %s destination', (key, type, path) => {
         expect(isSearchResultPath(key, { ...store, type, path })).toBe(true);
         expect(isSearchResultPath(key, { ...store, id: 13, type, path })).toBe(false);
     });
@@ -29,6 +45,21 @@ describe('unified search navigation boundary', () => {
         expect(result.groups[2]).toMatchObject({ items: [], error: { status: 503 } });
         const failed = normalizeSearchResponse({ keyword: '카페', groups: [{ ...group(), items: [], error: { status: 503, message: 'internal secret' } }] }, '카페', ['stores']);
         expect(failed.groups[0].error).toEqual({ status: 503 });
+    });
+    it('accepts only the matching public thumbnail while keeping the result if the optional image is unusable', () => {
+        const root = 'https://cdn.reserve.it.kr/users/7/stores/12';
+        const thumbnailUrl = root + '/thumbnails/main.webp';
+        const normalize = value => normalizeSearchResponse({ keyword: '카페', groups: [
+            group('stores', [{ ...store, publicId, thumbnailUrl: value }]),
+        ] }, '카페', ['stores']).groups[0].items[0];
+        expect(normalize(thumbnailUrl)).toEqual({ ...store, thumbnailUrl });
+        const localThumbnail = thumbnailUrl.replace('/users/', '/local/users/');
+        expect(normalize(localThumbnail)).toEqual({ ...store, thumbnailUrl: localThumbnail });
+        for (const unsafe of [null, thumbnailUrl + '?signed=fixture', root + '/images/detail.webp',
+            thumbnailUrl.replace('/12/', '/13/'), thumbnailUrl.replace('/users/', '/other/users/'),
+            thumbnailUrl.replace('cdn.reserve.it.kr', 'cdn.example.test')]) {
+            expect(normalize(unsafe)).toEqual(store);
+        }
     });
     it('rejects mismatched keywords and response shapes instead of turning them into an empty search', () => {
         try {

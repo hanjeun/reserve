@@ -90,7 +90,8 @@ class AdminPaginationContractTest {
         assertThat(result.getContent().getFirst()).isEqualTo(Map.of(
                 "id", 41L, "name", "조회회원", "email", "query@example.test",
                 "role", "USER", "provider", "LOCAL", "status", "ACTIVE",
-                "suspendedUntil", "", "suspendReason", ""));
+                "suspendedUntil", "", "suspendReason", "",
+                "accountProtected", false, "protectionContactReady", false));
         PageRequest expected = PageRequest.of(expectedPage, expectedSize);
         if (keyword.isEmpty()) {
             verify(members).findByDeletedAtIsNullOrderByIdDesc(expected);

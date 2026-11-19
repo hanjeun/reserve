@@ -1,3 +1,5 @@
+import { STORE_DETAIL_PATH, storeDetailPath } from './storePublicAddress';
+
 const KEY = 'reserve:payment-return';
 const MAX_AGE = 30 * 60 * 1000;
 const MAX_ENTRIES = 5;
@@ -5,7 +7,7 @@ let entries = [];
 let termsReturn = null;
 
 function returnPath(location) {
-    if (/^\/store\/[1-9][0-9]*$/.test(location?.pathname)) return location.pathname;
+    if (STORE_DETAIL_PATH.test(location?.pathname)) return location.pathname.toLowerCase().replace(/\/$/, '');
     if (location?.pathname !== '/my-reservations') return null;
     const params = new URLSearchParams(location.search);
     const saved = new URLSearchParams();
@@ -45,14 +47,14 @@ export function rememberPaymentReturn(merchantUid, memberId, location) {
     save();
 }
 
-export function consumePaymentReturn(merchantUid, memberId, storeId) {
+export function consumePaymentReturn(merchantUid, memberId, storePublicId) {
     const entry = read().find(item => item.merchantUid === merchantUid && item.memberId === memberId);
     entries = entries.filter(item => item.merchantUid !== merchantUid);
     save();
     if (typeof entry?.path !== 'string') return '/my-reservations';
     const [pathname, search = ''] = entry.path.split('?');
     const path = returnPath({ pathname, search });
-    return path && (pathname === '/my-reservations' || pathname === '/store/' + storeId) ? path : '/my-reservations';
+    return path && (pathname === '/my-reservations' || path === storeDetailPath({ publicId: storePublicId })) ? path : '/my-reservations';
 }
 
 export function clearPaymentReturns() {

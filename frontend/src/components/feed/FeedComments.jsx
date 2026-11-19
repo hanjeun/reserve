@@ -1,12 +1,12 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Avatar, Bone, Button, DataState } from '../common';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Bone, Button, DataState } from '../common';
 import IconTool from '../common/IconTool';
 import RetryButton from '../common/RetryButton';
 import { CloseOutlined, CommentOutlined } from '../common/icons';
-import FeedItemMenu from './FeedItemMenu';
+import FeedCommentRow from './FeedCommentRow';
 import ChatComposer from '../chat/ChatComposer';
 import ChatImagePicker from '../chat/ChatImagePicker';
 import CommentAttachments from './CommentAttachments';
@@ -18,12 +18,13 @@ import service from '../../services/feedInteractionService';
 import feedService from '../../services/feedService';
 import useAuthStore from '../../store/useAuthStore';
 import useMessage from '../../hooks/useMessage';
-import { authorPath, feedDate, feedMediaUrl, feedRelativeDate, feedTotal } from '../../utils/feed';
+import { feedMediaUrl, feedTotal } from '../../utils/feed';
 import { prepareFeedPhoto, reorderFeedPhotos } from '../../utils/feedPhoto';
 import useExitAnimation from '../../hooks/useExitAnimation';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import { assertCurrentSession, currentSession, isCurrentSession } from '../../api/sessionScope';
 import { saveRedirect } from '../../utils/redirect';
+import { normalizePublicId } from '../../utils/publicAddress';
 import { forgetFeedCommentForProfile, readFeedCommentForProfile, rememberFeedCommentForProfile } from '../../utils/feedCommentProfileNavigation';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
 import { httpStatusOf, isMissingRequestError } from '../../utils/listErrorMessage';
@@ -64,40 +65,29 @@ function CommentReplies({ parent, focusedReply, onReply, onEdit, onDelete, onRep
 CommentReplies.propTypes = { parent: PropTypes.object.isRequired, focusedReply: PropTypes.object, onReply: PropTypes.func, onEdit: PropTypes.func, onDelete: PropTypes.func, onReport: PropTypes.func };
 
 function CommentItem({ item, focusedReply, onReply, onEdit, onDelete, onReport }) {
-    const removed = item.state !== 'PUBLISHED';
     const actions = item.mine ? [
         { key: 'edit', label: '댓글 수정', icon: 'edit', onClick: () => onEdit(item) },
         { key: 'delete', label: '댓글 삭제', icon: 'delete', danger: true, onClick: () => onDelete(item) },
     ] : [{ key: 'report', label: '댓글 신고', icon: 'report', onClick: () => onReport(item) }];
-    return <div id={`comment-${item.id}`} tabIndex={-1} className="reserve-feed-comment-block"><article className="reserve-feed-comment is-thread-comment" data-list-item-id={`comment:${item.id}`} aria-label={removed ? '삭제된 댓글' : `${item.author?.nickname}의 댓글`}>
-        <div className="reserve-feed-post-avatar">{!removed && <Link to={authorPath(item.author.publicId)} aria-label={`${item.author.nickname}의 공개 프로필`}>
-            <Avatar src={item.author.avatarUrl} size={32} referrerPolicy="no-referrer" /></Link>}</div>
-        <div className="reserve-feed-comment-content">
-        {!removed && <header className="reserve-feed-post-header"><div className="reserve-feed-post-byline">
-            <Link className="reserve-feed-post-name" to={authorPath(item.author.publicId)}><strong>{item.author.nickname}</strong></Link>
-            <time dateTime={item.createdAt} title={feedDate(item.createdAt)}>{feedRelativeDate(item.createdAt)}</time>
-        </div><FeedItemMenu label="댓글 메뉴" actions={actions} /></header>}
-        <p className={removed ? 'reserve-feed-note' : 'reserve-feed-post-text'}>{removed ? '삭제되거나 숨겨진 댓글이에요.' : item.content}</p>
-        {!removed && <FeedMediaStrip label="댓글" images={(item.images || []).map(image => ({ ...image, src: feedMediaUrl(image.url) })).filter(image => image.src)} />}
-        {!removed && <div className="reserve-feed-comment-actions">
+    return <FeedCommentRow item={item} actions={actions}
+        replies={!item.parentId && <CommentReplies parent={item} focusedReply={focusedReply} onReply={onReply} onEdit={onEdit} onDelete={onDelete} onReport={onReport} />}>
+        <FeedMediaStrip label="댓글" images={(item.images || []).map(image => ({ ...image, src: feedMediaUrl(image.url) })).filter(image => image.src)} />
+        <div className="reserve-feed-comment-actions">
             <ContentLikeButton type="COMMENT" targetId={item.id} initialStatus={{ liked: Boolean(item.liked), likeCount: item.likeCount || 0, commentCount: 0 }} />
             {!item.parentId && <IconTool label="답글" icon={<CommentOutlined aria-hidden="true" />} onClick={() => onReply(item)} />}
-        </div>}
         </div>
-        </article>
-        {!item.parentId && <CommentReplies parent={item} focusedReply={focusedReply} onReply={onReply} onEdit={onEdit} onDelete={onDelete} onReport={onReport} />}
-    </div>;
+    </FeedCommentRow>;
 }
 CommentItem.propTypes = { item: PropTypes.object.isRequired, focusedReply: PropTypes.object, onReply: PropTypes.func, onEdit: PropTypes.func, onDelete: PropTypes.func, onReport: PropTypes.func };
 
-export default function FeedComments({ postId }) {
+export default function FeedComments({ postId, postPublicId }) {
     const memberId = useAuthStore(state => state.user?.id);
     const role = useAuthStore(state => state.user?.role);
     const revision = useAuthStore(state => state.sessionRevision);
-    return <FeedCommentsSession key={`${postId}:${memberId}:${role}:${revision}`} postId={postId} />;
+    return <FeedCommentsSession key={`${postId}:${memberId}:${role}:${revision}`} postId={postId} postPublicId={postPublicId} />;
 }
 
-function FeedCommentsSession({ postId }) {
+function FeedCommentsSession({ postId, postPublicId }) {
     const user = useAuthStore(state => state.user);
     const sessionRevision = useAuthStore(state => state.sessionRevision);
     const [returningDraft] = useState(() => readFeedCommentForProfile(postId));
@@ -145,11 +135,12 @@ function FeedCommentsSession({ postId }) {
         });
         return () => cancelAnimationFrame(frame);
     }, [returningDraft]);
-    const focusedId = /^#comment-[1-9]\d*$/.test(location.hash) ? Number(location.hash.slice(9)) : null;
+    const focusedId = location.hash.startsWith('#comment-') ? normalizePublicId(location.hash.slice(9)) : null;
     const focused = useQuery({ queryKey: interactionKeys.comment(focusedId), queryFn: ({ signal }) => service.comment(focusedId, signal),
-        enabled: enabled && Number.isSafeInteger(focusedId) && focusedId > 0, retry: false });
+        enabled: enabled && Boolean(focusedId), retry: false });
     const focusedUnavailable = [401, 403].includes(httpStatusOf(focused.error)) || isMissingRequestError(focused.error);
-    const focusedComment = !focusedUnavailable && focused.data?.postId === postId ? focused.data : null;
+    const focusedComment = !focusedUnavailable && focused.data?.postId === postId
+        && normalizePublicId(focused.data?.publicId) === focusedId ? focused.data : null;
     const focusedParent = useQuery({ queryKey: interactionKeys.comment(focusedComment?.parentId),
         queryFn: ({ signal }) => service.comment(focusedComment.parentId, signal), enabled: enabled && Boolean(focusedComment?.parentId), retry: false });
     const focusedParentUnavailable = [401, 403].includes(httpStatusOf(focusedParent.error)) || isMissingRequestError(focusedParent.error);
@@ -160,7 +151,7 @@ function FeedCommentsSession({ postId }) {
         if (scrolledAnchor.current === key) return;
         let frame;
         const scroll = attempts => {
-            const node = document.getElementById(`comment-${focusedComment.id}`);
+            const node = document.getElementById('comment-' + focusedId);
             if (!node) { if (attempts > 0) frame = requestAnimationFrame(() => scroll(attempts - 1)); return; }
             scrolledAnchor.current = key;
             node?.focus({ preventScroll: true }); node?.scrollIntoView({ block: 'center', behavior: 'auto' });
@@ -262,10 +253,10 @@ function FeedCommentsSession({ postId }) {
         event?.preventDefault();
         if (lock.current || save.isPending || preparing || unavailable || profileUnavailable || user && profile.isPending && !profile.data) return;
         if (!user) { login(); return; }
-        if (profile.isError && profile.data === undefined) { setError('공개 프로필을 다시 불러와주세요.'); return; }
+        if (profile.isError && profile.data === undefined) { setError('프로필을 다시 불러와주세요.'); return; }
         if (!profile.data) {
-            rememberFeedCommentForProfile({ postId, content, images, target, nonce: nonce.current });
-            navigate('/my-page?tab=public-profile'); return;
+            rememberFeedCommentForProfile({ postId, postPublicId, content, images, target, nonce: nonce.current });
+            navigate('/my-page?tab=profile'); return;
         }
         const text = content.trim();
         if ((!text && !images.length) || text.length > 1000) { setError('댓글 내용이나 사진을 추가해주세요. 글은 1,000자까지 쓸 수 있어요.'); return; }
@@ -286,7 +277,7 @@ function FeedCommentsSession({ postId }) {
     }
     if (!enabled) return null;
     return <section ref={listRef} id="comments" className="reserve-feed-comments" aria-labelledby="feed-comments-title" data-discovery-swipe-ignore="true" aria-busy={comments.isFetching}>
-        <h2 id="feed-comments-title">댓글</h2>
+        <h2 id="feed-comments-title" className="reserve-feed-comment-title">댓글</h2>
         {focusedId && (focused.isError && (!focused.data || focusedUnavailable) || focusedParentUnavailable) && <p className="reserve-feed-note">해당 댓글이 삭제되었거나 현재 볼 수 없어요.</p>}
         {!unavailable && focusedRoot?.postId === postId && <CommentItem key={`focused-${focusedRoot.id}`} item={focusedRoot} focusedReply={focusedComment?.parentId ? focusedComment : undefined} {...actions} />}
         {!unavailable && backgroundFailure && <DataState compact state="error" title="댓글을 갱신하지 못했어요." error={backgroundFailure.error} onRetry={retryReads} retrying={retrying} />}
@@ -313,9 +304,9 @@ function FeedCommentsSession({ postId }) {
                     onRemove={uid => { setPhotoError(''); setImages(current => current.filter(image => { if (image.uid !== uid) return true;
                         if (objectUrls.current.has(image.url)) { URL.revokeObjectURL(image.url); objectUrls.current.delete(image.url); } return false; })); }} />} />
             {error && <p className="reserve-field-error" role="alert">{error}</p>}
-            {profile.isError && <RetryButton variant="ghost-sm" onRetry={profile.refetch} loading={profile.isFetching}>공개 프로필 다시 불러오기</RetryButton>}
+            {profile.isError && <RetryButton variant="ghost-sm" onRetry={profile.refetch} loading={profile.isFetching}>프로필 다시 불러오기</RetryButton>}
         </form>
         <Suspense fallback={null}>{reportMounted && <FeedReportModal commentId={reportId} onClose={() => setReportId(null)} />}</Suspense>
     </section>;
 }
-FeedComments.propTypes = { postId: PropTypes.number.isRequired };
+FeedComments.propTypes = { postId: PropTypes.number.isRequired, postPublicId: PropTypes.string };

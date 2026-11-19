@@ -22,9 +22,8 @@ export const RESERVATION_STATUS_LABELS = {
     COMPLETED: '이용 완료',
     REJECTED:  '거절됨',
     NO_SHOW:   '노쇼',
-    // 승인됐는데 예약 시각이 지나도록 완료·노쇼 처리가 안 된 건.
-    // 사장님이 "아직 처리 안 한 건"으로 알아볼 수 있어야 하므로 '확정'과 다른 말을 쓴다.
-    UNCONFIRMED: '미확인',
+    // 시간 경과만으로 방문 여부를 확정하지 않아요.
+    UNCONFIRMED: '확인 필요',
 };
 
 /*

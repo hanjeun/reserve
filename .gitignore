@@ -51,6 +51,7 @@ playwright-report/
 blob-report/
 .ci-evidence/
 /frontend/coverage/
+/frontend/.vitest/
 
 # 환경변수 (보안)
 
@@ -116,5 +117,8 @@ docs/images/*.new.png
 /docs/technical/history/
 /docs/design-system/snapshots/
 /Claude outputs/
+
+# 소개 영상 합성의 로컬 시험 출력
+/marketing/media/hero/
 
 /coverage/

@@ -29,7 +29,7 @@ public final class StoreNewsDto {
                        boolean feedEnabled, String state, long revision, Long feedPostId,
                        List<FeedDto.Image> images, OffsetDateTime createdAt, OffsetDateTime updatedAt,
                        String benefitState, OffsetDateTime benefitRequestedAt, OffsetDateTime benefitReviewedAt,
-                       String benefitReviewNote, String design) {}
+                       String benefitReviewNote, String design, String publicId, String storePublicId) {}
     public record Configuration(boolean enabled, boolean imageEnabled, int maxImages, long maxImageBytes,
                                 int deleteGraceDays, boolean benefitApprovalEnabled, boolean benefitDesignEnabled, boolean benefitEventsEnabled) {
         public Configuration(boolean enabled, boolean imageEnabled, int maxImages, long maxImageBytes,

@@ -13,7 +13,6 @@ import StoreListRowSkeleton from '../store/StoreListRowSkeleton';
 import DiscoveryRouteSkeleton from './DiscoveryRouteSkeleton';
 import { STORE_LIST_PAGE_SIZE } from '../../constants/storeListPageSize';
 import MyPageSkeleton from './MyPageSkeleton';
-import DraftTransferSkeleton from '../store/DraftTransferSkeleton';
 import { SERVICE_DOMAIN_OPTIONS, SERVICE_DOMAIN_FILTER_OPTIONS, OWNER_STORE_SORT_OPTIONS, SORT_OPTIONS,
     RESERVATION_STATUS_FILTER_OPTIONS, RESERVATION_SORT_OPTIONS } from '../../constants';
 import PropTypes from 'prop-types';
@@ -39,6 +38,9 @@ import { readQuerySelection } from '../../utils/querySelection';
 import { breakpoints, colors, field } from '../../styles/tokens';
 import { StateIllustrationSkeleton } from '../common/StateIllustration';
 import { GUIDE_PAGES, guidePageForPath, guideStyles } from '../../pages/legal/GuidePageMetadata';
+import { hasOwnerAccess } from '../../constants/roles';
+import { DraftListSkeleton } from '../../pages/drafts/DraftList';
+import { DRAFTS_TITLE, draftPath, draftWorkspace } from '../../pages/drafts/draftWorkspace';
 
 // 라우트별 골격은 실제 페이지의 틀·여백·순서를 공유한다.
 // 고정 문구도 실제 줄바꿈·크기를 유지하는 SkeletonText로 가린다.
@@ -262,10 +264,11 @@ export function PaymentResultRouteSkeleton() {
 /* 관리자·사업자 작업 공간 골격 */
 
 export function AdminRouteSkeleton({ search = '' }) {
-    const tab = resolveAdminTab(new URLSearchParams(search).get('tab'));
+    const params = new URLSearchParams(search);
+    const tab = resolveAdminTab(params.get('tab'));
     return <WorkspaceLayout loading title="관리자 패널"
         groups={ADMIN_WORKSPACE_GROUPS} activeKey={tab} hrefFor={key => '?tab=' + key}>
-        <AdminTabRouteSkeleton tab={tab} search={search} />
+        {tab === 'news' ? <StoreNewsSkeleton view={params.get('view') === 'cards' ? 'cards' : 'list'} /> : <AdminTabRouteSkeleton tab={tab} search={search} />}
     </WorkspaceLayout>;
 }
 AdminRouteSkeleton.propTypes = { search: PropTypes.string };
@@ -279,7 +282,7 @@ export function BusinessRouteSkeleton({ search = '' }) {
     return <WorkspaceLayout loading title="사업자 파트너 패널"
         groups={BUSINESS_WORKSPACE_GROUPS} activeKey={tab} hrefFor={key => '?tab=' + key}>
         {contentTab === 'waiting' && <WaitingTabSkeleton view={isCards ? 'cards' : 'list'} />}
-        {contentTab === 'news' && <StoreNewsSkeleton />}
+        {contentTab === 'news' && <StoreNewsSkeleton view={params.get('view') === 'cards' ? 'cards' : 'list'} />}
         {contentTab === 'ads' && <AdsRouteSkeleton />}
         {contentTab === 'analytics' && <StatisticsRouteSkeleton search={search} />}
         {contentTab === 'chat-intro' && <ChatIntroRouteSkeleton business />}
@@ -357,6 +360,15 @@ StoreFormRouteSkeleton.propTypes = { pathname: PropTypes.string };
 // StoreDetail.jsx 의 BREAKPOINT 와 같은 값 — PC 두 칸 배치가 시작되는 폭.
 
 // 모듈·데이터 로딩에서 같은 컴포넌트·개수·보기 배치를 사용한다.
+function DraftsRouteSkeleton({ search = '' }) {
+    const canManageStores = useAuthStore(state => hasOwnerAccess(state.user?.role));
+    const { groups, activeKey } = draftWorkspace(new URLSearchParams(search).get('tab'), canManageStores);
+    return <WorkspaceLayout loading title={DRAFTS_TITLE} groups={groups} activeKey={activeKey} hrefFor={draftPath}>
+        <DraftListSkeleton />
+    </WorkspaceLayout>;
+}
+DraftsRouteSkeleton.propTypes = { search: PropTypes.string };
+
 function CardsSkeleton({ pathname = '', search = '' }) {
     const isList = resolveViewMode(pathname, new URLSearchParams(search), 'cards') === 'list';
     if (pathname.startsWith('/my-favorites')) {
@@ -464,12 +476,12 @@ function SearchSkeleton() {
 const KINDS = {
     search: SearchSkeleton,
     'my-page': MyPageSkeleton,
-    'draft-transfer': DraftTransferSkeleton,
     discovery: DiscoveryRouteSkeleton,
     'store-form': StoreFormRouteSkeleton,
     // 가게 상세 페이지가 데이터 로딩 때 쓰는 것과 같은 틀·스켈레톤
     detail: StoreDetailLoading,
     cards: CardsSkeleton,
+    drafts: DraftsRouteSkeleton,
     'store-list': StoreListRouteSkeleton,
     waiting: WaitingRouteSkeleton,
     reservations: ReservationsSkeleton,

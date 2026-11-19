@@ -42,7 +42,8 @@ class EntityUpdateStreamTest {
                 .filter(java.util.Map.class::isInstance).map(java.util.Map.class::cast).findFirst().orElseThrow();
         assertThat(ready.get("epoch")).isInstanceOf(String.class);
         assertThat(ready.get("revision")).isEqualTo(0L);
-        assertThat((EntityUpdates.Domain[]) ready.get("domains")).contains(FEED, NEWS, WAITING, RESERVATION);
+        assertThat(ready.get("revisionTracksGaps")).isEqualTo(true);
+        assertThat((EntityUpdates.Domain[]) ready.get("domains")).contains(FEED, NEWS, WAITING, RESERVATION).doesNotContain(SESSION);
         assertThatCode(() -> java.time.Instant.parse((String) ready.get("serverTime"))).doesNotThrowAnyException();
     }
 
@@ -54,11 +55,14 @@ class EntityUpdateStreamTest {
         stream.subscribe(member(2, Role.USER));
         stream.subscribe(member(3, Role.ADMIN));
         emitted.forEach(org.mockito.Mockito::clearInvocations);
+        clearInvocations(access);
 
         stream.changed(change(NOTIFICATION, false, Set.of(1L), false));
 
         verify(emitted.get(1)).send(any(SseEmitter.SseEventBuilder.class));
         for (int index : new int[]{0, 2, 3}) verify(emitted.get(index), never()).send(any(SseEmitter.SseEventBuilder.class));
+        verify(access).current(argThat(identity -> identity.memberId().equals(1L)));
+        verifyNoMoreInteractions(access);
     }
 
     @Test
@@ -230,6 +234,20 @@ class EntityUpdateStreamTest {
         verify(emitter, never()).send(any(SseEmitter.SseEventBuilder.class));
     }
 
+    @Test
+    void aRelayGapChangesTheRevisionEvenWhenNoEventWasDelivered() throws Exception {
+        stream.subscribePublic("127.0.0.1");
+        stream.relayReconnected(new RedisEntityUpdateRelay.Reconnected());
+        stream.subscribePublic("127.0.0.1");
+
+        verify(emitted.getFirst()).complete();
+        var sent = ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
+        verify(emitted.get(1)).send(sent.capture());
+        var ready = sent.getValue().build().stream().map(item -> item.getData())
+                .filter(java.util.Map.class::isInstance).map(java.util.Map.class::cast).findFirst().orElseThrow();
+        assertThat(ready.get("revision")).isEqualTo(1L);
+    }
+
     private EntityUpdates.Change change(EntityUpdates.Domain domain, boolean visible, Set<Long> recipients, boolean admin) {
         return new EntityUpdates.Change(domain, 17L, 11L, 7L, UPDATED, null, visible, recipients, admin);
     }
@@ -260,6 +278,36 @@ class EntityUpdateStreamTest {
         verify(one).complete();
         verify(two).send(any(SseEmitter.SseEventBuilder.class));
         verify(two, never()).complete();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void sessionSignalsRecheckOnlyTheAddressedMemberAndDoNotEmitUpdates(boolean remote) throws Exception {
+        Member member = member(1, Role.USER);
+        var fixture = new kr.it.reserve.config.JwtSessionFixture(member);
+        var first = fixture.issue(null);
+        var second = fixture.issue(null);
+        var guarded = new UpdateStreamAccess(fixture.members, fixture.tokens);
+        SseEmitter one = mock(SseEmitter.class), two = mock(SseEmitter.class), publicStream = mock(SseEmitter.class);
+        var emitters = List.of(one, two, publicStream).iterator();
+        var live = new EntityUpdateStream(guarded, emitters::next);
+        live.subscribe(member, null, "PASSWORD", fixture.tokens.getSessionId(first.accessToken()));
+        live.subscribe(member, null, "PASSWORD", fixture.tokens.getSessionId(second.accessToken()));
+        live.subscribePublic("127.0.0.1");
+        clearInvocations(one, two, publicStream);
+        fixture.service.revoke(first.refreshToken());
+        verify(fixture.updates).recheckSessions(1L);
+        var change = new EntityUpdates.Change(SESSION, 0L, null, null, INVALIDATED, null, false,
+                remote ? Set.of() : Set.of(1L), false);
+        if (remote) live.remoteChanged(new RedisEntityUpdateRelay.RemoteChanged(change, id -> id.equals(1L)));
+        else live.changed(change);
+
+        var ended = ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
+        verify(one).send(ended.capture());
+        assertThat(ended.getValue().build().stream().map(SseEmitter.DataWithMediaType::getData).toList().toString())
+                .contains("session-ended").doesNotContain("Signal");
+        verify(one).complete();
+        verifyNoInteractions(two, publicStream);
     }
 
     private static TokenProvider activeDeviceTokens() {

@@ -2,6 +2,7 @@ package kr.it.reserve.payment.service;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
+import kr.it.reserve.global.persistence.CurrentLockedState;
 import kr.it.reserve.config.updates.EntityUpdates;
 
 import kr.it.reserve.global.common.ServiceTime;
@@ -97,15 +98,13 @@ public class PaymentService {
     }
 
     private Payment refreshLockedPayment(Payment payment) {
-        entityManager.flush();
-        entityManager.refresh(payment, LockModeType.PESSIMISTIC_WRITE);
+        CurrentLockedState.refresh(entityManager, payment);
         return payment;
     }
 
     private List<Payment> lockPaymentRows(Long reservationId) {
         List<Payment> payments = paymentRepository.findAllByReservationIdForUpdate(reservationId);
-        entityManager.flush();
-        for (Payment payment : payments) entityManager.refresh(payment, LockModeType.PESSIMISTIC_WRITE);
+        for (Payment payment : payments) CurrentLockedState.refresh(entityManager, payment);
         return payments;
     }
 
@@ -170,7 +169,8 @@ public class PaymentService {
                     && row.getStatus() != Payment.PaymentStatus.FAILED && row.getStatus() != Payment.PaymentStatus.CANCELLED);
             if (!anotherPayment) status = PaymentCheckoutReturnResponse.Outcome.INCOMPLETE;
         }
-        return new PaymentCheckoutReturnResponse(merchantUid, status, storeId);
+        String storePublicId = reservation.getStore() == null ? null : reservation.getStore().getPublicId();
+        return new PaymentCheckoutReturnResponse(merchantUid, status, storeId, storePublicId);
     }
 
     /**
@@ -516,12 +516,16 @@ public class PaymentService {
         // 결제 완료 후 자동 승인 처리
         // autoApprovalEnabled=true인 가게는 결제가 완료된 시점에 CONFIRMED로 전환
         Store store = reservation.getStore();
-        if (Boolean.TRUE.equals(store.getAutoApprovalEnabled())
-                && reservation.getStatus() == Reservation.ReservationStatus.PENDING) {
+        boolean approved = Boolean.TRUE.equals(store.getAutoApprovalEnabled())
+                && reservation.getStatus() == Reservation.ReservationStatus.PENDING;
+        if (approved) {
             reservation.setStatus(Reservation.ReservationStatus.CONFIRMED);
             log.info("Auto-approve processed: reservationId={}", reservation.getId());
         }
-        if (reservationUpdates != null) reservationUpdates.changed(reservation, EntityUpdates.Operation.UPDATED);
+        if (reservationUpdates != null) {
+            if (approved) reservationUpdates.approved(reservation);
+            else reservationUpdates.updated(reservation);
+        }
     }
 
     /** 결제를 더 받을 수 없는 예약인지 — 대기·확정 상태만 결제를 받는다. */
@@ -750,10 +754,7 @@ public class PaymentService {
         return refundAmount;
     }
 
-    /**
-     * 환불이 <b>확정</b>됐을 때만 실행되는 뒷정리. 웹훅·스케줄러도 같은 결말에 도달하면 여기를 부른다 —
-     * 확정 처리를 세 곳에 복붙하면 반드시 어긋난다(설계 원칙: 관문 하나).
-     */
+    /** 확정된 환불만 반영하며 웹훅·재조회·스케줄러도 같은 확정 관문을 사용한다. */
     void applyRefundSucceeded(Payment payment, Integer refundAmount, String reason) {
         applyRefundSucceeded(payment, refundAmount, reason, true);
     }
@@ -1009,7 +1010,7 @@ public class PaymentService {
     public Long prepareFullRefundAfterAttendance(Long reservationId) {
         Reservation reservation = lockFinancialReservation(reservationId);
         if (!Boolean.TRUE.equals(reservation.getAttendanceRefundEnabled())) return null;
-        if (reservation.getStatus() != Reservation.ReservationStatus.COMPLETED || reservation.getCheckedInAt() == null)
+        if (reservation.getStatus() != Reservation.ReservationStatus.COMPLETED || !reservation.hasAttendanceConfirmation())
             throw new PaymentException("방문과 이용 완료를 먼저 확인해주세요.", HttpStatus.CONFLICT);
         List<Payment> rows = lockPaymentRows(reservationId);
         if (rows.stream().anyMatch(value -> value.getStatus() == Payment.PaymentStatus.REFUND_PENDING)) return null;
@@ -1029,7 +1030,7 @@ public class PaymentService {
 
     private boolean refundableDecision(Reservation reservation) {
         return REFUND_RETRYABLE_RESERVATION_STATUSES.contains(reservation.getStatus())
-                || Boolean.TRUE.equals(reservation.getAttendanceRefundEnabled()) && reservation.getCheckedInAt() != null
+                || Boolean.TRUE.equals(reservation.getAttendanceRefundEnabled()) && reservation.hasAttendanceConfirmation()
                 && reservation.getStatus() == Reservation.ReservationStatus.COMPLETED;
     }
 
@@ -1061,7 +1062,7 @@ public class PaymentService {
         boolean refundDue = reservation.getStatus() == Reservation.ReservationStatus.CANCELLED && reservation.getCancelReason() != null
                 || reservation.getStatus() == Reservation.ReservationStatus.REJECTED
                 || reservation.getStatus() == Reservation.ReservationStatus.COMPLETED
-                && Boolean.TRUE.equals(reservation.getAttendanceRefundEnabled()) && reservation.getCheckedInAt() != null;
+                && Boolean.TRUE.equals(reservation.getAttendanceRefundEnabled()) && reservation.hasAttendanceConfirmation();
         for (Payment payment : lockPaymentRows(reservation.getId())) {
             if (payment.getAmount() == null || payment.getAmount() < 0 || payment.refundedSoFar() < 0
                     || payment.refundedSoFar() > payment.getAmount()) return false;
@@ -1122,9 +1123,7 @@ public class PaymentService {
                 .orElseThrow(() -> new PaymentException("예약 정보를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
 
         Store store = reservation.getStore();
-        // KST 기준 오늘이어야 한다 — 환불 구간을 가르는 숫자다.
-        //   컨테이너가 UTC 라 인자 없는 LocalDate.now() 는 한국 시간 00:00~09:00 사이에 "어제"를 준다.
-        //   그러면 daysUntil 이 1 커져서 **정책보다 한 구간 후한 환불**이 나갔다(부분 환불 → 전액 등).
+        // 환불 구간이 서버 시간대에 따라 달라지지 않도록 한국 날짜를 기준으로 계산한다.
         long daysUntil = ChronoUnit.DAYS.between(ServiceTime.today(), reservation.getReservationDate());
 
         // 미리보기와 실행은 같은 결제 기록을 기준으로 계산한다. 환불할 결제 기록이 없으면 예상 환불액은 0이다.

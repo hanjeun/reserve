@@ -5,12 +5,14 @@ import jakarta.validation.Valid;
 import kr.it.reserve.chat.dto.ChatMessageResponse;
 import kr.it.reserve.chat.dto.SendChatImageRequest;
 import kr.it.reserve.chat.service.ChatImageService;
-import kr.it.reserve.chat.service.ChatImageFilename;
+import kr.it.reserve.chat.service.ChatAttachmentFilename;
 import kr.it.reserve.config.util.SecurityUtil;
 import kr.it.reserve.file.util.ImageFileValidator;
+import kr.it.reserve.file.util.ChatDocumentValidator;
 import kr.it.reserve.global.common.ApiResponse;
 import kr.it.reserve.global.ratelimit.IpExtractor;
 import kr.it.reserve.global.ratelimit.RateLimiter;
+import kr.it.reserve.member.entity.Member;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ContentDisposition;
@@ -23,6 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 import java.nio.charset.StandardCharsets;
+import java.util.function.Function;
 
 @RestController
 @RequestMapping("/api/chat")
@@ -34,23 +37,36 @@ public class ChatImageController {
 
     @GetMapping("/images/config")
     public ApiResponse<Map<String, Object>> config() {
-        return ApiResponse.success(Map.of("enabled", images.isEnabled(), "maxBytes", ImageFileValidator.MAX_FILE_BYTES),
-                "사진 첨부 설정 조회 성공");
+        boolean enabled = images.isEnabled();
+        return ApiResponse.success(Map.of("enabled", enabled, "maxBytes", ImageFileValidator.MAX_FILE_BYTES,
+                "documentsEnabled", enabled, "maxDocumentBytes", ChatDocumentValidator.MAX_BYTES), "첨부 설정 조회 성공");
     }
 
     @PostMapping(value = "/rooms/{roomId}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<ChatMessageResponse>> send(@PathVariable Long roomId,
             @RequestPart("image") MultipartFile image, @Valid @ModelAttribute SendChatImageRequest request,
             HttpServletRequest httpRequest) {
-        var member = SecurityUtil.getCurrentMember("로그인이 필요해요.");
-        if (!limiter.tryConsume(IpExtractor.extract(httpRequest), RateLimiter.Policy.CHAT_SEND)
-                || !limiter.tryConsume("chat-image-member:" + member.getId(), RateLimiter.Policy.CHAT_SEND)) {
-            return ResponseEntity.status(429).body(ApiResponse.error("조금 천천히 보내주세요."));
-        }
-        return ResponseEntity.ok(ApiResponse.success(images.send(member, roomId, image, request), "전송 완료"));
+        return sendGuarded(httpRequest, member -> images.send(member, roomId, image, request));
     }
 
-    @RequestMapping(value = "/images/{messageId:[0-9]+}", method = RequestMethod.HEAD)
+    @PostMapping(value = "/rooms/{roomId}/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<ChatMessageResponse>> sendDocument(@PathVariable Long roomId,
+            @RequestPart("file") MultipartFile file, @Valid @ModelAttribute SendChatImageRequest request,
+            HttpServletRequest httpRequest) {
+        return sendGuarded(httpRequest, member -> images.sendDocument(member, roomId, file, request));
+    }
+
+    private ResponseEntity<ApiResponse<ChatMessageResponse>> sendGuarded(HttpServletRequest httpRequest,
+            Function<Member, ChatMessageResponse> send) {
+        Member member = SecurityUtil.getCurrentMember("로그인이 필요해요.");
+        if (!limiter.tryConsume(member.getId().toString(), RateLimiter.Policy.CHAT_MEMBER_SEND)
+                || !limiter.tryConsume(IpExtractor.extract(httpRequest), RateLimiter.Policy.CHAT_SEND)) {
+            return ResponseEntity.status(429).body(ApiResponse.error("조금 천천히 보내주세요."));
+        }
+        return ResponseEntity.ok(ApiResponse.success(send.apply(member), "전송 완료"));
+    }
+
+    @RequestMapping(value = {"/images/{messageId:[0-9]+}", "/images/{messageId:[0-9]+}/thumbnail"}, method = RequestMethod.HEAD)
     public ResponseEntity<Void> checkRead(@PathVariable Long messageId) {
         images.assertReadable(SecurityUtil.getCurrentMember("로그인이 필요해요."), messageId);
         return ResponseEntity.noContent().cacheControl(CacheControl.noStore())
@@ -63,11 +79,30 @@ public class ChatImageController {
         return imageResponse(image);
     }
 
+    @GetMapping("/images/{messageId:[0-9]+}/thumbnail")
+    public ResponseEntity<byte[]> thumbnail(@PathVariable Long messageId) {
+        return imageResponse(images.thumbnail(SecurityUtil.getCurrentMember("로그인이 필요해요."), messageId));
+    }
+
+    @GetMapping("/files/{messageId:[0-9]+}")
+    public ResponseEntity<byte[]> readDocument(@PathVariable Long messageId) {
+        return documentResponse(images.readDocument(SecurityUtil.getCurrentMember("로그인이 필요해요."), messageId));
+    }
+
     static ResponseEntity<byte[]> imageResponse(ChatImageService.ImageContent image) {
+        return attachmentResponse(image, ContentDisposition.inline(), MediaType.parseMediaType(image.contentType()));
+    }
+
+    static ResponseEntity<byte[]> documentResponse(ChatImageService.ImageContent file) {
+        return attachmentResponse(file, ContentDisposition.attachment(), MediaType.APPLICATION_OCTET_STREAM);
+    }
+
+    private static ResponseEntity<byte[]> attachmentResponse(ChatImageService.ImageContent attachment,
+            ContentDisposition.Builder disposition, MediaType type) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .header(HttpHeaders.PRAGMA, "no-cache").header("X-Content-Type-Options", "nosniff")
-                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
-                        .filename(ChatImageFilename.forDownload(image.originalFilename(), image.contentType()), StandardCharsets.UTF_8).build().toString())
-                .contentType(MediaType.parseMediaType(image.contentType())).body(image.bytes());
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.filename(
+                        ChatAttachmentFilename.forDownload(attachment.originalFilename(), attachment.contentType()), StandardCharsets.UTF_8).build().toString())
+                .contentType(type).body(attachment.bytes());
     }
 }

@@ -34,8 +34,7 @@ export default function BusinessGuide() {
         </>,
         draft: <>
             <GuideParagraph>가게 등록·수정 초안과 새 사진은 작성한 브라우저에 저장해요. 피드와 가게 소식의 서버 임시저장과 저장 위치가 달라요. 마이페이지에서 자동 임시저장 설정을 바꿀 수 있고, 꺼도 수동 임시저장과 기존 초안은 유지돼요.</GuideParagraph>
-            <GuideParagraph>앱 주소나 브라우저를 옮길 때는 기존 브라우저의 가게 임시저장 옮기기에서 초안을 선택해 파일로 내보내주세요. 옮길 브라우저에서 같은 계정으로 로그인하고 파일을 가져와요. 기존 초안을 덮어쓸지는 직접 선택하며 원래 보관 기한 30일은 연장되지 않아요.</GuideParagraph>
-            <GuideLinks links={[{ to: '/drafts/transfer', label: '가게 임시저장 옮기기' }]} />
+            <GuideLinks links={[{ to: '/drafts?tab=stores', label: '가게 임시보관함 열기' }]} />
         </>,
         reservation: <>
             <GuideParagraph>파트너 패널의 예약 관리에서 가게와 예약 상태를 고르거나 예약자를 검색해요. 각 예약의 상태에 따라 표시되는 승인·거절·취소·완료 등의 처리 버튼을 이용하고, 결제와 환불 상태도 함께 확인해주세요.</GuideParagraph>

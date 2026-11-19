@@ -30,7 +30,9 @@ test('the full candidate retains legacy callbacks and rejects an already bootstr
     assert.match(candidate, /ssl_certificate \/etc\/letsencrypt\/live\/reserve\.it\.kr\/fullchain\.pem;/);
     assert.equal(candidate.match(/location \/oauth2\/authorization\//g)?.length, 2);
     assert.equal(candidate.match(/location \/login\/oauth2\//g)?.length, 2);
-    assert.match(candidate, /drafts\/transfer\|login\|signup\/social\|oauth2\/callback/);
+    assert.match(candidate, /location ~ \^\/\(signup\/social\|oauth2\/callback\)\/\?\$ \{ try_files/);
+    assert.match(candidate, /location ~ \^\/login\/\?\$ \{[^}]+\}[\s\S]*?return 302 https:\/\/app\.reserve\.it\.kr\/login;/);
+    assert.match(candidate, /location ~ \^\/drafts\/transfer\/\?\$ \{[^}]+\}[\s\S]*?return 302 https:\/\/app\.reserve\.it\.kr\/my-stores;/);
     assert.match(candidate, /root \/usr\/share\/nginx\/html\/legacy-domain\.current;/);
     const bootstrap = domainSplitHttpNginx(installed);
     assert.throws(() => domainSplitHttpNginx(bootstrap), /already configured/);
@@ -54,6 +56,23 @@ test('CLI uses a reviewed source without replacing it, including on invalid argu
         for (const path of [source, output]) await unlink(path).catch(error => { if (error.code !== 'ENOENT') throw error; });
         await rmdir(directory);
     }
+});
+
+test('only the marketing service preview accepts same-origin framing', () => {
+    const candidate = domainSplitNginx(installed);
+    const marketing = candidate.split(/(?=^server\s*\{)/m).find(part =>
+        /listen 443 ssl/.test(part) && part.includes('root /usr/share/nginx/html/marketing/current;'));
+    const preview = marketing.match(/location \^~ \/service-preview\/ \{([^{}]+)\}/)?.[1];
+    assert.ok(preview);
+    assert.equal(candidate.match(/X-Frame-Options "SAMEORIGIN"/g)?.length, 1);
+    assert.match(preview, /X-Frame-Options "SAMEORIGIN" always;/);
+    assert.match(preview, /Content-Security-Policy "default-src 'none';[^"\n]*connect-src 'none';[^"\n]*form-action 'none'; frame-ancestors 'self'" always;/);
+    assert.match(preview, /Strict-Transport-Security "max-age=31536000; includeSubDomains" always;/);
+    assert.match(preview, /X-Content-Type-Options "nosniff" always;/);
+    assert.match(preview, /try_files \$uri \$uri\/ =404;/);
+    assert.doesNotMatch(preview, /proxy_pass|X-Frame-Options "DENY"/);
+    assert.match(marketing, /X-Frame-Options "DENY" always;/);
+    assert.match(marketing, /frame-ancestors 'none'/);
 });
 
 test('CSP aliases share the exact collector before generic API routing on both hosts', () => {

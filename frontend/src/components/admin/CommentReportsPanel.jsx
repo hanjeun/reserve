@@ -1,5 +1,6 @@
 import { useContext, useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
+import { adminKeys } from '../../hooks/queryKeys';
 import { Checkbox, Form} from 'antd';
 import Pagination from '../common/Pagination';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -19,10 +20,10 @@ import useReportReviewDraft from './useReportReviewDraft';
 const statuses = [{ value: 'OPEN', label: '접수' }, { value: 'RESOLVED', label: '처리 완료' }];
 const reasonLabel = value => FEED_REPORT_REASONS.find(item => item.value === value)?.label || value;
 
-export default function CommentReportsPanel({ status, page, onPageChange, enabled = true }) {
+export default function CommentReportsPanel({ status, page, onPageChange, enabled = true, initialReportId = null }) {
     const active = useContext(WorkspaceActivityContext);
     const requestAction = useWorkspaceAction();
-    const [selected, setSelected] = useState(null);
+    const [selected, setSelected] = useState(initialReportId);
     const [form] = Form.useForm();
     const submitLock = useRef(false);
     const [validating, setValidating] = useState(false);
@@ -43,7 +44,11 @@ export default function CommentReportsPanel({ status, page, onPageChange, enable
     const review = useMutation({ mutationFn: async ({ reportId, values, session }) => {
         assertCurrentSession(session); const saved = await service.reviewReport(reportId, values); assertCurrentSession(session); return saved;
     },
-        onSuccess: async (_, variables) => { if (!isCurrentSession(variables.session)) return; await invalidateInteractions(client); if (isCurrentSession(variables.session)) { message.success('댓글 신고를 처리했어요.'); setSelected(null); } },
+        onSuccess: async (_, variables) => {
+            if (!isCurrentSession(variables.session)) return;
+            await Promise.all([invalidateInteractions(client), client.invalidateQueries({ queryKey: adminKeys.reportQueue() })]);
+            if (isCurrentSession(variables.session)) { message.success('댓글 신고를 처리했어요.'); setSelected(null); }
+        },
         onError: failure => { if (!failure.isStaleSession) { if (failure.status === 409) draft.reject(); message.error(failure.message); } } });
     const visibility = useMutation({ mutationFn: async ({ commentId, values, session }) => {
         assertCurrentSession(session); const saved = await service.visibility(commentId, values); assertCurrentSession(session); return saved;
@@ -89,7 +94,7 @@ export default function CommentReportsPanel({ status, page, onPageChange, enable
                 <p><strong>{reasonLabel(report.data.reason)}</strong> · {feedDate(report.data.createdAt)}</p>
                 <p className="reserve-feed-post-text">{report.data.detail}</p>
                 <p className="reserve-feed-note">신고 시점의 댓글이에요. 이후 수정·삭제와 별도로 보관해요.</p>
-                <article className="reserve-feed-comment"><strong>{report.data.comment.author?.nickname || '공개 프로필'}</strong><p className="reserve-feed-post-text">{report.data.comment.content}</p></article>
+                <article className="reserve-feed-comment"><strong>{report.data.comment.author?.nickname || '피드 프로필'}</strong><p className="reserve-feed-post-text">{report.data.comment.content}</p></article>
                 <FeedMediaStrip label="신고 당시 댓글" images={(report.data.comment.images || []).map(image => ({ ...image, src: feedMediaUrl(image.url) })).filter(image => image.src)} />
                 {current.data?.state !== 'DELETED' && current.data && <>
                     <p className="reserve-feed-note">현재 댓글 · {current.data.state === 'HIDDEN' ? '관리자 숨김' : '공개 중'}</p>
@@ -116,4 +121,5 @@ export default function CommentReportsPanel({ status, page, onPageChange, enable
         </FormModal>
     </section>;
 }
-CommentReportsPanel.propTypes = { status: PropTypes.string.isRequired, page: PropTypes.number.isRequired, onPageChange: PropTypes.func.isRequired, enabled: PropTypes.bool };
+CommentReportsPanel.propTypes = { status: PropTypes.string.isRequired, page: PropTypes.number.isRequired, onPageChange: PropTypes.func.isRequired,
+    enabled: PropTypes.bool, initialReportId: PropTypes.number };

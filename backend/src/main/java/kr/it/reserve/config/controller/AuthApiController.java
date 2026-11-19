@@ -2,13 +2,16 @@ package kr.it.reserve.config.controller;
 
 import kr.it.reserve.config.jwt.JwtProperties;
 import kr.it.reserve.config.jwt.TokenProvider;
+import kr.it.reserve.config.oauth2.OAuthLoginOutcome;
 import kr.it.reserve.config.service.TokenService;
 import kr.it.reserve.config.util.CookieUtil;
+import kr.it.reserve.config.util.SecurityUtil;
 import kr.it.reserve.global.common.ApiResponse;
 import kr.it.reserve.global.error.AuthException;
 import kr.it.reserve.global.error.MemberSuspendedException;
 import kr.it.reserve.global.ratelimit.IpExtractor;
 import kr.it.reserve.global.ratelimit.RateLimiter;
+import kr.it.reserve.global.security.PasswordPolicy;
 import kr.it.reserve.member.dto.MemberResponse;
 import kr.it.reserve.member.dto.MemberSignupRequest;
 import kr.it.reserve.member.entity.Member;
@@ -56,10 +59,6 @@ public class AuthApiController {
      */
     private static final String LOGIN_FAILED_MESSAGE = "이메일 또는 비밀번호가 올바르지 않아요.";
 
-    /** 미가입 요청도 동일 비용의 bcrypt 검증을 수행해 가입 여부의 시간 차이를 줄인다. 인코더 비용을 바꾸면 더미 해시도 맞춘다. */
-    private static final String DUMMY_PASSWORD_HASH =
-            "$2a$10$ZZZZZZZZZZZZZZZZZZZZZeZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ";
-
     /**
      * rate limit 키와 조회 키를 일관되게 만들기 위한 이메일 정규화.
      * 안 하면 {@code A@x.com} 과 {@code a@x.com} 이 서로 다른 버킷이 되어 계정 단위 제한을 우회한다.
@@ -79,12 +78,45 @@ public class AuthApiController {
         return ApiResponse.success(new SessionStatus(member == null ? null : MemberResponse.fromEntity(member), refreshPossible), "로그인 상태예요.");
     }
 
-    public record LoginPolicy(long idleSeconds, long absoluteSeconds) { }
+    public record LoginPolicy(long idleSeconds, long absoluteSeconds, long browserIdleSeconds) { }
     @GetMapping("/login-policy")
     public ApiResponse<LoginPolicy> loginPolicy(HttpServletResponse response) {
         response.setHeader("Cache-Control", "no-store");
-        return ApiResponse.success(new LoginPolicy(jwtProperties.getRefreshTokenExpiration().toSeconds(),
-                jwtProperties.getAbsoluteSessionLifetime().toSeconds()), "로그인 유지 정책이에요.");
+        var remembered = jwtProperties.sessionLifetime(true, true);
+        return ApiResponse.success(new LoginPolicy(remembered.idle().toSeconds(), remembered.absolute().toSeconds(),
+                jwtProperties.getBrowserSessionIdleLifetime().toSeconds()), "로그인 유지 정책이에요.");
+    }
+
+    public record RememberLoginOffer(String reference) { }
+    public record RememberLoginChoice(String reference) { }
+
+    @GetMapping("/remember-login")
+    public ApiResponse<RememberLoginOffer> rememberLoginOffer(@AuthenticationPrincipal Member member,
+            HttpServletRequest request, HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store");
+        String reference = tokenService.rememberOffer(CookieUtil.getCookie(request, REFRESH_TOKEN_COOKIE), member, SecurityUtil.getSessionId());
+        if (reference == null) return ApiResponse.success(null, "로그인 유지 확인 완료");
+        return ApiResponse.success(new RememberLoginOffer(reference), "로그인 유지 선택이에요.");
+    }
+
+    @PostMapping("/remember-login")
+    public ApiResponse<Void> rememberLogin(@AuthenticationPrincipal Member member, @RequestBody RememberLoginChoice choice,
+            HttpServletRequest request, HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store");
+        var result = tokenService.rememberLogin(CookieUtil.getCookie(request, REFRESH_TOKEN_COOKIE), member,
+                SecurityUtil.getSessionId(), choice.reference());
+        cookieUtil.addAuthCookies(response, result.accessToken(), result.refreshToken(),
+                (int) jwtProperties.getAccessTokenExpiration().toSeconds(), (int) result.refreshMaxAge().toSeconds(), result.persistent());
+        return ApiResponse.success(null, "로그인 유지가 켜졌어요.");
+    }
+
+    public record OAuthOutcomeRequest(String reference) { }
+
+    @PostMapping("/oauth-outcome")
+    public ApiResponse<OAuthLoginOutcome.View> oauthOutcome(@RequestBody OAuthOutcomeRequest outcome,
+            HttpServletRequest request, HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store");
+        return ApiResponse.success(OAuthLoginOutcome.take(request, outcome.reference()), "소셜 로그인 결과를 확인했어요.");
     }
 
     @PostMapping("/login")
@@ -114,7 +146,7 @@ public class AuthApiController {
         Member member = memberService.findByEmailOrNull(email);
         String storedHash = (member != null && member.getPassword() != null)
                 ? member.getPassword()
-                : DUMMY_PASSWORD_HASH;
+                : PasswordPolicy.DUMMY_BCRYPT_HASH;
         boolean passwordMatches = passwordEncoder.matches(rawPassword, storedHash);
 
         // 소셜 전용 계정은 로컬 비밀번호가 없다(getPassword() == null) → 위에서 더미 해시로 검증됐으므로
@@ -128,6 +160,8 @@ public class AuthApiController {
         }
 
         rateLimiter.refund(email, RateLimiter.Policy.LOGIN_ACCOUNT);
+        if (member.isAccountProtected())
+            throw AuthException.forbidden("계정 보호 중이에요. 확인한 이메일의 계정 복구 링크를 열어주세요.");
 
         // 자격 증명 검증 통과 후 정지 여부 확인 — 정지 회원은 토큰 발급 없이 로그인 자체를 차단
         // (소셜 로그인의 URL 리다이렉트 방식과 달리, 여기는 일반 JSON 응답이라
@@ -156,6 +190,7 @@ public class AuthApiController {
         }
         cookieUtil.deleteCookie(response, "mfa_ticket");
         handleTokenIssue(response, member, "true".equals(loginRequest.get("rememberMe")));
+        if (ipProtection != null) ipProtection.writeBrowserCookie(request, response);
         return ApiResponse.success(MemberResponse.fromEntity(member), "로그인 성공");
     }
 

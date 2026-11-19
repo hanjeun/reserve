@@ -79,6 +79,39 @@ it('opens, replies to and trashes a received inquiry independently of sent mail'
     expect(screen.queryByText('합성 문의 내용')).not.toBeInTheDocument();
 });
 
+it('shows received and sent mail times in Korea Standard Time', async () => {
+    const inquiry = {
+        id: 12, title: '수신 시간 테스트', memberEmail: 'guest@example.test',
+        status: 'PENDING', createdAt: '2026-11-19 15:01:00.123456',
+    };
+    const sent = { id: 13, subject: '발송 시간 테스트', toEmail: 'guest@example.test', sentAt: '2026-11-20T00:00:00+09:00' };
+    api.get.mockImplementation(async url => {
+        if (url.endsWith('/photos')) return [];
+        return { content: [url === '/api/inquiries/admin/all' ? inquiry : sent], page: { totalElements: 1 } };
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-19T15:02:30Z'));
+    try {
+        render(<MemoryRouter initialEntries={['/admin?tab=mailbox']}>
+            <QueryClientProvider client={client}><MailboxTab /></QueryClientProvider>
+        </MemoryRouter>);
+
+        const receivedRow = await screen.findByRole('button', { name: /수신 시간 테스트/ });
+        expect(within(receivedRow).getByText('1분 전')).toBeInTheDocument();
+        fireEvent.click(receivedRow);
+        expect(screen.getByText('2026. 11. 20. 00:01')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('radio', { name: '보낸 메일' }));
+        const sentRow = await screen.findByRole('button', { name: /발송 시간 테스트/ });
+        expect(within(sentRow).getByText('2분 전')).toBeInTheDocument();
+        fireEvent.click(sentRow);
+        expect(screen.getByText('2026. 11. 20. 00:00')).toBeInTheDocument();
+    } finally {
+        vi.useRealTimers();
+    }
+});
+
 it('saves to the draft hub, reopens the associated editor, and clears the draft on confirmed send', async () => {
     useAuthStore.setState({ user: { id: 7, role: 'ADMIN' }, isLoggedIn: true });
     const photo = new File(['draft-image'], 'draft.png', { type: 'image/png' });

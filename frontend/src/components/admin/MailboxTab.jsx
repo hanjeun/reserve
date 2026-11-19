@@ -31,12 +31,25 @@ const { Text, Title, Paragraph } = Typography;
 const PAGE_SIZE = 20;
 const QUERY_DEFAULTS = { search: '', page: '1', mailFolder: 'received' };
 const FOLDERS = [{ value: 'received', label: '받은 문의' }, { value: 'sent', label: '보낸 메일' }];
+const MAIL_DATE = new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul', year: 'numeric', month: 'numeric', day: 'numeric',
+});
+const MAIL_TIME = new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+});
+
+const parseMailDate = (value) => {
+    if (typeof value !== 'string' || !value) return null;
+    const iso = value.trim().replace(' ', 'T');
+    // 메일 API에서 오프셋 없이 내려오는 시각은 UTC다.
+    const date = new Date(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(iso) ? iso : iso + 'Z');
+    return Number.isNaN(date.getTime()) ? null : date;
+};
 
 const formatDate = (dateStr) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr.replace(' ', 'T'));
-    const now = new Date();
-    const diffMs = now - date;
+    const date = parseMailDate(dateStr);
+    if (!date) return '';
+    const diffMs = Date.now() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
     const diffHrs = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
@@ -44,14 +57,12 @@ const formatDate = (dateStr) => {
     if (diffMins < 60) return `${diffMins}분 전`;
     if (diffHrs < 24) return `${diffHrs}시간 전`;
     if (diffDays < 7) return `${diffDays}일 전`;
-    return `${date.getFullYear()}. ${date.getMonth() + 1}. ${date.getDate()}`;
+    return MAIL_DATE.format(date).replace(/\.$/, '');
 };
 
 const formatFullDate = (dateStr) => {
-    if (!dateStr) return '';
-    const d = new Date(dateStr.replace(' ', 'T'));
-    return `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}. `
-         + `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const date = parseMailDate(dateStr);
+    return date ? MAIL_DATE.format(date) + ' ' + MAIL_TIME.format(date) : '';
 };
 
 // data?.mails 가 매 렌더 새 배열이면 자식들이 불필요하게 다시 그려진다 — 상수 빈 배열로 막는다.

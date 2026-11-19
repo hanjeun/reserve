@@ -31,29 +31,6 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Package recovery backend
-        run: |
-          test "$(git rev-parse HEAD)" = "$RECOVERY_SHA"
-          cd backend
-          chmod +x ./gradlew
-          ./gradlew bootJar --console=plain --no-build-cache
-
-      - name: Build and verify recovery image
-        run: |
-          docker build --pull --no-cache --platform linux/amd64 \
-            --label reserve.schema-compat=v280-mfa-completion-settlement-v1 \
-            --label reserve.feature-compat=waiting-signup-hidden-feed-oauth-login-session-admission-mfa-completion-test-settlement-v11 \
-            --label "org.opencontainers.image.revision=$RECOVERY_SHA" \
-            -t "reserve-security:$RECOVERY_SHA" ./backend
-          image_id=$(docker image inspect --format '{{.Id}}' "reserve-security:$RECOVERY_SHA")
-          bash scripts/check-release-compatibility-image.sh "$image_id"
-          bash scripts/scan-container-security.sh "reserve-security:$RECOVERY_SHA"
-          jar_sha=$(sha256sum backend/build/libs/reserve-2.17.0.jar | cut -d ' ' -f 1)
-          image_jar_sha=$(docker run --rm --network none --read-only --entrypoint sha256sum "$image_id" /app.jar | cut -d ' ' -f 1)
-          [[ "$jar_sha" =~ ^[0-9a-f]{64}$ && "$jar_sha" = "$image_jar_sha" ]]
-          jq -n --arg source "$RECOVERY_SHA" --arg imageId "$image_id" --arg jarSha256 "$jar_sha" \
-            '{source: $source, imageId: $imageId, jarSha256: $jarSha256}' > reserve-recovery.json
-
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version-file: frontend/.nvmrc
@@ -105,6 +82,29 @@ jobs:
           printf '%s\n' "$RECOVERY_SHA" > frontend/dist/release-id.txt
         env:
           RELEASE_ID: ${{ env.RECOVERY_SHA }}
+
+      - name: Package recovery backend
+        run: |
+          test "$(git rev-parse HEAD)" = "$RECOVERY_SHA"
+          cd backend
+          chmod +x ./gradlew
+          ./gradlew bootJar --console=plain --no-build-cache
+
+      - name: Build and verify recovery image
+        run: |
+          docker build --pull --no-cache --platform linux/amd64 \
+            --label reserve.schema-compat=v280-mfa-completion-settlement-v1 \
+            --label reserve.feature-compat=waiting-signup-hidden-feed-oauth-login-session-admission-mfa-completion-test-settlement-v11 \
+            --label "org.opencontainers.image.revision=$RECOVERY_SHA" \
+            -t "reserve-security:$RECOVERY_SHA" ./backend
+          image_id=$(docker image inspect --format '{{.Id}}' "reserve-security:$RECOVERY_SHA")
+          bash scripts/check-release-compatibility-image.sh "$image_id"
+          bash scripts/scan-container-security.sh "reserve-security:$RECOVERY_SHA"
+          jar_sha=$(sha256sum backend/build/libs/reserve-2.17.0.jar | cut -d ' ' -f 1)
+          image_jar_sha=$(docker run --rm --network none --read-only --entrypoint sha256sum "$image_id" /app.jar | cut -d ' ' -f 1)
+          [[ "$jar_sha" =~ ^[0-9a-f]{64}$ && "$jar_sha" = "$image_jar_sha" ]]
+          jq -n --arg source "$RECOVERY_SHA" --arg imageId "$image_id" --arg jarSha256 "$jar_sha" \
+            '{source: $source, imageId: $imageId, jarSha256: $jarSha256}' > reserve-recovery.json
 
       - name: Build matching recovery marketing site
         if: vars.RESERVE_DOMAIN_SPLIT == 'true'

@@ -6,6 +6,7 @@ import { App as AntApp } from 'antd';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import MessengerShell from './MessengerShell';
+import StatisticsCsvAction from '../business/StatisticsCsvAction';
 import useAuthStore from '../../store/useAuthStore';
 import useMessengerStore, { messengerIdentityOf } from '../../store/useMessengerStore';
 import { chatService } from '../../services';
@@ -73,6 +74,27 @@ describe('MessengerShell accessibility', () => {
         expect(screen.getByLabelText('현재 경로')).toHaveTextContent('/messages');
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         expect(useMessengerStore.getState().view).toBe('home');
+    });
+
+    it('keeps a mobile chart download clear of the floating launcher while scrolling', async () => {
+        Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+        render(<StatisticsCsvAction aria-label="예약 추이 CSV 다운로드" />);
+        renderShell();
+        const download = screen.getByRole('button', { name: '예약 추이 CSV 다운로드' });
+        const launcher = await screen.findByRole('button', { name: '메시지, 읽지 않은 메시지 2개 열기' });
+        vi.spyOn(launcher, 'getBoundingClientRect').mockReturnValue({
+            left: 326, right: 374, top: 720, bottom: 768, width: 48, height: 48,
+        });
+        const downloadPosition = vi.spyOn(download, 'getBoundingClientRect').mockReturnValue({
+            left: 275, right: 359, top: 725, bottom: 747, width: 84, height: 22,
+        });
+        fireEvent.scroll(document);
+        await waitFor(() => expect(launcher).not.toBeVisible());
+        expect(download).toBeVisible();
+
+        downloadPosition.mockReturnValue({ left: 275, right: 359, top: 675, bottom: 697, width: 84, height: 22 });
+        fireEvent.scroll(document);
+        await waitFor(() => expect(launcher).toBeVisible());
     });
 
     it('uses the click-time viewport when the debounced width is stale', async () => {

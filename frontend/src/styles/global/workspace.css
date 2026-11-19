@@ -44,6 +44,16 @@
 .reserve-management-toolbar-trailing .reserve-filter-menu { margin-left: 0; }
 .reserve-management-count { color: var(--c-text-secondary); font-size: 14px; line-height: 24px; }
 
+.reserve-customer-management-intro {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+.reserve-customer-management-intro > .ant-typography { min-width: 0; }
+.reserve-customer-management-intro > button { flex: none; white-space: nowrap; }
+
 /* 열린 메뉴 옆에서는 작업 공간의 실제 폭으로 카드 열을 정한다. */
 @media (min-width: 900px) {
     .reserve-workspace-layout:not(.is-menu-collapsed) :is(.rsv-mystore-grid, .reserve-reservation-card-grid) {

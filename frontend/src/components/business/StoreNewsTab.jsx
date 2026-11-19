@@ -148,10 +148,12 @@ export default function StoreNewsTab() {
             : !owned.length ? '소식을 게시할 수 있는 내 가게가 있어야 작성할 수 있어요.' : '';
     return <section ref={listRef} className="reserve-store-news-management" aria-label="내 가게 소식 관리">
         <div className="reserve-explore-filters reserve-store-news-manage-toolbar">
-            <StoreListViewToggle view={view} onChange={value => setParams({ view: value })} disabled={list.isPending} />
-            <StoreNewsWriteAction unavailableReason={writeUnavailable} onWrite={() => setEditor({ open: true, mounted: true })} />
-            <IconTool label="가게 소식 임시보관함" icon={<InterfaceIcon name="folder" />} to={draftPath('news', 1, view)} />
-            <ListingCount>{blockingError ? '소식 확인 필요' : `${total.toLocaleString('ko-KR')}개 소식`}</ListingCount>
+            <div className="reserve-store-news-actions">
+                <StoreListViewToggle view={view} onChange={value => setParams({ view: value })} disabled={list.isPending} />
+                <StoreNewsWriteAction unavailableReason={writeUnavailable} onWrite={() => setEditor({ open: true, mounted: true })} />
+                <IconTool label="가게 소식 임시보관함" icon={<InterfaceIcon name="folder" />} to={draftPath('news', 1, view)} />
+                <ListingCount>{blockingError ? '소식 확인 필요' : `${total.toLocaleString('ko-KR')}개 소식`}</ListingCount>
+            </div>
             <div className="reserve-explore-filter-controls"><FilterMenu appearance="plain" value={storeId || 'ALL'} aria-label="내 소식 가게 필터" options={[{ value: 'ALL', label: '전체 가게' }, ...owned.map(store => ({ value: store.id, label: store.name }))]}
                 loading={stores.isPending} disabled={stores.isPending || stores.isError && !stores.data} onChange={value => change({ newsStore: value })} />
                 <FilterMenu appearance="plain" value={selectedState} options={STORE_NEWS_STATES} aria-label="내 소식 상태 필터" onChange={value => change({ newsState: value })} />

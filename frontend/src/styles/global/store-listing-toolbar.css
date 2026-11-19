@@ -190,6 +190,14 @@
     .reserve-filter-toolbar-primary { flex-wrap: nowrap; }
     .reserve-filter-toolbar-controls { flex: 0 1 auto; }
     .reserve-filter-toolbar-extra { flex: 1 1 auto; }
+
+    .reserve-filter-toolbar-primary:has(.reserve-filter-toolbar-extra) {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+    .reserve-filter-toolbar-controls:has(> .reserve-filter-toolbar-extra) { display: contents; }
+    .reserve-filter-toolbar-controls:has(> .reserve-filter-toolbar-extra) > .reserve-filter-menu { grid-column: 1 / -1; }
+    .reserve-filter-toolbar-primary:has(.reserve-filter-toolbar-extra) .reserve-filter-toolbar-refresh { padding-left: 0; }
 }
 
 /* 예약 카드형: 내 가게 카드와 같은 이미지 → 본문 → 균등 액션 바 구조. */

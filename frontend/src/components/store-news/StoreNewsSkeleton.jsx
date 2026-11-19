@@ -31,7 +31,10 @@ export default function StoreNewsSkeleton({ contentOnly = false, showRefresh = t
     return <section className="reserve-store-news-management" aria-label="내 가게 소식을 불러오는 중" aria-busy="true">
         {!contentOnly && <>
             <div className="reserve-explore-filters reserve-store-news-manage-toolbar" aria-hidden="true">
-                <IconToolSkeleton /><StoreNewsActionSkeleton /><span className="reserve-explore-count"><Bone width={52} height={16} /></span>
+                <div className="reserve-store-news-actions">
+                    <IconToolSkeleton /><IconToolSkeleton /><IconToolSkeleton />
+                    <span className="reserve-explore-count"><Bone width={52} height={16} /></span>
+                </div>
                 <div className="reserve-explore-filter-controls"><FilterMenuSkeleton select={{ value: 'ALL', options: [{ value: 'ALL', label: '전체 가게' }] }} />
                     <FilterMenuSkeleton select={{ value: 'ALL', options: STORE_NEWS_STATES }} />{showRefresh && <IconToolSkeleton />}</div></div></>}
         <div className={view === 'cards' ? 'rsv-mystore-grid' : 'reserve-store-list-rows'} aria-hidden="true">

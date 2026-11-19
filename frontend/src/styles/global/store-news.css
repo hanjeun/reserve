@@ -61,6 +61,7 @@
 .reserve-benefit-review-change p { flex: 1 1 220px; margin: 0; font-size: 14px; line-height: 1.6; color: var(--c-text-secondary); }
 .reserve-store-news-toolbar { gap: 8px 12px; }
 .reserve-store-news-actions { display: inline-flex; align-items: center; flex-shrink: 0; gap: 8px; }
+.reserve-store-news-manage-toolbar > .reserve-store-news-actions { max-width: 100%; flex-wrap: wrap; }
 .reserve-store-news-manage-toolbar .reserve-filter-menu { max-width: min(240px, 60vw); }
 .reserve-store-news-management .reserve-store-news-meta { margin: 0; }
 .reserve-store-news-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 12px 0; font-size: 12px; color: var(--c-text-secondary); }

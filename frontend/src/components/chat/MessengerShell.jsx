@@ -91,15 +91,15 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
     const previousStoreOpenRevisionRef = useRef(storeOpenRevision);
     const [launcherObstructed, setLauncherObstructed] = useState(false);
 
-    // 모바일 댓글 입력과 겹칠 때만 런처가 자리를 비운다. 입력 폼의 크기·위치는 바꾸지 않는다.
+    // 모바일에서 런처가 입력창이나 지정된 도구를 가릴 때만 숨긴다.
     useEffect(() => {
         if (!isMobile || isMessagesPage || open || !user) return undefined;
         let frame;
         const measure = () => {
             const launcher = launcherRef.current?.getBoundingClientRect();
             if (!launcher) return;
-            const obstructed = [...document.querySelectorAll('.reserve-chat-composer')].some(composer => {
-                const field = composer.getBoundingClientRect();
+            const obstructed = [...document.querySelectorAll('.reserve-chat-composer, [data-reserve-messenger-clearance]')].some(control => {
+                const field = control.getBoundingClientRect();
                 return field.width > 0 && field.height > 0 && field.left < launcher.right && field.right > launcher.left
                     && field.top < launcher.bottom && field.bottom > launcher.top;
             });

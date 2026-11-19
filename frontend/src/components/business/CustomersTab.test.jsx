@@ -25,5 +25,7 @@ it('shows a successful customer page and uses the server total', async () => {
     const row = await screen.findByRole('row', { name: /테스트 고객/ });
     expect(within(row).getByText('3.5점')).toBeInTheDocument();
     expect(screen.getByText('21건')).toBeInTheDocument();
+    const intro = screen.getByText(/이 목록의 예약 수/).closest('.reserve-customer-management-intro');
+    expect(within(intro).getByRole('button', { name: '내 신고' })).toBeEnabled();
     expect(screen.queryByText('고객 내역을 불러오지 못했어요.')).not.toBeInTheDocument();
 });

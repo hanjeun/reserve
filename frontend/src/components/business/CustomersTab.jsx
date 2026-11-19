@@ -72,12 +72,12 @@ export default function CustomersTab() {
             : row.manualUntil ? `${new Date(row.manualUntil).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}까지` : '—' },
     ];
     return <section aria-label="고객 관리">
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <div className="reserve-customer-management-intro">
+            <Typography.Paragraph type="secondary" style={{ margin: 0 }}>
+                이 목록의 예약 수는 이용 종료 후 30일이 지나기 전 내역만 집계해요. 리뷰 통계는 삭제·숨김 처리되지 않은 리뷰를 집계해요.
+            </Typography.Paragraph>
             <Button variant="ghost-sm" onClick={() => setReportsOpen(true)}><FlagOutlined aria-hidden="true" /> 내 신고</Button>
         </div>
-        <Typography.Paragraph type="secondary" style={{ marginBottom: 16 }}>
-            이 목록의 예약 수는 이용 종료 후 30일이 지나기 전 내역만 집계해요. 리뷰 통계는 삭제·숨김 처리되지 않은 리뷰를 집계해요.
-        </Typography.Paragraph>
         <FilterToolbar selects={[{ value: storeId == null ? 'ALL' : String(storeId), ariaLabel: '고객 관리 가게', fitContent: true,
             loading: storesLoading, options: [{ value: 'ALL', label: '전체 가게' }, ...stores.map(store => ({ value: String(store.id), label: store.name }))],
             onChange: value => setFilters({ customerStore: value, customerPage: '1' }) }]}

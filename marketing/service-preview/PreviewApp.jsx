@@ -8,12 +8,15 @@ import Header from '../../frontend/src/components/layout/Header';
 import DiscoveryNav from '../../frontend/src/components/layout/DiscoveryNav';
 import WorkspaceNavigationProvider from '../../frontend/src/components/layout/WorkspaceNavigationProvider';
 import WorkspaceMenuProvider from '../../frontend/src/components/layout/WorkspaceMenuProvider';
+import WorkspaceLayout from '../../frontend/src/components/layout/WorkspaceLayout';
 import ServiceAdmissionProvider from '../../frontend/src/components/common/ServiceAdmissionProvider';
 import { RouteErrorBoundary } from '../../frontend/src/components/layout/AppErrorBoundary';
 import StoreList from '../../frontend/src/pages/store/StoreList';
 import StoreDetail from '../../frontend/src/pages/store/StoreDetail';
 import MyReservations from '../../frontend/src/pages/reservation/MyReservations';
 import QrCodeModal from '../../frontend/src/components/reservation/QrCodeModal';
+import StatisticsTab from '../../frontend/src/components/business/StatisticsTab';
+import { BUSINESS_WORKSPACE_GROUPS } from '../../frontend/src/constants/workspaces';
 import useMessage from '../../frontend/src/hooks/useMessage';
 import { LiveUpdatesContext } from '../../frontend/src/hooks/useLiveUpdatesStatus';
 import { appMessageConfig, buildThemeConfig, validateMessages } from '../../frontend/src/components/common/appProviderConfig';
@@ -26,11 +29,23 @@ import useAuthStore from '../../frontend/src/store/useAuthStore';
 import api from '../../frontend/src/api/axios';
 import { createPreviewTransport } from './transport';
 import { createPreviewPlayback, isPreviewMessage, loadPreviewFont } from './playback';
-import { resolvePreviewLocation } from './navigation';
+import { isPreviewScene, PREVIEW_BUSINESS_TAB, resolvePreviewLocation } from './navigation';
 import '../../frontend/src/index.css';
 import './preview.css';
 
-const scenes = new Set(['explore', 'booking', 'reservations', 'waiting', 'qr']);
+const businessBuild = __RESERVE_BUSINESS_PREVIEW__;
+const statisticsGroups = BUSINESS_WORKSPACE_GROUPS.flatMap(group => {
+    const items = group.items.filter(item => item.key === PREVIEW_BUSINESS_TAB);
+    return items.length ? [{ ...group, items }] : [];
+});
+
+function PreviewBusiness() {
+    return <WorkspaceLayout title="사업자 파트너 패널" groups={statisticsGroups} activeKey={PREVIEW_BUSINESS_TAB}
+        hrefFor={() => '?' + new URLSearchParams({ tab: PREVIEW_BUSINESS_TAB })}>
+        <StatisticsTab showCsvActions={false} />
+    </WorkspaceLayout>;
+}
+
 function FixedPage({ scene, children }) {
     const [location, setLocation] = useState(() => ({ ...resolvePreviewLocation(scene), key: 'preview-0', state: null }));
     const navigator = useMemo(() => {
@@ -90,11 +105,14 @@ function Preview({ scene, transport }) {
         <AntApp message={appMessageConfig}><FixedPage scene={scene}><WorkspaceNavigationProvider><WorkspaceMenuProvider><ServiceAdmissionProvider>
             <Layout className="reserve-app-layout" onClickCapture={blockPageLinks}>
                 <div inert style={{ display: 'contents' }}><Header />{scene === 'explore' && <DiscoveryNav />}</div>
-                <Layout.Content><RouteErrorBoundary><Routes>
-                    <Route path="/stores" element={<StoreList />} />
-                    <Route path="/store/:id" element={<PreviewStoreDetail />} />
-                    <Route path="/my-reservations" element={<MyReservations />} />
-                </Routes>{scene === 'qr' && <QrCodeModal reservationId={701} open={qrOpen} onClose={() => setQrOpen(false)} />}</RouteErrorBoundary></Layout.Content>
+                <Layout.Content><RouteErrorBoundary>
+                    <Routes>{businessBuild ? <Route path="/business" element={<PreviewBusiness />} /> : <>
+                        <Route path="/stores" element={<StoreList />} />
+                        <Route path="/store/:id" element={<PreviewStoreDetail />} />
+                        <Route path="/my-reservations" element={<MyReservations />} />
+                    </>}</Routes>
+                    {!businessBuild && scene === 'qr' && <QrCodeModal reservationId={701} open={qrOpen} onClose={() => setQrOpen(false)} />}
+                </RouteErrorBoundary></Layout.Content>
             </Layout>
         </ServiceAdmissionProvider></WorkspaceMenuProvider></WorkspaceNavigationProvider></FixedPage></AntApp>
     </ConfigProvider>;
@@ -105,9 +123,10 @@ export function mountPreview() {
         document.getElementById('root').textContent = '이 환경에서는 미리보기를 열 수 없어요.';
         return;
     }
-    const requested = new URLSearchParams(window.location.search).get('scene');
-    const scene = scenes.has(requested) ? requested : 'explore';
-    const transport = createPreviewTransport();
+    const requested = businessBuild ? 'business' : new URLSearchParams(window.location.search).get('scene');
+    const customerScene = isPreviewScene(requested) && requested !== 'business';
+    const scene = businessBuild || customerScene ? requested : 'explore';
+    const transport = createPreviewTransport({ scene });
     api.defaults.adapter = transport.adapter; api.defaults.withCredentials = false;
     useAuthStore.getState().login(transport.member); initTheme();
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 60000, refetchOnWindowFocus: false } } });

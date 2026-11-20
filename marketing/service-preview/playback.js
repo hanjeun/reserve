@@ -30,10 +30,14 @@ export function createPreviewPlayback(view, { scene, transport, client, setQrOpe
     const updateQr = next => { if (next !== open) { open = next; setQrOpen(next); } };
     const render = () => {
         frame = undefined;
-        if (!active || manual) return;
+        if (!active || manual || scene === 'business') return;
         const phase = motion.matches ? 1 : ease(progress);
         if (scene === 'waiting' && transport.setPlaybackPhase(phase)) void client.invalidateQueries({ queryKey: ['waiting'] });
-        if (scene === 'qr') { updateQr(phase > 0.45); return; }
+        if (scene === 'qr') {
+            const buttons = [...document.querySelectorAll('#root button:not(:disabled)')];
+            updateQr(phase > 0.45 && buttons.some(button => button.textContent.trim() === 'QR'));
+            return;
+        }
         let target;
         if (scene === 'booking') {
             const panel = document.querySelector('.reserve-store-action-panel form')?.closest('.reserve-store-action-panel');

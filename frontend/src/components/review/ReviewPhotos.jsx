@@ -57,13 +57,16 @@ export function ReviewPhotoOverview({ photos, isPC }) {
             </UnderlinedTextButton>}
         </header>
         <div ref={grid} className="reserve-review-photo-grid" id={extraId}
-            style={isPC ? { '--review-photo-columns': Math.min(columns, photos.length) } : undefined}>
+            style={isPC ? { '--review-photo-columns': columns } : undefined}>
             {visiblePhotos.map((photo, index) => {
                 const extra = index >= limit;
                 const closing = extra && !expanded;
+                const hasDimensions = photo.width > 0 && photo.height > 0;
+                const width = hasDimensions ? photo.width : 4;
+                const height = hasDimensions ? photo.height : 3;
                 return <button key={photo.id} type="button" className="reserve-review-photo-tile"
                     data-extra={extra || undefined} inert={closing || undefined} aria-hidden={closing || undefined}
-                    style={{ aspectRatio: photo.width > 0 && photo.height > 0 ? photo.width + ' / ' + photo.height : '4 / 3' }}
+                    style={{ aspectRatio: width + ' / ' + height, '--review-photo-ratio': width / height }}
                     aria-label={'리뷰 사진 ' + (index + 1) + ' 크게 보기'} onClick={event => {
                         rememberPhotoPreviewOrigin(event);
                         handlePreview(previewFile(photo), (expanded ? photos : firstPhotos).map(previewFile));

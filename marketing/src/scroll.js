@@ -7,14 +7,17 @@ export function installMarketingScroll(document, motion) {
     let direction = 0;
     let distance = 0;
     let touchPoint;
+    let targetWidth;
 
     const headerHeight = () => document.querySelector('.marketing-header')?.getBoundingClientRect().height ?? 64;
-    const maximum = () => Math.max(0, root.scrollHeight - view.innerHeight);
+    const viewportHeight = () => view.visualViewport?.scale === 1 ? view.visualViewport.height : view.innerHeight;
+    const maximum = () => Math.max(0, root.scrollHeight - viewportHeight());
     const clamp = value => Math.max(0, Math.min(maximum(), value));
     const heroReady = hero => hero.querySelector('[data-hero-handoff][data-present="true"] [data-marketing-section-title]')?.dataset.typingState === 'complete';
     const cancel = () => {
         if (frame != null) view.cancelAnimationFrame(frame);
         frame = undefined;
+        targetWidth = undefined;
         root.classList.remove('marketing-scrolling');
     };
     const resetGesture = () => { locked = false; direction = 0; distance = 0; };
@@ -25,12 +28,13 @@ export function installMarketingScroll(document, motion) {
     const settle = () => { cancel(); view.clearTimeout(quietTimer); resetGesture(); };
     const scrollTo = (target, duration = 420) => {
         cancel();
-        const end = clamp(target);
+        const end = () => clamp(typeof target === 'function' ? target() : target);
+        if (typeof target === 'function' && view.innerWidth <= 768) targetWidth = view.innerWidth;
         const start = view.scrollY;
         root.classList.add('marketing-scrolling');
-        if (motion.matches || Math.abs(end - start) < 1) {
-            view.scrollTo(0, end);
-            root.classList.remove('marketing-scrolling');
+        if (motion.matches || Math.abs(end() - start) < 1) {
+            view.scrollTo(0, end());
+            cancel();
             return;
         }
         let began;
@@ -38,15 +42,15 @@ export function installMarketingScroll(document, motion) {
             began ??= now;
             const progress = Math.min(1, (now - began) / duration);
             const eased = 1 - (1 - progress) ** 3;
-            view.scrollTo(0, start + (end - start) * eased);
+            view.scrollTo(0, start + (end() - start) * eased);
             if (progress < 1) frame = view.requestAnimationFrame(step);
-            else { frame = undefined; root.classList.remove('marketing-scrolling'); afterQuiet(); }
+            else { cancel(); afterQuiet(); }
         };
         frame = view.requestAnimationFrame(step);
     };
 
     const stepTarget = (nextDirection, position = view.scrollY) => {
-        const available = view.innerHeight - headerHeight();
+        const available = viewportHeight() - headerHeight();
         const scenes = [...document.querySelectorAll('.marketing-scene, footer')]
             .filter(node => node.getClientRects().length)
             .map(node => ({ node, start: clamp(node.getBoundingClientRect().top + view.scrollY - headerHeight()), height: node.getBoundingClientRect().height }));
@@ -87,7 +91,7 @@ export function installMarketingScroll(document, motion) {
             if (!['pending', 'typing'].includes(heading.dataset.typingState) || heading.closest('[inert]') || !heading.getClientRects().length) return false;
             if (view.getComputedStyle(heading).visibility === 'hidden') return false;
             const bounds = heading.getBoundingClientRect();
-            return bounds.height > 0 && Math.max(0, Math.min(bounds.bottom, view.innerHeight) - Math.max(bounds.top, header)) / bounds.height >= 0.6;
+            return bounds.height > 0 && Math.max(0, Math.min(bounds.bottom, viewportHeight()) - Math.max(bounds.top, header)) / bounds.height >= 0.6;
         });
     };
     const heroLanding = delta => {
@@ -96,8 +100,8 @@ export function installMarketingScroll(document, motion) {
             if (!hero.getClientRects().length) continue;
             if (heroReady(hero)) continue;
             const bounds = hero.getBoundingClientRect();
-            if (bounds.top > headerHeight() + 1 || bounds.bottom < view.innerHeight - 1) continue;
-            const end = clamp(bounds.bottom + view.scrollY - view.innerHeight);
+            if (bounds.top > headerHeight() + 1 || bounds.bottom < viewportHeight() - 1) continue;
+            const end = clamp(bounds.bottom + view.scrollY - viewportHeight());
             if (view.scrollY < end - 1) return end;
         }
         return undefined;
@@ -105,7 +109,7 @@ export function installMarketingScroll(document, motion) {
     const heroPending = () => !motion.matches && !document.hidden && [...document.querySelectorAll('[data-hero-story]')].some(hero => {
         if (!['playing', 'preparing', 'transition'].includes(hero.dataset.playbackState) || !hero.getClientRects().length) return false;
         const bounds = hero.getBoundingClientRect();
-        return bounds.top <= headerHeight() && bounds.bottom <= view.innerHeight + 2 && bounds.bottom >= headerHeight();
+        return bounds.top <= headerHeight() && bounds.bottom <= viewportHeight() + 2 && bounds.bottom >= headerHeight();
     });
     const forwardPending = () => typingPending() || heroPending();
     const holdForward = event => {
@@ -122,7 +126,7 @@ export function installMarketingScroll(document, motion) {
         if ((locked || frame != null) && direction === nextDirection) {
             event.preventDefault(); afterQuiet(); return;
         }
-        const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? view.innerHeight : 1);
+        const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewportHeight() : 1);
         // 첫 전진 입력은 예약 장면의 전환 지점에 정착해요.
         const target = heroLanding(delta) ?? stepTarget(nextDirection);
         if (target == null) return;
@@ -143,9 +147,9 @@ export function installMarketingScroll(document, motion) {
         if (!top && !section) return;
         const hero = section?.closest('[data-hero-story]');
         const embedded = hero && section !== hero && !motion.matches;
-        const target = embedded ? hero.getBoundingClientRect().bottom + view.scrollY - view.innerHeight
-            : section?.getBoundingClientRect().top + view.scrollY - headerHeight();
-        if (!top && target > view.scrollY + 1 && forwardPending()) { holdForward(event); return; }
+        const target = () => embedded ? hero.getBoundingClientRect().bottom + view.scrollY - viewportHeight()
+            : section.getBoundingClientRect().top + view.scrollY - headerHeight();
+        if (!top && target() > view.scrollY + 1 && forwardPending()) { holdForward(event); return; }
         event.preventDefault();
         settle();
         scrollTo(top ? 0 : target);
@@ -171,11 +175,13 @@ export function installMarketingScroll(document, motion) {
         if (!motion.matches && !event.defaultPrevented && !event.ctrlKey && !event.metaKey && !event.altKey
             && forward && !activatesControl && !nativeScroll(event.target, 1)) {
             if (forwardPending()) { holdForward(event); return; }
-            const landing = heroLanding(event.key === 'ArrowDown' ? 40 : view.innerHeight * 0.9);
+            const landing = heroLanding(event.key === 'ArrowDown' ? 40 : viewportHeight() * 0.9);
             if (landing != null) { event.preventDefault(); settle(); scrollTo(landing); return; }
         }
         if (['Escape', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) settle();
     };
+    // 모바일 주소창 높이만 바뀌면 탭으로 선택한 장면의 새 위치까지 이동해요.
+    const resize = () => { if (targetWidth !== view.innerWidth) settle(); };
     document.addEventListener('wheel', wheel, { passive: false });
     document.addEventListener('click', click);
     document.addEventListener('keydown', keydown);
@@ -184,7 +190,7 @@ export function installMarketingScroll(document, motion) {
     document.addEventListener('touchend', touchEnd, { passive: true });
     document.addEventListener('touchcancel', touchCancel);
     motion.addEventListener('change', settle);
-    view.addEventListener('resize', settle);
+    view.addEventListener('resize', resize);
     view.addEventListener('pagehide', settle);
     return () => {
         settle();
@@ -196,7 +202,7 @@ export function installMarketingScroll(document, motion) {
         document.removeEventListener('touchend', touchEnd);
         document.removeEventListener('touchcancel', touchCancel);
         motion.removeEventListener('change', settle);
-        view.removeEventListener('resize', settle);
+        view.removeEventListener('resize', resize);
         view.removeEventListener('pagehide', settle);
     };
 }

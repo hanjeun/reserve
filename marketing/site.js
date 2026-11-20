@@ -2,6 +2,8 @@ import Hangul from 'hangul-js';
 import { installMarketingTyping } from './src/typing';
 import { installFaqMotion } from './src/faq';
 import { installMarketingScroll } from './src/scroll';
+import { installMarketingScenes } from './src/scenes';
+import { installServicePreviews } from './src/servicePreviews';
 
 document.documentElement.classList.add('js');
 const theme = window.matchMedia('(prefers-color-scheme: dark)');
@@ -10,9 +12,11 @@ updateTheme();
 theme.addEventListener('change', updateTheme);
 
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+const previews = installServicePreviews(document);
 installFaqMotion(document, motion);
 installMarketingTyping(document, motion, Hangul);
 installMarketingScroll(document, motion);
+installMarketingScenes(document, motion, previews.progress);
 
 if ('IntersectionObserver' in window) {
     const observer = new IntersectionObserver(entries => {

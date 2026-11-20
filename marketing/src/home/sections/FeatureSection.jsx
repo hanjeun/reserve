@@ -14,7 +14,7 @@ export default function FeatureSection({ sec, index, embedded = false }) {
                     {title.map((line, lineIndex) => <TypingLine key={lineIndex} line={splitLine(line, blue)} reserveSpace />)}
                 </Title>
             </div>
-            <div className={`marketing-feature-media${embedded ? '' : ' reveal reveal-delayed'}`}>
+            <div className={`marketing-feature-media${embedded ? '' : ' reveal'}`}>
                 <MarketingPhone label={tag} scene={demo} />
             </div>
         </div>

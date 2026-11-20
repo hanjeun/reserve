@@ -16,11 +16,15 @@ export default function MarketingPhone({ scene, label }) {
                             data-service-preview={scene} data-preview-src={`/service-preview/index.html?scene=${scene}`}
                             sandbox="allow-scripts allow-forms" loading="lazy" referrerPolicy="same-origin" width="402" height="780" />
                         <div className="marketing-phone-loading" aria-hidden="true"><span /><span /><span /></div>
+                        <div className="marketing-phone-error">
+                            <p role="status">미리보기를 불러오지 못했어요.</p>
+                            <button type="button" className="reserve-text-link" data-service-preview-retry>다시 불러오기</button>
+                        </div>
                     </div>
                     <div className="marketing-phone-home" aria-hidden="true" />
                 </div>
             </div>
-            <img className="marketing-phone-hardware" src="/marketing-images/device/iphone16-pro.png" alt="" width="450" height="920" loading="lazy" decoding="async" aria-hidden="true" />
+            <img className="marketing-phone-hardware" src="/marketing-images/device/iphone16-pro.png" alt="" width="450" height="920" decoding="async" aria-hidden="true" />
         </div>
     </figure>;
 }

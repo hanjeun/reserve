@@ -109,6 +109,24 @@ it('scrolls the logo to the top with intermediate frames instead of reloading th
     expect(document.documentElement).not.toHaveClass('marketing-scrolling');
 });
 
+it('keeps a mobile section tap aligned when the browser bars change height', () => {
+    vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(390);
+    const target = document.querySelector('[data-index="1"]');
+    target.id = 'next';
+    const button = document.createElement('button');
+    button.dataset.scrollTarget = target.id;
+    main().prepend(button);
+
+    button.click();
+    frame(0); frame(180);
+    expect(position).toBeGreaterThan(0);
+    heights[0] = 780;
+    window.dispatchEvent(new Event('resize'));
+    frame(420);
+    expect(target.getBoundingClientRect().top).toBe(64);
+    expect(document.documentElement).not.toHaveClass('marketing-scrolling');
+});
+
 it('keeps scrolling native and returns to the top immediately under reduced motion', () => {
     motion.matches = true;
     expect(wheel().defaultPrevented).toBe(false);

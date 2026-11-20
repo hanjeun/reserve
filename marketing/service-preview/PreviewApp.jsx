@@ -25,7 +25,7 @@ import useModalScrollLock from '../../frontend/src/hooks/useModalScrollLock';
 import useAuthStore from '../../frontend/src/store/useAuthStore';
 import api from '../../frontend/src/api/axios';
 import { createPreviewTransport } from './transport';
-import { createPreviewPlayback, isPreviewMessage } from './playback';
+import { createPreviewPlayback, isPreviewMessage, loadPreviewFont } from './playback';
 import { resolvePreviewLocation } from './navigation';
 import '../../frontend/src/index.css';
 import './preview.css';
@@ -55,8 +55,18 @@ function Preview({ scene, transport }) {
     const [qrOpen, setQrOpen] = useState(false);
     useImagePreviewSwipe(); useModalScrollLock();
     useEffect(() => {
-        const playback = createPreviewPlayback(window, { scene, transport, client, setQrOpen });
         const parentOrigin = new URL(document.baseURI).origin;
+        let readyFrame;
+        const fontReady = new Promise(resolve => {
+            // 첫 프레임을 보여준 뒤 원본 글꼴을 요청한다.
+            readyFrame = window.requestAnimationFrame(() => {
+                readyFrame = window.requestAnimationFrame(() => {
+                    window.parent.postMessage({ type: 'reserve:service-preview:ready' }, parentOrigin);
+                    resolve(loadPreviewFont(document));
+                });
+            });
+        });
+        const playback = createPreviewPlayback(window, { scene, transport, client, setQrOpen, fontReady });
         const receive = event => {
             if (!isPreviewMessage(event, window.parent, parentOrigin)) return;
             if (event.data.type === 'reserve:service-preview:active') {
@@ -66,12 +76,6 @@ function Preview({ scene, transport }) {
             } else playback.setProgress(event.data.progress);
         };
         window.addEventListener('message', receive);
-        // 바깥 화면은 시연의 첫 프레임이 그려질 때까지 골격을 유지한다.
-        let readyFrame = window.requestAnimationFrame(() => {
-            readyFrame = window.requestAnimationFrame(() => {
-                window.parent.postMessage({ type: 'reserve:service-preview:ready' }, parentOrigin);
-            });
-        });
         return () => {
             window.cancelAnimationFrame(readyFrame);
             window.removeEventListener('message', receive);

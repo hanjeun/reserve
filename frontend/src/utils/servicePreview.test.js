@@ -6,6 +6,7 @@ import { createPreviewTransport } from '../../../marketing/service-preview/trans
 import { serviceEntryStatus } from './serviceAdmissionStatus';
 import { isPreviewMessage, loadPreviewFont } from '../../../marketing/service-preview/playback';
 import { PREVIEW_STORE_PUBLIC_ID, resolvePreviewLocation } from '../../../marketing/service-preview/navigation';
+import { SECTIONS } from '../../../marketing/src/home/Home.constants';
 
 const NOVEMBER_NOW = Date.parse('2026-11-09T00:00:00Z');
 const busyDate = '2026-11-10';
@@ -20,6 +21,37 @@ const sampleBooking = async (adapter, fields) => {
     };
 };
 const submit = (adapter, data) => adapter({ url: '/api/reservations', method: 'POST', data });
+
+it('소개에 표시하는 세 장면은 서로 다른 앱 경로를 열어요', () => {
+    expect(SECTIONS.map(({ demo }) => [demo, resolvePreviewLocation(demo)])).toEqual([
+        ['explore', { pathname: '/stores', search: '', hash: '' }],
+        ['qr', { pathname: '/my-reservations', search: '?tab=reservation', hash: '' }],
+        ['business', { pathname: '/business', search: '?tab=analytics', hash: '' }],
+    ]);
+    expect(resolvePreviewLocation('unknown').pathname).toBe('/stores');
+    expect(resolvePreviewLocation('business', '?tab=analytics&statisticsRange=7d')?.search)
+        .toBe('?tab=analytics&statisticsRange=7d');
+    expect(resolvePreviewLocation('business', '/admin')).toBeNull();
+});
+
+it('사업자 장면은 소유 가게의 예시 통계를 기간별로 읽어요', async () => {
+    const options = { scene: 'business', now: () => NOVEMBER_NOW };
+    const { adapter, member } = createPreviewTransport(options);
+    const stats = (storeId, range) => adapter({ method: 'GET', url: `/api/stores/${storeId}/statistics`, params: { range } });
+    expect(member.role).toBe('BUSINESS');
+    const { data: { data: stores } } = await adapter({ method: 'GET', url: '/api/stores/my' });
+    expect(stores.map(store => store.ownerId)).toEqual([member.id, member.id]);
+    const { data: { data: recent } } = await stats(81, '7d');
+    const { data: { data: longer } } = await stats(81, '30d');
+    expect(recent.reservationTrend).toHaveLength(7);
+    expect(longer.reservationTrend).toHaveLength(30);
+    expect(recent.reservationTrend.at(-1).date).toBe('2026-11-09');
+    expect(longer.totalDepositRevenue).toBeGreaterThan(recent.totalDepositRevenue);
+    await expect(stats(99, '7d')).rejects.toMatchObject({ response: { status: 403 } });
+    await expect(adapter({ method: 'DELETE', url: '/api/stores/81' })).rejects.toMatchObject({ response: { status: 403 } });
+    await expect(previewTransport().adapter({ method: 'GET', url: '/api/stores/81/statistics' }))
+        .rejects.toMatchObject({ response: { status: 403 } });
+});
 
 it('같은 내 예약 화면에서 예약·웨이팅 탭과 각 탭의 필터를 유지해요', () => {
     expect(resolvePreviewLocation('reservations').search).toBe('?tab=reservation');

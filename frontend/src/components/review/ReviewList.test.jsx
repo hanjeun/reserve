@@ -317,11 +317,12 @@ describe('review read states', () => {
         }
     });
     it.each([
-        { isPC: false, width: 360, first: 2 },
-        { isPC: true, width: 1440, first: 6 },
-        { isPC: true, width: 950, first: 4 },
-        { isPC: true, width: 1700, first: 7 },
-    ])('fills the first photo row at $width px and only expands additional rows', async ({ isPC, width, first }) => {
+        { isPC: false, width: 360, first: 2, total: 7 },
+        { isPC: true, width: 1440, first: 6, total: 2 },
+        { isPC: true, width: 1440, first: 6, total: 7 },
+        { isPC: true, width: 950, first: 4, total: 7 },
+        { isPC: true, width: 1700, first: 7, total: 7 },
+    ])('keeps the first row sized for $width px with $total photos', async ({ isPC, width, first, total }) => {
         let resize;
         const OriginalObserver = globalThis.ResizeObserver;
         vi.stubGlobal('ResizeObserver', class extends OriginalObserver {
@@ -331,8 +332,8 @@ describe('review read states', () => {
                 if (node.classList.contains('reserve-review-photo-grid')) resize = this.callback;
             }
         });
-        const photos = Array.from({ length: 7 }, (_, index) => ({
-            id: index + 1, url: '/api/reviews/12/photos/' + (index + 1), width: 180, height: 320,
+        const photos = Array.from({ length: total }, (_, index) => ({
+            id: index + 1, url: '/api/reviews/12/photos/' + (index + 1), width: index === 0 ? 480 : 180, height: 320,
         }));
         reviewService.getReviewsByStore.mockResolvedValue([
             { id: 12, rating: 5, title: '사진 리뷰 1', photos: photos.slice(0, 5) },
@@ -349,17 +350,20 @@ describe('review read states', () => {
                 act(() => resize());
                 expect(grid.style.getPropertyValue('--review-photo-columns')).toBe(String(first));
             }
-            expect(within(overview).getAllByRole('button', { name: /리뷰 사진 \d+ 크게 보기/ })).toHaveLength(first);
+            const tiles = within(overview).getAllByRole('button', { name: /리뷰 사진 \d+ 크게 보기/ });
+            expect(tiles).toHaveLength(Math.min(first, total));
+            expect(tiles[0].style.getPropertyValue('--review-photo-ratio')).toBe('1.5');
+            expect(tiles[1].style.getPropertyValue('--review-photo-ratio')).toBe('0.5625');
             if (first < photos.length) {
                 fireEvent.click(within(overview).getByRole('button', { name: '사진 더 보기' }));
                 expect(within(overview).getByRole('button', { name: '사진 접기' })).toHaveAttribute('aria-expanded', 'true');
             } else expect(within(overview).queryByRole('button', { name: '사진 더 보기' })).toBeNull();
-            expect(within(overview).getAllByRole('button', { name: /리뷰 사진 \d+ 크게 보기/ })).toHaveLength(7);
+            expect(within(overview).getAllByRole('button', { name: /리뷰 사진 \d+ 크게 보기/ })).toHaveLength(total);
             expect(document.querySelector('.reserve-image-preview img')).toBeNull();
-            const lastPhoto = within(overview).getByRole('button', { name: '리뷰 사진 7 크게 보기' });
-            expect(lastPhoto.parentElement).toBe(within(overview).getByRole('button', { name: '리뷰 사진 1 크게 보기' }).parentElement);
+            const lastPhoto = within(overview).getByRole('button', { name: '리뷰 사진 ' + total + ' 크게 보기' });
+            expect(lastPhoto.parentElement).toBe(tiles[0].parentElement);
             fireEvent.click(lastPhoto);
-            await waitFor(() => expect(document.querySelector('.reserve-image-preview img')).toHaveAttribute('src', photos[6].url));
+            await waitFor(() => expect(document.querySelector('.reserve-image-preview img')).toHaveAttribute('src', photos[total - 1].url));
         } finally {
             view.unmount(); view.client.clear();
             vi.unstubAllGlobals();

@@ -374,7 +374,7 @@ const renderAdPerformance = (loading, adSummary) => {
 /*
  * 서버의 예약·매출 집계를 공통 통계 카드와 차트 토큰으로 표시한다.
  */
-const StatisticsTab = () => {
+const StatisticsTab = ({ showCsvActions = true }) => {
     const sessionRevision = useAuthStore(state => state.sessionRevision);
     const { stores: myStores, loading: storesLoading, error: storesError, refetch: refetchStores } = useMyStores();
     const [{ statisticsStore, statisticsRange }, setStatisticsParams] = useQueryParamsState(STATISTICS_QUERY_DEFAULTS);
@@ -386,7 +386,7 @@ const StatisticsTab = () => {
     const toolbarLoading = loading || isFetching;
     const selectedStore = myStores.find(store => store.id === storeId);
     const csvDisabled = toolbarLoading || Boolean(storesError || statsError) || !stats || !selectedStore;
-    const csvButton = (name, title, columns, rows) => <StatisticsCsvAction loading={loading} disabled={csvDisabled}
+    const csvButton = (name, title, columns, rows) => showCsvActions && <StatisticsCsvAction loading={loading} disabled={csvDisabled}
         aria-label={`${title} CSV 다운로드`} onClick={() => {
             if (csvDisabled || useAuthStore.getState().sessionRevision !== sessionRevision) return;
             const metadata = [
@@ -525,5 +525,7 @@ const StatisticsTab = () => {
         </div>
     );
 };
+
+StatisticsTab.propTypes = { showCsvActions: PropTypes.bool };
 
 export default StatisticsTab;

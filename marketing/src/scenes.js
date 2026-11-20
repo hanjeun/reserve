@@ -6,7 +6,6 @@ const ease = (from, to, value) => { const t = clamp((value - from) / (to - from)
 export function installMarketingScenes(document, motion, onProgress = () => {}) {
     const view = document.defaultView;
     const scenes = [...document.querySelectorAll('.marketing-scene')];
-    const screens = [...document.querySelectorAll('.marketing-phone-screen')];
     const navigation = [...document.querySelectorAll('[data-marketing-scene-nav]')];
     const videos = [...document.querySelectorAll('[data-hero-idle], [data-hero-video]')];
     const players = new Map(), transitions = new Map();
@@ -22,7 +21,8 @@ export function installMarketingScenes(document, motion, onProgress = () => {}) 
         frame = undefined;
         const now = view.performance.now();
         const header = document.querySelector('.marketing-header')?.getBoundingClientRect().height ?? 64;
-        const available = Math.max(1, view.innerHeight - header);
+        const viewportHeight = view.visualViewport?.scale === 1 ? view.visualViewport.height : view.innerHeight;
+        const available = Math.max(1, viewportHeight - header);
         let current, centerMatch, heroTarget, closest = Infinity;
         for (const scene of scenes) {
             if (!scene.getClientRects().length) {
@@ -98,9 +98,6 @@ export function installMarketingScenes(document, motion, onProgress = () => {}) 
                 placeHeroHandoff(scene, pose);
                 onProgress(scene, 0);
             } else {
-                const entry = motion.matches ? 1 : ease(0, 0.5, progress);
-                scene.style.setProperty('--phone-enter-y', `${(1 - entry) * 64}px`);
-                scene.style.setProperty('--phone-enter-scale', String(0.96 + entry * 0.04));
                 onProgress(scene, progress);
             }
         }
@@ -116,12 +113,6 @@ export function installMarketingScenes(document, motion, onProgress = () => {}) 
                 if (item.tagName === 'BUTTON') { if (active) item.setAttribute('aria-current', 'step'); else item.removeAttribute('aria-current'); }
             }
         }
-        for (const screen of screens) {
-            if (!screen.getClientRects().length) continue;
-            const scale = Math.min(screen.clientWidth / 402, screen.clientHeight / 874);
-            screen.style.setProperty('--phone-scale', String(scale));
-            screen.dataset.sizeReady = 'true';
-        }
     };
     const schedule = () => { if (frame == null) frame = view.requestAnimationFrame(update); };
     const metadata = () => schedule();
@@ -130,8 +121,6 @@ export function installMarketingScenes(document, motion, onProgress = () => {}) 
         players.set(video, createHeroPlayback(video, schedule));
         video.addEventListener('loadedmetadata', metadata);
     });
-    const resize = typeof view.ResizeObserver === 'function' ? new view.ResizeObserver(schedule) : null;
-    screens.forEach(screen => resize?.observe(screen));
     view.addEventListener('scroll', schedule, { passive: true });
     view.addEventListener('resize', schedule);
     document.addEventListener('reserve:service-preview-ready', schedule);
@@ -140,7 +129,6 @@ export function installMarketingScenes(document, motion, onProgress = () => {}) 
     schedule();
     return () => {
         if (frame != null) view.cancelAnimationFrame(frame);
-        resize?.disconnect();
         view.removeEventListener('scroll', schedule);
         view.removeEventListener('resize', schedule);
         document.removeEventListener('reserve:service-preview-ready', schedule);

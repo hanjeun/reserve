@@ -4,11 +4,27 @@ export const isPreviewMessage = (event, parent, origin) => event.source === pare
         || event.data?.type === 'reserve:service-preview:progress' && isPreviewProgress(event.data.progress));
 const ease = value => { const t = Math.max(0, Math.min(1, (value - 0.25) / 0.4)); return t * t * (3 - 2 * t); };
 
-export function createPreviewPlayback(view, { scene, transport, client, setQrOpen }) {
+export function loadPreviewFont(document) {
+    const href = document.querySelector('script[data-preview-font]')?.dataset.previewFont;
+    if (!href) return document.fonts?.ready;
+    return new Promise(resolve => {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = href;
+        link.addEventListener('load', () => {
+            const loaded = document.fonts?.load?.('14px "Pretendard Variable"', '예약');
+            resolve(loaded?.catch(() => undefined));
+        }, { once: true });
+        link.addEventListener('error', () => resolve(), { once: true });
+        document.head.append(link);
+    });
+}
+
+export function createPreviewPlayback(view, { scene, transport, client, setQrOpen, fontReady = view.document.fonts?.ready }) {
     const document = view.document, motion = view.matchMedia('(prefers-reduced-motion: reduce)');
     let active = false, manual = false, progress = 0, frame, positioned = false, open = false, pressed, paintFrame, painted = false;
-    let fontsReady = !document.fonts;
-    document.fonts?.ready.then(() => { fontsReady = true; schedule(); });
+    let fontsReady = !fontReady;
+    fontReady?.then(() => { fontsReady = true; schedule(); });
     const cancel = () => { if (frame != null) view.cancelAnimationFrame(frame); frame = undefined; };
     const clearPress = () => { pressed?.removeAttribute('data-preview-press'); pressed = undefined; };
     const updateQr = next => { if (next !== open) { open = next; setQrOpen(next); } };

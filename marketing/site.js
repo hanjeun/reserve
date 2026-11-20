@@ -2,6 +2,8 @@ import Hangul from 'hangul-js';
 import { installMarketingTyping } from './src/typing';
 import { installFaqMotion } from './src/faq';
 import { installMarketingScroll } from './src/scroll';
+import { installMarketingScenes } from './src/scenes';
+import { installServicePreviews } from './src/servicePreviews';
 
 document.documentElement.classList.add('js');
 const theme = window.matchMedia('(prefers-color-scheme: dark)');
@@ -12,6 +14,9 @@ theme.addEventListener('change', updateTheme);
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 installFaqMotion(document, motion);
 installMarketingTyping(document, motion, Hangul);
+// 미리보기 iframe 로딩과 기기 화면 배율/스크롤 장면을 함께 초기화한다.
+const servicePreviews = installServicePreviews(document);
+installMarketingScenes(document, motion, (scene, progress) => servicePreviews.progress(scene, progress));
 installMarketingScroll(document, motion);
 
 if ('IntersectionObserver' in window) {

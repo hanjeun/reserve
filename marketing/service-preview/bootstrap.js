@@ -25,7 +25,7 @@ try {
 const unavailable = () => {
     document.getElementById('root').textContent = '이 환경에서는 미리보기를 열 수 없어요.';
     if (globalThis.origin === 'null' && globalThis.parent !== globalThis) {
-        globalThis.parent.postMessage({ type: 'reserve:service-preview:ready' }, new URL(document.baseURI).origin);
+        globalThis.parent.postMessage({ type: 'reserve:service-preview:unavailable' }, new URL(document.baseURI).origin);
     }
 };
 if (globalThis.__RESERVE_PREVIEW_ISOLATED__ === true) {

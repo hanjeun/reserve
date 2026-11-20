@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { createPreviewTransport } from '../../../marketing/service-preview/transport';
 import { serviceEntryStatus } from './serviceAdmissionStatus';
-import { isPreviewMessage } from '../../../marketing/service-preview/playback';
+import { isPreviewMessage, loadPreviewFont } from '../../../marketing/service-preview/playback';
 import { PREVIEW_STORE_PUBLIC_ID, resolvePreviewLocation } from '../../../marketing/service-preview/navigation';
 
 const NOVEMBER_NOW = Date.parse('2026-11-09T00:00:00Z');
@@ -172,5 +172,24 @@ it('저장소를 격리하지 못하면 앱 코드를 불러오지 않아요', (
     expect(scope.__RESERVE_PREVIEW_ISOLATED__).toBe(false);
     expect(appended).not.toHaveBeenCalled();
     expect(status.textContent).toContain('미리보기를 열 수 없어요');
-    expect(postMessage).toHaveBeenCalledExactlyOnceWith({ type: 'reserve:service-preview:ready' }, 'https://reserve.example');
+    expect(postMessage).toHaveBeenCalledExactlyOnceWith({ type: 'reserve:service-preview:unavailable' }, 'https://reserve.example');
+});
+
+it.each(['load', 'error'])('지연된 글꼴 스타일의 %s 이후에도 시연을 이어가요', async outcome => {
+    const preview = document.implementation.createHTMLDocument();
+    const settings = preview.createElement('script');
+    settings.dataset.previewFont = '/service-preview/assets/pretendard-test.css';
+    preview.head.append(settings);
+    const load = vi.fn().mockResolvedValue([]);
+    Object.defineProperty(preview, 'fonts', { value: { load } });
+
+    expect(preview.querySelector('link')).toBeNull();
+    const fontReady = loadPreviewFont(preview);
+    const sheet = preview.querySelector('link[rel="stylesheet"]');
+    expect(sheet?.getAttribute('href')).toBe(settings.dataset.previewFont);
+    expect(load).not.toHaveBeenCalled();
+    sheet.dispatchEvent(new Event(outcome));
+    await fontReady;
+    if (outcome === 'load') expect(load).toHaveBeenCalledExactlyOnceWith('14px "Pretendard Variable"', '예약');
+    else expect(load).not.toHaveBeenCalled();
 });

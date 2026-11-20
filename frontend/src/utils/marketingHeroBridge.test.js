@@ -5,7 +5,7 @@ import { createPreviewPlayback } from '../../../marketing/service-preview/playba
 import { installServicePreviews } from '../../../marketing/src/servicePreviews';
 
 const cleanups = [];
-afterEach(() => { cleanups.splice(0).forEach(cleanup => cleanup()); vi.useRealTimers(); vi.restoreAllMocks(); document.body.innerHTML = ''; });
+afterEach(() => { cleanups.splice(0).forEach(cleanup => cleanup()); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); document.body.innerHTML = ''; });
 
 function mediaElement(allowReset = false) {
     const media = document.createElement('video');
@@ -178,12 +178,46 @@ it('시연 문서가 보낸 준비 신호가 도착해야 골격을 내리고 �
     expect(iframe.dataset.previewPainted).toBe('true');
 });
 
+it('보이는 기기의 크기를 먼저 맞추고 응답이 없으면 같은 미리보기를 다시 열 수 있어요', () => {
+    vi.useFakeTimers();
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+    let updateVisibility;
+    vi.stubGlobal('IntersectionObserver', class {
+        constructor(callback) { updateVisibility = callback; }
+        observe() {}
+        disconnect() {}
+    });
+    document.body.innerHTML = '<div class="marketing-phone-screen"><div class="marketing-phone-content">'
+        + '<iframe data-service-preview="explore" data-preview-src="/service-preview/index.html?scene=explore"></iframe>'
+        + '<button data-service-preview-retry>다시 불러오기</button></div></div>';
+    const screen = document.querySelector('.marketing-phone-screen');
+    Object.defineProperties(screen, { clientWidth: { value: 201 }, clientHeight: { value: 437 } });
+    const iframe = screen.querySelector('iframe');
+    const previews = installServicePreviews(document);
+    cleanups.push(previews.dispose);
+    expect(screen.dataset.sizeReady).toBe('true');
+    expect(screen.style.getPropertyValue('--phone-scale')).toBe('0.5');
+    expect(iframe).not.toHaveAttribute('src');
+
+    updateVisibility([{ target: iframe, isIntersecting: true }]);
+    expect(iframe).toHaveAttribute('src', '/service-preview/index.html?scene=explore');
+    vi.advanceTimersByTime(8000);
+    expect(iframe.dataset.previewFailed).toBe('true');
+    screen.querySelector('button').click();
+    expect(iframe.dataset.previewFailed).toBeUndefined();
+    expect(iframe.dataset.started).toBe('true');
+    window.dispatchEvent(new MessageEvent('message', {
+        origin: 'null', source: iframe.contentWindow, data: { type: 'reserve:service-preview:ready' },
+    }));
+    vi.advanceTimersByTime(8000);
+    expect(iframe.dataset.previewReady).toBe('true');
+    expect(iframe.dataset.previewFailed).toBeUndefined();
+});
+
 it('글꼴과 예약 폼의 시작 위치를 맞춘 뒤에만 실제 그리기 신호를 보내요', async () => {
     document.body.innerHTML = '<div id="root"><section class="reserve-store-action-panel"><form></form></section></div>';
     let resolveFonts, position = 0, next = 0; const frames = new Map();
-    const previousFonts = Object.getOwnPropertyDescriptor(document, 'fonts');
-    Object.defineProperty(document, 'fonts', { configurable: true, value: { ready: new Promise(resolve => { resolveFonts = resolve; }) } });
-    cleanups.push(() => { if (previousFonts) Object.defineProperty(document, 'fonts', previousFonts); else delete document.fonts; });
+    const fontReady = new Promise(resolve => { resolveFonts = resolve; });
     Object.defineProperty(document.documentElement, 'scrollHeight', { configurable: true, value: 2000 });
     cleanups.push(() => { delete document.documentElement.scrollHeight; });
     vi.spyOn(window, 'scrollY', 'get').mockImplementation(() => position);
@@ -193,7 +227,8 @@ it('글꼴과 예약 폼의 시작 위치를 맞춘 뒤에만 실제 그리기 �
     vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(id => frames.delete(id));
     const post = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => {});
     const run = () => { const work = [...frames.values()]; frames.clear(); work.forEach(callback => callback(0)); };
-    const playback = createPreviewPlayback(window, { scene: 'booking', transport: {}, client: {}, setQrOpen: vi.fn() }); cleanups.push(playback.dispose);
+    const playback = createPreviewPlayback(window, { scene: 'booking', transport: {}, client: {}, setQrOpen: vi.fn(), fontReady });
+    cleanups.push(playback.dispose);
     playback.setActive(true); run();
     expect(position).toBe(100); expect(post).not.toHaveBeenCalled();
     resolveFonts(); await Promise.resolve(); run(); run(); run();

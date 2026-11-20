@@ -94,7 +94,7 @@ html:not(.js) .reveal{opacity:1;transform:translateY(0)}
 @media(max-width:768px){
     .marketing-hero{padding:48px 22px}
     .marketing-hero-title{font-size:clamp(28px,7.5vw,36px);line-height:1.3;letter-spacing:-.05em;margin-bottom:24px}
-    .marketing-feature{--marketing-feature-title-size:clamp(26px,7.5vw,34px);display:flex;align-items:center;height:auto;min-height:calc(100svh - var(--marketing-header-height,64px));padding:32px 18px}
+    .marketing-feature{--marketing-feature-title-size:clamp(26px,7.5vw,34px);display:flex;align-items:center;height:auto;min-height:calc(100dvh - var(--marketing-header-height,64px));padding:32px 18px}
     .marketing-feature-inner{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto;align-content:center;gap:24px}
     .marketing-feature-copy,.marketing-feature.is-reversed .marketing-feature-copy{order:0;text-align:center}
     .marketing-feature-media,.marketing-feature.is-reversed .marketing-feature-media{order:1;height:auto}

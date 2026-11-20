@@ -4,6 +4,7 @@ import { basename, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
 import { buildServicePreview } from './build-service-preview.mjs';
+import { isPreviewScene, previewDocumentPath } from './service-preview/navigation.js';
 import { collectDependencyNotices } from '../frontend/scripts/bundle-notices.mjs';
 const root = fileURLToPath(new URL('.', import.meta.url));
 const output = resolve(root, 'dist');
@@ -44,7 +45,9 @@ function staticMarkup(source, mobile = false) {
             }
             const path = attr('data-app-path');
             const preview = attr('data-preview-src');
-            if (preview && (node.tagName !== 'iframe' || !/^\/service-preview\/index\.html\?scene=(explore|booking|reservations|waiting|qr)$/.test(preview.value)
+            const scene = attr('data-service-preview')?.value;
+            if ((preview || scene) && (node.tagName !== 'iframe' || !isPreviewScene(scene)
+                || preview?.value !== previewDocumentPath(scene)
                 || attr('sandbox')?.value !== 'allow-scripts allow-forms')) throw new Error('Invalid service preview frame');
             if (path) {
                 const url = new URL(path.value, app.origin);

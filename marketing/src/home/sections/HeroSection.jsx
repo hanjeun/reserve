@@ -2,7 +2,7 @@ import { LINES, fullText } from '../../typing';
 import TypingLine from '../../TypingLine';
 import BounceArrow from './BounceArrow';
 import FeatureSection from './FeatureSection';
-import { SECTIONS } from '../Home.constants';
+import { BOOKING_HANDOFF } from '../Home.constants';
 
 export default function HeroSection({ heroVideo, isMobile }) {
     const video = heroVideo?.[isMobile ? 'mobile' : 'desktop'];
@@ -30,8 +30,8 @@ export default function HeroSection({ heroVideo, isMobile }) {
                 </a>
             </div>
         </div>
-        {video && <div className="marketing-hero-handoff" data-hero-handoff inert aria-hidden="true"><FeatureSection sec={{ ...SECTIONS[1], reverse: false }} index={1} embedded /></div>}
-        <BounceArrow targetId={heroVideo ? 'section-1' : 'section-0'} style={{ position: 'absolute', bottom: 16, left: 0, right: 0 }} />
+        {video && <div className="marketing-hero-handoff" data-hero-handoff inert aria-hidden="true"><FeatureSection sec={BOOKING_HANDOFF} index={1} embedded /></div>}
+        <BounceArrow targetId={video ? BOOKING_HANDOFF.id : 'section-0'} style={{ position: 'absolute', bottom: 16, left: 0, right: 0 }} />
         </div>
         {video && <div className="marketing-hero-landing" aria-hidden="true" />}
     </section>;

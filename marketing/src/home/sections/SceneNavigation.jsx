@@ -1,7 +1,12 @@
-import { SECTIONS } from '../Home.constants';
+import { BOOKING_HANDOFF } from '../Home.constants';
 
-export default function SceneNavigation({ firstFeature = 0 }) {
-    const sections = [{ id: firstFeature ? 'section-0' : 'section-top', tag: '처음' }, ...SECTIONS.slice(firstFeature), { id: 'section-faq', tag: '자주 묻는 질문' }];
+export default function SceneNavigation({ features, hasHeroVideo }) {
+    const sections = [
+        { id: hasHeroVideo ? 'section-0' : 'section-top', tag: '처음' },
+        ...(hasHeroVideo ? [BOOKING_HANDOFF] : []),
+        ...features,
+        { id: 'section-faq', tag: '자주 묻는 질문' },
+    ];
     return <>
         <nav className="marketing-scene-navigation" aria-label="소개 단계" data-marketing-scene-nav>
             {sections.map(section => <button type="button" key={section.id} data-scroll-target={section.id}

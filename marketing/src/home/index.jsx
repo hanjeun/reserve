@@ -7,16 +7,16 @@ import MarketingBackdrop from './sections/MarketingBackdrop';
 import SceneNavigation from './sections/SceneNavigation';
 
 export default function Home({ isMobile = false, heroVideo }) {
+    const hasHeroVideo = Boolean(heroVideo?.[isMobile ? 'mobile' : 'desktop']);
+    const features = hasHeroVideo ? SECTIONS.slice(1) : SECTIONS;
     return (
         <div className="marketing-home" style={{ overflowX: 'clip' }}>
             <MarketingBackdrop />
-            <SceneNavigation firstFeature={heroVideo ? 1 : 0} />
+            <SceneNavigation features={features} hasHeroVideo={hasHeroVideo} />
 
             <HeroSection heroVideo={heroVideo} isMobile={isMobile} />
 
-            {SECTIONS.map((sec, i) => (
-                (!heroVideo || i > 1) && <FeatureSection key={sec.id} sec={sec} index={i} isMobile={isMobile} />
-            ))}
+            {features.map((sec, index) => <FeatureSection key={sec.id} sec={sec} index={index + (hasHeroVideo ? 2 : 0)} />)}
 
             <FaqSection isMobile={isMobile} />
 

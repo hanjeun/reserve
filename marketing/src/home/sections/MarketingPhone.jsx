@@ -1,3 +1,5 @@
+import { previewDocumentPath } from '../../../service-preview/navigation';
+
 export default function MarketingPhone({ scene, label }) {
     return <figure className="marketing-device" data-marketing-scroll-stop aria-label={`${label} 시연`}>
         <div className="marketing-phone">
@@ -13,7 +15,7 @@ export default function MarketingPhone({ scene, label }) {
                     </div>
                     <div className="marketing-phone-content">
                         <iframe className="marketing-phone-webview" title={`${label} 실제 화면 미리보기`}
-                            data-service-preview={scene} data-preview-src={`/service-preview/index.html?scene=${scene}`}
+                            data-service-preview={scene} data-preview-src={previewDocumentPath(scene)}
                             sandbox="allow-scripts allow-forms" loading="lazy" referrerPolicy="same-origin" width="402" height="780" />
                         <div className="marketing-phone-loading" aria-hidden="true"><span /><span /><span /></div>
                         <div className="marketing-phone-error">

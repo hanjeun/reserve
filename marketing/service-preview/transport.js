@@ -8,11 +8,33 @@ const pageOf = (all, params) => {
     return { content: all.slice(number * size, (number + 1) * size), page: { number, size, totalElements: all.length, totalPages: Math.ceil(all.length / size) } };
 };
 
-export function createPreviewTransport({ now = Date.now } = {}) {
+const statisticsDays = { '7d': 7, '30d': 30, '90d': 90 };
+const dailyReservations = [3, 5, 4, 7, 6, 9, 8];
+
+function previewStatistics(store, range, now) {
+    const days = Object.hasOwn(statisticsDays, range) ? statisticsDays[range] : statisticsDays['30d'];
+    const reservationTrend = Array.from({ length: days }, (_, index) => ({
+        date: previewBookingDate(now, index + 1 - days),
+        value: dailyReservations[index % dailyReservations.length] + (store.id === 82 ? 2 : 0),
+    }));
+    const revenueTrend = reservationTrend.map(day => ({ ...day, value: day.value * 5000 }));
+    const total = reservationTrend.reduce((sum, day) => sum + day.value, 0);
+    const completed = Math.floor(total * 0.8);
+    return {
+        averageRating: store.rating, reviewCount: store.id === 81 ? 28 : 19,
+        totalDepositRevenue: revenueTrend.reduce((sum, day) => sum + day.value, 0),
+        statusBreakdown: { COMPLETED: completed, CONFIRMED: total - completed },
+        reservationTrend, revenueTrend,
+    };
+}
+
+export function createPreviewTransport({ scene, now = Date.now } = {}) {
     const startedAt = now();
     const firstOpenDay = (store, offset) => [offset, offset + 1].map(days => previewBookingDate(startedAt, days))
         .find(date => describePreviewBookingDay(store, date, [], startedAt).status === 'OPEN');
-    const member = { id: 41, name: '미리보기 회원', email: 'preview@example.test', role: 'USER', termsAgreed: true, emailNotificationEnabled: true, marketingAgreed: false };
+    const business = scene === 'business';
+    const member = { id: business ? 8 : 41, name: business ? '미리보기 사업자' : '미리보기 회원',
+        email: 'preview@example.test', role: business ? 'BUSINESS' : 'USER', termsAgreed: true, emailNotificationEnabled: true, marketingAgreed: false };
     const store = { id: 81, publicId: PREVIEW_STORE_PUBLIC_ID, name: '모던 필라테스 스튜디오', category: '필라테스', serviceDomain: 'SPORTS', ownerId: 8, status: 'ACTIVE',
         description: '몸을 움직이는 시간을 함께해요.', address: '서울 종로구 예시길 12', phone: '02-0000-0000',
         mainImageUrl: '/marketing-images/pilates.jpg', mainImageWidth: 400, mainImageHeight: 267,
@@ -22,6 +44,7 @@ export function createPreviewTransport({ now = Date.now } = {}) {
         rating: 4.8, reviewCount: 0, noShowDeposit: 0, maxCapacityPerSlot: 6, bookingDeadlineHours: 1, maxAdvanceBookingDays: 30,
         closedDays: [1], allowDuplicateReservation: false, autoApprovalEnabled: true };
     const stores = [store, { ...store, id: 82, publicId: '00000000-0000-4000-8000-000000000082', name: '청담 헤어살롱', category: '헤어', serviceDomain: 'BEAUTY_CLINIC', address: '서울 강남구 예시길 24', mainImageUrl: '/marketing-images/hair.jpg', detailImageUrls: ['/marketing-images/hair.jpg'] }];
+    const ownedStores = business ? stores.filter(item => item.ownerId === member.id) : [];
     const busyDate = firstOpenDay(store, 1);
     // 한 날짜의 마지막 두 자리를 채워 마감과 취소 후 복원을 시연할 수 있게 한다.
     const backgroundBookings = previewSlotGrid(store).map(time => ({
@@ -80,6 +103,9 @@ export function createPreviewTransport({ now = Date.now } = {}) {
             const addressedStore = stores.find(item => path === '/api/stores/' + item.publicId);
             if (addressedStore) return respond(addressedStore);
             if (path === '/api/stores/regions') return respond([{ name: '서울', count: 2, areas: [{ name: '종로구', count: 1 }, { name: '강남구', count: 1 }] }]);
+            if (path === '/api/stores/my') return respond(ownedStores);
+            const statisticsStore = ownedStores.find(item => path === `/api/stores/${item.id}/statistics`);
+            if (statisticsStore) return respond(previewStatistics(statisticsStore, params.get('range'), requestTime));
             if (path === '/api/tourism/region-photos' || path === '/api/tourism/region-photos/catalog') return respond([]);
             if (path.startsWith('/api/favorites/status/')) return respond({ isFavorite: favorites.has(Number(path.split('/').at(-1))) });
             if (path === '/api/reservations/my/page') return respond(pageOf(reservations.filter(item =>
@@ -120,7 +146,7 @@ export function createPreviewTransport({ now = Date.now } = {}) {
             if (path === '/api/waiting/retention-policy') return respond(waitingPolicy);
             if (path === '/api/store-news/config') return respond({ enabled: false, imageEnabled: false, benefitEventsEnabled: false });
             if (/^\/api\/reviews\/store\/8[12]$/.test(path)) return respond([]);
-            if (path === '/api/holidays' || path === '/api/advertisements/active' || path === '/api/stores/my') return respond([]);
+            if (path === '/api/holidays' || path === '/api/advertisements/active') return respond([]);
             if (path.includes('/unread') || path.includes('/unread-count')) return respond(0);
         }
         // 실제 계정·결제·관리 경로로 넘기는 기본 어댑터는 두지 않는다.

@@ -234,3 +234,29 @@ it('글꼴과 예약 폼의 시작 위치를 맞춘 뒤에만 실제 그리기 �
     resolveFonts(); await Promise.resolve(); run(); run(); run();
     expect(post).toHaveBeenCalledExactlyOnceWith({ type: 'reserve:service-preview:painted' }, new URL(document.baseURI).origin);
 });
+
+it('예약의 QR 도구가 나타난 뒤에만 시연 모달을 열고 직접 조작을 우선해요', async () => {
+    document.body.innerHTML = '<div id="root"></div>';
+    const frames = new Map();
+    let next = 0;
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => { frames.set(++next, callback); return next; });
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(id => frames.delete(id));
+    const runFrame = () => { const work = [...frames.values()]; frames.clear(); work.forEach(callback => callback(0)); };
+    const setQrOpen = vi.fn();
+    const playback = createPreviewPlayback(window, { scene: 'qr', transport: {}, client: {}, setQrOpen });
+    cleanups.push(playback.dispose);
+    playback.setActive(true);
+    playback.setProgress(0.6);
+    runFrame();
+    expect(setQrOpen).not.toHaveBeenCalled();
+
+    document.getElementById('root').innerHTML = '<button>QR</button>';
+    await Promise.resolve();
+    runFrame();
+    expect(setQrOpen).toHaveBeenCalledExactlyOnceWith(true);
+
+    window.dispatchEvent(new Event('pointerdown'));
+    playback.setProgress(0);
+    runFrame();
+    expect(setQrOpen).toHaveBeenCalledTimes(1);
+});

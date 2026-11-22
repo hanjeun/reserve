@@ -91,7 +91,7 @@ test('past unpaid ads cannot be paid and both ad previews keep the shared modal 
     await dateDialog.getByRole('button', { name: `${month}월 2일` }).click();
     await dateDialog.getByRole('button', { name: '선택 완료' }).click();
 
-    await dialog.getByRole('button', { name: '미리보기' }).click();
+    await dialog.getByRole('button', { name: '미리보기', exact: true }).click();
     let previewDialog = page.getByRole('dialog', { name: '광고 미리보기' });
     const placementPreview = previewDialog.locator('.reserve-ad-placement-preview');
     await expect(placementPreview).toBeVisible();
@@ -138,7 +138,7 @@ test('past unpaid ads cannot be paid and both ad previews keep the shared modal 
     await dialog.locator('input[type="file"]').setInputFiles(path.resolve('public/images/discovery-v3/operation-guide-cover-v1.webp'));
     const modalBody = dialog.locator('.ant-modal-body');
     await modalBody.evaluate(element => { element.scrollTop = element.scrollHeight; });
-    await dialog.getByRole('button', { name: '미리보기' }).click();
+    await dialog.getByRole('button', { name: '미리보기', exact: true }).click();
 
     previewDialog = page.getByRole('dialog', { name: '광고 미리보기' });
     await expect(previewDialog.getByRole('heading', { name: '가게 목록 화면' })).toBeVisible();

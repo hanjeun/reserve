@@ -141,7 +141,12 @@ test('comment attachments expand above the field and keep its tools usable', asy
     await composer.scrollIntoViewIfNeeded();
     const before = await composer.boundingBox();
     await page.getByLabel('첨부할 사진 선택').setInputFiles(files);
-    await expect(composer.getByRole('button', { name: '첨부 사진 크게 보기', exact: true })).toHaveCount(3);
+    await expect(composer.getByRole('button', { name: /^댓글 사진 \d+ 미리보기$/ })).toHaveCount(3);
+    const thumbnail = composer.locator('.reserve-photo-upload-image').first();
+    await expect.poll(() => thumbnail.evaluate(image => {
+        const { width, height } = image.getBoundingClientRect();
+        return Math.abs(width / height - image.naturalWidth / image.naturalHeight);
+    })).toBeLessThan(0.02);
     await expect.poll(async () => (await composer.boundingBox()).height).toBeGreaterThan(before.height);
     const field = await composer.locator('.reserve-chat-composer-input-area').boundingBox();
     const text = await composer.locator('textarea').boundingBox();

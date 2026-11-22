@@ -71,10 +71,11 @@ const StoreImages = ({
                     onPreview={onPreview}
                     beforeUpload={validateImage}
                     maxCount={1}
+                    showTrigger={mainImage.length === 0}
                     accept={IMAGE_ACCEPT}
                     onClickCapture={onPreviewClickCapture}
                 >
-                    {mainImage.length === 0 && <ImageUploadButton />}
+                    <ImageUploadButton />
                 </LoadingUpload>
             </Form.Item>
 
@@ -94,11 +95,12 @@ const StoreImages = ({
                     onPreview={(file) => onPreview(file, detailImages)}
                     beforeUpload={validateImage}
                     maxCount={5}
+                    showTrigger={detailImages.length < 5}
                     multiple
                     accept={IMAGE_ACCEPT}
                     onClickCapture={onPreviewClickCapture}
                 >
-                    {detailImages.length < 5 && <ImageUploadButton />}
+                    <ImageUploadButton />
                 </SortableImageUpload>
             </Form.Item>
             <Form.Item

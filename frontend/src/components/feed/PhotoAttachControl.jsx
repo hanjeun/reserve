@@ -24,7 +24,7 @@ export default function PhotoAttachControl({ images, onSelect, onRemove, onReord
     };
     return <div className="reserve-feed-photo-upload" data-discovery-swipe-ignore="true">
         <p className="reserve-feed-photo-upload-label">{label}{required && ' (필수)'}</p>
-        <SortableImageUpload listType="picture-card" fileList={files} maxCount={maxImages} multiple
+        <SortableImageUpload listType="picture-card" fileList={files} maxCount={maxImages} multiple showTrigger={enabled && images.length < maxImages}
             accept="image/jpeg,image/png,image/webp" aria-label={`${label} 선택`} disabled={busy}
             openFileDialogOnClick={!selectionDisabled}
             beforeUpload={selectFiles} onClickCapture={suppressLinkNavigation}
@@ -32,7 +32,7 @@ export default function PhotoAttachControl({ images, onSelect, onRemove, onReord
             onRemove={file => { if (!busy) onRemove(file.uid); return false; }}
             onReorder={next => { if (!busy) onReorder(next.map(file => file.uid)); }}
             showUploadList={{ showPreviewIcon: true, showRemoveIcon: !busy, showDownloadIcon: false }}>
-            {enabled && images.length < maxImages && <ImageUploadButton />}
+            <ImageUploadButton />
         </SortableImageUpload>
         <p className="reserve-feed-note">{images.length}/{maxImages}장 · 한 장당 {Math.floor(maxBytes / 1024 / 1024)}MB 이하</p>
         {!enabled && <p className="reserve-feed-note" role="status">사진 업로드를 준비하고 있어요.{required && ' 사진 업로드가 준비되면 신청할 수 있어요.'}</p>}

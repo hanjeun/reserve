@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { arrayMove } from '@dnd-kit/sortable';
 import useAuthStore from '../store/useAuthStore';
 import chatService from '../services/chatService';
-import { chatAttachmentError, CHAT_DOCUMENT_MAX_BYTES, CHAT_PHOTO_MAX_BYTES } from '../utils/chatAttachments';
+import { chatAttachmentError, chatAttachmentKind, CHAT_DOCUMENT_MAX_BYTES, CHAT_PHOTO_MAX_BYTES } from '../utils/chatAttachments';
 
 const EMPTY_FILES = [];
 
@@ -50,6 +51,16 @@ export default function useChatImageDraft(threadKey) {
             });
         },
         remove: selected => edit(current => ({ scope, selectionError: '', files: current.files.filter(file => file !== selected) })),
+        movePhoto: (source, target) => {
+            if (!enabled || error || threadKey == null || source === target
+                || chatAttachmentKind(source) !== 'photo' || chatAttachmentKind(target) !== 'photo') return;
+            edit(current => {
+                const from = current.files.indexOf(source);
+                const to = current.files.indexOf(target);
+                if (from < 0 || to < 0) return current;
+                return { ...current, files: arrayMove(current.files, from, to) };
+            });
+        },
         clear: () => edit(() => emptyDraft(scope)),
         restore: selected => edit(current => current.files.length ? current : { scope, selectionError: '', files: selected }),
     };

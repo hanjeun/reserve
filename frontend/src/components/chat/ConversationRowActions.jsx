@@ -1,10 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
-import { Dropdown } from 'antd';
-import { EyeInvisibleOutlined, EyeOutlined, LogoutOutlined, MoreOutlined } from '../common/icons';
-import IconTool from '../common/IconTool';
+import { EyeInvisibleOutlined, EyeOutlined, LogoutOutlined } from '../common/icons';
 import Button from '../common/Button';
-import Tooltip from '../common/Tooltip';
 import { useMessage } from '../../hooks';
 
 const ACTION_WIDTH = 96;
@@ -15,14 +12,13 @@ export default function ConversationRowActions({ children, title, hidden = false
     const [side, setSide] = useState(0);
     const [dragging, setDragging] = useState(false);
     const [pending, setPending] = useState(false);
-    const [menuOpen, setMenuOpen] = useState(false);
     const root = useRef(null);
     const gesture = useRef(null);
     const suppressClick = useRef(false);
     const busy = useRef(false);
     const confirmation = useRef(null);
     const mounted = useRef(true);
-    const actionId = useId();
+    const instructionsId = useId();
     const { confirm, message } = useMessage();
     const visibilityLabel = hidden ? '복원' : '숨기기';
     const visibilityIcon = hidden ? <EyeOutlined aria-hidden="true" /> : <EyeInvisibleOutlined aria-hidden="true" />;
@@ -51,8 +47,7 @@ export default function ConversationRowActions({ children, title, hidden = false
             setDragging(false);
             const direction = cancelled ? 0 : Math.sign(start.offset);
             const fullDistance = Math.max(116, start.width * 0.6);
-            if (direction && Math.abs(start.offset) >= fullDistance
-                && (start.offset - start.origin) * direction >= fullDistance) {
+            if (direction && !start.origin && start.distance * direction >= fullDistance) {
                 setSide(0);
                 confirmAction(direction > 0 ? 'leave' : 'visibility');
             } else {
@@ -70,9 +65,11 @@ export default function ConversationRowActions({ children, title, hidden = false
             return;
         }
         if (event.target.closest('.reserve-messenger-row')) {
-            const offset = side * ACTION_WIDTH;
-            const width = root.current?.clientWidth || ACTION_WIDTH;
-            gesture.current = { id: event.pointerId, x: event.clientX, y: event.clientY, axis: null, origin: offset, offset, width };
+            const width = root.current?.clientWidth || ACTION_WIDTH * 2;
+            const limit = Math.min(ACTION_WIDTH, width / 2);
+            const offset = side * limit;
+            gesture.current = { id: event.pointerId, x: event.clientX, y: event.clientY,
+                axis: null, direction: side, origin: offset, offset, distance: 0, limit, width };
         }
     };
     const pointerMove = event => {
@@ -83,6 +80,7 @@ export default function ConversationRowActions({ children, title, hidden = false
         if (!start.axis && Math.max(Math.abs(dx), Math.abs(dy)) > 10) {
             start.axis = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y';
             if (start.axis === 'x') {
+                start.direction ||= Math.sign(dx);
                 if (event.pointerType !== 'touch') root.current?.setPointerCapture?.(event.pointerId);
                 setDragging(true);
             }
@@ -90,7 +88,10 @@ export default function ConversationRowActions({ children, title, hidden = false
         if (start.axis !== 'x') return;
         suppressClick.current = true;
         if (event.pointerType !== 'touch') event.preventDefault();
-        start.offset = Math.min(onLeave ? start.width : 0, Math.max(-start.width, start.origin + dx));
+        start.distance = dx;
+        const limit = start.direction > 0 && !onLeave ? 0 : start.limit;
+        // 한 제스처는 한쪽 동작만 열고, 길게 밀었는지는 손가락 이동으로 판단한다.
+        start.offset = start.direction * Math.min(limit, Math.max(0, (start.origin + dx) * start.direction));
         root.current?.style.setProperty(DRAG_OFFSET, `${start.offset}px`);
         setSide(Math.sign(start.offset));
     };
@@ -134,9 +135,24 @@ export default function ConversationRowActions({ children, title, hidden = false
     const actionVisible = Boolean(side) && !dragging;
     const visibilityVisible = actionVisible && side < 0;
     const leaveVisible = actionVisible && side > 0;
-    const menuLabel = `${title} 대화 메뉴`;
+    const handleKeyDown = event => {
+        if (event.key === 'Escape' && side) {
+            event.preventDefault();
+            event.stopPropagation();
+            setSide(0);
+            root.current?.querySelector('.reserve-messenger-row')?.focus();
+            return;
+        }
+        if (!event.target.matches('.reserve-messenger-row') || gesture.current || busy.current || confirmation.current) return;
+        if (event.key === 'ArrowLeft') setSide(-1);
+        else if (event.key === 'ArrowRight' && onLeave) setSide(1);
+        else return;
+        event.preventDefault();
+        event.stopPropagation();
+    };
     return <div ref={root} className="reserve-messenger-row-actions" data-discovery-swipe-ignore="true"
-        style={{ '--reserve-messenger-row-action-width': `${ACTION_WIDTH}px` }}
+        role="group" aria-describedby={instructionsId}
+        style={{ '--reserve-messenger-row-action-width': `min(${ACTION_WIDTH}px, 50%)` }}
         data-dragging={dragging || undefined}
         data-reveal={side < 0 ? 'left' : side > 0 ? 'right' : undefined}
         onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerCancel}
@@ -157,54 +173,30 @@ export default function ConversationRowActions({ children, title, hidden = false
                 event.stopPropagation();
             }
         }}
-        onKeyDown={event => {
-            if (event.key !== 'Escape' || !side) return;
-            event.preventDefault();
-            event.stopPropagation();
-            setSide(0);
-            root.current?.querySelector('.reserve-messenger-row-menu button')?.focus();
-        }}
+        onKeyDown={handleKeyDown}
         onBlur={event => {
             if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) setSide(0);
         }}>
-        <div id={actionId} className="reserve-messenger-row-swipe-action reserve-messenger-row-visibility"
+        <span id={instructionsId} className="reserve-messenger-sr-only">
+            왼쪽 방향키로 {visibilityLabel}{onLeave ? ', 오른쪽 방향키로 나가기' : ''} 버튼을 열고 Tab 키로 이동할 수 있어요.
+        </span>
+        <div className="reserve-messenger-row-front">{children}</div>
+        <div className="reserve-messenger-row-swipe-action reserve-messenger-row-visibility"
             inert={!visibilityVisible || undefined} aria-hidden={!visibilityVisible}>
-            <Button variant="ghost-sm" size="sm" loading={pending} onClick={() => runAction('visibility')}
+            <Button variant="ghost-sm" size="sm" loading={pending} tabIndex={visibilityVisible ? undefined : -1}
+                onClick={() => runAction('visibility')}
                 aria-label={`${title} ${visibilityLabel}`}>
                 {visibilityIcon}{visibilityLabel}
             </Button>
         </div>
         {onLeave && <div className="reserve-messenger-row-swipe-action reserve-messenger-row-leave"
             inert={!leaveVisible || undefined} aria-hidden={!leaveVisible}>
-            <Button variant="ghost-sm-danger" size="sm" loading={pending} onClick={() => confirmAction('leave')}
+            <Button variant="ghost-sm-danger" size="sm" loading={pending} tabIndex={leaveVisible ? undefined : -1}
+                onClick={() => confirmAction('leave')}
                 aria-label={`${title} 채팅방 나가기`}>
                 <LogoutOutlined aria-hidden="true" />나가기
             </Button>
         </div>}
-        <div className="reserve-messenger-row-front">
-            {children}
-            <span className="reserve-messenger-row-menu">
-                {onLeave ? <Dropdown trigger={['click']} placement="bottomRight" open={menuOpen} autoFocus
-                    onOpenChange={open => {
-                        setMenuOpen(open);
-                        if (open) setSide(0);
-                    }}
-                    menu={{ items: [
-                        { key: 'visibility', icon: visibilityIcon, label: visibilityLabel },
-                        { key: 'leave', icon: <LogoutOutlined aria-hidden="true" />, label: '채팅방 나가기', danger: true },
-                    ], onClick: ({ key }) => {
-                        setMenuOpen(false);
-                        if (key === 'leave') confirmAction('leave');
-                        else void runAction('visibility');
-                    } }}>
-                    <Tooltip title={menuLabel} disabled={menuOpen}>
-                        <button type="button" className="reserve-icon-tool" aria-label={menuLabel} aria-haspopup="menu"
-                            aria-expanded={menuOpen} disabled={pending}><MoreOutlined /></button>
-                    </Tooltip>
-                </Dropdown> : <IconTool label={menuLabel} icon={<MoreOutlined />} disabled={pending}
-                    expanded={actionVisible} controls={actionId} onClick={() => setSide(value => value ? 0 : -1)} />}
-            </span>
-        </div>
     </div>;
 }
 

@@ -23,7 +23,7 @@ const EMOJI = [
 export default function ChatComposer({ value, onChange, onSend, sending = false, disabled = false,
     file, onFileChange, imageEnabled = false, imageLoading = false, onCancel,
     imageError, imageRetrying = false, onImageRetry,
-    files, onFilesChange, onRemoveFile, onStageFiles, allowDocuments, draftScope,
+    files, onFilesChange, onRemoveFile, onMovePhoto, onStageFiles, allowDocuments, draftScope,
     maxLength = 2000, placeholder = '메시지를 입력하세요', inputLabel = '메시지 입력', sendText = '보내기',
     inputRef, attachmentControl, attachments, attachmentError, hasAttachments = Boolean(files?.length || file) }) {
     const input = useRef(null);
@@ -125,7 +125,7 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
     if (attachmentControl != null) return renderComposer(attachmentControl, attachments, hasAttachments);
     return <ChatImagePicker file={file} onChange={onFileChange} files={files} onFilesChange={onFilesChange} onRemoveFile={onRemoveFile}
         enabled={imageEnabled || imageLoading || Boolean(imageError)} disabled={blocked || imageLoading || Boolean(imageError)}
-        allowDocuments={allowDocuments} onStageFiles={onStageFiles} draftScope={draftScope}
+        allowDocuments={allowDocuments} onStageFiles={onStageFiles} onMovePhoto={onMovePhoto} draftScope={draftScope}
         renderContent={(control, previews, expanded) => renderComposer(control, attachments ?? previews, expanded)} />;
 }
 
@@ -138,6 +138,6 @@ ChatComposer.propTypes = {
     sendText: PropTypes.string, inputRef: PropTypes.oneOfType([PropTypes.func, PropTypes.shape({ current: PropTypes.any })]),
     attachmentControl: PropTypes.oneOfType([PropTypes.node, PropTypes.func]), attachments: PropTypes.node,
     attachmentError: PropTypes.string, hasAttachments: PropTypes.bool,
-    files: PropTypes.arrayOf(PropTypes.object), onFilesChange: PropTypes.func, onRemoveFile: PropTypes.func,
+    files: PropTypes.arrayOf(PropTypes.object), onFilesChange: PropTypes.func, onRemoveFile: PropTypes.func, onMovePhoto: PropTypes.func,
     onStageFiles: PropTypes.func, allowDocuments: PropTypes.bool, draftScope: PropTypes.string,
 };

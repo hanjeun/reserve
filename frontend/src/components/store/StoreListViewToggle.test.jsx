@@ -82,6 +82,12 @@ describe('store result layout pattern', () => {
         expect(styleAtWidth('.reserve-store-list-row-image img', width)['object-fit']).toBe('cover');
         expect(styleAtWidth('.reserve-store-list-row-body', width)['min-width']).toBe('0');
         expect(styleAtWidth('.reserve-store-identity-text', width)).toMatchObject({ 'flex-wrap': 'wrap', 'min-width': '0' });
+        if (width < 576) {
+            expect(styleAtWidth('.reserve-store-list-row-body > .reserve-store-list-row-meta', width)['flex-wrap']).toBe('nowrap');
+            expect(styleAtWidth('.reserve-store-list-row-meta .reserve-store-identity-category', width)).toMatchObject({
+                'min-width': '0', overflow: 'hidden', 'text-overflow': 'ellipsis', 'white-space': 'nowrap',
+            });
+        }
         expect(styleAtWidth('.reserve-ad-mark', width)).toMatchObject({ color: 'inherit', 'font-weight': 'inherit' });
         expect(styleAtWidth('.reserve-store-view-toggle', width)).toMatchObject({ width: '44px', height: '44px', background: 'transparent', color: 'var(--c-text-secondary)' });
         expect(styleAtWidth('.reserve-store-view-toggle:hover:not(:disabled)', width)).toMatchObject({ background: 'transparent', color: 'var(--c-text-primary)' });

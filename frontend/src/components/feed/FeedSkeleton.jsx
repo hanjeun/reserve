@@ -111,7 +111,7 @@ export default function FeedSkeleton({ detail = false, postId }) {
             <div className="reserve-feed-post-avatar"><Bone width={36} height={36} borderRadius={50} /></div>
             <div className="reserve-feed-post-content">
                 <header className="reserve-feed-post-header"><div className="reserve-feed-post-byline"><Bone width={100} height={16} /><Bone width={48} height={14} /></div></header>
-                <div className="reserve-feed-post-text"><Bone width="85%" height={16} /><Bone width="62%" height={16} style={{ marginTop: 6 }} /></div>
+                <div className={`reserve-feed-post-text${detail ? '' : ' is-summary'}`}><Bone width="85%" height={16} /><Bone width="62%" height={16} style={{ marginTop: 6 }} /></div>
                 <FeedMediaSkeleton images={images} />
                 <div className="reserve-feed-interactions" aria-hidden="true">{[0, 1, 2].map(action => <div key={action} style={{ display: 'grid', placeItems: 'center', width: 44, height: 44 }}><Bone width={20} height={20} borderRadius={6} /></div>)}</div>
             </div>

@@ -13,9 +13,15 @@ describe('chat photo picker', () => {
         const firstAttachment = view.container.querySelector('.reserve-chat-attachment');
         view.rerender(<ChatImagePicker enabled file={second} onChange={vi.fn()} />);
         await waitFor(() => expect(screen.getByAltText('첨부 사진')).toHaveAttribute('src', 'blob:second'));
-        fireEvent.load(screen.getByAltText('첨부 사진'));
-        const secondAttachment = screen.getByAltText('첨부 사진').closest('.reserve-chat-attachment');
+        const image = screen.getByAltText('첨부 사진');
+        Object.defineProperties(image, { naturalWidth: { value: 1206 }, naturalHeight: { value: 2622 } });
+        fireEvent.load(image);
+        const secondAttachment = image.closest('.reserve-chat-attachment');
         expect(secondAttachment).not.toBe(firstAttachment);
+        expect(secondAttachment.style.inlineSize).toBe('88px');
+        expect(secondAttachment.style.aspectRatio).toBe('1 / 1');
+        const tools = secondAttachment.querySelector('.reserve-photo-actions');
+        expect(Array.from(tools.children).map(element => element.tagName)).toEqual(['BUTTON', 'BUTTON']);
         expect(secondAttachment.style.animation).toContain('slideUpIn');
         await waitFor(() => expect(revoke).toHaveBeenCalledWith('blob:first'));
         view.unmount();

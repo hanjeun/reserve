@@ -8,7 +8,7 @@ import { storeService, tourismService } from '../../services';
 
 vi.mock('../../services', () => ({
     storeService: { getRegions: vi.fn() },
-    tourismService: { getRegionPhotos: vi.fn() },
+    tourismService: { getRegionPhotos: vi.fn(), getCachedRegionPhotos: () => [] },
 }));
 vi.mock('antd', () => ({
     Modal: ({ open, children }) => open ? <div role="dialog">{children}</div> : null,

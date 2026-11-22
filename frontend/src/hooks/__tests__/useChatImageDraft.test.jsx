@@ -37,18 +37,23 @@ describe('chat photo draft scope', () => {
         hook.unmount(); client.clear();
         useAuthStore.setState({ isLoggedIn: false });
     });
-    it('never restores an old account photo into a new room or session', async () => {
+    it('ignores old photo restorations and reorders after a room or session change', async () => {
         useAuthStore.setState({ isLoggedIn: true, sessionRevision: 100 });
         const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
         const wrapper = ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
         const hook = renderHook(({ room }) => useChatImageDraft(room), { wrapper, initialProps: { room: 'A' } });
         await waitFor(() => expect(hook.result.current.enabled).toBe(true));
         const photo = new File(['image'], 'photo.png', { type: 'image/png' });
-        act(() => hook.result.current.choose([photo]));
-        expect(hook.result.current.files).toEqual([photo]);
+        const other = new File(['other'], 'other.png', { type: 'image/png' });
+        act(() => hook.result.current.choose([photo, other]));
+        expect(hook.result.current.files).toEqual([photo, other]);
         const oldRestore = hook.result.current.restore;
+        const oldMove = hook.result.current.movePhoto;
         hook.rerender({ room: 'B' });
         expect(hook.result.current.files).toEqual([]);
+        act(() => hook.result.current.choose([photo, other]));
+        act(() => oldMove(photo, other));
+        expect(hook.result.current.files).toEqual([photo, other]);
         act(() => hook.result.current.clear());
         act(() => oldRestore([photo]));
         expect(hook.result.current.files).toEqual([]);

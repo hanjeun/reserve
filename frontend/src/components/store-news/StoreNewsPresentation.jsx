@@ -19,7 +19,7 @@ export function StoreNewsMetadata({ item }) {
     if ((!item.newsType || item.newsType === 'NEWS') && !item.periodStatus && !item.startsAt && !item.endsAt) return null;
     return <span className="reserve-store-news-meta">{item.newsType && item.newsType !== 'NEWS' && <span>{storeNewsTypeLabel(item.newsType)}</span>}
         {item.periodStatus && <span className={item.periodStatus === 'ENDED' ? 'is-ended' : ''}>{storeNewsPeriodLabel(item.periodStatus)}</span>}
-        {(item.startsAt || item.endsAt) && <span>{item.startsAt ? feedDate(item.startsAt) : '시작 미정'} ~ {item.endsAt ? feedDate(item.endsAt) : '종료 미정'} (한국 시간)</span>}
+        {(item.startsAt || item.endsAt) && <span className="reserve-store-news-period">{item.startsAt ? feedDate(item.startsAt) : '시작 미정'} ~ {item.endsAt ? feedDate(item.endsAt) : '종료 미정'} (한국 시간)</span>}
     </span>;
 }
 StoreNewsMetadata.propTypes = { item: PropTypes.object.isRequired };

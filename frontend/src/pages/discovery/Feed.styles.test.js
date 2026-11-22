@@ -67,4 +67,11 @@ describe('feed directory toolbar alignment source contracts', () => {
             expect(read(file)).toContain('className="reserve-feed-directory-tools"');
         }
     });
+
+    it('shows one line of linked post copy on narrow screens and keeps the full detail text', () => {
+        const summary = ['.reserve-feed-post-text', '.reserve-feed-post-text.is-summary', '.reserve-feed-post-body-link > .reserve-feed-post-text.is-summary'];
+        expect(styleAtWidth(summary, 390)).toMatchObject({ display: 'block', overflow: 'hidden', 'text-overflow': 'ellipsis', 'white-space': 'nowrap' });
+        expect(styleAtWidth(summary, 576)).toMatchObject({ display: '-webkit-box', '-webkit-line-clamp': '6' });
+        expect(styleAtWidth(['.reserve-feed-post-text'], 390)['white-space']).toBe('pre-wrap');
+    });
 });

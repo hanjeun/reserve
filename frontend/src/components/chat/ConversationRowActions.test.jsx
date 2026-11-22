@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { App as AntApp, ConfigProvider } from 'antd';
 import { expect, it, vi } from 'vitest';
 import ConversationRowActions from './ConversationRowActions';
@@ -48,6 +49,28 @@ it.each([['touch', -70, 'left'], ['touch', 70, 'right'], ['mouse', -70, 'left'],
         }
     });
 
+it.each([[-1, 'left'], [1, 'right']])('caps a long drag on the %s side without revealing the opposite action', (direction, side) => {
+    const { row, root } = setup({ onLeave: vi.fn() });
+    pointer(row, 'pointerdown', 150, 100);
+    pointer(row, 'pointermove', 150 + direction * 70, 100);
+    pointer(root, 'pointerup', 150 + direction * 70, 100);
+    expect(root).toHaveAttribute('data-reveal', side);
+
+    pointer(row, 'pointerdown', 150, 100);
+    pointer(row, 'pointermove', 150 + direction * 245, 100);
+    expect(root.style.getPropertyValue('--reserve-messenger-row-drag-offset')).toBe(`${direction * 96}px`);
+    pointer(root, 'pointerup', 150 + direction * 245, 100);
+    expect(root).toHaveAttribute('data-reveal', side);
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    pointer(row, 'pointerdown', 150, 100);
+    pointer(row, 'pointermove', 150 - direction * 245, 100);
+    expect(root.style.getPropertyValue('--reserve-messenger-row-drag-offset')).toBe('0px');
+    expect(root).not.toHaveAttribute('data-reveal');
+    pointer(root, 'pointerup', 150 - direction * 245, 100);
+    expect(root).not.toHaveAttribute('data-reveal');
+});
+
 it.each([[245, '채팅방에서 나갈까요?', '나가기'], [-245, '대화를 목록에서 숨길까요?', '숨기기']])(
     'requires an explicit decision after a full swipe of %s', async (distance, heading, label) => {
         const onLeave = vi.fn().mockResolvedValue(undefined);
@@ -55,6 +78,7 @@ it.each([[245, '채팅방에서 나갈까요?', '나가기'], [-245, '대화를 
         const drag = () => {
             pointer(row, 'pointerdown', 275, 100);
             pointer(row, 'pointermove', 275 + distance, 100);
+            expect(root.style.getPropertyValue('--reserve-messenger-row-drag-offset')).toBe(`${Math.sign(distance) * 96}px`);
             expect(screen.queryByRole('dialog')).toBeNull();
             pointer(root, 'pointerup', 275 + distance, 100);
         };
@@ -103,24 +127,30 @@ it.each(['pointercancel', 'lostpointercapture', 'second pointer'])('cancels a re
     expect(onVisibilityChange).not.toHaveBeenCalled();
 });
 
-it('provides menu, restore and Escape controls without a swipe', async () => {
-    const { root, onVisibilityChange } = setup({ hidden: true });
-    const menu = screen.getByRole('button', { name: '가게 문의 대화 메뉴' });
+it('keeps the row free of a menu and allows keyboard reveal, restore and Escape', async () => {
+    const user = userEvent.setup();
+    const { row, root, onVisibilityChange } = setup({ hidden: true, onLeave: vi.fn() });
+    expect(screen.queryByRole('button', { name: '가게 문의 대화 메뉴' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '가게 문의 복원' })).not.toBeInTheDocument();
-    fireEvent.click(menu);
-    const restore = screen.getByRole('button', { name: '가게 문의 복원' });
-    restore.focus();
-    fireEvent.keyDown(restore, { key: 'Escape' });
-    expect(menu).toHaveFocus();
+    row.focus();
+    fireEvent.keyDown(row, { key: 'ArrowRight' });
+    await user.tab();
+    const leave = screen.getByRole('button', { name: '가게 문의 채팅방 나가기' });
+    expect(leave).toHaveFocus();
+    fireEvent.keyDown(leave, { key: 'Escape' });
+    expect(row).toHaveFocus();
     expect(root).not.toHaveAttribute('data-reveal');
-    fireEvent.click(menu);
-    fireEvent.click(screen.getByRole('button', { name: '가게 문의 복원' }));
+    fireEvent.keyDown(row, { key: 'ArrowLeft' });
+    const restore = screen.getByRole('button', { name: '가게 문의 복원' });
+    await user.tab();
+    expect(restore).toHaveFocus();
+    await user.keyboard('{Enter}');
     await waitFor(() => expect(onVisibilityChange).toHaveBeenCalledExactlyOnceWith(false));
 });
 
 it('closes an open action when another row or control is pressed', () => {
-    const { root } = setup();
-    fireEvent.click(screen.getByRole('button', { name: '가게 문의 대화 메뉴' }));
+    const { row, root } = setup();
+    fireEvent.keyDown(row, { key: 'ArrowLeft' });
     fireEvent.pointerDown(document.body);
     expect(root).not.toHaveAttribute('data-reveal');
 });
@@ -128,8 +158,8 @@ it('closes an open action when another row or control is pressed', () => {
 it('keeps a failed action available and prevents duplicate submissions', async () => {
     let reject;
     const onVisibilityChange = vi.fn(() => new Promise((_, fail) => { reject = fail; }));
-    const { root } = setup({ onVisibilityChange });
-    fireEvent.click(screen.getByRole('button', { name: '가게 문의 대화 메뉴' }));
+    const { row, root } = setup({ onVisibilityChange });
+    fireEvent.keyDown(row, { key: 'ArrowLeft' });
     const action = screen.getByRole('button', { name: '가게 문의 숨기기' });
     fireEvent.click(action);
     fireEvent.click(action);

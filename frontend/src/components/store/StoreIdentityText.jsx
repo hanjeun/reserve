@@ -4,7 +4,7 @@ import AdMark from '../advertisement/AdMark';
 
 const StoreIdentityText = ({ category, isAdvertised = false, nearby = false }) => (
     <span className="reserve-store-identity-text">
-        <span>{category || '기타'}</span>
+        <span className="reserve-store-identity-category">{category || '기타'}</span>
         {isAdvertised && <AdMark />}
         {nearby && <span>우리동네</span>}
     </span>

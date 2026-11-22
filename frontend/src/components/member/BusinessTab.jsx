@@ -400,13 +400,12 @@ const BusinessForm = ({ form, setForm, fileList, onFileListChange, onPreview, on
                     beforeUpload={beforeUpload}
                     accept={IMAGE_ACCEPT}
                     maxCount={1}
+                    showTrigger={fileList.length === 0}
                 >
-                    {fileList.length === 0 && (
-                        <div>
-                            <UploadOutlined style={{ fontSize: 20, color: colors.text.tertiary }} />
-                            <div style={{ marginTop: 8, fontSize: fontSize.xs, color: colors.text.tertiary }}>사업자 등록증 *</div>
-                        </div>
-                    )}
+                    <div>
+                        <UploadOutlined style={{ fontSize: 20, color: colors.text.tertiary }} />
+                        <div style={{ marginTop: 8, fontSize: fontSize.xs, color: colors.text.tertiary }}>사업자 등록증 *</div>
+                    </div>
                 </LoadingUpload>
             </Form.Item>
 

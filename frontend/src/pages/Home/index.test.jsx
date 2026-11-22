@@ -26,7 +26,7 @@ vi.mock('react-router-dom', async () => {
 
 vi.mock('../../services', () => ({
     storeService: { getStores: vi.fn(), getRegions: vi.fn() },
-    tourismService: { getRegionPhotos: vi.fn() },
+    tourismService: { getRegionPhotos: vi.fn(), getCachedRegionPhotos: () => [] },
 }));
 
 vi.mock('../../hooks/useGeolocation', () => ({

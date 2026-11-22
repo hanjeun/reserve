@@ -839,6 +839,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 }
 .reserve-messenger-row-front {
     position: relative;
+    z-index: 1;
     background: var(--c-bg-paper, #fff);
     transform: translateX(var(--reserve-messenger-row-settled-offset, 0px));
     transition: transform 0.18s ease;
@@ -850,22 +851,18 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     transition: none;
     user-select: none;
 }
-.reserve-messenger-row-front > .reserve-messenger-row { padding-right: 52px; }
-.reserve-messenger-row-menu {
-    position: absolute;
-    right: 4px;
-    top: 50%;
-    transform: translateY(-50%);
-}
 .reserve-messenger-row-swipe-action {
     position: absolute;
     inset-block: 0;
     right: 0;
     width: var(--reserve-messenger-row-action-width);
     display: flex;
+    visibility: hidden;
     align-items: center;
     justify-content: center;
 }
+.reserve-messenger-row-actions[data-reveal='left'] > .reserve-messenger-row-visibility,
+.reserve-messenger-row-actions[data-reveal='right'] > .reserve-messenger-row-leave { visibility: visible; }
 .reserve-messenger-row-leave { left: 0; right: auto; }
 .reserve-messenger-row-swipe-action > button { min-height: 44px; gap: 6px; }
 .reserve-messenger-row-icon,
@@ -1154,9 +1151,11 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     min-width: 0;
     padding: 4px 4px 8px;
     overflow-x: auto;
-    overscroll-behavior-inline: contain;
+    overflow-y: hidden;
+    overscroll-behavior-x: none;
     scrollbar-width: none;
 }
+.reserve-chat-sortable-photo { flex: 0 0 auto; height: auto; }
 .reserve-chat-picker { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .reserve-chat-attachment-error {
     display: block;
@@ -1165,51 +1164,18 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     font-size: 12px;
     overflow-wrap: anywhere;
 }
-.reserve-chat-attachment {
+.reserve-chat-draft-file {
     flex: 0 0 auto;
     border: 1px solid var(--c-border-default);
     border-radius: var(--radius-md, 10px);
     background: var(--c-bg-paper);
 }
-.reserve-chat-draft-photo {
+.reserve-chat-draft-tools {
     position: relative;
-    display: grid;
-    justify-items: center;
-    min-inline-size: 104px;
-    min-block-size: 64px;
-}
-.reserve-chat-draft-image {
-    display: block;
-    inline-size: auto;
-    block-size: auto;
-    max-inline-size: 156px;
-    max-block-size: 64px;
-    align-self: center;
-    object-fit: contain;
-    border-radius: inherit;
-}
-.reserve-chat-draft-tools { position: relative; display: flex; gap: 12px; align-items: center; justify-content: center; }
-.reserve-chat-draft-photo > .reserve-chat-draft-tools { align-self: end; }
-.reserve-chat-draft-divider {
-    position: absolute;
-    inset-inline-start: 50%;
-    transform: translateX(-50%);
-    inline-size: 1px;
-    block-size: 18px;
-    background: var(--c-gray-400);
-    pointer-events: none;
-}
-@media (hover: hover) and (pointer: fine) {
-    .reserve-chat-draft-photo > .reserve-chat-draft-tools {
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        background: color-mix(in srgb, var(--c-bg-subtle) 88%, transparent);
-        opacity: 0;
-        transition: opacity 150ms ease;
-    }
-    .reserve-chat-draft-photo:hover > .reserve-chat-draft-tools,
-    .reserve-chat-draft-photo:focus-within > .reserve-chat-draft-tools { opacity: 1; }
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
 }
 .reserve-chat-draft-file, .reserve-chat-file-download {
     display: flex;
@@ -1738,6 +1704,21 @@ a.reserve-store-list-row-link[href]:active, button.reserve-store-list-row-link:e
 .reserve-store-identity-text > span { white-space: nowrap; }
 .reserve-ad-mark { color: inherit; font-weight: inherit; }
 .reserve-store-list-row-meta .reserve-store-identity-text { flex: 0 1 auto; }
+@media (max-width: 575px) {
+    .reserve-store-list-row .reserve-store-list-row-description { display: block; }
+    .reserve-store-list-row-body > .reserve-store-list-row-meta,
+    .reserve-store-list-row-meta .reserve-store-identity-text { flex-wrap: nowrap; }
+    .reserve-store-list-row-meta .reserve-store-identity-text { overflow: hidden; }
+    .reserve-store-list-row-meta .reserve-store-identity-text > :not(.reserve-store-identity-category) { flex-shrink: 0; }
+    .reserve-store-list-row-meta .reserve-store-list-row-rating { flex: 0 1 auto; min-width: 0; white-space: nowrap; }
+    .reserve-store-list-row-meta .reserve-store-identity-category,
+    .reserve-store-list-row-meta .reserve-store-list-row-rating > span:last-child {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
 .reserve-store-list-row-favorite { display: flex; flex: 0 0 44px; width: 44px; min-height: 44px; align-items: center; justify-content: center; }
 .reserve-store-list-row-favorite:empty { display: none; }
 .reserve-store-list-row-favorite--with-tools { flex-basis: auto; width: auto; justify-content: flex-end; }
@@ -2261,6 +2242,7 @@ button.reserve-store-card-hit:disabled { pointer-events: none; }
     .reserve-benefits-heading { align-items: flex-start; }
     .reserve-benefits-heading h2,
     .reserve-benefit-store-discovery h2 { font-size: 20px; }
+    .reserve-benefit-title-badge > span { display: block; white-space: nowrap; text-overflow: ellipsis; }
 }
 @media (max-width: 359px) {
     .reserve-benefits-page { --reserve-benefit-gutter: 16px; }
@@ -2812,6 +2794,15 @@ button.reserve-store-card-hit:disabled { pointer-events: none; }
 .reserve-search-recent-item { display: flex; align-items: center; min-width: 0; gap: 8px; }
 .reserve-search-recent-term { display: flex; align-items: center; flex: 1; min-width: 0; min-height: 44px; gap: 12px; border: 0; border-radius: 8px; padding: 8px; background: transparent; color: var(--c-text-primary, #191f28); text-align: left; font: inherit; font-size: 14px; cursor: pointer; }
 .reserve-search-recent-term > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 575px) {
+    .reserve-search-recent-term > span:last-child:not(.reserve-messenger-row-copy),
+    .reserve-search-recent-term .reserve-messenger-row-copy > strong {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
 .reserve-search-recent-term > .anticon { flex-shrink: 0; color: var(--c-text-tertiary, #8b95a1); }
 .reserve-search-store-thumbnail {
     display: grid;

@@ -704,6 +704,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, initial
                             files: imageDraft.files,
                             onStageFiles: imageDraft.choose,
                             onRemoveFile: imageDraft.remove,
+                            onMovePhoto: imageDraft.movePhoto,
                             allowDocuments: imageDraft.documentsEnabled,
                             attachmentError: imageDraft.selectionError,
                             draftScope: imageDraft.scopeKey,

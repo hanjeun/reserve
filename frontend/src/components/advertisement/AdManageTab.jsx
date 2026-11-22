@@ -664,14 +664,13 @@ const AdManageTab = () => {
                                         onPreview={(file) => handlePreview(file, imageFiles)}
                                         beforeUpload={beforeUploadImage}
                                         maxCount={MAX_BANNER_IMAGES}
+                                        showTrigger={imageFiles.length < MAX_BANNER_IMAGES}
                                         onClickCapture={suppressLinkNavigation}
                                     >
-                                        {imageFiles.length < MAX_BANNER_IMAGES && (
-                                            <div>
-                                                <PlusOutlined />
-                                                <div style={{ marginTop: 8 }}>업로드</div>
-                                            </div>
-                                        )}
+                                        <div>
+                                            <PlusOutlined />
+                                            <div style={{ marginTop: 8 }}>업로드</div>
+                                        </div>
                                     </LoadingUpload>
                                 </FormField>
                                 {previewNode}
@@ -756,14 +755,13 @@ const AdManageTab = () => {
                         onPreview={(file) => handlePreview(file, editImageFiles)}
                         beforeUpload={beforeUploadImage}
                         maxCount={MAX_BANNER_IMAGES}
+                        showTrigger={editImageFiles.length < MAX_BANNER_IMAGES}
                         onClickCapture={suppressLinkNavigation}
                     >
-                        {editImageFiles.length < MAX_BANNER_IMAGES && (
-                            <div>
-                                <PlusOutlined />
-                                <div style={{ marginTop: 8 }}>업로드</div>
-                            </div>
-                        )}
+                        <div>
+                            <PlusOutlined />
+                            <div style={{ marginTop: 8 }}>업로드</div>
+                        </div>
                     </LoadingUpload>
                 </FormField>
                 {previewNode}

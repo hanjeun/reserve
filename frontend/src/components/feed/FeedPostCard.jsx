@@ -18,7 +18,10 @@ export default function FeedPostCard({ post, detail = false, preview = false, li
     const removed = post.state === 'DELETED';
     const address = postPath(post.publicId);
     const storePath = storeDetailPath(post.store);
-    const storeLink = (to, label, icon) => preview || !to ? <span className="reserve-text-link">{icon}{label}</span> : <TextLink to={to}>{icon}{label}</TextLink>;
+    const storeLink = (to, label, icon) => {
+        const content = <>{icon}<span>{label}</span></>;
+        return preview || !to ? <span className="reserve-text-link">{content}</span> : <TextLink to={to}>{content}</TextLink>;
+    };
     const text = <>
         {preview && post.news && <div className="reserve-feed-news-heading"><h2>{post.news.title}</h2><StoreNewsMetadata item={post.news} />
             {post.news.conditions && <p className="reserve-feed-note">적용 조건: {post.news.conditions}</p>}</div>}

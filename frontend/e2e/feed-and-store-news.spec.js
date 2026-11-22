@@ -158,19 +158,25 @@ for (const theme of ['light', 'dark']) test(`photo uploads keep the add tile fir
     await expect.poll(async () => Math.abs((await position(add)).y - (await position(photos.first())).y)).toBeLessThan(1);
     await list.evaluate(node => { node.scrollLeft = node.scrollWidth; });
     await expect.poll(async () => Math.abs((await position(add)).x - initial.x)).toBeLessThan(1);
-    const actions = photos.last().locator('.ant-upload-list-item-actions');
-    const preview = actions.locator(':scope > a');
-    const remove = actions.locator(':scope > button');
+    const thumbnail = photos.last().locator('.reserve-photo-upload-thumbnail');
+    const preview = thumbnail.getByRole('button', { name: /미리보기$/ });
+    const remove = thumbnail.getByRole('button', { name: /삭제$/ });
     await preview.focus();
+    const thumbnailBox = await position(thumbnail);
     const previewBox = await position(preview);
     const removeBox = await position(remove);
     for (const box of [previewBox, removeBox]) {
         expect(box.width).toBeGreaterThanOrEqual(44);
         expect(box.height).toBeGreaterThanOrEqual(44);
     }
-    expect(removeBox.x - previewBox.x - previewBox.width).toBeGreaterThanOrEqual(11.5);
-    expect(Math.abs(removeBox.y - previewBox.y)).toBeLessThan(1);
-    await preview.click();
+    expect(previewBox.x).toBeCloseTo(thumbnailBox.x, 0);
+    expect(previewBox.y).toBeCloseTo(thumbnailBox.y, 0);
+    expect(previewBox.width).toBeCloseTo(thumbnailBox.width / 2, 0);
+    expect(previewBox.height).toBeCloseTo(thumbnailBox.height, 0);
+    expect(removeBox.x).toBeCloseTo(previewBox.x + previewBox.width, 0);
+    expect(removeBox.width).toBeCloseTo(previewBox.width, 0);
+    expect(removeBox.height).toBeCloseTo(thumbnailBox.height, 0);
+    await preview.click({ position: { x: 4, y: 4 } });
     await expect(page.locator('.reserve-image-preview img')).toBeVisible();
     await expect(photos).toHaveCount(5);
 });

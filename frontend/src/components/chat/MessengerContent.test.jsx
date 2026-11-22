@@ -200,6 +200,46 @@ describe('MessengerContent', () => {
         expect(attachmentService.getFile).toHaveBeenCalledWith('/api/chat/files/10', expect.any(AbortSignal));
     });
 
+    it('drags a photo from its delete half without deleting it and sends in the new order', async () => {
+        attachmentService.getImageConfig.mockResolvedValue({ enabled: true });
+        const createUrl = vi.spyOn(URL, 'createObjectURL').mockImplementation(file => `blob:${file.name}`);
+        vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+        const photos = ['first.png', 'second.png'].map(name => new File(['photo'], name, { type: 'image/png' }));
+        chatService.sendImage.mockResolvedValueOnce({ id: 8, senderRole: 'MEMBER', createdAt: new Date().toISOString() })
+            .mockResolvedValueOnce({ id: 9, senderRole: 'MEMBER', createdAt: new Date().toISOString() });
+        const { container } = renderMessenger();
+        await waitFor(() => expect(screen.getByRole('button', { name: '사진 첨부' })).toBeEnabled());
+        fireEvent.change(screen.getByLabelText('첨부할 사진 선택'), { target: { files: photos } });
+        const items = () => Array.from(container.querySelectorAll('.reserve-chat-sortable-photo'));
+        const [first, second] = items();
+        const remove = within(first).getByRole('button', { name: '첨부 사진 제거: first.png' });
+        const image = await within(first).findByAltText('첨부 사진');
+        const measure = HTMLElement.prototype.getBoundingClientRect;
+        vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+            const index = items().indexOf(this);
+            if (index < 0) return measure.call(this);
+            const x = index * 128;
+            return { x, y: 0, left: x, top: 0, width: 120, height: 64, right: x + 120, bottom: 64 };
+        });
+        const touch = (clientX, clientY = 32) => [{ identifier: 1, clientX, clientY, target: remove }];
+        fireEvent.touchStart(remove, { touches: touch(100), changedTouches: touch(100) });
+        expect(first).not.toHaveClass('is-dragging');
+        await waitFor(() => expect(first).toHaveClass('is-dragging'));
+        fireEvent.touchMove(remove, { touches: touch(228, 144), changedTouches: touch(228, 144) });
+        await waitFor(() => expect(second.style.transform).toMatch(/translate3d\(-128px,/));
+        expect(first.style.transform).toBe('translate3d(128px, 0px, 0)');
+        fireEvent.touchEnd(remove, { touches: [], changedTouches: touch(228, 144) });
+        fireEvent.click(remove, { detail: 1 });
+        await waitFor(() => expect(items()).toEqual([second, first]));
+        expect(remove).toBeEnabled();
+        expect(within(first).getByAltText('첨부 사진')).toBe(image);
+        expect(createUrl).toHaveBeenCalledTimes(2);
+
+        await userEvent.setup({ delay: 60 }).click(screen.getByRole('button', { name: '보내기', exact: true }));
+        await waitFor(() => expect(chatService.sendImage).toHaveBeenCalledTimes(2));
+        expect(chatService.sendImage.mock.calls.map(([, file]) => file)).toEqual([photos[1], photos[0]]);
+    });
+
     it('omits the reservation bell on home and keeps it in the conversations list', async () => {
         useMessengerStore.getState().showHome();
         renderMessenger({ surface: 'page', onClose: vi.fn() });
@@ -290,7 +330,7 @@ describe('MessengerContent', () => {
         fireEvent.click(screen.getByRole('button', { name: '숨긴 대화 보기' }));
         expect(screen.getByRole('button', { name: notificationRow })).toBeInTheDocument();
         expect(screen.queryByText('숨긴 대화가 없어요.')).not.toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'RESERVE 알림 대화 메뉴' }));
+        fireEvent.keyDown(screen.getByRole('button', { name: notificationRow }), { key: 'ArrowLeft' });
         fireEvent.click(screen.getByRole('button', { name: 'RESERVE 알림 복원' }));
         fireEvent.click(screen.getByRole('button', { name: '일반 대화 보기' }));
         expect(screen.getByRole('button', { name: notificationRow })).toBeInTheDocument();
@@ -335,8 +375,8 @@ describe('MessengerContent', () => {
             { roomId: 31, storeId: 21, type: 'STORE', viewerRole: 'MEMBER', storeName: '테스트 공방' },
         ])));
         renderMessenger({ surface: 'panel' });
-        fireEvent.click(await screen.findByRole('button', { name: '테스트 공방 대화 메뉴' }));
-        fireEvent.click(await screen.findByRole('menuitem', { name: '숨기기' }));
+        fireEvent.keyDown(await screen.findByRole('button', { name: /테스트 공방/ }), { key: 'ArrowLeft' });
+        fireEvent.click(screen.getByRole('button', { name: '테스트 공방 숨기기' }));
         await waitFor(() => expect(chatService.setHidden).toHaveBeenCalledExactlyOnceWith(31, 'MEMBER', true));
         expect(chatService.getStore).not.toHaveBeenCalled();
         expect(chatService.getSupport).not.toHaveBeenCalled();

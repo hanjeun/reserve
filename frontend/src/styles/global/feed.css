@@ -112,11 +112,6 @@
 .reserve-feed-comments { max-width: 640px; margin-top: 16px; padding: 16px 24px; border: 1px solid var(--c-border-default); border-radius: 24px; background: var(--c-bg-paper); scroll-margin-top: 100px; }
 .reserve-feed-comment-title { margin: 0 0 20px; font-size: 18px; }
 .reserve-feed-comment { min-width: 0; padding: 16px 0; border-bottom: 1px solid var(--c-border-default); }
-.reserve-feed-comment-attachments.ant-upload-wrapper .ant-upload-list.ant-upload-list-picture-card { display: flex; flex-wrap: nowrap; gap: 8px; width: max-content; }
-.reserve-feed-comment-attachments.ant-upload-wrapper.ant-upload-picture-card-wrapper .ant-upload-list.ant-upload-list-picture-card:not(:empty) { min-height: 0; }
-/* 44px 사진·4px 간격·44px 제거 도구를 사용해 AntD 사진 카드 최소 크기와 구분한다. */
-.reserve-feed-comment-attachments.ant-upload-wrapper .ant-upload-list.ant-upload-list-picture-card > .ant-upload-list-item-container { flex: 0 0 92px; width: 92px; height: 44px; margin: 0; }
-.reserve-feed-comment-attachment { display: flex; align-items: center; gap: 4px; height: 100%; }
 .reserve-feed-comment.is-thread-comment { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; border-bottom: 0; }
 .reserve-feed-comment-block { border-bottom: 1px solid var(--c-border-default); }
 .reserve-feed-comment-block:last-child { border-bottom: 0; }
@@ -196,6 +191,23 @@
     .reserve-feed-page.reserve-page-container:not(.reserve-feed-notifications-page) { padding-inline: 0 !important; }
     .reserve-feed-column-header, .reserve-feed-heading { padding-inline: 16px; }
     .reserve-feed-post { padding: 16px; gap: 10px; }
+    .reserve-feed-post.is-list-item :is(.reserve-feed-post-byline, .reserve-feed-store-links) { flex-wrap: nowrap; }
+    .reserve-feed-post.is-list-item .reserve-feed-post-byline > :not(.reserve-feed-post-name),
+    .reserve-feed-post.is-list-item .reserve-feed-store-links > :not(:first-child),
+    .reserve-feed-post.is-list-item .reserve-feed-store-links .anticon { flex-shrink: 0; white-space: nowrap; }
+    .reserve-feed-post.is-list-item .reserve-feed-store-links > :first-child { min-width: 0; }
+    .reserve-feed-post-body-link > .reserve-feed-post-text.is-summary,
+    .reserve-feed-post.is-list-item .reserve-feed-post-name,
+    .reserve-feed-post.is-list-item .reserve-feed-store-links > :first-child > span,
+    .reserve-feed-notification-list li > a > span:nth-child(2) > :is(strong, span),
+    .reserve-liked-list-row .reserve-store-list-row-meta {
+        display: block;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .reserve-feed-skeleton .reserve-feed-post-text.is-summary > :nth-child(2) { display: none; }
     .reserve-feed-comments { padding-inline: 16px; }
     .reserve-feed-media-strip { --feed-media-height: 240px; }
     .reserve-feed-media-strip.is-single { --feed-media-height: 320px; }

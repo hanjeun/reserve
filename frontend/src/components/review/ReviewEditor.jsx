@@ -122,11 +122,11 @@ export default function ReviewEditor({ review, profile, reservationDate, submitt
                                 attachmentDrag.onClickCapture(event);
                                 if (!event.defaultPrevented) suppressLinkNavigation(event);
                             }}>
-                            <LoadingUpload listType="picture-card" fileList={photos} multiple accept={PHOTO_TYPES.join(',')} hasControlInside={false}
+                            <LoadingUpload listType="picture-card" fileList={photos} multiple showTrigger={photos.length < MAX_PHOTOS} accept={PHOTO_TYPES.join(',')} hasControlInside={false}
                                 aria-label="리뷰 사진 선택" beforeUpload={selectPhotos} disabled={submitting}
                                 onPreview={file => handlePreview(file, photos)} onRemove={removePhoto}
                                 showUploadList={{ showPreviewIcon: true, showRemoveIcon: !submitting, showDownloadIcon: false }}>
-                                {photos.length < MAX_PHOTOS && <ImageUploadButton />}
+                                <ImageUploadButton />
                             </LoadingUpload>
                         </div>
                     </FormField>

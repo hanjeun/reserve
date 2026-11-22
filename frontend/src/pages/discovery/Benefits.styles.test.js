@@ -92,14 +92,19 @@ describe('landscape benefits banner layout source contracts', () => {
         expect(styleAtWidth('.reserve-benefit-row', 360)['--reserve-benefit-store-size']).toBe('22px');
     });
 
-    it('keeps copy readable and contains long titles without losing the accessible link text', () => {
+    it('keeps mobile headlines on one line and desktop headlines at two lines', () => {
         for (const width of [320, 390, 575]) {
             const ticket = styleAtWidth('.reserve-benefit-title-badge', width);
             expect(ticket['max-width']).toBe('100%');
             expect(ticket['overflow-wrap']).toBe('anywhere');
-            expect(styleAtWidth('.reserve-benefit-title-badge > span', width)['-webkit-line-clamp']).toBe('2');
+            expect(styleAtWidth('.reserve-benefit-title-badge > span', width)).toMatchObject({
+                display: 'block', overflow: 'hidden', 'white-space': 'nowrap', 'text-overflow': 'ellipsis',
+            });
             expect(styleAtWidth('.reserve-benefit-description', width)['white-space']).toBe('nowrap');
         }
+        expect(styleAtWidth('.reserve-benefit-title-badge > span', 576)).toMatchObject({
+            display: '-webkit-box', '-webkit-line-clamp': '2',
+        });
         expect(styleAtWidth('.reserve-benefit-row', 576)['--reserve-benefit-store-size']).toBe('30px');
         expect(styleAtWidth('.reserve-benefit-row', 576)['--reserve-benefit-ticket-size']).toBe('14px');
         const tokens = styleAtWidth('.reserve-benefits-page', 390);

@@ -1,5 +1,4 @@
 import LoadingStatus from '../common/LoadingStatus';
-import LoadingImage from '../common/LoadingImage';
 import { useId, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Skeleton } from 'antd';
@@ -51,7 +50,8 @@ const PopularAreaButton = ({ area, draft, onPick }) => {
             <span className="reserve-region-sheet-popular-icon" aria-hidden="true">
                 <EnvironmentOutlined />
                 {photoSrc && (
-                    <LoadingImage
+                    <img
+                        key={photoSrc}
                         src={photoSrc}
                         alt=""
                         loading="lazy"
@@ -157,15 +157,17 @@ export default function RegionPickerSheet({ open, value = '', onClose, onApply, 
     const photoRegions = useMemo(
         // 17개 시도 코드를 일괄 등록하지 않는다. 현재 보이는 인기 지역만 조회하고, 새 지역이
         // 목록에 나타나면 서버가 같은 방식으로 후보를 검증·캐시한다.
-        () => [...new Set(popularAreas.map(area => area.group))],
+        () => [...new Set(popularAreas.map(area => area.group))].sort(),
         [popularAreas],
     );
+    const cachedPhotos = useMemo(() => tourismService.getCachedRegionPhotos(photoRegions), [photoRegions]);
     // 지역 사진 조회 오류와 지역 선택 동작을 분리한다.
-    const { data: dynamicPhotos = [] } = useQuery({
+    const { data: dynamicPhotos = cachedPhotos } = useQuery({
         queryKey: tourismKeys.regionPhotos(photoRegions),
         queryFn: () => tourismService.getRegionPhotos(photoRegions),
         enabled: open && photoRegions.length > 0,
-        staleTime: 1000 * 60 * 60 * 24,
+        staleTime: 1000 * 60 * 15,
+        gcTime: 1000 * 60 * 60 * 24,
         retry: false,
     });
     const dynamicPhotoByRegion = useMemo(

@@ -78,8 +78,22 @@
 .reserve-feed-news-heading h2 { margin: 0; font-size: 18px; line-height: 1.5; color: var(--c-text-primary); overflow-wrap: anywhere; }
 @media (max-width: 575px) {
     .reserve-benefit-row--photo .reserve-benefit-row-copy { padding: 16px; }
+    .reserve-benefit-row--photo .reserve-benefit-store,
+    .reserve-benefit-row--compact .reserve-benefit-store { white-space: nowrap; }
     .reserve-benefit-row--compact { gap: 12px; padding: 12px; }
     .reserve-benefit-row--compact .reserve-benefit-media { flex-basis: 80px; width: 80px; height: 80px; }
+    :is(.reserve-benefit-row, .reserve-store-list-row-body) .reserve-store-news-meta {
+        flex-wrap: nowrap;
+        max-width: 100%;
+        gap: 8px;
+        white-space: nowrap;
+    }
+    :is(.reserve-benefit-row, .reserve-store-list-row-body) .reserve-store-news-meta > :not(.reserve-store-news-period) { flex: none; }
+    :is(.reserve-benefit-row, .reserve-store-list-row-body) .reserve-store-news-period {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
     .reserve-benefit-detail { gap: 16px; }
     .reserve-store-news-selectors,
     .reserve-store-news-dates { grid-template-columns: minmax(0, 1fr); gap: 0; }

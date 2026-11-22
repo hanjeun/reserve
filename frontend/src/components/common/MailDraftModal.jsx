@@ -4,7 +4,7 @@ import { Spin, Typography, Upload } from 'antd';
 import FormModal, { FormField } from './FormModal';
 import Button from './Button';
 import ImageUploadButton from './ImageUploadButton';
-import LoadingUpload from './LoadingUpload';
+import SortableImageUpload from './SortableImageUpload';
 import MailPhotoStrip from './MailPhotoStrip';
 import MailHtmlPreview from './MailHtmlPreview';
 import useImagePreview from '../../hooks/useImagePreview';
@@ -30,6 +30,7 @@ export default function MailDraftModal({
     const savingDraft = useRef(false);
     const previewRequest = useRef(null);
     const urls = useRef(new Set());
+    const nextPhotoId = useRef(0);
     const { handlePreview, previewNode, suppressLinkNavigation } = useImagePreview();
     useEffect(() => {
         const activeUrls = urls.current;
@@ -84,7 +85,7 @@ export default function MailDraftModal({
             const selected = batch.map(photo => {
                 const url = URL.createObjectURL(photo);
                 urls.current.add(url);
-                return { uid: photo.uid, name: photo.name, status: 'done', url, thumbUrl: url, originFileObj: photo };
+                return { uid: `local-${nextPhotoId.current++}`, name: photo.name, status: 'done', url, thumbUrl: url, originFileObj: photo };
             });
             setPhotos(current => [...current, ...selected]);
         }
@@ -154,13 +155,14 @@ export default function MailDraftModal({
         </> : <>
             {children}
             <FormField label="사진 · 최대 3장, 한 장당 2MB" error={photoError}>
-                <LoadingUpload listType="picture-card" fileList={photos} maxCount={MAX_PHOTOS} multiple
+                <SortableImageUpload listType="picture-card" fileList={photos} maxCount={MAX_PHOTOS} multiple
+                    showTrigger={photos.length < MAX_PHOTOS} onReorder={setPhotos}
                     accept={PHOTO_TYPES.join(',')} beforeUpload={selectPhotos} disabled={sending}
                     aria-label="첨부 사진 선택" onClickCapture={suppressLinkNavigation}
                     onPreview={file => handlePreview(file, photos)} onRemove={removePhoto}
                     showUploadList={{ showPreviewIcon: true, showRemoveIcon: true, showDownloadIcon: false }}>
-                    {photos.length < MAX_PHOTOS && <ImageUploadButton />}
-                </LoadingUpload>
+                    <ImageUploadButton />
+                </SortableImageUpload>
             </FormField>
             {previewNode}
             {draftError && <Paragraph type="danger" role="alert">{draftError}</Paragraph>}
